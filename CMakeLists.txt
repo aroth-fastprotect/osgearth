@@ -1,0 +1,48 @@
+SET(OSGEARTH_MAJOR_VERSION 0)
+SET(OSGEARTH_MINOR_VERSION 1)
+SET(OSGEARTH_PATCH_VERSION 0)
+SET(OSGEARTH_SOVERSION 1)
+
+SET(OSGEARTH_VERSION ${OSGEARTH_MAJOR_VERSION}.${OSGEARTH_MINOR_VERSION}.${OSGEARTH_PATCH_VERSION})
+
+# We want to build SONAMES shared librariess
+SET(OSGEARTH_SONAMES TRUE)
+SET(OPENTHREADS_SONAMES TRUE)
+
+# We have some custom .cmake scripts not in the official distribution.
+# Maybe this can be used override existing behavior if needed?
+SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules;${CMAKE_MODULE_PATH}")
+
+SET(OSG_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
+
+FIND_PACKAGE(EXPAT)
+FIND_PACKAGE(LibZip)
+FIND_PACKAGE(GEOS)
+
+
+
+
+
+# Dynamic vs Static Linking
+OPTION(DYNAMIC_OSGEARTH "Set to ON to build OSGEARTH for dynamic linking.  Use OFF for static." ON)
+IF   (DYNAMIC_OSGEARTH)
+    SET(OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC "SHARED")
+ELSE (DYNAMIC_OSGEARTH)
+    SET(OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC "STATIC")
+ENDIF(DYNAMIC_OSGEARTH)
+
+#Whether or not to copy osgEarth to the OSG_DIR during installation
+# Dynamic vs Static Linking
+OPTION(INSTALL_TO_OSG_DIR "Set to ON to install osgearth to the path defined in the OSG_DIR" OFF)
+IF(INSTALL_TO_OSG_DIR)
+    SET(OSGEARTH_INSTALL_TO_OSG_DIR TRUE)
+ELSE (INSTALL_TO_OSG_DIR)
+    SET(OSGEARTH_INSTALL_TO_OSG_DIR FALSE)
+ENDIF(INSTALL_TO_OSG_DIR)
+
+# Make the headers visible to everything
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/src	../include)
+
+# OE Core
+ADD_SUBDIRECTORY(src)
+

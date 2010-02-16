@@ -300,6 +300,18 @@ GeoExtent::expandToInclude( double x, double y )
     if ( y > _ymax ) _ymax = y;
 }
 
+GeoExtent
+GeoExtent::intersectionSameSRS( const GeoExtent& rhs ) const
+{
+    Bounds b(
+        osg::maximum( xMin(), rhs.xMin() ),
+        osg::maximum( yMin(), rhs.yMin() ),
+        osg::minimum( xMax(), rhs.xMax() ),
+        osg::minimum( yMax(), rhs.yMax() ) );
+
+    return b.width() > 0 && b.height() > 0 ? GeoExtent( getSRS(), b ) : GeoExtent::INVALID;
+}
+
 std::string
 GeoExtent::toString() const
 {
@@ -517,7 +529,7 @@ reprojectImage(osg::Image* srcImage, const std::string srcWKT, double srcMinX, d
                const std::string destWKT, double destMinX, double destMinY, double destMaxX, double destMaxY,
                int width = 0, int height = 0)
 {
-    osg::notify(osg::NOTICE) << "Reprojecting..." << std::endl;
+    //osg::notify(osg::NOTICE) << "Reprojecting..." << std::endl;
     GDAL_SCOPED_LOCK;
 	osg::Timer_t start = osg::Timer::instance()->tick();
 

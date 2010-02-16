@@ -30,6 +30,7 @@
 #include <osgEarth/Profile>
 #include <osgEarth/GeoData>
 #include <osgDB/ReaderWriter>
+#include <OpenThreads/Mutex>
 #include <list>
 
 using namespace osgEarth;
@@ -60,6 +61,23 @@ namespace osgEarth { namespace Features
     protected:
         FeatureList _features;
         FeatureList::iterator _iter;
+    };
+
+    /**
+     * A simple cursor that returns each Geometry wrapped in a feature.
+     */
+    class OSGEARTHFEATURES_EXPORT GeometryFeatureCursor : public FeatureCursor
+    {
+    public:
+        GeometryFeatureCursor( Geometry* geom );
+        GeometryFeatureCursor( Geometry* geom, const FeatureProfile* fp, FeatureFilterList& filters );
+        virtual bool hasMore() const;
+        virtual Feature* nextFeature();
+    protected:
+        osg::ref_ptr<Geometry> _geom;
+        osg::ref_ptr<const FeatureProfile> _featureProfile;
+        FeatureFilterList _filters;
+        osg::ref_ptr<Feature> _lastFeature;
     };
 
     /**
@@ -126,7 +144,7 @@ namespace osgEarth { namespace Features
 		/**
 		 * Initialize the FeatureSource.  The profile should be computed and set here using setProfile()
 		 */
-		virtual void initialize( const std::string& referenceURI, const Profile* overrideProfile = NULL) =0;
+		virtual void initialize( const std::string& referenceURI ) =0; //, const Profile* overrideProfile = NULL) =0;
 
     protected:
 
@@ -146,6 +164,7 @@ namespace osgEarth { namespace Features
         osg::ref_ptr<const FeatureProfile> _featureProfile;
         osg::ref_ptr<const PluginOptions>  _options;
         FeatureFilterList _filters;
+        OpenThreads::Mutex _createMutex;
 
         friend class Map;
         friend class FeatureSourceFactory;

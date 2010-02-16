@@ -42,7 +42,7 @@ int main(int argc, char** argv)
   {
 	  //NOTE:  You must run this from the osgearth/tests directory for world.tif to be found at this path.
       Config conf;
-      conf.add( "url", "../data/world.tif" );
+      conf.add( "url", "c:\\work\\trac\\external\\OpenSceneGraph\\build\\data\\world.tif" );
 	  osg::ref_ptr<MapLayer> layer = new MapLayer("test_simple", MapLayer::TYPE_IMAGE, "gdal", conf );
 
 	  osg::ref_ptr<TileKey> key = new TileKey(0, 0, 0, 0, layer->getProfile());

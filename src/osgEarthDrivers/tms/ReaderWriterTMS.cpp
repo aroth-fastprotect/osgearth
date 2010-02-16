@@ -34,47 +34,37 @@
 #include <iomanip>
 #include <string.h>
 
-using namespace osgEarth;
+#include "TMSOptions"
 
-#define PROPERTY_URL         "url"
-#define PROPERTY_TMS_TYPE    "tms_type"
-#define PROPERTY_TILE_SIZE   "tile_size"
-#define PROPERTY_FORMAT      "format"
+using namespace osgEarth;
+using namespace osgEarth::Drivers;
+
+//#define PROPERTY_URL         "url"
+//#define PROPERTY_TMS_TYPE    "tms_type"
+//#define PROPERTY_TILE_SIZE   "tile_size"
+//#define PROPERTY_FORMAT      "format"
 
 
 class TMSSource : public TileSource
 {
 public:
-    TMSSource(const PluginOptions* options) : TileSource(options),
-      _invertY(false),
-      _tile_size(256)
+    TMSSource(const PluginOptions* options) : TileSource(options)
     {
-        const Config& conf = options->config();
-
-        _url = conf.value( PROPERTY_URL );
-
-        // tile_size and format are only used if no TMS tile map file can be found:
-        _tile_size = conf.value<int>( PROPERTY_TILE_SIZE, _tile_size );
-        _format = conf.value<std::string>( PROPERTY_FORMAT, _format );
-
-        if ( conf.value( PROPERTY_TMS_TYPE ) == "google" )
+        _settings = dynamic_cast<const TMSOptions*>( options );
+        if ( !_settings.valid() )
         {
-            _invertY = true;
-            osg::notify(osg::INFO) << "[osgEarth::TMS] TMS driver inverting y" << std::endl;
+            _settings = new TMSOptions( options->config() );
         }
 
-        // quit now if there's no URL
-        if (_url.empty())
-        {
-            osg::notify(osg::WARN) << "TMSSource: No URL specified " << std::endl;
-        }
+        _invertY = _settings->tmsType() == "google";
     }
+
 
     void initialize( const std::string& referenceURI, const Profile* overrideProfile)
     {
         const Profile* result = NULL;
 
-        std::string tmsPath = _url;
+        std::string tmsPath = _settings->url().value();
 
         //Find the full path to the URL
         //If we have a relative path and the map file contains a server address, just concat the server path and the url together
@@ -98,7 +88,12 @@ public:
 		{
 		    osg::notify(osg::NOTICE) << "[osgEarth::TMS] Using override profile " << overrideProfile->toString() << std::endl;				
 			result = overrideProfile;
-			_tileMap = TileMap::create( _url, overrideProfile, _format, _tile_size, _tile_size );
+			_tileMap = TileMap::create( 
+                _settings->url().value(), 
+                overrideProfile, 
+                _settings->format().value(),
+                _settings->tileSize().value(), 
+                _settings->tileSize().value() );
 		}
 		else
 		{
@@ -133,7 +128,7 @@ public:
     {
         if (_tileMap.valid() && key->getLevelOfDetail() <= getMaxDataLevel() )
         {
-            std::string image_url = _tileMap->getURL( key, _invertY);
+            std::string image_url = _tileMap->getURL( key, _invertY );
                 
             //osg::notify(osg::NOTICE) << "TMSSource: Key=" << key->str() << ", URL=" << image_url << std::endl;
 
@@ -176,12 +171,15 @@ public:
 private:
 
     osg::ref_ptr<TileMap> _tileMap;
-    std::string _url;
     bool _invertY;
 
+    //std::string _url;
+
     // these are backups in case no tilemap definition is found
-    std::string _format;
-    int _tile_size;
+    //std::string _format;
+    //int _tile_size;
+
+    osg::ref_ptr<const TMSOptions> _settings;
 };
 
 

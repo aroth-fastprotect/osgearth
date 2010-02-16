@@ -47,7 +47,6 @@ typedef std::map<unsigned int, osg::observer_ptr<MapNode> > MapNodeCache;
 #define CHILD_TERRAINS 0
 #define CHILD_MODELS   1
 
-
 static
 MapNodeCache& getMapNodeCache()
 {
@@ -241,6 +240,21 @@ MapNode::init()
 MapNode::~MapNode()
 {
     unregisterMapNode(_id);
+
+    removeChildren( 0, getNumChildren() );
+}
+
+osg::BoundingSphere
+MapNode::computeBound() const
+{
+    if ( isGeocentric() )
+    {
+        return osg::BoundingSphere( osg::Vec3(0,0,0), getEllipsoidModel()->getRadiusEquator()+25000 );
+    }
+    else
+    {
+        return osg::CoordinateSystemNode::computeBound();
+    }
 }
 
 Map*
@@ -423,6 +437,13 @@ MapNode::onModelLayerAdded( ModelLayer* layer )
         else
         {
            _models->addChild( node );
+        }
+
+        ModelSource* ms = layer->getModelSource();
+        if ( ms && ms->renderOrder().isSet() )
+        {
+            node->getOrCreateStateSet()->setRenderBinDetails(
+                ms->renderOrder().value(), "RenderBin" );
         }
     }
 }

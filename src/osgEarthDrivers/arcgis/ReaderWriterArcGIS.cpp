@@ -18,6 +18,8 @@
 */
 
 #include "MapService.h"
+#include "ArcGISOptions"
+
 #include <osgEarth/TileSource>
 #include <osgEarth/Registry>
 #include <osg/Notify>
@@ -32,9 +34,10 @@
 #include <algorithm>
 
 using namespace osgEarth;
+using namespace osgEarth::Drivers;
 
-#define PROPERTY_URL        "url"
-#define PROPERTY_PROFILE    "profile"
+//#define PROPERTY_URL        "url"
+//#define PROPERTY_PROFILE    "profile"
 
 class ArcGISSource : public TileSource
 {
@@ -43,19 +46,25 @@ public:
       TileSource( options ),
       _profileConf( ProfileConfig() )
     {
-        if ( options )
+        _settings = dynamic_cast<const ArcGISOptions*>( options );
+        if ( !_settings.valid() )
         {
-            const Config& conf = options->config();
-
-            // this is the ArcGIS REST services URL for the map service,
-            // e.g. http://server/ArcGIS/rest/services/Layer/MapServer
-            _url = conf.value( PROPERTY_URL );
-
-            // force a profile type
-            // TODO? do we need this anymore? doesn't this happen with overrideprofile now?
-            if ( conf.hasChild( PROPERTY_PROFILE ) )
-                _profileConf = ProfileConfig( conf.child( PROPERTY_PROFILE ) );
+            _settings = new ArcGISOptions( options->config() );
         }
+
+        //if ( options )
+        //{
+        //    const Config& conf = options->config();
+
+        //    // this is the ArcGIS REST services URL for the map service,
+        //    // e.g. http://server/ArcGIS/rest/services/Layer/MapServer
+        //    _url = conf.value( PROPERTY_URL );
+
+        //    // force a profile type
+        //    // TODO? do we need this anymore? doesn't this happen with overrideprofile now?
+        //    if ( conf.hasChild( PROPERTY_PROFILE ) )
+        //        _profileConf = ProfileConfig( conf.child( PROPERTY_PROFILE ) );
+        //}
 
         //TODO: allow single layers vs. "fused view"
         if ( _layer.empty() )
@@ -66,7 +75,7 @@ public:
             _format = "png";
 
         // read metadata from the server
-        if ( !_map_service.init( _url, getOptions()) )
+        if ( !_map_service.init( _settings->url().value(), getOptions()) )
         {
             osg::notify(osg::WARN) << "[osgearth] [ArcGIS] map service initialization failed: "
                 << _map_service.getError() << std::endl;
@@ -147,7 +156,7 @@ public:
 
         if ( _map_service.isTiled() )
         {
-            buf << _url << "/tile"
+            buf << _settings->url().value() << "/tile"
                 << "/" << level
                 << "/" << tile_y
                 << "/" << tile_x << "." << f;
@@ -157,7 +166,7 @@ public:
             const GeoExtent& ex = key->getGeoExtent();
 
             buf << std::setprecision(16)
-                << _url << "/export"
+                << _settings->url().value() << "/export"
                 << "?bbox=" << ex.xMin() << "," << ex.yMin() << "," << ex.xMax() << "," << ex.yMax()
                 << "&format=" << f 
                 << "&size=256,256"
@@ -192,8 +201,9 @@ public:
     }
 
 private:
+    osg::ref_ptr<const ArcGISOptions> _settings;
     //osg::ref_ptr<const osgDB::ReaderWriter::Options> _options;
-    std::string _url;
+    //std::string _url;
     //std::string _profile_str;
     optional<ProfileConfig> _profileConf;
     std::string _map;
@@ -204,10 +214,10 @@ private:
 };
 
 
-class ReaderWriterArcGIS : public osgDB::ReaderWriter
+class ArcGISTileSourceFactory : public osgDB::ReaderWriter
 {
 public:
-    ReaderWriterArcGIS()
+    ArcGISTileSourceFactory()
     {
         supportsExtension( "osgearth_arcgis", "ArcGIS Server" );
     }
@@ -226,6 +236,6 @@ public:
     }
 };
 
-REGISTER_OSGPLUGIN(osgearth_arcgis, ReaderWriterArcGIS)
+REGISTER_OSGPLUGIN(osgearth_arcgis, ArcGISTileSourceFactory)
 
 

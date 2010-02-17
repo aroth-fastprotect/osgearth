@@ -251,7 +251,7 @@ public:
           getText()->setBackdropType(osgText::Text::OUTLINE);
       }
 
-     virtual bool mousePush(double, double, osgWidget::WindowManager*) {
+     virtual bool mousePush(double, double, const osgWidget::WindowManager*) {
          _view->getDatabasePager()->clear();
          _map->addMapLayer( _layer );
          //_mapNode->addImageSource( _sourceConfig );

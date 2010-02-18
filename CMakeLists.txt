@@ -9,19 +9,9 @@ SET(OSGEARTH_VERSION ${OSGEARTH_MAJOR_VERSION}.${OSGEARTH_MINOR_VERSION}.${OSGEA
 SET(OSGEARTH_SONAMES TRUE)
 SET(OPENTHREADS_SONAMES TRUE)
 
-# We have some custom .cmake scripts not in the official distribution.
-# Maybe this can be used override existing behavior if needed?
-SET(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules;${CMAKE_MODULE_PATH}")
-
-SET(OSG_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/include")
-
 FIND_PACKAGE(EXPAT)
 FIND_PACKAGE(LibZip)
 FIND_PACKAGE(GEOS)
-
-
-
-
 
 # Dynamic vs Static Linking
 OPTION(DYNAMIC_OSGEARTH "Set to ON to build OSGEARTH for dynamic linking.  Use OFF for static." ON)

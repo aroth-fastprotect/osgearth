@@ -386,16 +386,17 @@ void EarthManipulator::setNode(osg::Node* node)
     if ( node )
     {
         osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( node );
-        _node = mapNode; //->getTerrain(0);
 
-        if ( mapNode->isGeocentric() )
+        if ( mapNode && mapNode->isGeocentric() )
         {
+			_node = mapNode;
             setHomeViewpoint( 
                 Viewpoint(osg::Vec3d(0,0,0), 0, -89.9,
                 mapNode->getEllipsoidModel()->getRadiusEquator()*3.0 ) );
         }
         else
         {
+			_node = node;
             setHomeViewpoint( Viewpoint(
                 _node->getBound().center(),
                 0, -89.9, 

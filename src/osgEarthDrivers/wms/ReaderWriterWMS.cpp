@@ -30,6 +30,9 @@
 #include <stdlib.h>
 #include <iomanip>
 
+// ARO: include string.h to get memcpy on Linux
+#include <string.h>
+
 #include "Capabilities"
 #include "TileService"
 

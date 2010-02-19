@@ -44,6 +44,9 @@
 #include <sstream>
 #include <osg/Depth>
 
+// ARO: include string.h to get memcpy on Linux
+#include <string.h>
+
 using namespace osgTerrain;
 using namespace osgEarth;
 using namespace OpenThreads;

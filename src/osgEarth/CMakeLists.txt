@@ -17,51 +17,51 @@ MARK_AS_ADVANCED(CURL_IS_STATIC)
 
 SET(LIB_NAME osgEarth)
 
-SET(HEADER_PATH ${OSGEARTH_SOURCE_DIR}/include/${LIB_NAME})
+SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(LIB_PUBLIC_HEADERS
-    Caching
-	CacheSeed
-    Common
-    Compositing
-    Config
-    Cube
-    DriverOptions
-    EarthFile
-    EarthTerrainTechnique
-	EarthTerrain
-    Export
-    FileUtils
-	FileLocationCallback
-	FindNode
-    GeoData
-    HeightFieldUtils
-    HTTPClient
-    ImageToHeightFieldConverter
-    ImageUtils
-    JsonUtils
-    Locators
-    Map
-    MapLayer
-    MapNode
-    MapEngine
-    MapEngineProperties
-    MaskNode
-    ModelLayer
-    ModelSource
-	MultiPassTerrainTechnique
-    Profile
-	Progress
-    Registry
-    SpatialReference
-    StringUtils
-    TaskService
-    TerrainTileEdgeNormalizerUpdateCallback
-    TileKey
-    TileSource
-    TileSourceFactory
-    TMS
-    VersionedTerrain
-    XmlUtils
+    ${HEADER_PATH}/Caching
+	${HEADER_PATH}/CacheSeed
+	${HEADER_PATH}/Common
+	${HEADER_PATH}/Compositing
+	${HEADER_PATH}/Config
+	${HEADER_PATH}/Cube
+	${HEADER_PATH}/DriverOptions
+	${HEADER_PATH}/EarthFile
+	${HEADER_PATH}/EarthTerrainTechnique
+	${HEADER_PATH}/EarthTerrain
+	${HEADER_PATH}/Export
+	${HEADER_PATH}/FileUtils
+	${HEADER_PATH}/FileLocationCallback
+	${HEADER_PATH}/FindNode
+	${HEADER_PATH}/GeoData
+	${HEADER_PATH}/HeightFieldUtils
+	${HEADER_PATH}/HTTPClient
+	${HEADER_PATH}/ImageToHeightFieldConverter
+	${HEADER_PATH}/ImageUtils
+	${HEADER_PATH}/JsonUtils
+	${HEADER_PATH}/Locators
+	${HEADER_PATH}/Map
+	${HEADER_PATH}/MapLayer
+	${HEADER_PATH}/MapNode
+	${HEADER_PATH}/MapEngine
+	${HEADER_PATH}/MapEngineProperties
+	${HEADER_PATH}/MaskNode
+	${HEADER_PATH}/ModelLayer
+	${HEADER_PATH}/ModelSource
+	${HEADER_PATH}/MultiPassTerrainTechnique
+	${HEADER_PATH}/Profile
+	${HEADER_PATH}/Progress
+	${HEADER_PATH}/Registry
+	${HEADER_PATH}/SpatialReference
+	${HEADER_PATH}/StringUtils
+	${HEADER_PATH}/TaskService
+	${HEADER_PATH}/TerrainTileEdgeNormalizerUpdateCallback
+	${HEADER_PATH}/TileKey
+	${HEADER_PATH}/TileSource
+	${HEADER_PATH}/TileSourceFactory
+	${HEADER_PATH}/TMS
+	${HEADER_PATH}/VersionedTerrain
+	${HEADER_PATH}/XmlUtils
 )
 
 ADD_LIBRARY(${LIB_NAME} SHARED
@@ -72,6 +72,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
     Compositing.cpp
     Config.cpp
     Cube.cpp
+    DriverOptions.cpp
     EarthFile.cpp
     EarthTerrainTechnique.cpp
     FileUtils.cpp

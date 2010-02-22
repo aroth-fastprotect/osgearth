@@ -6,16 +6,16 @@ ENDIF(DYNAMIC_OSGEARTH)
 
 SET(LIB_NAME osgEarthUtil)
 
-SET(HEADER_PATH ${OSGEARTH_SOURCE_DIR}/include/${LIB_NAME})
-SET(LIB_PUBLIC_HEADERS    
-    Common
-    EarthManipulator
-    ElevationFadeCallback
-    ElevationManager
-    Export
-	FadeLayerNode
-	ObjectPlacer
-	Viewpoint
+SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
+SET(LIB_PUBLIC_HEADERS
+	${HEADER_PATH}/Common
+	${HEADER_PATH}/EarthManipulator
+	${HEADER_PATH}/ElevationFadeCallback
+	${HEADER_PATH}/ElevationManager
+	${HEADER_PATH}/Export
+	${HEADER_PATH}/FadeLayerNode
+	${HEADER_PATH}/ObjectPlacer
+	${HEADER_PATH}/Viewpoint
 )
 
 ADD_LIBRARY(${LIB_NAME} SHARED

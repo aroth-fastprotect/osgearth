@@ -22,6 +22,7 @@
 #include <osgEarth/EarthTerrainTechnique>
 #include <osgEarth/Map>
 #include <osgEarth/MapEngine>
+#include <osgEarth/FindNode>
 #include <OpenThreads/ScopedLock>
 #include <osg/NodeCallback>
 #include <osg/NodeVisitor>
@@ -1140,20 +1141,6 @@ VersionedTile::releaseGLObjects(osg::State* state) const
 
 /****************************************************************************/
 
-// finds a camera in a node's parent hierarchy.
-static osg::Camera* findCam( osg::Node* n )
-{
-    osg::Camera* c = 0L;
-    while ( n && n->getNumParents() > 0 )
-    {
-        osg::Group* g = n->getParent(0);
-        c = dynamic_cast<osg::Camera*>(g);
-        if ( c ) return c;
-        n = g;
-    }
-    return 0L;
-}
-
 // a simple draw callback, to be installed on a Camera, that tells the
 // versionedterrain to release GL memory on any expired tiles.
 struct ReleaseGLCallback : public osg::Camera::DrawCallback
@@ -1431,7 +1418,7 @@ VersionedTerrain::traverse( osg::NodeVisitor &nv )
 {
     if ( !_releaseCBInstalled )
     {
-        osg::Camera* cam = findCam( this );
+        osg::Camera* cam = findFirstParentOfType<osg::Camera>( this );
         if ( cam )
         {
             cam->setPostDrawCallback( new ReleaseGLCallback(this) );
@@ -1478,8 +1465,16 @@ VersionedTerrain::traverse( osg::NodeVisitor &nv )
             {
                 if ( i->get()->cancelRequests() )
                 {
-                    //osg::notify(osg::NOTICE) << "Tile (" << i->get()->getKey()->str() << ") shut down." << std::endl;
-                    _tilesToRelease.push( i->get() );
+                    //Only add the tile to be released if we could actually install the callback.
+                    if (_releaseCBInstalled)
+                    {
+                        //osg::notify(osg::NOTICE) << "Tile (" << i->get()->getKey()->str() << ") shut down." << std::endl;
+                        _tilesToRelease.push( i->get() );
+                    }
+                    else
+                    {
+                        osg::notify(osg::WARN) << "Warning:  Could not install ReleaseGLCallback" << std::endl;
+                    }
                     i = _tilesToShutDown.erase( i );
                 }
                 else
@@ -1623,14 +1618,14 @@ VersionedTerrain::updateTaskServiceThreads()
     float elevationWeight = 0.0f;
     for (MapLayerList::const_iterator itr = _map->getHeightFieldMapLayers().begin(); itr != _map->getHeightFieldMapLayers().end(); ++itr)
     {
-        float w = itr->get()->getLoadWeight();
+        float w = itr->get()->loadingWeight().value();
         if (w > elevationWeight) elevationWeight = w;
     }
 
     float totalImageWeight = 0.0f;
     for (MapLayerList::const_iterator itr = _map->getImageMapLayers().begin(); itr != _map->getImageMapLayers().end(); ++itr)
     {
-        totalImageWeight += itr->get()->getLoadWeight();
+        totalImageWeight += itr->get()->loadingWeight().value();
     }
 
     float totalWeight = elevationWeight + totalImageWeight;
@@ -1645,10 +1640,9 @@ VersionedTerrain::updateTaskServiceThreads()
 
     for (MapLayerList::const_iterator itr = _map->getImageMapLayers().begin(); itr != _map->getImageMapLayers().end(); ++itr)
     {
-        int imageThreads = (int)osg::round((float)_numAsyncThreads * (itr->get()->getLoadWeight() / totalWeight ));
+        int imageThreads = (int)osg::round((float)_numAsyncThreads * (itr->get()->loadingWeight().value() / totalWeight ));
         osg::notify(osg::NOTICE) << "Image Threads for " << itr->get()->getName() << " = " << imageThreads << std::endl;
         getImageryTaskService( itr->get()->getId() )->setNumThreads( imageThreads );
     }
 
 }
-

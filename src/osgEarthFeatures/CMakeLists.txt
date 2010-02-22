@@ -10,29 +10,30 @@ ENDIF(GEOS_FOUND)
 
 SET(LIB_NAME osgEarthFeatures)
 
-SET(HEADER_PATH ${OSGEARTH_SOURCE_DIR}/include/${LIB_NAME})
+SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(LIB_PUBLIC_HEADERS
-    Annotation  
-    BufferFilter
-    BuildGeometryFilter  
-    Common
-    ConvertTypeFilter
-    CssUtils
-    Feature
-    FeatureGridder
-    FeatureModelSource
-    FeatureSource
-    FeatureTileSource
-    Filter
-    Geometry
-    GEOS
-	Query
-    ResampleFilter
-	ScaleFilter
-    SLD
-    StencilVolumeNode
-    Styling
-    TransformFilter
+	${HEADER_PATH}/Annotation  
+	${HEADER_PATH}/BufferFilter
+	${HEADER_PATH}/BuildGeometryFilter  
+	${HEADER_PATH}/Common
+	${HEADER_PATH}/ConvertTypeFilter
+	${HEADER_PATH}/CssUtils
+	${HEADER_PATH}/DriverOptions
+	${HEADER_PATH}/Feature
+	${HEADER_PATH}/FeatureGridder
+	${HEADER_PATH}/FeatureModelSource
+	${HEADER_PATH}/FeatureSource
+	${HEADER_PATH}/FeatureTileSource
+	${HEADER_PATH}/Filter
+	${HEADER_PATH}/Geometry
+	${HEADER_PATH}/GEOS
+	${HEADER_PATH}/Query
+	${HEADER_PATH}/ResampleFilter
+	${HEADER_PATH}/ScaleFilter
+	${HEADER_PATH}/SLD
+	${HEADER_PATH}/StencilVolumeNode
+	${HEADER_PATH}/Styling
+	${HEADER_PATH}/TransformFilter
 )
 
 ADD_LIBRARY(${LIB_NAME} SHARED
@@ -42,6 +43,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
     BuildGeometryFilter.cpp
     ConvertTypeFilter.cpp
     CssUtils.cpp
+    DriverOptions.cpp
     Feature.cpp
     FeatureGridder.cpp
     FeatureModelSource.cpp
@@ -76,24 +78,12 @@ LINK_INTERNAL(${LIB_NAME}
 osgEarth
 )
 
-
-LINK_INTERNAL(${LIB_NAME}     
-    osg
-    osgUtil
-    osgSim
-    osgTerrain
-    osgDB
-    osgFX
-    osgViewer
-	osgText
-	osgGA
-    OpenThreads
-)
-
 IF(GEOS_FOUND)
-   LINK_WITH_VARIABLES(${LIB_NAME} GEOS_LIBRARY)
+   LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGTERRAIN_LIBRARY OSGDB_LIBRARY OSGFX_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OPENTHREADS_LIBRARY GEOS_LIBRARY)
+ELSE(GEOS_FOUND)
+  LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGTERRAIN_LIBRARY OSGDB_LIBRARY OSGFX_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OPENTHREADS_LIBRARY)
 ENDIF(GEOS_FOUND)
 
-LINK_CORELIB_DEFAULT_VER(${LIB_NAME} ${OSGEARTH_VERSION} ${OSGEARTH_SOVERSION})
+LINK_CORELIB_DEFAULT(${LIB_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
 
 INCLUDE(ModuleInstall OPTIONAL)

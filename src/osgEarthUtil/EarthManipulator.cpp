@@ -303,7 +303,8 @@ _local_azim( 0.0 ),
 _local_pitch( 0.0 ),
 _has_pending_viewpoint( false ),
 _homeViewpoint( Viewpoint() ),
-_homeViewpointDuration( 0.0 )
+_homeViewpointDuration( 0.0 ),
+_after_first_frame(false)
 {
     // install default action bindings:
     ActionOptions options;
@@ -386,22 +387,30 @@ void EarthManipulator::setNode(osg::Node* node)
     if ( node )
     {
         osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( node );
+        if ( mapNode )
+        {
+            _node = mapNode;
 
-        if ( mapNode && mapNode->isGeocentric() )
-        {
-			_node = mapNode;
-            setHomeViewpoint( 
-                Viewpoint(osg::Vec3d(0,0,0), 0, -89.9,
-                mapNode->getEllipsoidModel()->getRadiusEquator()*3.0 ) );
+            if ( !_homeViewpoint.isSet() )
+            {
+                if ( mapNode && mapNode->isGeocentric() )
+                {
+                    setHomeViewpoint( 
+                        Viewpoint(osg::Vec3d(-90,0,0), 0, -89,
+                        mapNode->getEllipsoidModel()->getRadiusEquator()*3.0 ) );
+                }
+                else
+                {
+                    setHomeViewpoint( Viewpoint(
+                        _node->getBound().center(),
+                        0, -89.9, 
+                        _node->getBound().radius()*2.0) );
+                }
+            }
+
+            setViewpoint( _homeViewpoint.get(), 0.0 );
         }
-        else
-        {
-			_node = node;
-            setHomeViewpoint( Viewpoint(
-                _node->getBound().center(),
-                0, -89.9, 
-                _node->getBound().radius()*2.0) );
-        }
+
         //if (getAutoComputeHomePosition()) computeHomePosition();
 
         // reset the srs cache:
@@ -507,7 +516,7 @@ EarthManipulator::getRotation(const osg::Vec3d& point) const
 void
 EarthManipulator::setViewpoint( const Viewpoint& vp, double duration_s )
 {
-    if ( !_node.valid() )
+    if ( !_node.valid() ) // || !_after_first_frame )
     {
         _pending_viewpoint = vp;
         _pending_viewpoint_duration_s = duration_s;
@@ -659,7 +668,7 @@ accelerationInterp( double t, double a ) {
 void
 EarthManipulator::updateSetViewpoint()
 {
-    // intiialize the start time:
+	// initialize the start time:
     //if ( _time_s_set_viewpoint == 0.0 )
     //    _time_s_set_viewpoint = _time_s_now;
 
@@ -821,11 +830,17 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
     if ( ea.getEventType() == osgGA::GUIEventAdapter::FRAME )
     {
         _time_s_last_frame = _time_s_now;
-        //_time_s_now = ea.getTime();
         _time_s_now = osg::Timer::instance()->time_s();
         _delta_t = _time_s_now - _time_s_last_frame;
         // this factor adjusts for the variation of frame rate relative to 60fps
         _t_factor = _delta_t / 0.01666666666;
+
+        //osg::notify(osg::NOTICE)
+        //    << "center=(" << _center.x() << "," << _center.y() << "," << _center.z() << ")"
+        //    << ", dist=" << _distance
+        //    << ", p=" << _local_pitch
+        //    << ", h=" << _local_azim
+        //    << std::endl;
 
         if ( _has_pending_viewpoint && _node.valid() )
         {
@@ -844,13 +859,10 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
             updateTether();
         }
 
-        if ( _thrown || _continuous )
+        if ( _thrown || _continuous || _setting_viewpoint )
         {
             handleContinuousAction( _last_action );
             aa.requestRedraw();
-            //if ( handleMouseAction( _last_action ) )
-            //    us.requestRedraw();
-            //osg::notify(osg::NOTICE) << "throwing, action = " << _last_action._type << std::endl;
         }
 
         if ( !_continuous )
@@ -864,6 +876,8 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
             if ( serviceTask() )
                 aa.requestRedraw();
         }
+
+        _after_first_frame = true;
 
         return false;
     }
@@ -1247,6 +1261,20 @@ EarthManipulator::recalculateCenter( const osg::CoordinateFrame& coordinateFrame
 
         // need to reintersect with the terrain
         double distance = _node->getBound().radius()*0.25f;
+
+        //osg::notify(osg::NOTICE)
+        //    << std::fixed
+        //    << "ISECT: center=(" << _center.x() << "," << _center.y() << "," << _center.y() << ")"
+        //    << ", distnace=" << distance
+        //    << std::endl;
+
+        //osg::Vec3d ev = getUpVector(coordinateFrame);
+        //osg::Vec3d ip;
+        //if ( intersect( _center -ev * distance, _center + ev*distance, ip ) )
+        //{
+        //    _center = ip;
+        //    hitFound = true;
+        //}
 
         osg::Vec3d ip1;
         osg::Vec3d ip2;
@@ -1693,7 +1721,7 @@ EarthManipulator::recalculateRoll()
 
     if (sideVector.length()<0.1)
     {
-        osg::notify(osg::INFO)<<"Side vector short "<<sideVector.length()<<std::endl;
+        //osg::notify(osg::INFO)<<"Side vector short "<<sideVector.length()<<std::endl;
 
         sideVector = upVector^localUp;
         sideVector.normalize();

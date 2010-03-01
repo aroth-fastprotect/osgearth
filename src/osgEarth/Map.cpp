@@ -326,6 +326,7 @@ Map::addModelLayer( ModelLayer* layer )
         {
             ScopedWriteLock lock( getMapDataMutex() );
             _modelLayers.push_back( layer );
+            _dataModelRevision++;
         }
 
         layer->initialize( getReferenceURI(), this );        
@@ -334,6 +335,31 @@ Map::addModelLayer( ModelLayer* layer )
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
             i->get()->onModelLayerAdded( layer );
+        }
+    }
+}
+
+void
+Map::removeModelLayer( ModelLayer* layer )
+{
+    if ( layer )
+    {
+        {
+            ScopedWriteLock lock( getMapDataMutex() );
+            for( ModelLayerList::iterator i = _modelLayers.begin(); i != _modelLayers.end(); ++i )
+            {
+                if ( i->get() == layer )
+                {
+                    _modelLayers.erase( i );
+                    _dataModelRevision++;
+                    break;
+                }
+            }
+        }
+
+        for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); ++i )
+        {
+            i->get()->onModelLayerRemoved( layer );
         }
     }
 }
@@ -354,6 +380,29 @@ Map::setTerrainMaskLayer( ModelLayer* layer )
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
             i->get()->onTerrainMaskLayerAdded( layer );
+        }	
+    }
+    else
+    {
+        removeTerrainMaskLayer();
+    }
+}
+
+void
+Map::removeTerrainMaskLayer()
+{
+    if ( _terrainMaskLayer.valid() )
+    {
+        osg::ref_ptr<ModelLayer> layer = _terrainMaskLayer.get();
+        {
+            ScopedWriteLock lock( getMapDataMutex() );
+            _terrainMaskLayer = 0L;
+        }
+        
+        // a separate block b/c we don't need the mutex   
+        for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
+        {
+            i->get()->onTerrainMaskLayerRemoved( layer );
         }	
     }
 }
@@ -486,10 +535,11 @@ Map::createHeightField( const TileKey* key,
     //First pass:  Try to get the exact LOD requested for each enabled heightfield
     for( MapLayerList::const_iterator i = getHeightFieldMapLayers().begin(); i != getHeightFieldMapLayers().end(); i++ )
     {
-        if (i->get()->getEnabled())
+        MapLayer* layer = i->get();
+        if (layer->enabled() == true)
         {
-            osg::ref_ptr< osg::HeightField > hf = i->get()->createHeightField( key, progress );
-            layerValidMap[ i->get() ] = hf.valid();
+            osg::ref_ptr< osg::HeightField > hf = layer->createHeightField( key, progress );
+            layerValidMap[ layer ] = hf.valid();
             if (hf.valid())
             {
                 numValidHeightFields++;
@@ -508,15 +558,17 @@ Map::createHeightField( const TileKey* key,
     //              Fall back on parent tiles to fill in the missing data if possible.
     for( MapLayerList::const_iterator i = getHeightFieldMapLayers().begin(); i != getHeightFieldMapLayers().end(); i++ )
     {
-        if (i->get()->getEnabled())
+        MapLayer* layer = i->get();
+
+        if (layer->enabled() == true)
         {
-            if (!layerValidMap[ i->get()])
+            if (!layerValidMap[ layer ])
             {
                 osg::ref_ptr< const TileKey > hf_key = key;
                 osg::ref_ptr< osg::HeightField > hf;
                 while (hf_key.valid())
                 {
-                    hf = i->get()->createHeightField( hf_key.get(), progress );
+                    hf = layer->createHeightField( hf_key.get(), progress );
                     if (hf.valid()) break;
                     hf_key = hf_key->createParentKey();
                 }

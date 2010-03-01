@@ -16,11 +16,12 @@ SET(OPENSCENEGRAPH_APPLICATION_DIR ${PROJECT_SOURCE_DIR})
 #OpenThreads, osg, osgDB and osgUtil are included elsewhere.
 SET(TARGET_COMMON_LIBRARIES
     osgEarth
+    osgEarthFeatures
 	osgEarthUtil
 )
 
 SET(TARGET_DEFAULT_PREFIX "application_")
-SET(TARGET_DEFAULT_LABEL_PREFIX "Applications")
+SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
 
 ADD_SUBDIRECTORY(osgearth_simple)
 ADD_SUBDIRECTORY(osgearth_seed)
@@ -31,4 +32,8 @@ ADD_SUBDIRECTORY(osgearth_fadelayers)
 ADD_SUBDIRECTORY(osgearth_elevation)
 ADD_SUBDIRECTORY(osgearth_loadmaps)
 ADD_SUBDIRECTORY(osgearth_earthfile)
+ADD_SUBDIRECTORY(osgearth_features)
+
+
+
 

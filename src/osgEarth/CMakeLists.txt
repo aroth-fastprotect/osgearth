@@ -93,6 +93,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
 	ModelLayer.cpp
 	ModelSource.cpp
 	MultiPassTerrainTechnique.cpp
+	Notify.cpp
     Profile.cpp
 	Progress.cpp
     Registry.cpp
@@ -118,8 +119,8 @@ LINK_INTERNAL(${LIB_NAME}
     osgDB
     osgFX
     osgViewer
-	osgText
-	osgGA
+        osgText
+        osgGA
     OpenThreads
 )
 

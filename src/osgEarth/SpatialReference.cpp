@@ -71,7 +71,7 @@ SpatialReference::createFromPROJ4( const std::string& init, const std::string& i
 	}
 	else 
 	{
-        osg::notify(osg::WARN) << "[osgEarth::SRS] Unable to create spatial reference from PROJ4: " << init << std::endl;
+        OE_WARN << "[osgEarth::SRS] Unable to create spatial reference from PROJ4: " << init << std::endl;
 		OSRDestroySpatialReference( handle );
 	}
     return result;
@@ -91,7 +91,7 @@ SpatialReference::createCube(unsigned int face)
 	}
 	else 
 	{
-		osg::notify(osg::WARN) << "[osgEarth::SRS] Unable to create spatial reference from PROJ4: " << init << std::endl;
+		OE_WARN << "[osgEarth::SRS] Unable to create spatial reference from PROJ4: " << init << std::endl;
 		OSRDestroySpatialReference( handle );
 	}
     return result;
@@ -113,7 +113,7 @@ SpatialReference::createFromWKT( const std::string& init, const std::string& ini
 	}
 	else 
 	{
-		osg::notify(osg::WARN) << "[osgEarth::SRS] Unable to create spatial reference from WKT: " << init << std::endl;
+		OE_WARN << "[osgEarth::SRS] Unable to create spatial reference from WKT: " << init << std::endl;
 		OSRDestroySpatialReference( handle );
 	}
     return result.release();
@@ -128,7 +128,7 @@ SpatialReference::create( const std::string& init )
     SpatialReferenceCache::iterator itr = getSpatialReferenceCache().find(init);
     if (itr != getSpatialReferenceCache().end())
     {
-        //osg::notify(osg::NOTICE) << "Returning cached SRS" << std::endl;
+        //OE_NOTICE << "Returning cached SRS" << std::endl;
         return itr->second.get();
     }
 
@@ -253,7 +253,7 @@ SpatialReference::validate()
         else
             replaceIn( new_wkt, "Lambert_Conformal_Conic", "Lambert_Conformal_Conic_1SP" );
 
-        osg::notify(osg::NOTICE) << "[osgEarth] Morphing Lambert_Conformal_Conic to 1SP/2SP" << std::endl;
+        OE_NOTICE << "Morphing Lambert_Conformal_Conic to 1SP/2SP" << std::endl;
         
         return createFromWKT( new_wkt, _init_str, _name );
     }
@@ -263,13 +263,13 @@ SpatialReference::validate()
     {
         std::string new_wkt = getWKT();
         replaceIn( new_wkt, "Plate_Carree", "Equirectangular" );
-        osg::notify(osg::NOTICE) << "[osgEarth::SRS] Morphing Plate_Carree to Equirectangular" << std::endl;
+        OE_NOTICE << "[osgEarth::SRS] Morphing Plate_Carree to Equirectangular" << std::endl;
         return createFromWKT( new_wkt, _init_str, _name ); //, input->getReferenceFrame() );
     }
     else if ( proj == "Equidistant_Cylindrical" )
     {
         std::string new_wkt = getWKT();
-        osg::notify(osg::NOTICE) << "[osgEarth::SRS] Morphing Equidistant_Cylindrical to Equirectangular" << std::endl;
+        OE_NOTICE << "[osgEarth::SRS] Morphing Equidistant_Cylindrical to Equirectangular" << std::endl;
         replaceIn( new_wkt, "Equidistant_Cylindrical", "Equirectangular" );
         return createFromWKT( new_wkt, _init_str, _name );
     }
@@ -574,7 +574,7 @@ SpatialReference::transform( double x, double y, const SpatialReference* out_srs
     TransformHandleCache::const_iterator itr = _transformHandleCache.find(out_srs->getWKT());
     if (itr != _transformHandleCache.end())
     {
-        osg::notify(osg::DEBUG_INFO) << "[osgEarth::SpatialReference] using cached transform handle" << std::endl;
+        OE_DEBUG << "SpatialReference: using cached transform handle" << std::endl;
         xform_handle = itr->second;
     }
     else
@@ -585,8 +585,8 @@ SpatialReference::transform( double x, double y, const SpatialReference* out_srs
 
     if ( !xform_handle )
     {
-        osg::notify( osg::WARN )
-            << "[osgEarth::SRS] SRS xform not possible" << std::endl
+        OE_WARN
+            << "SpatialReference: SRS xform not possible" << std::endl
             << "    From => " << getName() << std::endl
             << "    To   => " << out_srs->getName() << std::endl;
         return false;
@@ -607,7 +607,7 @@ SpatialReference::transform( double x, double y, const SpatialReference* out_srs
     }
     else
     {
-        osg::notify( osg::WARN ) << "[osgEarth::SRS] Failed to xform a point from "
+        OE_WARN << "SRS: Failed to xform a point from "
             << getName() << " to " << out_srs->getName()
             << std::endl;
         result = false;
@@ -690,7 +690,7 @@ SpatialReference::transformPoints(const SpatialReference* out_srs,
         TransformHandleCache::const_iterator itr = _transformHandleCache.find(out_srs->getWKT());
         if (itr != _transformHandleCache.end())
         {
-            osg::notify(osg::DEBUG_INFO) << "[osgEarth::SRS] using cached transform handle" << std::endl;
+            OE_DEBUG << "SpatialRefernece: using cached transform handle" << std::endl;
             xform_handle = itr->second;
         }
         else
@@ -701,8 +701,8 @@ SpatialReference::transformPoints(const SpatialReference* out_srs,
 
         if ( !xform_handle )
         {
-            osg::notify( osg::WARN )
-                << "[osgEarth::SRS] SRS xform not possible" << std::endl
+            OE_WARN
+                << "SpatialReference: SRS xform not possible" << std::endl
                 << "    From => " << getName() << std::endl
                 << "    To   => " << out_srs->getName() << std::endl;
             return false;
@@ -724,7 +724,7 @@ SpatialReference::transformPoints(const SpatialReference* out_srs,
     }
     else
     {
-        osg::notify( osg::WARN ) << "[osgEarth::SRS] Failed to xform a point from "
+        OE_WARN << "SpatialReference: Failed to xform a point from "
             << getName() << " to " << out_srs->getName()
             << std::endl;
     }

@@ -65,7 +65,6 @@ SET(LIB_PUBLIC_HEADERS
 )
 
 ADD_LIBRARY(${LIB_NAME} SHARED
-#    ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
     ${LIB_PUBLIC_HEADERS}
     Caching.cpp
     CacheSeed.cpp
@@ -112,16 +111,16 @@ ADD_LIBRARY(${LIB_NAME} SHARED
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${CURL_INCLUDE_DIR} ${EXPAT_INCLUDE_DIR} ${GDAL_INCLUDE_DIR})
 
 LINK_INTERNAL(${LIB_NAME}     
-    osg
-    osgUtil
-    osgSim
-    osgTerrain
-    osgDB
-    osgFX
-    osgViewer
-        osgText
-        osgGA
-    OpenThreads
+	osg
+	osgUtil
+	osgSim
+	osgTerrain
+	osgDB
+	osgFX
+	osgViewer
+	osgText
+	osgGA
+	OpenThreads
 )
 
 LINK_WITH_VARIABLES(${LIB_NAME} CURL_LIBRARY GDAL_LIBRARY EXPAT_LIBRARY)

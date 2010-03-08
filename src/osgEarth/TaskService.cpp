@@ -224,6 +224,12 @@ _lastRemoveFinishedThreadsStamp(0)
     setNumThreads( numThreads );
 }
 
+unsigned int
+TaskService::getNumRequests() const
+{
+    return _queue->getNumRequests();
+}
+
 void
 TaskService::add( TaskRequest* request )
 {

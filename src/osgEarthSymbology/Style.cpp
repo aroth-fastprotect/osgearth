@@ -17,6 +17,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 #include <osgEarthSymbology/Style>
+#include <osgEarthFeatures/Geometry>
 #include <algorithm>
 
 using namespace osgEarth;
@@ -25,4 +26,9 @@ using namespace osgEarth::Symbology;
 Style::Style()
 {
     //NOP
+}
+
+Style::Style(const Style&, const osg::CopyOp&)
+{
+    // NOP
 }

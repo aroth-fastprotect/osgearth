@@ -18,6 +18,7 @@ SET(TARGET_COMMON_LIBRARIES
     osgEarth
     osgEarthFeatures
 	osgEarthUtil
+    osgEarthSymbology
 )
 
 SET(TARGET_DEFAULT_PREFIX "application_")

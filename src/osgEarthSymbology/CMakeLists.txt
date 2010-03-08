@@ -10,9 +10,10 @@ SET(LIB_NAME osgEarthSymbology)
 SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(LIB_PUBLIC_HEADERS
 #   header files go here
-    ${HEADER_PATH}/BasicSymbolizer
+    ${HEADER_PATH}/GeometrySymbolizer
     ${HEADER_PATH}/Common
     ${HEADER_PATH}/FeatureDataSet
+    ${HEADER_PATH}/FeatureDataSetAdapter
     ${HEADER_PATH}/Registry
     ${HEADER_PATH}/Style
     ${HEADER_PATH}/StyleSheet
@@ -25,8 +26,9 @@ SET(LIB_PUBLIC_HEADERS
 ADD_LIBRARY(${LIB_NAME} SHARED
     ${LIB_PUBLIC_HEADERS}
 #  .cpp files go here
-    BasicSymbolizer.cpp
+    GeometrySymbolizer.cpp
     FeatureDataSet.cpp
+    FeatureDataSetAdapter.cpp
     Registry.cpp
     Style.cpp
     StyleSheet.cpp

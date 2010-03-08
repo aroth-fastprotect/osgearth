@@ -8,7 +8,7 @@ SET(LIB_NAME osgEarthUtil)
 
 SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(LIB_PUBLIC_HEADERS
-${HEADER_PATH}/AutoClipPlaneHandler
+	${HEADER_PATH}/AutoClipPlaneHandler
 	${HEADER_PATH}/Common
 	${HEADER_PATH}/EarthManipulator
 	${HEADER_PATH}/ElevationFadeCallback

@@ -37,6 +37,7 @@ osg::Referenced( true ),
 _type( type ),
 _driverOptions( options ),
 _opacity(1.0f),
+_gamma(1.0), _prevGamma(1.0),
 _enabled(true),
 _exactCropping(false),
 _useMercatorFastPath(true),
@@ -64,6 +65,7 @@ osg::Referenced( true ),
 _type( type ),
 _name( driverConf.value("name") ),
 _opacity(1.0f),
+_gamma(1.0), _prevGamma(1.0),
 _enabled(true),
 _exactCropping(false),
 _useMercatorFastPath(true),
@@ -89,6 +91,7 @@ _name( name ),
 _type( type ),
 _tileSource( source ),
 _opacity(1.0f),
+_gamma(1.0), _prevGamma(1.0),
 _enabled(true),
 _exactCropping(false),
 _useMercatorFastPath(true),
@@ -117,7 +120,8 @@ MapLayer::init()
 {
 	readEnvironmentalVariables();
     _id = s_mapLayerID++;
-    _cacheFormat = suggestCacheFormat();
+    if ( !_cacheFormat.isSet() || _cacheFormat->empty() )
+      _cacheFormat = suggestCacheFormat();
 }
 
 void
@@ -134,6 +138,7 @@ MapLayer::fromConfig( const Config& conf )
     conf.getIfSet( "use_mercator_locator", _useMercatorFastPath );
     conf.getIfSet( "use_mercator_fast_path", _useMercatorFastPath );
     conf.getIfSet( "opacity", _opacity );
+    conf.getIfSet( "gamma", _gamma );
     conf.getIfSet( "enabled", _enabled );
     conf.getObjIfSet( "profile", _profileConf );
 }
@@ -155,6 +160,7 @@ MapLayer::toConfig() const
     conf.updateIfSet( "use_mercator_locator", _useMercatorFastPath );
     conf.updateIfSet( "use_mercator_fast_path", _useMercatorFastPath );
     conf.updateIfSet( "opacity", _opacity );
+    conf.updateIfSet( "gamma", _gamma );
     conf.updateIfSet( "enabled", _enabled );
     conf.updateObjIfSet( "profile", _profileConf );
 
@@ -399,16 +405,60 @@ MapLayer::setReferenceURI( const std::string& uri ) {
 }
 
 GeoImage*
+MapLayer::postProcess( GeoImage* input )
+{
+    if ( input && input->getImage() && _gamma.isSet() && !_gamma.isSetTo( 1.0 ) )
+    {
+        double g = _gamma.value();
+        if ( g != _prevGamma )
+        {
+            double gc = g > 0.0 ? 1.0/g : 1.0/5.0;
+            OE_INFO << "Building gamma LUT, gamma = " << g << std::endl;
+            for(unsigned int i = 0; i < 256; i++)
+            {
+                _gammaLUT[i] = (unsigned char)(pow(double(i) / 255.0, gc) * 255.0);
+            }            
+            _prevGamma = g;
+        }
+
+        osg::Image* im = input->getImage();
+        unsigned int p = input->getImage()->getTotalSizeInBytes();
+        unsigned char* d = input->getImage()->data();
+        if ( im->getPixelFormat() == GL_RGBA )
+        {
+            for(unsigned int i=0; i<p; i+=4, d+=4)
+            {
+                *d = _gammaLUT[*d];
+                *(d+1) = _gammaLUT[*(d+1)];
+                *(d+2) = _gammaLUT[*(d+2)];
+            }
+        }
+        else if ( im->getPixelFormat() == GL_RGB )
+        {
+            for(unsigned int i=0; i<p; ++i, ++d)
+                *d = _gammaLUT[*d];
+        }
+        else
+        {
+            OE_INFO << "Gamma not applied (image not RGB or RGBA)" << std::endl;
+        }
+    }
+    return input;
+}
+
+GeoImage*
 MapLayer::createImage( const TileKey* key,
                        ProgressCallback* progress)
 {
+    //OE_NOTICE << "[MapLayer] createImage for " << key->str() << std::endl;
+
     osg::ref_ptr<GeoImage> result = NULL;
     const Profile* mapProfile = key->getProfile();
 	const Profile* layerProfile = getProfile();
 
 	if (!layerProfile)
 	{
-		OE_NOTICE << "Could not get a valid profile for Layer " << _name << std::endl;
+		OE_WARN << "Could not get a valid profile for Layer " << _name << std::endl;
 		return NULL;
 	}
 
@@ -417,7 +467,7 @@ MapLayer::createImage( const TileKey* key,
 	//OE_NOTICE << "[osgEarth::MapLayer::createImage] " << key->str() << std::endl;
 	if (!getTileSource() && _cacheOnly == false )
 	{
-		OE_NOTICE << "Error:  MapLayer does not have a valid TileSource, cannot create image " << std::endl;
+		OE_WARN << "Error:  MapLayer does not have a valid TileSource, cannot create image " << std::endl;
 		return NULL;
 	}
 
@@ -462,7 +512,7 @@ MapLayer::createImage( const TileKey* key,
 		if (image)
 		{
 			OE_INFO << "Layer " << _name << " got tile " << key->str() << " from map cache " << std::endl;
-			return new GeoImage( image.get(), key->getGeoExtent() );
+			return postProcess( new GeoImage( image.get(), key->getGeoExtent() ) );
 		}
 	}
 
@@ -626,7 +676,7 @@ MapLayer::createImage( const TileKey* key,
 		_cache->setImage( key, _name, _cacheFormat.value(), result->getImage());
 	}
 
-    return result.release();
+    return postProcess( result.release() );
 }
 
 osg::Image*

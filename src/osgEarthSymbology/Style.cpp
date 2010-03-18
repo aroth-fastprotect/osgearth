@@ -23,7 +23,7 @@
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
 
-Style::Style()
+Style::Style() : _revision(0)
 {
     //NOP
 }
@@ -31,4 +31,9 @@ Style::Style()
 Style::Style(const Style&, const osg::CopyOp&)
 {
     // NOP
+}
+
+void Style::addSymbol(Symbol* symbol)
+{
+    _symbols.push_back(symbol);
 }

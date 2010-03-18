@@ -72,9 +72,7 @@ public:
         _url = _settings->url().value();
         if ( !_url.empty() )
         {
-            if ( osgEarth::isRelativePath( _url ) ) 
-                _url = osgDB::concatPaths( osgDB::getFilePath(referenceURI), _url );
-
+            _url = osgEarth::getFullPath( osgDB::getFilePath(referenceURI), _url );
             HTTPClient::readImageFile( _url, _image, getOptions() );
         }
 
@@ -125,6 +123,7 @@ public:
         osg::Image* newImage = new osg::Image();
         newImage->setAllocationMode( osg::Image::USE_NEW_DELETE );
         newImage->allocateImage( crop_s, crop_t, 1, _image->getPixelFormat(), _image->getDataType(), _image->getPacking() );
+        newImage->setInternalTextureFormat( _image->getInternalTextureFormat());
         for( int row=crop_y; row<crop_y+crop_t; row++ )
             memcpy( newImage->data(0, row-crop_y), _image->data(crop_x, row), crop_s * _image->getPixelSizeInBits() / 8 );
 

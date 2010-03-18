@@ -26,6 +26,7 @@
 #include <osgEarthFeatures/TransformFilter>
 #include <osgEarthFeatures/BuildGeometryFilter>
 #include <osg/Notify>
+#include <osg/MatrixTransform>
 #include <osgDB/FileNameUtils>
 #include <OpenThreads/Mutex>
 #include <OpenThreads/ScopedLock>
@@ -39,7 +40,103 @@ using namespace OpenThreads;
 
 #define PROP_HEIGHT_OFFSET "height_offset"
 
+//#define USE_SYMBOLOGY
+#ifdef USE_SYMBOLOGY
+#include <osgEarthSymbology/Style>
+#include <osgEarthSymbology/GeometrySymbol>
+#include <osgEarthSymbology/GeometrySymbolizer>
+#include <osgEarthSymbology/GeometryInput>
+#include <osgEarthSymbology/SymbolicNode>
 
+class FeatureGeomModelSource : public FeatureModelSource
+{
+public:
+    FeatureGeomModelSource( const PluginOptions* options, int sourceId ) : FeatureModelSource( options ),
+        _sourceId( sourceId )
+    {
+        _options = dynamic_cast<const FeatureGeomModelOptions*>( options );
+        if ( !_options )
+            _options = new FeatureGeomModelOptions( options );
+    }
+
+    //override
+    void initialize( const std::string& referenceURI, const osgEarth::Map* map )
+    {
+        FeatureModelSource::initialize( referenceURI, map );
+        _map = map;
+    }
+
+    //override
+    osg::Node* renderFeaturesForStyle( const Style& style, FeatureList& features, osg::Referenced* data, osg::Node** out_newNode )
+    {
+        // A processing context to use with the filters:
+        FilterContext context;
+        context.profile() = getFeatureSource()->getFeatureProfile();
+
+        // Transform them into the map's SRS:
+        TransformFilter xform( _map->getProfile()->getSRS(), _map->isGeocentric() );
+        xform.heightOffset() = _options->heightOffset().value();
+        context = xform.push( features, context );
+
+        // Make the symbolic node:
+        osgEarth::Symbology::SymbolicNode* symNode = new osgEarth::Symbology::SymbolicNode;
+
+        osgEarth::Symbology::Style* sstyle = new osgEarth::Symbology::Style;
+        sstyle->addSymbol(new osgEarth::Symbology::PointSymbol);
+        sstyle->addSymbol(new osgEarth::Symbology::LineSymbol);
+        sstyle->addSymbol(new osgEarth::Symbology::PolygonSymbol);
+
+        symNode->setStyle(sstyle);
+        symNode->setSymbolizer(new osgEarth::Symbology::GeometrySymbolizer);
+
+        osgEarth::Symbology::GeometryInput* geoms = new osgEarth::Symbology::GeometryInput;
+        symNode->setDataSet(geoms);
+
+        for (FeatureList::iterator it = features.begin(); it != features.end(); ++it)
+        {
+            Feature* feature = it->get();
+            if ( feature )
+            {
+                Geometry* geometry = feature->getGeometry();
+                if ( geometry )
+                {
+                    // this is temporary until we finish migrating Geometry to ::Symbology
+                    geoms->getGeometryList().push_back( 
+                        osgEarth::Symbology::Geometry::create(
+                            osgEarth::Symbology::Geometry::Type((int)(feature->getGeometry()->getType())), geometry));
+                }
+            }
+        }
+
+        osg::Node* result = symNode;
+
+        // If the context specifies a reference frame, apply it to the resulting model.
+        // Q: should this be here, or should the reference frame matrix be passed to the Symbolizer?
+        // ...probably the latter.
+        if ( context.hasReferenceFrame() )
+        {
+            osg::MatrixTransform* delocalizer = new osg::MatrixTransform(
+                context.inverseReferenceFrame() );
+            delocalizer->addChild( result );
+            result = delocalizer;
+        }
+
+        // set the output node if necessary:
+        if ( out_newNode )
+            *out_newNode = result;
+
+        return result;
+    }
+
+protected:
+    osg::ref_ptr<const FeatureGeomModelOptions> _options;
+    osg::ref_ptr<osgEarth::Symbology::SymbolicNode> _symbolic;
+    int _sourceId;
+    osg::ref_ptr<const Map> _map;
+};
+
+
+#else
 class FeatureGeomModelSource : public FeatureModelSource
 {
 public:
@@ -98,6 +195,7 @@ private:
     osg::ref_ptr<const Map> _map;
 };
 
+#endif
 
 class FeatureGeomModelSourceFactory : public osgDB::ReaderWriter
 {

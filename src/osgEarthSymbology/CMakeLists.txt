@@ -10,25 +10,36 @@ SET(LIB_NAME osgEarthSymbology)
 SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(LIB_PUBLIC_HEADERS
 #   header files go here
-    ${HEADER_PATH}/GeometrySymbolizer
     ${HEADER_PATH}/Common
-    ${HEADER_PATH}/FeatureDataSet
-    ${HEADER_PATH}/FeatureDataSetAdapter
+    ${HEADER_PATH}/ExtrudedSymbol
+    ${HEADER_PATH}/Geometry
+    ${HEADER_PATH}/GeometryExtrudeSymbolizer
+    ${HEADER_PATH}/GeometryInput
+    ${HEADER_PATH}/GeometrySymbolizer
+    ${HEADER_PATH}/GeometrySymbol
+    ${HEADER_PATH}/MarkerSymbolizer
+    ${HEADER_PATH}/MarkerSymbol
+    ${HEADER_PATH}/ModelSymbolizer
     ${HEADER_PATH}/Registry
     ${HEADER_PATH}/Style
     ${HEADER_PATH}/StyleSheet
     ${HEADER_PATH}/Symbol
     ${HEADER_PATH}/SymbolicNode
     ${HEADER_PATH}/Symbolizer
-    ${HEADER_PATH}/SymbolDisplayFunctor
 )
 
 ADD_LIBRARY(${LIB_NAME} SHARED
     ${LIB_PUBLIC_HEADERS}
 #  .cpp files go here
+    ExtrudedSymbol.cpp
+    Geometry.cpp
+    GeometryExtrudeSymbolizer.cpp
+    GeometryInput.cpp
     GeometrySymbolizer.cpp
-    FeatureDataSet.cpp
-    FeatureDataSetAdapter.cpp
+    GeometrySymbol.cpp
+    MarkerSymbolizer.cpp
+    MarkerSymbol.cpp
+    ModelSymbolizer.cpp
     Registry.cpp
     Style.cpp
     StyleSheet.cpp

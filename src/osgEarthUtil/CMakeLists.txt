@@ -40,6 +40,8 @@ LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT}
 
 LINK_INTERNAL(${LIB_NAME}
 	osgEarth
+	osgEarthFeatures
+	osgEarthSymbology
     osg
     osgUtil
     osgSim

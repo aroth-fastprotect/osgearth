@@ -11,6 +11,7 @@ SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(LIB_PUBLIC_HEADERS
 #   header files go here
     ${HEADER_PATH}/Common
+    ${HEADER_PATH}/CssUtils
     ${HEADER_PATH}/ExtrudedSymbol
     ${HEADER_PATH}/Geometry
     ${HEADER_PATH}/GeometryExtrudeSymbolizer
@@ -20,8 +21,11 @@ SET(LIB_PUBLIC_HEADERS
     ${HEADER_PATH}/MarkerSymbolizer
     ${HEADER_PATH}/MarkerSymbol
     ${HEADER_PATH}/ModelSymbolizer
+	${HEADER_PATH}/Query
     ${HEADER_PATH}/Registry
+	${HEADER_PATH}/StencilVolumeNode
     ${HEADER_PATH}/Style
+    ${HEADER_PATH}/SLD
     ${HEADER_PATH}/StyleSheet
     ${HEADER_PATH}/Symbol
     ${HEADER_PATH}/SymbolicNode
@@ -31,6 +35,7 @@ SET(LIB_PUBLIC_HEADERS
 ADD_LIBRARY(${LIB_NAME} SHARED
     ${LIB_PUBLIC_HEADERS}
 #  .cpp files go here
+    CssUtils.cpp
     ExtrudedSymbol.cpp
     Geometry.cpp
     GeometryExtrudeSymbolizer.cpp
@@ -40,8 +45,11 @@ ADD_LIBRARY(${LIB_NAME} SHARED
     MarkerSymbolizer.cpp
     MarkerSymbol.cpp
     ModelSymbolizer.cpp
+    Query.cpp
     Registry.cpp
+    StencilVolumeNode.cpp
     Style.cpp
+    SLD.cpp
     StyleSheet.cpp
     Symbol.cpp
     SymbolicNode.cpp

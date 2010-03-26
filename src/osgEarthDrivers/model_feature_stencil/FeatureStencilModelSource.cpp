@@ -33,6 +33,7 @@
 #include <osg/ClusterCullingCallback>
 #include <osg/Geode>
 #include <osg/Projection>
+#include <osgUtil/Tessellator>
 #include <osg/MatrixTransform>
 #include <osgDB/FileNameUtils>
 #include <OpenThreads/Mutex>
@@ -87,6 +88,7 @@ osg::Node* createColorNode( const osg::Vec4f& color )
 
     return proj;
 }
+
 
 
 class FeatureStencilModelSource : public FeatureModelSource
@@ -286,7 +288,6 @@ private:
     
     osg::ref_ptr<const FeatureStencilModelOptions> _options;
 };
-
 
 class FeatureStencilModelSourceFactory : public osgDB::ReaderWriter
 {

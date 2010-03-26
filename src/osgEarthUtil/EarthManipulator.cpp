@@ -668,7 +668,7 @@ accelerationInterp( double t, double a ) {
 void
 EarthManipulator::updateSetViewpoint()
 {
-    // intiialize the start time:
+	// initialize the start time:
     //if ( _time_s_set_viewpoint == 0.0 )
     //    _time_s_set_viewpoint = _time_s_now;
 
@@ -1347,7 +1347,7 @@ EarthManipulator::pan( double dx, double dy )
 
 		if (_node.valid())
 		{
-			// now reorientate the coordinate frame to the frame coords.
+			// now re-orientate the coordinate frame to the frame coords.
 			osg::CoordinateFrame coordinateFrame =  getCoordinateFrame(_center);
 
 			recalculateCenter( coordinateFrame );

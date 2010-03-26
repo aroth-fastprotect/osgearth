@@ -44,6 +44,7 @@ ADD_SUBDIRECTORY(model_simple)
 
 IF(LIBZIP_FOUND)
   ADD_SUBDIRECTORY(zipfs)
+  ADD_SUBDIRECTORY(worldwind)
 ENDIF(LIBZIP_FOUND)
 
 IF(GDAL_FOUND)
@@ -52,6 +53,10 @@ IF(GDAL_FOUND)
   ADD_SUBDIRECTORY(model_feature_overlay)
   ADD_SUBDIRECTORY(model_feature_stencil)
   ADD_SUBDIRECTORY(model_feature_geom)
+
+  ADD_SUBDIRECTORY(feature_ogr2)
+  ADD_SUBDIRECTORY(model_feature_stencil2)
+  ADD_SUBDIRECTORY(model_feature_geom2)
 ENDIF(GDAL_FOUND)
 
     

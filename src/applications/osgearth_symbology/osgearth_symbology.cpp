@@ -41,8 +41,6 @@
 #include <osg/Point>
 #include <osg/Material>
 
-typedef std::vector<osg::ref_ptr<osgEarth::Symbology::Style> > StyleList;
-
 using namespace osgEarth::Symbology;
 
 Geometry* createLineGeometry(const osg::Vec3d& start)
@@ -132,7 +130,7 @@ protected:
 
 struct GeometryPointSymbolizer : public GeometrySymbolizer
 {
-    bool update(SymbolizerInput* dataSet,
+    bool update(const SymbolizerInput* dataSet,
                 const Style* style,
                 osg::Group* attachPoint,
                 SymbolizerContext* context )
@@ -140,7 +138,7 @@ struct GeometryPointSymbolizer : public GeometrySymbolizer
         if (!dataSet || !attachPoint || !style)
             return false;
 
-        GeometryInput* geometryInput = dynamic_cast<GeometryInput*>(dataSet);
+        const GeometryInput* geometryInput = dynamic_cast<const GeometryInput*>(dataSet);
         if (!geometryInput)
             return false;
 
@@ -477,7 +475,6 @@ osg::Group* createSymbologyScene(const std::string url)
         osg::ref_ptr<ModelSymbolizer> symbolizer = new ModelSymbolizer();
         osg::ref_ptr<SymbolicNode> node = new SymbolicNode;
         node->setSymbolizer(symbolizer.get());
-        node->setDataSet(new SymbolizerInput);
         Style* style = new Style;
         std::string real = osgDB::getRealPath("../data/tree.ive");
         MarkerSymbol* marker = new MarkerSymbol;

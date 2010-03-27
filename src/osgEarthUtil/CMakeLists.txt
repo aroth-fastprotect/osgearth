@@ -7,7 +7,7 @@ ENDIF(DYNAMIC_OSGEARTH)
 SET(LIB_NAME osgEarthUtil)
 
 SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
-SET(LIB_PUBLIC_HEADERS
+SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/AutoClipPlaneHandler
 	${HEADER_PATH}/Common
 	${HEADER_PATH}/ClampCallback
@@ -21,13 +21,12 @@ SET(LIB_PUBLIC_HEADERS
 	${HEADER_PATH}/Viewpoint
 )
 
-ADD_LIBRARY(${LIB_NAME} SHARED
-    ${LIB_PUBLIC_HEADERS}
-    AutoClipPlaneHandler.cpp
+SET(TARGET_SRC
+	AutoClipPlaneHandler.cpp
 	ClampCallback.cpp
-    EarthManipulator.cpp
-    ElevationFadeCallback.cpp
-    ElevationManager.cpp
+	EarthManipulator.cpp
+	ElevationFadeCallback.cpp
+	ElevationManager.cpp
 	FadeLayerNode.cpp
 	Graticule.cpp
 	ObjectPlacer.cpp
@@ -36,9 +35,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
 
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})
 
-LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
-
-LINK_INTERNAL(${LIB_NAME}
+SET(TARGET_ADDED_LIBRARIES
 	osgEarth
 	osgEarthFeatures
 	osgEarthSymbology
@@ -52,9 +49,7 @@ LINK_INTERNAL(${LIB_NAME}
 	osgText
 	osgGA
     OpenThreads
-)
+    )
 
-#LINK_CORELIB_DEFAULT(${LIB_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
-LINK_CORELIB_DEFAULT_VER(${LIB_NAME} ${OSGEARTH_VERSION} ${OSGEARTH_SOVERSION})
+SETUP_OSG_LIB(osgEarthUtil)
 
-INCLUDE(ModuleInstall OPTIONAL)

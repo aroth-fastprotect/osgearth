@@ -6,23 +6,6 @@
 
 PROJECT(OSGEARTH_PLUGINS_MASTER)
 
-
-SET(CMAKE_SHARED_MODULE_PREFIX ${OSGEARTH_PLUGIN_PREFIX})
-
-IF(MSVC80)
-  IF(NOT OSGEARTH_MSVC_GENERATE_PLUGINS_AND_WRAPPERS_MANIFESTS)
-    SET(CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} /MANIFEST:NO")
-  ENDIF(NOT OSGEARTH_MSVC_GENERATE_PLUGINS_AND_WRAPPERS_MANIFESTS)
-ENDIF(MSVC80)
-
-SET(TARGET_DEFAULT_PREFIX "osgdb_")
-SET(TARGET_DEFAULT_LABEL_PREFIX "Plugin")
-
-#OpenThreads, osg, osgDB and osgUtil are included elsewhere.
-SET(TARGET_COMMON_LIBRARIES 
-    osgEarth
-)
-
 ############################################################
 #
 #  NodeKit/Psudo loader plugins
@@ -43,20 +26,20 @@ ADD_SUBDIRECTORY(agglite)
 ADD_SUBDIRECTORY(model_simple)
 
 IF(LIBZIP_FOUND)
-  ADD_SUBDIRECTORY(zipfs)
-  ADD_SUBDIRECTORY(worldwind)
+	ADD_SUBDIRECTORY(zipfs)
+	ADD_SUBDIRECTORY(worldwind)
 ENDIF(LIBZIP_FOUND)
 
 IF(GDAL_FOUND)
-  ADD_SUBDIRECTORY(gdal)
-  ADD_SUBDIRECTORY(feature_ogr)
-  ADD_SUBDIRECTORY(model_feature_overlay)
-  ADD_SUBDIRECTORY(model_feature_stencil)
-  ADD_SUBDIRECTORY(model_feature_geom)
+	ADD_SUBDIRECTORY(gdal)
+	ADD_SUBDIRECTORY(feature_ogr)
+	ADD_SUBDIRECTORY(model_feature_overlay)
+	ADD_SUBDIRECTORY(model_feature_stencil)
+	ADD_SUBDIRECTORY(model_feature_geom)
 
-  ADD_SUBDIRECTORY(feature_ogr2)
-  ADD_SUBDIRECTORY(model_feature_stencil2)
-  ADD_SUBDIRECTORY(model_feature_geom2)
+	ADD_SUBDIRECTORY(feature_ogr2)
+	ADD_SUBDIRECTORY(model_feature_stencil2)
+	ADD_SUBDIRECTORY(model_feature_geom2)
 ENDIF(GDAL_FOUND)
 
     

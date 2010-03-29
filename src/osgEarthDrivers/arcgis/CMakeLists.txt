@@ -8,13 +8,8 @@ SET(TARGET_SRC
 SET(TARGET_H
     Extent.h
     MapService.h
-    ArcGISOptions
 )
 
+SET(TARGET_PUBLIC_H ArcGISOptions)
+
 SETUP_PLUGIN(osgearth_arcgis)
-
-
-# to install public driver includes:
-SET(LIB_NAME arcgis)
-SET(LIB_PUBLIC_HEADERS ArcGISOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

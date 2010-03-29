@@ -6,6 +6,7 @@
 
 PROJECT(OSGEARTH_PLUGINS_MASTER)
 
+SET(TARGET_COMMON_LIBRARIES osg osgDB osgUtil osgEarth)
 ############################################################
 #
 #  NodeKit/Psudo loader plugins

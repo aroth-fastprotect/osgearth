@@ -36,6 +36,7 @@
 #include <osg/Math>
 #include <osg/Timer>
 #include <osg/Depth>
+#include <osg/Version>
 
 using namespace osgEarth;
 using namespace osgTerrain;
@@ -108,9 +109,14 @@ void MultiPassTerrainTechnique::setFilterMatrixAs(FilterType filterType)
     };
 }
 
-void MultiPassTerrainTechnique::init()
+void
+#if OSG_MIN_VERSION_REQUIRED(2,9,8)
+MultiPassTerrainTechnique::init(int dirtyMask, bool assumeMultiThreaded)
+#else
+MultiPassTerrainTechnique::init()
+#endif
 {
-    OE_INFO<<"Doing MultiPassTerrainTechnique::init()"<<std::endl;
+    OE_DEBUG<<"Doing MultiPassTerrainTechnique::init()"<<std::endl;
     
     if (!_terrainTile) return;
    
@@ -187,8 +193,8 @@ osg::Vec3d MultiPassTerrainTechnique::computeCenterModel(Locator* masterLocator)
         }
     }
 
-    OE_INFO<<"bottomLeftNDC = "<<bottomLeftNDC<<std::endl;
-    OE_INFO<<"topRightNDC = "<<topRightNDC<<std::endl;
+    OE_DEBUG<<"bottomLeftNDC = "<<bottomLeftNDC<<std::endl;
+    OE_DEBUG<<"topRightNDC = "<<topRightNDC<<std::endl;
 
     _transform = new osg::MatrixTransform;
 
@@ -239,7 +245,7 @@ osg::Geometry* MultiPassTerrainTechnique::createGeometryPrototype(Locator* maste
     
 
     bool treatBoundariesToValidDataAsDefaultValue = _terrainTile->getTreatBoundariesToValidDataAsDefaultValue();
-    OE_INFO<<"TreatBoundariesToValidDataAsDefaultValue="<<treatBoundariesToValidDataAsDefaultValue<<std::endl;
+    OE_DEBUG<<"TreatBoundariesToValidDataAsDefaultValue="<<treatBoundariesToValidDataAsDefaultValue<<std::endl;
     
     float skirtHeight = 0.0f;
     HeightFieldLayer* hfl = dynamic_cast<HeightFieldLayer*>(elevationLayer);
@@ -565,7 +571,7 @@ osg::Geometry* MultiPassTerrainTechnique::createGeometryPrototype(Locator* maste
 
 osg::Geode* MultiPassTerrainTechnique::createPass(unsigned int layerNum, Locator* masterLocator, const osg::Vec3d& centerModel, osg::Geometry* geometry)
 {
-	OE_INFO << "osgEarth::MultiPassTerrainTechnique createPass " << layerNum << std::endl;
+	OE_DEBUG << "osgEarth::MultiPassTerrainTechnique createPass " << layerNum << std::endl;
     unsigned int binNumber = 1000;
     binNumber += layerNum;
    
@@ -611,7 +617,7 @@ osg::Geode* MultiPassTerrainTechnique::createPass(unsigned int layerNum, Locator
     }
 
     bool treatBoundariesToValidDataAsDefaultValue = _terrainTile->getTreatBoundariesToValidDataAsDefaultValue();
-    OE_INFO<<"TreatBoundariesToValidDataAsDefaultValue="<<treatBoundariesToValidDataAsDefaultValue<<std::endl;
+    OE_DEBUG<<"TreatBoundariesToValidDataAsDefaultValue="<<treatBoundariesToValidDataAsDefaultValue<<std::endl;
     
     float skirtHeight = 0.0f;
     HeightFieldLayer* hfl = dynamic_cast<HeightFieldLayer*>(elevationLayer);
@@ -898,7 +904,11 @@ void MultiPassTerrainTechnique::traverse(osg::NodeVisitor& nv)
     {
         if ((_terrainTile->getDirty()))
         {
+#if OSG_MIN_VERSION_REQUIRED(2,9,8)
+            _terrainTile->init(~0x0, true);
+#else
             _terrainTile->init();
+#endif
             _terrainTileInitialized = true;
         }
 
@@ -925,8 +935,12 @@ void MultiPassTerrainTechnique::traverse(osg::NodeVisitor& nv)
 
     if (_terrainTile->getDirty() && !_terrainTileInitialized) 
     {
-        OE_INFO<<"******* Doing init ***********"<<std::endl;
+        OE_DEBUG<<"******* Doing init ***********"<<std::endl;
+#if OSG_MIN_VERSION_REQUIRED(2,9,8)
+        _terrainTile->init(~0x0, true);
+#else
         _terrainTile->init();
+#endif
         _terrainTileInitialized = true;
     }
 

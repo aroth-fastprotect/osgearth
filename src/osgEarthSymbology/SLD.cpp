@@ -50,6 +50,18 @@ htmlColorToVec4f( const std::string& html )
 #define CSS_FILL           "fill"
 #define CSS_FILL_OPACITY   "fill-opacity"
 
+#define CSS_POINT_SIZE     "point-size"
+
+#define CSS_TEXT_FONT             "text-font"
+#define CSS_TEXT_SIZE             "text-size"
+#define CSS_TEXT_HALO             "text-halo"
+#define CSS_TEXT_ATTRIBUTE        "text-attribute"
+#define CSS_TEXT_ROTATE_TO_SCREEN "text-rotate-to-screen"
+#define CSS_TEXT_SIZE_MODE        "text-size-mode"
+#define CSS_TEXT_REMOVE_DUPLICATE_LABELS "text-remove-duplicate-labels"
+#define CSS_TEXT_LINE_ORIENTATION "text-line-orientation"
+#define CSS_TEXT_LINE_PLACEMENT   "text-line-placement"
+
 
 static void
 parseLineCap( const std::string& value, optional<Stroke::LineCapStyle>& cap )
@@ -66,6 +78,8 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
 
     LineSymbol* line = 0;
     PolygonSymbol* polygon = 0;
+    PointSymbol* point = 0;
+    TextSymbol* text = 0;
     for(Properties::const_iterator p = conf.attrs().begin(); p != conf.attrs().end(); p++ )
     {
         if ( p->first == CSS_STROKE ) {
@@ -89,18 +103,87 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
         else if ( p->first == CSS_FILL ) {
             if (!polygon)
                 polygon = new PolygonSymbol;
+
+            if (!point)
+                point = new PointSymbol;
+
+            if (!text)
+                text = new TextSymbol;
+
             polygon->fill()->color() = htmlColorToVec4f( p->second );
+            point->fill()->color() = htmlColorToVec4f( p->second );
+            text->fill()->color() = htmlColorToVec4f( p->second );
         }
         else if ( p->first == CSS_FILL_OPACITY ) {
             if (!polygon)
                 polygon = new PolygonSymbol;
             polygon->fill()->color().a() = as<float>( p->second, 1.0f );
         }
+        else if (p->first == CSS_POINT_SIZE) {
+            if (!point)
+                point = new PointSymbol;
+            point->size() = as<float>(p->second, 1.0f);
+        }
+        else if (p->first == CSS_TEXT_SIZE) {
+            if (!text)
+                text = new TextSymbol;
+            text->size() = as<float>(p->second, 32.0f);
+        }
+        else if (p->first == CSS_TEXT_FONT) {
+            if (!text)
+                text = new TextSymbol;
+            text->font() = p->second;
+        }
+        else if (p->first == CSS_TEXT_HALO) {
+            if (!text)
+                text = new TextSymbol;
+            text->halo()->color() = htmlColorToVec4f( p->second );
+        }
+        else if (p->first == CSS_TEXT_ATTRIBUTE) {
+            if (!text)
+                text = new TextSymbol;
+            text->attribute() = p->second;
+        }
+        else if (p->first == CSS_TEXT_ROTATE_TO_SCREEN) {
+            if (!text)
+                text = new TextSymbol;
+            if (p->second == "true") text->rotateToScreen() = true;
+            else if (p->second == "false") text->rotateToScreen() = false;
+        }
+        else if (p->first == CSS_TEXT_SIZE_MODE) {
+            if (!text)
+                text = new TextSymbol;
+            if (p->second == "screen") text->sizeMode() = TextSymbol::SIZEMODE_SCREEN;
+            else if (p->second == "object") text->sizeMode() = TextSymbol::SIZEMODE_OBJECT;
+        }
+        else if (p->first == CSS_TEXT_REMOVE_DUPLICATE_LABELS) {
+            if (!text)
+                text = new TextSymbol;
+            if (p->second == "true") text->removeDuplicateLabels() = true;
+            else if (p->second == "false") text->removeDuplicateLabels() = false;
+        } 
+        else if (p->first == CSS_TEXT_LINE_ORIENTATION) {
+            if (!text)
+                text = new TextSymbol;
+            if (p->second == "parallel") text->lineOrientation() = TextSymbol::LINEORIENTATION_PARALLEL;
+            else if (p->second == "horizontal") text->lineOrientation() = TextSymbol::LINEORIENTATION_HORIZONTAL;
+            else if (p->second == "perpendicular") text->lineOrientation() = TextSymbol::LINEORIENTATION_PERPENDICULAR;
+        }
+        else if (p->first == CSS_TEXT_LINE_PLACEMENT) {
+            if (!text)
+                text = new TextSymbol;
+            if (p->second == "centroid") text->linePlacement() = TextSymbol::LINEPLACEMENT_CENTROID;
+            else if (p->second == "along-line") text->linePlacement() = TextSymbol::LINEPLACEMENT_ALONG_LINE;
+        }
     }
     if (line)
         sc.addSymbol(line);
     if (polygon)
         sc.addSymbol(polygon);
+    if (point)
+        sc.addSymbol(point);
+    if (text)
+        sc.addSymbol(text);
     return true;
 }
 

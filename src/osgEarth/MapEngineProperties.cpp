@@ -19,14 +19,15 @@
 
 #include <osgEarth/MapEngineProperties>
 #include <osg/Notify>
+#include <OpenThreads/Thread>
 
 using namespace osgEarth;
 
 LoadingPolicy::LoadingPolicy( const Config& conf ) :
 _mode( MODE_STANDARD ),
 _numThreads( 2 ),
-_numThreadsPerCore( 2 ),
-_numTileGenThreads( 4 )
+_numThreadsPerCore( 4 ),
+_numTileGenThreads( OpenThreads::GetNumberOfProcessors() )
 {
     fromConfig( conf );
 }
@@ -51,7 +52,7 @@ LoadingPolicy::toConfig() const
     conf.addIfSet( "mode", "sequential", _mode, MODE_SEQUENTIAL );
     conf.addIfSet( "mode", "preemptive", _mode, MODE_PREEMPTIVE );
     conf.addIfSet( "loading_threads", _numThreads );
-    conf.addIfSet( "loading_threads_per_logical_processor", _numThreadsPerCore );
+    //conf.addIfSet( "loading_threads_per_logical_processor", _numThreadsPerCore );
     conf.addIfSet( "loading_threads_per_core", _numThreadsPerCore );
     conf.addIfSet( "tile_generation_threads", _numTileGenThreads );
     return conf;

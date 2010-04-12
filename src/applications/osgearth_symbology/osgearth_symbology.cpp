@@ -18,6 +18,7 @@
 */
 
 
+#include <sstream>
 #include <osg/Notify>
 #include <osgGA/StateSetManipulator>
 #include <osgGA/GUIEventHandler>
@@ -25,6 +26,7 @@
 #include <osgDB/FileNameUtils>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
+#include <osgDB/ReadFile>
 #include <osgEarthSymbology/GeometryExtrudeSymbolizer>
 #include <osgEarthSymbology/GeometrySymbolizer>
 #include <osgEarthSymbology/GeometryInput>
@@ -34,6 +36,10 @@
 #include <osgEarthSymbology/MarkerSymbolizer>
 #include <osgEarthSymbology/ExtrudedSymbol>
 #include <osgEarthSymbology/ModelSymbolizer>
+#include <osgEarthUtil/WindowManager>
+#include <osgEarthUtil/WidgetMessageBox>
+#include <osgEarthUtil/WidgetIcon>
+#include <osgEarthUtil/WidgetNode>
 #include <osg/MatrixTransform>
 #include <osg/Geometry>
 #include <osgUtil/Tessellator>
@@ -42,6 +48,13 @@
 #include <osg/Material>
 
 using namespace osgEarth::Symbology;
+using namespace osgEarthUtil;
+
+static double getRandomValueInOne()
+{
+    return ((rand() * 1.0)/(RAND_MAX-1));
+}
+
 
 Geometry* createLineGeometry(const osg::Vec3d& start)
 {
@@ -113,13 +126,122 @@ struct SampleGeometryInput : public GeometryInput
 };
 
 
+struct PopUpSymbolizerContext : public SymbolizerContext
+{
+    typedef std::vector<osg::ref_ptr<WidgetMessageBox> > WidgetMessageBoxList;
+
+    PopUpSymbolizerContext(WindowManager* windowmanager)  : _wm(windowmanager) {}
+    osg::ref_ptr<WindowManager> _wm;
+    WidgetMessageBoxList _widgetList;
+};
+
+
+
+struct PopUpSymbolizer : public GeometrySymbolizer
+{
+    static int PopUpIndex;
+    bool update(const SymbolizerInput* dataSet,
+                const Style* style,
+                osg::Group* attachPoint,
+                SymbolizerContext* context,
+                Symbolizer::State* state )
+    {
+        if (!dataSet || !attachPoint || !style)
+            return false;
+
+        const GeometryInput* geometryInput = dynamic_cast<const GeometryInput*>(dataSet);
+        if (!geometryInput)
+            return false;
+
+        const Style* geometryStyle = dynamic_cast<const Style*>(style);
+        if (!geometryStyle)
+            return false;
+
+        PopUpSymbolizerContext* ctx = dynamic_cast<PopUpSymbolizerContext*>(context);
+        if (!ctx)
+            return false;
+
+        osg::ref_ptr<osg::Group> newSymbolized = new osg::Group;
+
+        const GeometryList& geometryList = geometryInput->getGeometryList();
+        for (GeometryList::const_iterator it = geometryList.begin(); it != geometryList.end(); ++it)
+        {
+            Geometry* geometry = *it;
+            if (!geometry)
+                continue;
+
+            osg::ref_ptr<osg::Geometry> osgGeom = new osg::Geometry;
+            switch( geometry->getType())
+            {
+            case Geometry::TYPE_POINTSET:
+            case Geometry::TYPE_LINESTRING:
+            case Geometry::TYPE_RING:
+            case Geometry::TYPE_POLYGON:
+            {
+                const TextSymbol* symbol = style->getSymbol<TextSymbol>();
+                if (symbol)
+                {
+                    osg::Image* image = 0;
+                    if (!symbol->theme()->empty())
+                        image = osgDB::readImageFile(symbol->theme().value());
+                    osgText::Font* font = 0;
+                    if (!symbol->font()->empty())
+                        font = osgText::readFontFile(symbol->font().value());
+                    float size = symbol->size().value();
+                    osg::Vec4 color = symbol->fill()->color();
+                    
+                    for ( osg::Vec3dArray::iterator it = geometry->begin(); it != geometry->end(); ++it)
+                    {
+                        osg::MatrixTransform* transform = new osg::MatrixTransform;
+                        transform->setMatrix(osg::Matrix::translate(*it));
+                        if (!PopUpIndex) {
+                            std::stringstream ss;
+                            ss << "Hit i Key to see more popup" << std::endl;
+                            ss << "And hit a second time to hide them" << std::endl;
+                            std::string text = ss.str();
+                            std::string title = "Info";
+
+                            WidgetMessageBox* wmb = ctx->_wm->createWidgetMessageBox(title, text, symbol);
+                            wmb->setFocusColor(osg::Vec4(getRandomValueInOne(), getRandomValueInOne() , getRandomValueInOne(), 1.0));
+                            wmb->attach(transform);
+                            wmb->setAppear();
+
+                        } else {
+                            std::stringstream ss;
+                            ss << "osgEarth" << std::endl;
+                            ss << "rocks at " << *it << " miles" << std::endl;
+                            std::string text = ss.str();
+                            std::string title = "osgEarthUtil";
+                            WidgetMessageBox* wmb = ctx->_wm->createWidgetMessageBox(title, text, symbol);
+                            wmb->setFocusColor(osg::Vec4(getRandomValueInOne(), getRandomValueInOne() , getRandomValueInOne(), 1.0));
+                            wmb->attach(transform);
+                            ctx->_widgetList.push_back(wmb);
+                        }
+                        PopUpIndex++;
+                        newSymbolized->addChild(transform);
+                        transform->addChild(osgDB::readNodeFile("../data/tree.ive"));
+                    }
+                }
+            }
+            break;
+            }
+        }
+
+        if (newSymbolized->getNumChildren()) 
+        {
+            attachPoint->removeChildren(0, attachPoint->getNumChildren());
+            attachPoint->addChild(newSymbolized.get());
+            return true;
+        }
+
+        return false;
+    }
+};
+int PopUpSymbolizer::PopUpIndex = 0;
 
 struct PolygonPointSizeSymbol : public PolygonSymbol
 {
-    PolygonPointSizeSymbol() : _size (1.0)
-    {
-    }
-
+    PolygonPointSizeSymbol() : _size (1.0) {}
     float& size() { return _size; }
     const float& size() const { return _size; }
 
@@ -127,13 +249,13 @@ protected:
     float _size;
 };
 
-
 struct GeometryPointSymbolizer : public GeometrySymbolizer
 {
     bool update(const SymbolizerInput* dataSet,
                 const Style* style,
                 osg::Group* attachPoint,
-                SymbolizerContext* context )
+                SymbolizerContext* context,
+                Symbolizer::State* state )
     {
         if (!dataSet || !attachPoint || !style)
             return false;
@@ -250,11 +372,15 @@ struct GeometryPointSymbolizer : public GeometrySymbolizer
 class StyleEditor : public osgGA::GUIEventHandler
 {
 public:
-    
+    osg::ref_ptr<PopUpSymbolizerContext> _popupContext;
+    int _state;
+
     StyleEditor(const ::StyleList& styles) : _styles(styles)
     {
+        _state = 0;
     }
 
+    void setPopupContext(PopUpSymbolizerContext* context) { _popupContext = context; }
     
     virtual bool handle(const osgGA::GUIEventAdapter& ea,osgGA::GUIActionAdapter&)
     {
@@ -262,7 +388,22 @@ public:
         {
         case(osgGA::GUIEventAdapter::KEYUP):
         {
-            if (ea.getKey() == 'q') {
+            if (ea.getKey() == 'i') {
+                if (_popupContext.valid()) {
+                    for (int i = 0; i < _popupContext->_widgetList.size(); ++i) {
+                        if (_state) {
+                            _popupContext->_widgetList[i]->setDisappear();
+                        } else { 
+                            _popupContext->_widgetList[i]->setAppear();
+                        }
+                    }
+                    if (_state)
+                        _state = 0;
+                    else 
+                        _state = 1;
+                }
+                return true;
+            } else if (ea.getKey() == 'q') {
                 osgEarth::Symbology::Style* style = _styles[0].get();
                 PolygonSymbol* p = style->getSymbol<PolygonSymbol>();
                 if (p)
@@ -271,7 +412,7 @@ public:
                     color[0] = fmod(color[0]+0.5, 1.0);
                     color[2] = fmod(1 + color[0]-0.3, 1.0);
                     p->fill()->color() = color;
-                    style->setRevision(style->getRevision()+1);
+                    style->dirty();
                 }
                 return true;
             } else if (ea.getKey() == 'a') {
@@ -284,7 +425,7 @@ public:
                     color[2] = fmod(1 + color[0]-0.3, 1.0);
                     p->fill()->color() = color;
                     p->size() = 0.1 + color[2] * 10;
-                    style->setRevision(style->getRevision()+1);
+                    style->dirty();
                 }
                 return true;
             } else if (ea.getKey() == 'z') {
@@ -307,8 +448,9 @@ public:
                     p->fill()->color() = color;
                     p->extrude()->height() = p->extrude()->height() + 50;
                 }
-                style->setRevision(style->getRevision()+1);
+                style->dirty();
                 return true;
+
             } else if (ea.getKey() == 'x') {
                 Style* style = _styles[3].get();
                 MarkerLineSymbol* l = style->getSymbol<MarkerLineSymbol>();
@@ -331,10 +473,9 @@ public:
                         p->randomRatio() = 0.9;
                     }
                 }
-                style->setRevision(style->getRevision()+1);
+                style->dirty();
                 return true;
             }
-
         }
         break;
         }
@@ -346,7 +487,7 @@ public:
 
 
 
-osg::Group* createSymbologyScene(const std::string url)
+osg::Group* createSymbologyScene(WindowManager* wm)
 {
     osg::Group* grp = new osg::Group;
 
@@ -415,6 +556,18 @@ osg::Group* createSymbologyScene(const std::string url)
     }
 
 
+    // style for popup
+    {
+        osg::ref_ptr<Style> style = new Style;
+        style->setName("Popup");
+        osg::ref_ptr<TextSymbol> symbol = new TextSymbol;
+        symbol->theme() = "../data/popup-theme.png";
+        symbol->font() = "arial.ttf";
+        symbol->size() = 14;
+        symbol->fill()->color() = osg::Vec4(getRandomValueInOne(), getRandomValueInOne() , getRandomValueInOne(), 0.7);
+        style->addSymbol(symbol.get());
+        styles.push_back(style.get());
+    }
 
 
     /// associate the style / symbolizer to the symbolic node
@@ -479,6 +632,7 @@ osg::Group* createSymbologyScene(const std::string url)
         std::string real = osgDB::getRealPath("../data/tree.ive");
         MarkerSymbol* marker = new MarkerSymbol;
         marker->marker() = real;
+        node->setDataSet(dataset.get());
         style->addSymbol(marker);
         node->setStyle(style);
         osg::MatrixTransform* tr = new osg::MatrixTransform;
@@ -486,9 +640,26 @@ osg::Group* createSymbologyScene(const std::string url)
         tr->setMatrix(osg::Matrix::scale(10,10,10) * osg::Matrix::translate(0, 750 , 0));
         grp->addChild(tr);
     }
-    
 
-    grp->addEventCallback(new StyleEditor(styles));
+    StyleEditor* styleEditor = new StyleEditor(styles);
+    {
+        PopUpSymbolizerContext* ctx = new PopUpSymbolizerContext(wm);
+        styleEditor->setPopupContext(ctx);
+
+        osg::ref_ptr<PopUpSymbolizer> symbolizer = new PopUpSymbolizer();
+        osg::ref_ptr<SymbolicNode> node = new SymbolicNode;
+        osg::ref_ptr<SampleGeometryInput> dataset = new SampleGeometryInput;
+        node->setSymbolizer(symbolizer.get());
+        node->setDataSet(dataset.get());
+        node->setStyle(styles[4]);
+        node->setContext(ctx);
+        osg::MatrixTransform* tr = new osg::MatrixTransform;
+        tr->addChild(node.get());
+        tr->setMatrix(osg::Matrix::translate(0, 1000 , 0));
+        grp->addChild(tr);
+    }
+    
+    grp->addEventCallback(styleEditor);
     return grp;
 }
 
@@ -507,10 +678,12 @@ int main(int argc, char** argv)
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
     
-    std::string url = "../data/istates_dissolve.shp";
-    std::string real = osgDB::getRealPath(url);
-    osg::Node* node = createSymbologyScene(real);
-    viewer.setSceneData(node);
+    osg::Group* root = new osg::Group;
+    viewer.setSceneData(root);
+    viewer.realize();
 
+    WindowManager* wm = new WindowManager(viewer);
+    osg::Node* node = createSymbologyScene(wm);
+    root->addChild(node);
     return viewer.run();
 }

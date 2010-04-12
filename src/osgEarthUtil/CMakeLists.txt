@@ -18,7 +18,13 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/FadeLayerNode
 	${HEADER_PATH}/Graticule
 	${HEADER_PATH}/ObjectPlacer
+	${HEADER_PATH}/OceanSurfaceNode
 	${HEADER_PATH}/Viewpoint
+    ${HEADER_PATH}/WindowManager
+    ${HEADER_PATH}/Widget
+    ${HEADER_PATH}/WidgetIcon
+    ${HEADER_PATH}/WidgetMessageBox
+    ${HEADER_PATH}/WidgetNode
 )
 
 SET(TARGET_SRC
@@ -30,7 +36,13 @@ SET(TARGET_SRC
 	FadeLayerNode.cpp
 	Graticule.cpp
 	ObjectPlacer.cpp
+    OceanSurfaceNode.cpp
 	Viewpoint.cpp
+    WindowManager.cpp
+    Widget.cpp
+    WidgetIcon.cpp
+    WidgetMessageBox.cpp
+    WidgetNode.cpp
 )
 
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})
@@ -48,6 +60,7 @@ SET(TARGET_ADDED_LIBRARIES
     osgViewer
 	osgText
 	osgGA
+	osgWidget
     OpenThreads
     )
 

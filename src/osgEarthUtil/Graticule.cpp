@@ -17,11 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthUtil/Graticule>
-#include <osgEarthFeatures/StencilVolumeNode>
 #include <osgEarthFeatures/BufferFilter>
+#include <osgEarthFeatures/BuildGeometryFilter>
 #include <osgEarthFeatures/TransformFilter>
 #include <osgEarthFeatures/ResampleFilter>
 #include <osgEarthSymbology/StencilVolumeNode>
+#include <osgEarthSymbology/Geometry>
 #include <OpenThreads/Mutex>
 #include <OpenThreads/ScopedLock>
 #include <osg/PagedLOD>
@@ -37,6 +38,7 @@
 using namespace osgEarth;
 using namespace osgEarthUtil;
 using namespace osgEarth::Features;
+using namespace osgEarth::Symbology;
 using namespace OpenThreads;
 
 static Mutex s_graticuleMutex;
@@ -49,6 +51,7 @@ static GraticuleRegistry s_graticuleRegistry;
 #define GRID_MARKER "g"
 
 /**************************************************************************/
+
 
 Graticule::Graticule( const Map* map ) :
 _map( map ),
@@ -250,7 +253,7 @@ Graticule::createGridLevel( unsigned int levelNum ) const
     if ( !getLevel( levelNum, level ) )
         return 0L;
 
-    OE_INFO << "Graticule: creating grid level " << levelNum << std::endl;
+    OE_DEBUG << "Graticule: creating grid level " << levelNum << std::endl;
 
     osg::Group* group = new osg::Group();
 
@@ -301,7 +304,7 @@ Graticule::createGridLevel( unsigned int levelNum ) const
             Bounds bounds = feature->getGeometry()->getBounds();
             double exDist = bounds.radius()/2.0;
 
-            osg::Node* cellVolume = StencilVolumeFactory::createVolume(
+            osg::Node* cellVolume = createVolume(
                 feature->getGeometry(),
                 -exDist,
                 exDist*2,
@@ -418,7 +421,7 @@ Graticule::createTextLevel( unsigned int levelNum ) const
     if ( !getLevel( levelNum, level ) )
         return 0L;
 
-    OE_INFO << "Graticule: creating text level " << levelNum << std::endl;
+    OE_DEBUG << "Graticule: creating text level " << levelNum << std::endl;
 
     osg::Group* group = new osg::Group();
 

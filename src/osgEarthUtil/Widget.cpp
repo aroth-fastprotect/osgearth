@@ -16,26 +16,16 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-#include <osgEarthFeatures2/Filter>
 
-using namespace osgEarth;
-using namespace osgEarth::Features2;
 
-FilterContext::FilterContext() :
-_isGeocentric( false ),
-_extent( GeoExtent() )
+#include <osgEarthUtil/Widget>
+#include <osgEarthUtil/WidgetNode>
+
+using namespace osgEarthUtil;
+
+void Widget::attach(osg::Group* node)
 {
-    //NOP
+    WidgetNode* wn = new WidgetNode;
+    wn->setWidget(this);
+    node->addChild(wn);
 }
-
-//FilterContext::FilterContext(const FilterContext& rhs) :
-//_extent( rhs._extent ),
-//_profile( rhs._profile ),
-//_isGeocentric( rhs._isGeocentric ),
-//_referenceFrame( rhs._referenceFrame ),
-//_inverseReferenceFrame( rhs._inverseReferenceFrame )
-//{
-//    //NOP
-//}
-
-//---------------------------------------------------------------------------

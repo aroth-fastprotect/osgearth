@@ -35,8 +35,9 @@
 #include <osgEarthSymbology/GeometrySymbolizer>
 #include <osgEarthSymbology/GeometryInput>
 #include <osgEarthSymbology/SymbolicNode>
+#include <osgEarthFeatures/BuildTextOperator>
 
-#include "FeatureGeomModelOptions"
+#include "FeatureLabelModelOptions"
 
 using namespace osgEarth;
 using namespace osgEarth::Features;
@@ -47,13 +48,13 @@ using namespace OpenThreads;
 #define PROP_HEIGHT_OFFSET "height_offset"
 
 
-class FactoryGeomSymbolizer : public SymbolizerFactory
+class FactoryLabelSymbolizer : public SymbolizerFactory
 {
 protected:
     osg::ref_ptr<FeatureModelSource> _model;
 
 public:
-    FactoryGeomSymbolizer(FeatureModelSource* model) : _model(model) {}
+    FactoryLabelSymbolizer(FeatureModelSource* model) : _model(model) {}
     FeatureModelSource* getFeatureModelSource() { return _model.get(); }
     //override
 
@@ -69,31 +70,27 @@ public:
 
         // Transform them into the map's SRS:
         TransformFilter xform( context->getModelSource()->getMap()->getProfile()->getSRS(), context->getModelSource()->getMap()->isGeocentric() );
-        const FeatureGeomModelOptions* options = dynamic_cast<const FeatureGeomModelOptions*>(context->getModelSource()->getFeatureModelOptions());
+        const FeatureLabelModelOptions* options = dynamic_cast<const FeatureLabelModelOptions*>(context->getModelSource()->getFeatureModelOptions());
 
         FeatureList featureList;
         for (FeatureList::const_iterator it = features.begin(); it != features.end(); ++it)
             featureList.push_back(osg::clone((*it).get(),osg::CopyOp::DEEP_COPY_ALL));
 
         xform.heightOffset() = options->heightOffset().value();
-        contextFilter = xform.push( featureList, contextFilter );
-
-        GeometryList geometryList;
-        for (FeatureList::iterator it = featureList.begin(); it != featureList.end(); ++it)
+        contextFilter = xform.push( featureList, contextFilter );        
+        
+        //Make some labels
+        osg::ref_ptr<const TextSymbol> textSymbol = style->getSymbol<TextSymbol>();
+        //Use a default symbol if we have no text symbol
+        if (!textSymbol) textSymbol = new TextSymbol();
+        osg::Node* labels = NULL;
+        if (textSymbol.valid())
         {
-            Feature* feature = it->get();
-            if ( feature )
-            {
-                Geometry* geometry = feature->getGeometry();
-                if ( geometry )
-                    geometryList.push_back(geometry);
-            }
+            BuildTextOperator textOperator;
+            labels = textOperator(featureList, textSymbol.get(), contextFilter);
         }
-        GeometrySymbolizer::GeometrySymbolizerOperator geometryOperator;
-        osg::Node* result = geometryOperator(geometryList, style, context);        
 
-
-        osg::Group* root = new osg::Group;
+        osg::Node* result = labels;
 
         // If the context specifies a reference frame, apply it to the resulting model.
         // Q: should this be here, or should the reference frame matrix be passed to the Symbolizer?
@@ -102,38 +99,36 @@ public:
         {
             osg::MatrixTransform* delocalizer = new osg::MatrixTransform(
                 contextFilter.inverseReferenceFrame() );
-            delocalizer->addChild( result );
+            delocalizer->addChild( labels );
             result = delocalizer;
         }
 
-        root->addChild( result );
-        
         // Apply an LOD if required:
         if ( options->minRange().isSet() || options->maxRange().isSet() )
         {
             osg::LOD* lod = new osg::LOD();
-            lod->addChild( root, options->minRange().value(), options->maxRange().value() );
-            root = lod;
+            lod->addChild( result, options->minRange().value(), options->maxRange().value() );
+            result = lod;
         }
 
         // set the output node if necessary:
         if ( out_newNode )
-            *out_newNode = root;
+            *out_newNode = result;
 
-        return root;
+        return result;
     }
 };
 
 
-class FeatureGeomModelSource : public FeatureModelSource
+class FeatureLabelModelSource : public FeatureModelSource
 {
 public:
-    FeatureGeomModelSource( const PluginOptions* options, int sourceId ) : FeatureModelSource( options ),
+    FeatureLabelModelSource( const PluginOptions* options, int sourceId ) : FeatureModelSource( options ),
         _sourceId( sourceId )
     {
-        _options = dynamic_cast<const FeatureGeomModelOptions*>( options );
+        _options = dynamic_cast<const FeatureLabelModelOptions*>( options );
         if ( !_options )
-            _options = new FeatureGeomModelOptions( options );
+            _options = new FeatureLabelModelOptions( options );
     }
 
     //override
@@ -144,7 +139,7 @@ public:
 
     osg::Node* createNode( ProgressCallback* progress )
     {
-        return new FeatureSymbolizerGraph(new FactoryGeomSymbolizer(this));
+        return new FeatureSymbolizerGraph(new FactoryLabelSymbolizer(this));
     }
 
 
@@ -154,28 +149,28 @@ protected:
 
 
 
-class FeatureGeomModelSourceFactory : public osgDB::ReaderWriter
+class FeatureLabelModelSourceFactory : public osgDB::ReaderWriter
 {
 public:
-    FeatureGeomModelSourceFactory()
+    FeatureLabelModelSourceFactory()
     {
-        supportsExtension( "osgearth_model_feature_geom", "osgEarth feature geom plugin" );
+        supportsExtension( "osgearth_model_feature_label", "osgEarth feature label plugin" );
     }
 
     virtual const char* className()
     {
-        return "osgEarth Feature Geom Model Plugin";
+        return "osgEarth Feature Label Model Plugin";
     }
 
-    FeatureGeomModelSource* create( const PluginOptions* options )
+    FeatureLabelModelSource* create( const PluginOptions* options )
     {
         ScopedLock<Mutex> lock( _sourceIdMutex );
-        FeatureGeomModelSource* obj = new FeatureGeomModelSource( options, _sourceId );
+        FeatureLabelModelSource* obj = new FeatureLabelModelSource( options, _sourceId );
         if ( obj ) _sourceMap[_sourceId++] = obj;
         return obj;
     }
 
-    FeatureGeomModelSource* get( int sourceId )
+    FeatureLabelModelSource* get( int sourceId )
     {
         ScopedLock<Mutex> lock( _sourceIdMutex );
         return _sourceMap[sourceId].get();
@@ -186,7 +181,7 @@ public:
         if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
             return ReadResult::FILE_NOT_HANDLED;
 
-        FeatureGeomModelSourceFactory* nonConstThis = const_cast<FeatureGeomModelSourceFactory*>(this);
+        FeatureLabelModelSourceFactory* nonConstThis = const_cast<FeatureLabelModelSourceFactory*>(this);
         return nonConstThis->create( static_cast<const PluginOptions*>(options) );
     }
 
@@ -201,14 +196,14 @@ public:
         int sourceId = 0;
         sscanf( stripped.c_str(), "%d", &sourceId );
 
-        FeatureGeomModelSourceFactory* nonConstThis = const_cast<FeatureGeomModelSourceFactory*>(this);
+        FeatureLabelModelSourceFactory* nonConstThis = const_cast<FeatureLabelModelSourceFactory*>(this);
         return ReadResult( nonConstThis->get( sourceId ) );
     }
 
 protected:
     Mutex _sourceIdMutex;
     int _sourceId;
-    std::map<int, osg::ref_ptr<FeatureGeomModelSource> > _sourceMap;
+    std::map<int, osg::ref_ptr<FeatureLabelModelSource> > _sourceMap;
 };
 
-REGISTER_OSGPLUGIN(osgearth_model_feature_geom, FeatureGeomModelSourceFactory) 
+REGISTER_OSGPLUGIN(osgearth_model_feature_label, FeatureLabelModelSourceFactory) 

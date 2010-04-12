@@ -17,22 +17,17 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/BuildGeometryFilter  
 	${HEADER_PATH}/Common
 	${HEADER_PATH}/ConvertTypeFilter
-	${HEADER_PATH}/CssUtils
-	${HEADER_PATH}/DriverOptions
 	${HEADER_PATH}/Feature
 	${HEADER_PATH}/FeatureGridder
 	${HEADER_PATH}/FeatureModelSource
 	${HEADER_PATH}/FeatureSource
+	${HEADER_PATH}/FeatureSymbolizer
 	${HEADER_PATH}/FeatureTileSource
 	${HEADER_PATH}/Filter
-	${HEADER_PATH}/Geometry
-	${HEADER_PATH}/GEOS
-	${HEADER_PATH}/Query
+    ${HEADER_PATH}/GEOS
 	${HEADER_PATH}/ResampleFilter
 	${HEADER_PATH}/ScaleFilter
-	${HEADER_PATH}/SLD
-	${HEADER_PATH}/StencilVolumeNode
-	${HEADER_PATH}/Styling
+	${HEADER_PATH}/BuildTextOperator
 	${HEADER_PATH}/TransformFilter
 )
 
@@ -41,22 +36,17 @@ SET(TARGET_SRC
     BufferFilter.cpp
     BuildGeometryFilter.cpp
     ConvertTypeFilter.cpp
-    CssUtils.cpp
-    DriverOptions.cpp
     Feature.cpp
     FeatureGridder.cpp
     FeatureModelSource.cpp
     FeatureSource.cpp
+    FeatureSymbolizer.cpp
     FeatureTileSource.cpp
     Filter.cpp
     GEOS.cpp
-    Geometry.cpp
-	Query.cpp
     ResampleFilter.cpp
 	ScaleFilter.cpp
-    SLD.cpp
-    StencilVolumeNode.cpp
-    Styling.cpp
+	BuildTextOperator.cpp
     TransformFilter.cpp
 )
 
@@ -68,6 +58,7 @@ ENDIF(GEOS_FOUND)
 
 SET(TARGET_ADDED_LIBRARIES
 	osgEarth
+	osgEarthSymbology
     osg
     osgUtil
     osgSim

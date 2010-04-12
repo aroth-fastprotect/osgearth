@@ -26,6 +26,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/ImageUtils>
 #include <osgEarth/MaskNode>
+#include <osgEarth/EarthFile>
 #include <osg/TexEnv>
 #include <osg/TexEnvCombine>
 #include <osg/Notify>
@@ -375,6 +376,13 @@ MapNode::getTerrainsGroup() {
 }
 
 void
+MapNode::addTerrainDecorator(osg::Group* decorator)
+{
+    decorator->addChild( _terrains );
+    replaceChild( _terrains.get(), decorator );   
+}
+
+void
 MapNode::onMapProfileEstablished( const Profile* mapProfile )
 {
     // set up the CSN values
@@ -600,7 +608,7 @@ MapNode::addImageLayer( MapLayer* layer )
         VersionedTerrain* terrain = _terrainVec[i].get();
         TerrainTileList tiles;
         terrain->getTerrainTiles( tiles );
-        OE_INFO << "Found " << tiles.size() << std::endl;
+        OE_DEBUG << "Found " << tiles.size() << std::endl;
 
         for (TerrainTileList::iterator itr = tiles.begin(); itr != tiles.end(); ++itr)
         {
@@ -765,7 +773,7 @@ MapNode::updateElevation(VersionedTile* tile)
 void
 MapNode::addHeightFieldLayer( MapLayer* layer )
 {
-    OE_INFO << "[osgEarth::MapEngine::addHeightFieldLayer] Begin " << std::endl;
+    OE_DEBUG << "[osgEarth::MapEngine::addHeightFieldLayer] Begin " << std::endl;
     OpenThreads::ScopedReadLock mapDataLock( _map->getMapDataMutex() );
 
     for (unsigned int i = 0; i < _terrainVec.size(); ++i)
@@ -773,7 +781,7 @@ MapNode::addHeightFieldLayer( MapLayer* layer )
         VersionedTerrain* terrain = _terrainVec[i].get();
         TerrainTileList tiles;
         terrain->getTerrainTiles( tiles );
-        OE_INFO << "Found " << tiles.size() << std::endl;
+        OE_DEBUG << "Found " << tiles.size() << std::endl;
 
         for (TerrainTileList::iterator itr = tiles.begin(); itr != tiles.end(); ++itr)
         {
@@ -849,7 +857,7 @@ MapNode::removeImageLayer( unsigned int index )
 
     updateStateSet();
 
-    OE_INFO << "[osgEarth::Map::removeImageSource] end " << std::endl;  
+    OE_DEBUG << "[osgEarth::Map::removeImageSource] end " << std::endl;  
 }
 
 void
@@ -898,7 +906,7 @@ MapNode::moveImageLayer( unsigned int oldIndex, unsigned int newIndex )
         VersionedTerrain* terrain = _terrainVec[i].get();
         TerrainTileList tiles;
         terrain->getTerrainTiles( tiles );
-        OE_INFO << "Found " << tiles.size() << std::endl;
+        OE_DEBUG << "Found " << tiles.size() << std::endl;
 
         for (TerrainTileList::iterator itr = tiles.begin(); itr != tiles.end(); ++itr)
         {
@@ -943,7 +951,7 @@ MapNode::moveHeightFieldLayer( unsigned int oldIndex, unsigned int newIndex )
         VersionedTerrain* terrain = _terrainVec[i].get();
         TerrainTileList tiles;
         terrain->getTerrainTiles( tiles );
-        OE_INFO << "Found " << tiles.size() << std::endl;
+        OE_DEBUG << "Found " << tiles.size() << std::endl;
 
         for (TerrainTileList::iterator itr = tiles.begin(); itr != tiles.end(); ++itr)
         {

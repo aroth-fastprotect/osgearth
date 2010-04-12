@@ -17,14 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 
-#include <osgEarthFeatures2/FeatureSymbolizer>
-#include <osgEarthFeatures2/Feature>
+#include <osgEarthFeatures/FeatureSymbolizer>
+#include <osgEarthFeatures/Feature>
 #include <osgEarthSymbology/SymbolicNode>
 #include <osg/NodeVisitor>
 #include <osgUtil/Optimizer>
 
 using namespace osgEarth;
-using namespace osgEarth::Features2;
+using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
 void FeatureSymbolizerGraph::traverse(osg::NodeVisitor& nv)
@@ -41,7 +41,7 @@ void FeatureSymbolizerGraph::traverse(osg::NodeVisitor& nv)
             FeatureModelSource* model = _factory->getFeatureModelSource();
             // implementation-specific data
             osg::ref_ptr<osg::Referenced> buildData = model->createBuildData();
-            FeatureSymbolizerContext* context = new FeatureSymbolizerContext(model, buildData);
+            osg::ref_ptr<FeatureSymbolizerContext> context = new FeatureSymbolizerContext(model, buildData);
 
             const optional<StyleCatalog>& styles = model->getFeatureModelOptions()->styles();
     
@@ -58,7 +58,7 @@ void FeatureSymbolizerGraph::traverse(osg::NodeVisitor& nv)
                         FeatureList list;
                         list.push_back( feature );
                         // gridding is not supported for embedded styles.
-                        osg::Node* node = createSymbolizerNode(feature->style().get().get(), list, context);
+                        osg::Node* node = createSymbolizerNode(feature->style().get().get(), list, context.get());
                         if ( node )
                             addChild( node );
                     }
@@ -73,7 +73,7 @@ void FeatureSymbolizerGraph::traverse(osg::NodeVisitor& nv)
                         const StyleSelector& sel = *i;
                         Style* style;
                         styles->getStyle( sel.getSelectedStyleName(), style );
-                        osg::Node* node = createGridSymbolizerNode( style, sel.query().value(), context);
+                        osg::Node* node = createGridSymbolizerNode( style, sel.query().value(), context.get());
                         if ( node )
                             addChild( node );
                     }
@@ -81,14 +81,14 @@ void FeatureSymbolizerGraph::traverse(osg::NodeVisitor& nv)
                 else
                 {
                     const Style* style = styles->getDefaultStyle();
-                    osg::Node* node = createGridSymbolizerNode(style, Query(), context);
+                    osg::Node* node = createGridSymbolizerNode(style, Query(), context.get());
                     if ( node )
                         addChild( node );
                 }
             }
             else
             {
-                osg::Node* node = createGridSymbolizerNode( new Style, Query(), context);
+                osg::Node* node = createGridSymbolizerNode( new Style, Query(), context.get());
                 if ( node )
                     addChild( node );
             }
@@ -108,6 +108,9 @@ osg::Node* FeatureSymbolizerGraph::createGridSymbolizerNode(
     node->setContext(context);
     node->setSymbolizer(symbolizer);
     node->setStyle(style);
+
+    SymbolizerInput* input = new SymbolizerInput();
+    node->setDataSet(input);
     return node;
 }
 
@@ -205,7 +208,8 @@ bool FeatureSymbolizer::update(
     const SymbolizerInput* dataInput,
     const Style* style,
     osg::Group* attachPoint,
-    SymbolizerContext* context )
+    SymbolizerContext* context,
+    Symbolizer::State* state )
 {
     if (!dataInput || !context || !attachPoint || !style)
         return false;
@@ -232,7 +236,8 @@ bool GridFeatureSymbolizer::update(
     const SymbolizerInput* dataInput,
     const Style* style,
     osg::Group* attachPoint,
-    SymbolizerContext* context )
+    SymbolizerContext* context,
+    Symbolizer::State* state )
 {
     if (!context || !attachPoint || !style)
         return false;
@@ -290,7 +295,7 @@ osg::Group* GridFeatureSymbolizer::gridAndCreateNodeForStyle(
 
             // now copy the resulting feature set into a list, converting the data
             // types along the way if a geometry override is in place:
-            FeatureList cellFeatures2;
+            FeatureList cellFeatures;
             while( cursor->hasMore() )
             {
                 Feature* feature = cursor->nextFeature();
@@ -307,7 +312,7 @@ osg::Group* GridFeatureSymbolizer::gridAndCreateNodeForStyle(
                 }
                 if ( geom )
                 {
-                    cellFeatures2.push_back( feature );
+                    cellFeatures.push_back( feature );
                 }
             }
 
@@ -315,17 +320,17 @@ osg::Group* GridFeatureSymbolizer::gridAndCreateNodeForStyle(
             // do this is gridding is enabled.
             if ( gridder.getNumCells() > 1 )
             {
-                gridder.cullFeatureListToCell( cell, cellFeatures2 );
+                gridder.cullFeatureListToCell( cell, cellFeatures );
             }
 
-            if ( cellFeatures2.size() > 0 )
+            if ( cellFeatures.size() > 0 )
             {
                 // next ask the implementation to construct OSG geometry for the cell features.
                 // note: just b/c render* returns NULL does not mean it didn't generate anything.
                 // Some implementations might return a group node on the first pass and add children
                 // to it on subsequent passes.
                 osg::Node* createdNode = 0L;
-                osg::Node* nodeToAdd = _factory->createNodeForStyle( style, cellFeatures2, context, &createdNode );
+                osg::Node* nodeToAdd = _factory->createNodeForStyle( style, cellFeatures, context, &createdNode );
                 if ( nodeToAdd )
                 {
                     if ( !styleGroup )

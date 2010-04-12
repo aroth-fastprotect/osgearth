@@ -454,11 +454,11 @@ build_vrt(std::vector<std::string> &files, ResolutionStrategy resolutionStrategy
                                             psDatasetProperties[i].nBlockYSize);
         }
         isProxy = true;
-        OE_INFO << "GDAL: Using GDALProxyPoolDatasetH" << std::endl;
+        OE_DEBUG << "GDAL: Using GDALProxyPoolDatasetH" << std::endl;
 
 #else // !GDAL_VERSION_1_6_OR_NEWER
 
-        OE_INFO << "GDAL: Using GDALDataset, no proxy support enabled" << std::endl;
+        OE_DEBUG << "GDAL: Using GDALDataset, no proxy support enabled" << std::endl;
         //Just open the dataset
         GDALDatasetH hDS = (GDALDatasetH)GDALOpen(dsFileName, GA_ReadOnly);
         isProxy = false;
@@ -711,15 +711,15 @@ public:
         tokenize( _settings->extensions().value(), exts, ";");
         for (unsigned int i = 0; i < exts.size(); ++i)
         {
-            OE_INFO << "GDAL: Using Extension: " << exts[i] << std::endl;
+            OE_DEBUG << "GDAL: Using Extension: " << exts[i] << std::endl;
         }
         std::vector<std::string> files;
         getFiles(path, exts, files);
 
-        OE_NOTICE << "GDAL: Driver found " << files.size() << " files:" << std::endl;
+        OE_INFO << "GDAL: Driver found " << files.size() << " files:" << std::endl;
         for (unsigned int i = 0; i < files.size(); ++i)
         {
-            OE_NOTICE << "GDAL: " << files[i] << std::endl;
+            OE_INFO << "GDAL: " << files[i] << std::endl;
         }
 
         if (files.empty())
@@ -1278,8 +1278,6 @@ public:
 
     float getInterpolatedValue(GDALRasterBand *band, double x, double y)
     {
-        GDAL_SCOPED_LOCK;
-
         double offsetTransform[6];
         memcpy(offsetTransform, _geotransform, 6 * sizeof(double));
 
@@ -1454,10 +1452,10 @@ public:
         return hf.release();
     }
 
-    virtual int getPixelsPerTile() const
-    {
-        return _settings->tileSize().value();
-    }
+    //virtual int getPixelsPerTile() const
+    //{
+    //    return _settings->tileSize().value();
+    //}
 
     bool intersects(const TileKey* key)
     {

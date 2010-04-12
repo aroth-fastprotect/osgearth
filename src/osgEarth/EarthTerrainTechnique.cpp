@@ -108,7 +108,11 @@ void EarthTerrainTechnique::swapBuffers()
 }
 
 void
+#if OSG_MIN_VERSION_REQUIRED(2,9,8)
+EarthTerrainTechnique::init(int dirtyMask, bool assumeMultiThreaded)
+#else
 EarthTerrainTechnique::init()
+#endif
 {
     init( true, 0L );
 }
@@ -876,8 +880,11 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
         buf << "imglod" << std::endl;
     for (unsigned int i = 0; i < _terrainTile->getNumColorLayers(); ++i)
     {
-        TransparentLayer* tl = static_cast<TransparentLayer*>( _terrainTile->getColorLayer(i) );
-        buf << tl->getId() << "=" << tl->getLevelOfDetail() << std::endl;
+        TransparentLayer* tl = dynamic_cast<TransparentLayer*>( _terrainTile->getColorLayer(i) );
+        if (tl)
+        {
+            buf << tl->getId() << "=" << tl->getLevelOfDetail() << std::endl;
+        }
     }
 
 	std::string bufStr;
@@ -1073,7 +1080,11 @@ void EarthTerrainTechnique::traverse(osg::NodeVisitor& nv)
     // if app traversal update the frame count.
     if (nv.getVisitorType()==osg::NodeVisitor::UPDATE_VISITOR)
     {
+#if OSG_MIN_VERSION_REQUIRED(2,9,8)
+        if (_terrainTile->getDirty()) _terrainTile->init(~0x0,true);
+#else
         if (_terrainTile->getDirty()) _terrainTile->init();
+#endif
 
         osgUtil::UpdateVisitor* uv = dynamic_cast<osgUtil::UpdateVisitor*>(&nv);
         if (uv)
@@ -1097,7 +1108,11 @@ void EarthTerrainTechnique::traverse(osg::NodeVisitor& nv)
     if (_terrainTile->getDirty()) 
     {
         //OE_INFO<<"******* Doing init ***********"<<std::endl;
+#if OSG_MIN_VERSION_REQUIRED(2,9,8)
+        _terrainTile->init(~0x0, true);
+#else
         _terrainTile->init();
+#endif
     }
 
     BufferData& buffer = getReadOnlyBuffer();

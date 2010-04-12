@@ -57,7 +57,6 @@ SET(TARGET_SRC
 
 SET(TARGET_ADDED_LIBRARIES
     osgEarth
-    osgEarthFeatures
     osg
     osgUtil
     osgSim

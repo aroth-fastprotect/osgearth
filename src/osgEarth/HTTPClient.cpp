@@ -423,6 +423,10 @@ HTTPClient::readString(const std::string& filename,
 HTTPResponse
 HTTPClient::doGet( const HTTPRequest& request, const osgDB::ReaderWriter::Options* options, ProgressCallback* callback) const
 {
+    const osgDB::AuthenticationMap* authenticationMap = (options && options->getAuthenticationMap()) ? 
+            options->getAuthenticationMap() :
+            osgDB::Registry::instance()->getAuthenticationMap();
+
     std::string proxy_host;
     std::string proxy_port = "8080";
     readOptions( options, proxy_host, proxy_port );
@@ -437,11 +441,51 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::ReaderWriter::Option
 		bufStr = buf.str();
         proxy_addr = bufStr;
     
-        OE_INFO << "[osgEarth::HTTPClient] setting proxy: " << proxy_addr << std::endl;
+        OE_DEBUG << "[osgEarth::HTTPClient] setting proxy: " << proxy_addr << std::endl;
         curl_easy_setopt( _curl_handle, CURLOPT_PROXY, proxy_addr.c_str() );
     }
 
-    OE_INFO << "HTTP GET: " << request.getURL() << std::endl;
+    const osgDB::AuthenticationDetails* details = authenticationMap ?
+        authenticationMap->getAuthenticationDetails(request.getURL()) :
+        0;
+
+        if (details)
+        {
+            const std::string colon(":");
+            std::string password(details->username + colon + details->password);
+            curl_easy_setopt(_curl_handle, CURLOPT_USERPWD, password.c_str());
+            const_cast<HTTPClient*>(this)->_previousPassword = password;
+
+            // use for https.
+            // curl_easy_setopt(_curl, CURLOPT_KEYPASSWD, password.c_str());
+
+#if LIBCURL_VERSION_NUM >= 0x070a07
+            if (details->httpAuthentication != _previousHttpAuthentication)
+            { 
+                curl_easy_setopt(_curl_handle, CURLOPT_HTTPAUTH, details->httpAuthentication); 
+                const_cast<HTTPClient*>(this)->_previousHttpAuthentication = details->httpAuthentication;
+            }
+#endif
+    }
+    else
+    {
+        if (!_previousPassword.empty())
+        {
+            curl_easy_setopt(_curl_handle, CURLOPT_USERPWD, 0);
+            const_cast<HTTPClient*>(this)->_previousPassword.clear();
+        }
+
+#if LIBCURL_VERSION_NUM >= 0x070a07
+        // need to reset if previously set.
+        if (_previousHttpAuthentication!=0)
+        {
+            curl_easy_setopt(_curl_handle, CURLOPT_HTTPAUTH, 0); 
+            const_cast<HTTPClient*>(this)->_previousHttpAuthentication = 0;
+        }
+#endif
+    }
+
+    OE_DEBUG << "HTTP GET: " << request.getURL() << std::endl;
     //OE_INFO << "[osgEarth::HTTPClient] GET " << request.getURL() << std::endl;
 
     osg::ref_ptr<HTTPResponse::Part> part = new HTTPResponse::Part();
@@ -470,7 +514,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::ReaderWriter::Option
     else
         curl_easy_getinfo( _curl_handle, CURLINFO_RESPONSE_CODE, &code );     
 
-    OE_INFO << "[HTTPClient] got response, code = " << code << std::endl;
+    OE_DEBUG << "[HTTPClient] got response, code = " << code << std::endl;
 
     HTTPResponse response( code );
    
@@ -604,7 +648,7 @@ HTTPClient::doReadImageFile(const std::string& filename,
             if (!reader)
             {
                 std::string mimeType = response.getMimeType();
-                OE_INFO << "HTTPClient: Looking up extension for mime-type " << mimeType << std::endl;
+                OE_DEBUG << "HTTPClient: Looking up extension for mime-type " << mimeType << std::endl;
                 if ( mimeType.length() > 0 )
                 {
                     reader = osgEarth::Registry::instance()->getReaderWriterForMimeType(mimeType);
@@ -684,7 +728,7 @@ HTTPClient::doReadNodeFile(const std::string& filename,
             if (!reader)
             {
                 std::string mimeType = response.getMimeType();
-                OE_INFO << "HTTPClient: Looking up extension for mime-type " << mimeType << std::endl;
+                OE_DEBUG << "HTTPClient: Looking up extension for mime-type " << mimeType << std::endl;
                 if ( mimeType.length() > 0 )
                 {
                     reader = osgEarth::Registry::instance()->getReaderWriterForMimeType(mimeType);

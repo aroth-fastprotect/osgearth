@@ -227,6 +227,7 @@ HTTPClient& HTTPClient::getClient()
 
 HTTPClient::HTTPClient()
 {
+    _previousHttpAuthentication = 0;
     _curl_handle = curl_easy_init();
     curl_easy_setopt( _curl_handle, CURLOPT_USERAGENT, "libcurl-agent/1.0" );
     curl_easy_setopt( _curl_handle, CURLOPT_WRITEFUNCTION, osgEarth::StreamObjectReadCallback );
@@ -423,6 +424,8 @@ HTTPClient::readString(const std::string& filename,
 HTTPResponse
 HTTPClient::doGet( const HTTPRequest& request, const osgDB::ReaderWriter::Options* options, ProgressCallback* callback) const
 {
+    OE_DEBUG << "[HTTPClient] doGet " << request.getURL() << std::endl;
+
     const osgDB::AuthenticationMap* authenticationMap = (options && options->getAuthenticationMap()) ? 
             options->getAuthenticationMap() :
             osgDB::Registry::instance()->getAuthenticationMap();
@@ -484,9 +487,6 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::ReaderWriter::Option
         }
 #endif
     }
-
-    OE_DEBUG << "HTTP GET: " << request.getURL() << std::endl;
-    //OE_INFO << "[osgEarth::HTTPClient] GET " << request.getURL() << std::endl;
 
     osg::ref_ptr<HTTPResponse::Part> part = new HTTPResponse::Part();
     StreamObject sp( &part->_stream );

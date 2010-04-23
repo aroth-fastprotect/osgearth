@@ -834,6 +834,8 @@ public:
 
         //Get the _geotransform
         _warpedDS->GetGeoTransform(_geotransform);
+        GDALInvGeoTransform(_geotransform, _invtransform);
+
 
         //Compute the extents
         // polar needs a special case when combined with geographic
@@ -955,7 +957,7 @@ public:
     {
         if (key->getLevelOfDetail() > _maxDataLevel)
         {
-            OE_INFO << "GDAL: " << getName() << ": Reached maximum data resolution key=" 
+            OE_DEBUG << "GDAL: " << getName() << ": Reached maximum data resolution key=" 
                 << key->getLevelOfDetail() << " max=" << _maxDataLevel <<  std::endl;
             return NULL;
         }
@@ -1014,7 +1016,7 @@ public:
                 off_y = 0;
             }
 
-            OE_INFO << "GDAL: ReadWindow " << width << "x" << height << " DestWindow " << target_width << "x" << target_height << std::endl;
+            OE_DEBUG << "GDAL: ReadWindow " << width << "x" << height << " DestWindow " << target_width << "x" << target_height << std::endl;
 
             //Return if parameters are out of range.
             if (width <= 0 || height <= 0 || target_width <= 0 || target_height <= 0)
@@ -1278,13 +1280,8 @@ public:
 
     float getInterpolatedValue(GDALRasterBand *band, double x, double y)
     {
-        double offsetTransform[6];
-        memcpy(offsetTransform, _geotransform, 6 * sizeof(double));
-
-        double invTransform[6];
-        GDALInvGeoTransform(offsetTransform, invTransform);
         double r, c;
-        GDALApplyGeoTransform(invTransform, x, y, &c, &r);
+        GDALApplyGeoTransform(_invtransform, x, y, &c, &r);
 
         //Account for slight rounding errors.  If we are right on the edge of the dataset, clamp to the edge
         double eps = 0.0001;
@@ -1327,6 +1324,10 @@ public:
         if ( _settings->interpolation() == INTERP_NEAREST )
         {
             band->RasterIO(GF_Read, (int)osg::round(c), (int)osg::round(r), 1, 1, &result, 1, 1, GDT_Float32, 0, 0);
+            if (!isValidValue( result, band))
+            {
+                return NO_DATA_VALUE;
+            }
         }
         else
         {
@@ -1472,6 +1473,7 @@ private:
     GDALDataset* _srcDS;
     GDALDataset* _warpedDS;
     double       _geotransform[6];
+    double       _invtransform[6];
 
     osg::Vec2d _extentsMin;
     osg::Vec2d _extentsMax;

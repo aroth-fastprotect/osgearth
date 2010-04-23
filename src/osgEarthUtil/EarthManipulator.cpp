@@ -22,6 +22,7 @@
 #include <osg/Notify>
 #include <osgUtil/LineSegmentIntersector>
 #include <osgViewer/View>
+#include <iomanip>
 
 using namespace osgEarthUtil;
 using namespace osgEarth;
@@ -304,7 +305,6 @@ _last_action( rhs._last_action ),
 _srs_lookup_failed( rhs._srs_lookup_failed ),
 _setting_viewpoint( rhs._setting_viewpoint ),
 _delta_t( rhs._delta_t ),
-_traversalMask( rhs._traversalMask ),
 _t_factor( rhs._t_factor ),
 _time_s_last_frame( rhs._time_s_last_frame  ),
 _local_azim( rhs._local_azim ),
@@ -583,16 +583,6 @@ osg::Node*
 EarthManipulator::getNode()
 {
     return _node.get();
-}
-
-void
-EarthManipulator::setTraversalMask( const osg::Node::NodeMask& mask ) {
-    _traversalMask = mask;
-}
-
-const osg::Node::NodeMask&
-EarthManipulator::getTraversalMask() const {
-    return _traversalMask;
 }
 
 const osgEarth::SpatialReference*
@@ -997,6 +987,16 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
     if ( !established() )
         return false;
 
+    if ( !_viewCamera.valid() )
+    {
+        // installs a camera update callback. Camera updates get called AFTER the scene
+        // gets its update traversal. So, if you have tethering enabled (or some other
+        // feature that tracks scene graph nodes), this will update the camera after
+        // the scene graph.
+        _viewCamera = aa.asView()->getCamera();
+        _viewCamera->addUpdateCallback( new CameraPostUpdateCallback(this) );
+    }
+
     if ( ea.getEventType() == osgGA::GUIEventAdapter::FRAME )
     {
         _time_s_last_frame = _time_s_now;
@@ -1021,12 +1021,6 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
         if ( _setting_viewpoint )
         {
             updateSetViewpoint();
-        }
-
-        // check for _center update due to tethering:
-        if ( _tether_node.valid() )
-        {
-            updateTether();
         }
 
         if ( _thrown || _continuous )
@@ -1166,16 +1160,29 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
 }
 
 void
+EarthManipulator::postUpdate()
+{
+    updateTether();
+}
+
+void
 EarthManipulator::updateTether()
 {
     // capture a temporary ref since _tether_node is just an observer:
     osg::ref_ptr<osg::Node> temp = _tether_node.get();
     if ( temp.valid() )
     {
+        _center = temp->getBound().center();
+
+        //OE_NOTICE
+        //    << std::fixed << std::setprecision(3)
+        //    << "Tether center: (" << _center.x() << "," << _center.y() << "," << _center.z()
+        //    << "); bbox center: (" << bs.center().x() << "," << bs.center().y() << "," << bs.center().z() << ")"
+        //    << std::endl;
+        
         //OE_NOTICE << "updateTether" << std::endl;
-		//Get the bounding sphere of the Node
-        const osg::BoundingSphere& bs = temp->getBound();
-		_center = bs._center;
+  //      const osg::BoundingSphere& bs = temp->getBound();
+		//_center = bs._center;
 		osg::CoordinateFrame local_frame = getMyCoordinateFrame( _center ); //getCoordinateFrame( _center );
 	    _previousUp = getUpVector( local_frame );
 
@@ -1395,7 +1402,7 @@ EarthManipulator::setByLookAt(const osg::Vec3d& eye,const osg::Vec3d& center,con
             !hitFound && i<2;
             ++i, endPoint = farPosition)
         {
-            // compute the intersection with the scene.
+            // compute the intersection with the scene.s
             
             osg::Vec3d ip;
             if (intersect(eye, endPoint, ip))
@@ -1641,7 +1648,7 @@ EarthManipulator::screenToWorld(float x, float y, osg::View* theView, osg::Vec3d
     osg::ref_ptr< osgUtil::LineSegmentIntersector > picker = new osgUtil::LineSegmentIntersector(cf, local_x, local_y);
 
     osgUtil::IntersectionVisitor iv(picker.get());
-    iv.setTraversalMask(_traversalMask);
+    iv.setTraversalMask(_intersectTraversalMask);
 
     const_cast<osg::Camera*>(camera)->accept(iv);
 

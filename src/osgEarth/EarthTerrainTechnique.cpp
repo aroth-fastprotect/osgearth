@@ -22,6 +22,7 @@
 #include <osgTerrain/Terrain>
 #include <osgEarth/VersionedTerrain>
 #include <osgEarth/MapLayer>
+#include <osgEarth/Cube>
 
 #include <osgEarth/EarthTerrainTechnique>
 
@@ -51,25 +52,19 @@ using namespace osgEarth;
 using namespace OpenThreads;
 
 // OSG 2.9.5 introduced new texture buffer code..
-#if OSG_VERSION_GREATER_OR_EQUAL(2,9,5)
-#   define USE_NEW_OSG_TEXTURE_BUFFERS 1
-#endif
+//#if OSG_VERSION_GREATER_OR_EQUAL(2,9,5)
+//#   define USE_NEW_OSG_TEXTURE_BUFFERS 1
+//#endif
+//#ifndef USE_NEW_OSG_TEXTURE_BUFFERS
+//#   define EXPLICIT_RELEASE_GL_OBJECTS 1
+//#endif
+#define EXPLICIT_RELEASE_GL_OBJECTS 1
 
 // OSG 2.9.8 changed the osgTerrain API...
 #if OSG_VERSION_GREATER_OR_EQUAL(2,9,8)
 #   define USE_NEW_OSGTERRAIN_298_API 1 
 #endif
 
-
-#ifndef USE_NEW_OSG_TEXTURE_BUFFERS
-#   define EXPLICITY_REPLEASE_GL_OBJECTS 1
-#endif
-
-//#if OSG_MIN_VERSION_REQUIRED(2,9,5)
-//#  undef EXPLICIT_RELEASE_GL_OBJECTS
-//#else
-//#  define EXPLICIT_RELEASE_GL_OBJECTS
-//#endif
 
 EarthTerrainTechnique::EarthTerrainTechnique( Locator* masterLocator ) :
 TerrainTechnique(),
@@ -342,9 +337,11 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
     osg::ref_ptr< Locator > masterTextureLocator = masterLocator;
     GeoLocator* geoMasterLocator = dynamic_cast<GeoLocator*>(masterLocator);
 
+	bool isCube = dynamic_cast<CubeFaceLocator*>(masterLocator) != NULL;
+
     //If we have a geocentric locator, get a geographic version of it to avoid converting
     //to/from geocentric when computing texture coordinats
-    if (geoMasterLocator && masterLocator->getCoordinateSystemType() == osgTerrain::Locator::GEOCENTRIC)
+    if (!isCube && geoMasterLocator && masterLocator->getCoordinateSystemType() == osgTerrain::Locator::GEOCENTRIC)
     {
         masterTextureLocator = geoMasterLocator->getGeographicFromGeocentric();
     }
@@ -381,7 +378,7 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
     double i_sampleFactor, j_sampleFactor;
     calculateSampling( numColumns, numRows, i_sampleFactor, j_sampleFactor );
 
-    bool treatBoundariesToValidDataAsDefaultValue = _terrainTile->getTreatBoundariesToValidDataAsDefaultValue();
+//    bool treatBoundariesToValidDataAsDefaultValue = _terrainTile->getTreatBoundariesToValidDataAsDefaultValue();
 //    OE_INFO<<"[osgEarth::EarthTerrainTechnique] TreatBoundariesToValidDataAsDefaultValue="<<treatBoundariesToValidDataAsDefaultValue<<std::endl;
     
     float skirtHeight = 0.0f;
@@ -438,7 +435,7 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
 				TexCoordLocatorPair& tclp = layerToTexCoordMap[colorLayer];
                 tclp.first = new osg::Vec2Array;
                 tclp.first->reserve(numVertices);
-                if (locator && locator->getCoordinateSystemType() == Locator::GEOCENTRIC)
+                if (!isCube && locator && locator->getCoordinateSystemType() == Locator::GEOCENTRIC)
                 {
                     GeoLocator* geo = dynamic_cast<GeoLocator*>(locator);
                     if (geo)
@@ -510,17 +507,48 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
                     itr != layerToTexCoordMap.end();
                     ++itr)
                 {
-                    osg::Vec2Array* texcoords = itr->second.first.get();
-                    Locator* colorLocator = itr->second.second;
-                    if (colorLocator != masterLocator)
+                    osg::Vec2Array*         texcoords (itr->second.first.get());
+                    osgTerrain::ImageLayer* imageLayer(dynamic_cast<osgTerrain::ImageLayer*>(itr->first));
+
+                    if (imageLayer != NULL)
                     {
-                        osg::Vec3d color_ndc;
-                        Locator::convertLocalCoordBetween(*masterTextureLocator.get(), ndc, *colorLocator, color_ndc);
-                        (*texcoords).push_back(osg::Vec2(color_ndc.x(), color_ndc.y()));
+                      osgTerrain::Locator* colorLocator(itr->second.second);
+
+                      if (colorLocator != masterLocator)
+                      {
+                          osg::Vec3d color_ndc;
+
+                          Locator::convertLocalCoordBetween(*masterTextureLocator.get(), ndc, *colorLocator, color_ndc);
+                          (*texcoords).push_back(osg::Vec2(color_ndc.x(), color_ndc.y()));
+                      }
+                      else
+                          (*texcoords).push_back(osg::Vec2(ndc.x(), ndc.y()));
                     }
                     else
                     {
-                        (*texcoords).push_back(osg::Vec2(ndc.x(), ndc.y()));
+                      osgTerrain::ContourLayer* contourLayer(dynamic_cast<osgTerrain::ContourLayer*>(itr->first));
+
+                      if (contourLayer != NULL)
+                      {
+                        osg::TransferFunction1D const*const transferFunction = contourLayer->getTransferFunction();
+                        osg::Vec3d                          color_ndc;
+                        osgTerrain::Locator*                colorLocator(itr->second.second);
+                        
+                        if (colorLocator != masterTextureLocator)
+                          Locator::convertLocalCoordBetween(*masterTextureLocator.get(),ndc,*colorLocator,color_ndc);
+                        else
+                          color_ndc = ndc;
+                        color_ndc[2] /= scaleHeight;
+                        if (transferFunction != NULL)
+                        {
+                          float const difference = transferFunction->getMaximum()-transferFunction->getMinimum();
+                          
+                          if (difference != 0)
+                            (*texcoords).push_back(osg::Vec2((color_ndc[2]-transferFunction->getMinimum())/difference,0.0f));
+                          else
+                            (*texcoords).push_back(osg::Vec2(0.0f,0.0f));
+                        }
+                      }
                     }
                 }
 
@@ -1171,7 +1199,6 @@ void EarthTerrainTechnique::cleanSceneGraph()
 void
 EarthTerrainTechnique::releaseGLObjects(osg::State* state) const
 {
-#ifdef EXPLICIT_RELEASE_GL_OBJECTS
     EarthTerrainTechnique* ncThis = const_cast<EarthTerrainTechnique*>(this);
 
     ScopedWriteLock lock( ncThis->getMutex() );
@@ -1184,9 +1211,6 @@ EarthTerrainTechnique::releaseGLObjects(osg::State* state) const
     {
         _bufferData[1]._transform->releaseGLObjects(state);   
     }
-#else
-    TerrainTechnique::releaseGLObjects( state );
-#endif
 }
 
 //void

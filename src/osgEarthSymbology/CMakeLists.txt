@@ -30,6 +30,7 @@ SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/Symbol
     ${HEADER_PATH}/SymbolicNode
     ${HEADER_PATH}/Symbolizer
+	${HEADER_PATH}/Text
 )
 
 SET(TARGET_SRC
@@ -52,6 +53,7 @@ SET(TARGET_SRC
     Symbol.cpp
     SymbolicNode.cpp
     Symbolizer.cpp
+	Text.cpp
 )
 
 

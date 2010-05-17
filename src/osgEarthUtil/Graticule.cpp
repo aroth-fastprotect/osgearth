@@ -54,7 +54,7 @@ static GraticuleRegistry s_graticuleRegistry;
 
 
 Graticule::Graticule( const Map* map ) :
-_map( map ),
+_map( const_cast<Map*>(map) ),
 _autoLevels( true )
 {
     // safely generate a unique ID for this graticule:

@@ -27,6 +27,7 @@
 #include <osgEarth/TileSourceFactory>
 #include <osgEarth/EarthTerrainTechnique>
 #include <osgEarth/TerrainTileEdgeNormalizerUpdateCallback>
+#include <osgEarth/FileLocationCallback>
 
 #include <osg/Image>
 #include <osg/Notify>
@@ -240,7 +241,7 @@ MapEngine::isCached(Map* map, const osgEarth::TileKey *key)
 
         std::vector< osg::ref_ptr< const TileKey > > keys;
 
-        if ( map->getProfile()->isEquivalentTo( layer->getTileSource()->getProfile() ) )
+        if ( map->getProfile()->isEquivalentTo( layer->getProfile() ) )
         {
             keys.push_back( key );
         }
@@ -270,7 +271,7 @@ MapEngine::isCached(Map* map, const osgEarth::TileKey *key)
 
         std::vector< osg::ref_ptr< const TileKey > > keys;
 
-        if ( map->getProfile()->isEquivalentTo( layer->getTileSource()->getProfile() ) )
+        if ( map->getProfile()->isEquivalentTo( layer->getProfile() ) )
         {
             keys.push_back( key );
         }
@@ -713,6 +714,17 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
 	double min_units_per_pixel = DBL_MAX;
 
     int layer = 0;
+   // create contour layer:
+    if (map->getContourTransferFunction() != NULL)
+    {
+      osgTerrain::ContourLayer* contourLayer(new osgTerrain::ContourLayer(map->getContourTransferFunction()));
+
+      contourLayer->setMagFilter(_engineProps.getMagFilterMode().value());
+      contourLayer->setMinFilter(_engineProps.getMinFilterMode().value());
+      tile->setColorLayer(layer,contourLayer);
+      ++layer;
+    }
+
     for (unsigned int i = 0; i < image_tiles.size(); ++i)
     {
         if (image_tiles[i].valid())

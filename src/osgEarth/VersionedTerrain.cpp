@@ -32,11 +32,13 @@
 using namespace osgEarth;
 using namespace OpenThreads;
 
-#if OSG_MIN_VERSION_REQUIRED(2,9,5)
-#  undef EXPLICIT_RELEASE_GL_OBJECTS
-#else
-#  define EXPLICIT_RELEASE_GL_OBJECTS
-#endif
+#define EXPLICIT_RELEASE_GL_OBJECTS 1
+
+//#if OSG_MIN_VERSION_REQUIRED(2,9,5)
+//#  undef EXPLICIT_RELEASE_GL_OBJECTS
+//#else
+//#  define EXPLICIT_RELEASE_GL_OBJECTS
+//#endif
 
 //#define PREEMPTIVE_DEBUG 1
 
@@ -75,11 +77,13 @@ public:
 struct TileLayerRequest : public TaskRequest
 {
     TileLayerRequest( const TileKey* key, Map* map, MapEngine* engine )
-        : _key( key ), _map(map), _engine(engine) { }
+        : _key( key ), _map(map), _engine(engine), _numTries(0), _maxTries(3) { }
 
     osg::ref_ptr<const TileKey> _key;
     osg::ref_ptr<Map>           _map;
     osg::ref_ptr<MapEngine>     _engine;
+	unsigned int _numTries;
+	unsigned int _maxTries;
 };
 
 struct TileColorLayerRequest : public TileLayerRequest
@@ -106,6 +110,10 @@ struct TileColorLayerRequest : public TileLayerRequest
             if ( image.get() )
                 _result = _engine->createImageLayer( _map.get(), _key.get(), image.get() );*/
             _result = _engine->createImageLayer(_map.get(), mapLayer, _key.get(), progress);
+			if (!wasCanceled())
+			{
+			  _numTries++;
+			}
         }
     }
     unsigned int _layerId;
@@ -121,6 +129,7 @@ struct TileElevationLayerRequest : public TileLayerRequest
     void operator()( ProgressCallback* progress )
     {
         _result = _engine->createHeightFieldLayer( _map.get(), _key.get(), true ); //exactOnly=true
+		_numTries++;
     }
 };
 
@@ -977,11 +986,35 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
                                 }
                                 else
                                 {  
-                                    OE_DEBUG << "IReq error (" << _key->str() << ") (layer " << r->_layerId << "), retrying" << std::endl;
+									if (r->_numTries > r->_maxTries)
+									{
+										osg::ref_ptr< TransparentLayer > oldLayer = dynamic_cast<osgEarth::TransparentLayer*>(this->getColorLayer(index));
+										if (oldLayer)
+										{
+											TransparentLayer* newLayer = new osgEarth::TransparentLayer(oldLayer->getImage(), oldLayer->getMapLayer());
+											newLayer->setLocator( oldLayer->getLocator() );
+											newLayer->setName( oldLayer->getName() );
+											newLayer->setLevelOfDetail(_key->getLevelOfDetail());
+											// update the color layer safely:
+											{
+												OpenThreads::ScopedWriteLock layerLock( getTileLayersMutex() );
+												this->setColorLayer( index, newLayer );
+											}
 
-                                    //The color layer request failed, probably due to a server error. Reset it.
-                                    r->setState( TaskRequest::STATE_IDLE );
-                                    r->reset();
+											//static_cast<osgEarth::TransparentLayer*>(this->getColorLayer(index))->setLevelOfDetail( _key->getLevelOfDetail());										
+											itr = _requests.erase( itr );
+											increment = false;
+											OE_NOTICE << "Tried (" << _key->str() << ") (layer " << r->_layerId << "), too many times, moving on...." << std::endl;
+										}
+									}
+									else
+									{
+										OE_DEBUG << "IReq error (" << _key->str() << ") (layer " << r->_layerId << "), retrying" << std::endl;
+
+										//The color layer request failed, probably due to a server error. Reset it.
+										r->setState( TaskRequest::STATE_IDLE );
+										r->reset();
+									}
                                 }
                             }
                         }
@@ -1476,10 +1509,9 @@ VersionedTerrain::traverse( osg::NodeVisitor &nv )
         osg::Camera* cam = findFirstParentOfType<osg::Camera>( this );
         if ( cam )
         {
-            OE_NOTICE << "Explicit releaseGLObjects() enabled" << std::endl;
+            OE_INFO << "Explicit releaseGLObjects() enabled" << std::endl;
             cam->setPostDrawCallback( new ReleaseGLCallback(this) );
             _releaseCBInstalled = true;
-            //OE_NOTICE << "release cb installed." << std::endl;
         }
     }
 #endif // EXPLICIT_RELEASE_GL_OBJECTS

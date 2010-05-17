@@ -17,6 +17,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/Export
 	${HEADER_PATH}/FadeLayerNode
 	${HEADER_PATH}/Graticule
+	${HEADER_PATH}/Labeling
 	${HEADER_PATH}/ObjectPlacer
 	${HEADER_PATH}/OceanSurfaceNode
 	${HEADER_PATH}/Viewpoint
@@ -35,6 +36,7 @@ SET(TARGET_SRC
 	ElevationManager.cpp
 	FadeLayerNode.cpp
 	Graticule.cpp
+    Labeling.cpp
 	ObjectPlacer.cpp
     OceanSurfaceNode.cpp
 	Viewpoint.cpp

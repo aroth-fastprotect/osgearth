@@ -78,8 +78,10 @@ _port(port)
 void
 ProxySettings::fromConfig( const Config& conf )
 {
-    _hostName = conf.value( "host" );
+    _hostName = conf.value<std::string>( "host", "" );
     _port = conf.value<int>( "port", 8080 );
+	_userName = conf.value<std::string>( "username", "" );
+	_password = conf.value<std::string>( "password", "" );
 }
 
 Config
@@ -88,6 +90,9 @@ ProxySettings::toConfig() const
     Config conf( "proxy" );
     conf.add( "host", _hostName );
     conf.add( "port", toString(_port) );
+	conf.add( "username", _userName);
+	conf.add( "password", _password);
+
     return conf;
 }
 
@@ -105,7 +110,9 @@ _normalizeEdges( false ),
 _combineLayers( true ),
 _maxLOD( 23 ),
 _layeringTechnique( LAYERING_MULTITEXTURE ),
-_enableLighting( true )
+_enableLighting( true ),
+_magFilterMode(osg::Texture::LINEAR),
+_minFilterMode(osg::Texture::LINEAR)
 {
     fromConfig( conf );
 }
@@ -130,6 +137,19 @@ MapEngineProperties::toConfig() const
     conf.addIfSet( "layering_technique", "multipass", _layeringTechnique, LAYERING_MULTIPASS );
     conf.addIfSet( "layering_technique", "multitexture", _layeringTechnique, LAYERING_MULTITEXTURE );
 
+    conf.addIfSet("mag_filter_mode","LINEAR",                _magFilterMode,osg::Texture::LINEAR);
+    conf.addIfSet("mag_filter_mode","LINEAR_MIPMAP_LINEAR",  _magFilterMode,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.addIfSet("mag_filter_mode","LINEAR_MIPMAP_NEAREST", _magFilterMode,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.addIfSet("mag_filter_mode","NEAREST",               _magFilterMode,osg::Texture::NEAREST);
+    conf.addIfSet("mag_filter_mode","NEAREST_MIPMAP_LINEAR", _magFilterMode,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.addIfSet("mag_filter_mode","NEAREST_MIPMAP_NEAREST",_magFilterMode,osg::Texture::NEAREST_MIPMAP_NEAREST);
+    conf.addIfSet("min_filter_mode","LINEAR",                _minFilterMode,osg::Texture::LINEAR);
+    conf.addIfSet("min_filter_mode","LINEAR_MIPMAP_LINEAR",  _minFilterMode,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.addIfSet("min_filter_mode","LINEAR_MIPMAP_NEAREST", _minFilterMode,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.addIfSet("min_filter_mode","NEAREST",               _minFilterMode,osg::Texture::NEAREST);
+    conf.addIfSet("min_filter_mode","NEAREST_MIPMAP_LINEAR", _minFilterMode,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.addIfSet("min_filter_mode","NEAREST_MIPMAP_NEAREST",_minFilterMode,osg::Texture::NEAREST_MIPMAP_NEAREST);
+
     return conf;
 }
 
@@ -150,6 +170,19 @@ MapEngineProperties::fromConfig( const Config& conf )
 
     conf.getIfSet( "layering_technique", "multipass", _layeringTechnique, LAYERING_MULTIPASS );
     conf.getIfSet( "layering_technique", "multitexture", _layeringTechnique, LAYERING_MULTITEXTURE );
+    
+    conf.getIfSet("mag_filter_mode","LINEAR",                _magFilterMode,osg::Texture::LINEAR);
+    conf.getIfSet("mag_filter_mode","LINEAR_MIPMAP_LINEAR",  _magFilterMode,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.getIfSet("mag_filter_mode","LINEAR_MIPMAP_NEAREST", _magFilterMode,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.getIfSet("mag_filter_mode","NEAREST",               _magFilterMode,osg::Texture::NEAREST);
+    conf.getIfSet("mag_filter_mode","NEAREST_MIPMAP_LINEAR", _magFilterMode,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.getIfSet("mag_filter_mode","NEAREST_MIPMAP_NEAREST",_magFilterMode,osg::Texture::NEAREST_MIPMAP_NEAREST);
+    conf.getIfSet("min_filter_mode","LINEAR",                _minFilterMode,osg::Texture::LINEAR);
+    conf.getIfSet("min_filter_mode","LINEAR_MIPMAP_LINEAR",  _minFilterMode,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.getIfSet("min_filter_mode","LINEAR_MIPMAP_NEAREST", _minFilterMode,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.getIfSet("min_filter_mode","NEAREST",               _minFilterMode,osg::Texture::NEAREST);
+    conf.getIfSet("min_filter_mode","NEAREST_MIPMAP_LINEAR", _minFilterMode,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.getIfSet("min_filter_mode","NEAREST_MIPMAP_NEAREST",_minFilterMode,osg::Texture::NEAREST_MIPMAP_NEAREST);
 }
 
 void

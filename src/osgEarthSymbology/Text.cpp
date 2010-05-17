@@ -16,41 +16,16 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-#include <osgEarthSymbology/GeometrySymbol>
+#include <osgEarthSymbology/Text>
 
 using namespace osgEarth::Symbology;
 
-Stroke::Stroke() :
-_color( 1, 1, 1, 1 ),
-_width( 1.0f ),
-_lineJoin( LINEJOIN_DEFAULT ),
-_lineCap( LINECAP_DEFAULT )
+TextSymbol::TextSymbol() :
+_fill( Fill() ),
+_halo( Stroke() ),
+_size( 32.0f ),
+_sizeMode( SIZEMODE_SCREEN )
 {
-    //nop
+    _fill->color().set( 1, 1, 1, 1 );
+    _halo->color().set( 0, 0, 0, 1 );
 }
-
-Fill::Fill() :
-_color( 1, 1, 1, 1 )
-{
-    //nop
-}
-
-LineSymbol::LineSymbol() :
-_stroke( Stroke() )
-{
-    //nop
-}
-
-
-PolygonSymbol::PolygonSymbol() :
-_fill( Fill() )
-{
-    //nop
-}
-
-PointSymbol::PointSymbol() :
-_fill( Fill() ), _size(1.0)
-{
-    //nop
-}
-

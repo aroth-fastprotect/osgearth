@@ -77,6 +77,7 @@ _loadingWeight( 1.0f ),
 _profileConf( ProfileConfig() ),
 _minLevel(0),
 _maxLevel(99),
+_tileSize(256),
 _noDataImageFilename(""),
 _transparentColor(osg::Vec4ub(0,0,0,0))
 {
@@ -104,6 +105,7 @@ _profileConf( ProfileConfig() ),
 _minLevel(0),
 _maxLevel(99),
 _noDataImageFilename(""),
+_tileSize(256),
 _transparentColor(osg::Vec4ub(0,0,0,0))
 {
     init();
@@ -120,8 +122,32 @@ MapLayer::init()
 {
 	readEnvironmentalVariables();
     _id = s_mapLayerID++;
-    if ( !_cacheFormat.isSet() || _cacheFormat->empty() )
-      _cacheFormat = suggestCacheFormat();
+}
+
+static osg::Vec4ub
+getColor(const std::string& str, osg::Vec4ub default_value)
+{
+    osg::Vec4ub color = default_value;
+    std::istringstream strin(str);
+    int r, g, b, a;
+    if (strin >> r && strin >> g && strin >> b && strin >> a)
+    {
+        color.r() = (unsigned char)r;
+        color.g() = (unsigned char)g;
+        color.b() = (unsigned char)b;
+        color.a() = (unsigned char)a;
+    }
+    return color;
+}
+
+static std::string
+colorToString( const osg::Vec4ub& c )
+{
+    std::stringstream ss;
+    ss << c.r() << " " << c.g() << " " << c.b() << " " << c.a();
+    std::string ssStr;
+	ssStr = ss.str();
+	return ssStr;
 }
 
 void
@@ -142,6 +168,11 @@ MapLayer::fromConfig( const Config& conf )
     conf.getIfSet( "enabled", _enabled );
     conf.getIfSet( "edge_buffer_ratio", _edgeBufferRatio);
     conf.getObjIfSet( "profile", _profileConf );
+	std::string transparent_color = conf.value<std::string>("transparent_color", "");
+	if (!transparent_color.empty())
+	{
+		_transparentColor = getColor( transparent_color, osg::Vec4ub(0,0,0,0));
+	}
 }
 
 Config
@@ -165,6 +196,10 @@ MapLayer::toConfig() const
     conf.updateIfSet( "enabled", _enabled );
     conf.updateIfSet("edge_buffer_ratio", _edgeBufferRatio);
     conf.updateObjIfSet( "profile", _profileConf );
+	if (_transparentColor.isSet())
+	{
+		conf.update("transparent_color", colorToString( _transparentColor.value()));
+	}
 
     return conf;
 }
@@ -201,8 +236,7 @@ MapLayer::setCache(Cache* cache)
         if (_cache.valid() && _cacheEnabled == true )
         {
             std::string format;
-            unsigned int tile_size;
-            osg::ref_ptr< const Profile > profile = _cache->loadLayerProperties(_name, format, tile_size);
+            osg::ref_ptr< const Profile > profile = _cache->loadLayerProperties(_name, format, _tileSize);
 
             //Set the profile if it hasn't already been set
             if (!_profile.valid() && profile.valid())
@@ -243,6 +277,23 @@ MapLayer::getProfile() const
 		getTileSource();
 	}
 	return _profile.get();
+}
+
+unsigned int
+MapLayer::getTileSize() const
+{
+	return _tileSize;
+}
+
+unsigned int
+MapLayer::getMaxDataLevel() const
+{
+	TileSource* ts = getTileSource();
+	if (ts)
+	{
+		return ts->getMaxDataLevel();
+	}
+	return 20;
 }
 
 //optional<ProfileConfig>&
@@ -309,6 +360,7 @@ MapLayer::readEnvironmentalVariables()
 	if (getenv("OSGEARTH_CACHE_ONLY") != 0)
 	{
 		_cacheOnlyEnv = true;
+		_cacheOnly = true;
 	}
 }
 
@@ -325,13 +377,6 @@ MapLayer::initTileSource()
     {
         tileSource = tileSourceFactory.create( _driverOptions.get() );
     }
-    //else
-    //{
-	   // tileSource = tileSourceFactory.create(
-    //        getDriver(),
-    //        getDriverConfig(),
-    //        getGlobalOptions() );
-    //}
 
 	//Get the override profile if it is set.
 	osg::ref_ptr<const Profile> override_profile;
@@ -356,6 +401,7 @@ MapLayer::initTileSource()
 					OE_WARN << "Warning: Could not read nodata image from " << _noDataImageFilename.get() << std::endl;
 				}
 			}
+			_tileSize = tileSource->getPixelsPerTile();
 		}
 		else
 		{
@@ -382,15 +428,6 @@ MapLayer::initTileSource()
     }
 }
 
-const osgDB::ReaderWriter::Options*
-MapLayer::getGlobalOptions() const {
-    return _globalOptions.get();
-}
-
-void
-MapLayer::setGlobalOptions( const osgDB::ReaderWriter::Options* options ) {
-    _globalOptions = options;
-}
 
 bool
 MapLayer::isKeyValid(const TileKey* key) const
@@ -743,7 +780,6 @@ MapLayer::createImageWrapper( const TileKey* key,
 						g == _transparentColor->g() &&
 						b == _transparentColor->b())
 					{
-						//OE_NOTICE << "Transparent..." << std::endl;
 						image->data(col,row)[3] = 0;
 					}
 				}

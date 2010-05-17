@@ -32,6 +32,14 @@ _dataModelRevision(0),
 _cacheConf( CacheConfig() ),
 _profileConf( ProfileConfig() )
 {
+    // see if a cache if configured via env-var(s).
+    if ( getenv( "OSGEARTH_CACHE_PATH" ) )
+    {
+        std::string cachePath = getenv( "OSGEARTH_CACHE_PATH" );
+        _cacheConf->setType( CacheConfig::TYPE_DEFAULT );
+        _cacheConf->getProperties()[ "path" ] = cachePath;
+        OE_INFO << "Enabling map cache at " << cachePath << std::endl;
+    }
 }
 
 void
@@ -68,17 +76,6 @@ Map::getGlobalOptions() const {
 void
 Map::setGlobalOptions( const osgDB::ReaderWriter::Options* options ) {
     _globalOptions = options;
-
-    //Set the global options for all of the existing map layers as well
-    for (MapLayerList::iterator i = _imageMapLayers.begin(); i < _imageMapLayers.end(); ++i)
-    {
-        i->get()->setGlobalOptions( _globalOptions.get() );
-    }
-
-    for (MapLayerList::iterator i = _heightFieldMapLayers.begin(); i < _heightFieldMapLayers.end(); ++i)
-    {
-        i->get()->setGlobalOptions( _globalOptions.get() );
-    }
 }
 
 const std::string&
@@ -164,6 +161,14 @@ Map::getProfile() const
 Cache*
 Map::getCache() const
 {
+    if ( !_cache.valid() && _cacheConf.isSet() )
+    {
+        CacheFactory factory;
+        Cache* cache = factory.create( _cacheConf.value() );
+        if ( cache ) {
+            const_cast<Map*>(this)->setCache( cache );
+        }
+    }
 	return _cache.get();
 }
 
@@ -203,7 +208,6 @@ Map::addMapLayer( MapLayer* layer )
     {
 	    //Set options for the map from the layer
 		layer->setReferenceURI( getReferenceURI() );
-		layer->setGlobalOptions( getGlobalOptions() );
 		if ( _cacheConf.isSet() && _cacheConf->runOffCacheOnly().isSet() && _cacheConf->runOffCacheOnly().get())
 		{
 			layer->cacheOnly() = true;
@@ -407,6 +411,15 @@ Map::removeTerrainMaskLayer()
     }
 }
 
+osg::TransferFunction1D* Map::getContourTransferFunction(void) const
+{
+  return _contourTransferFunction;
+}
+        
+void Map::setContourTransferFunction(osg::TransferFunction1D* transferFunction)
+{
+  _contourTransferFunction = transferFunction;
+}
 
 //static const Profile*
 //getSuitableMapProfileFor( const Profile* candidate )
@@ -633,8 +646,6 @@ Map::createHeightField( const TileKey* key,
             for (unsigned r = 0; r < height; ++r)
             {
                 double geoY = miny + (dy * (double)r);
-
-                bool hasValidData = false;
 
                 //Collect elevations from all of the layers
                 std::vector<float> elevations;

@@ -41,7 +41,6 @@
 #include <osgGA/StateSetManipulator>
 #include <osgGA/AnimationPathManipulator>
 #include <osgGA/TerrainManipulator>
-#include <osgGA/SphericalManipulator>
 
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
@@ -181,6 +180,11 @@ struct MyEventHandler : public osgGA::GUIEventHandler
                     _ocean->setOceanSurfaceImageSizeRadians( _ocean->getOceanSurfaceImageSizeRadians() * 0.5f);
                 }
                 break;
+			case 'm':
+				{
+					_ocean->setAdjustToMSL( !_ocean->getAdjustToMSL());
+				}
+				break;
             }
         }
         return false;
@@ -234,7 +238,6 @@ int main(int argc, char** argv)
         keyswitchManipulator->addMatrixManipulator( '2', "Flight", new osgGA::FlightManipulator() );
         keyswitchManipulator->addMatrixManipulator( '3', "Drive", new osgGA::DriveManipulator() );
         keyswitchManipulator->addMatrixManipulator( '4', "Terrain", new osgGA::TerrainManipulator() );
-        keyswitchManipulator->addMatrixManipulator( '5', "Spherical", new osgGA::SphericalManipulator() );
 
         std::string pathfile;
         char keyForAnimationPath = '6';

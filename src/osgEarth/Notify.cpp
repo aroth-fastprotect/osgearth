@@ -37,6 +37,7 @@ using namespace osgEarth;
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
+#include <ctype.h>
 
 using namespace std;
 

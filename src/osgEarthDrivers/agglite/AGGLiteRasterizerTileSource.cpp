@@ -19,6 +19,7 @@
 
 #include <osgEarthFeatures/FeatureTileSource>
 #include <osgEarthFeatures/TransformFilter>
+#include <osgEarthFeatures/BufferFilter>
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/GeometrySymbol>
 #include <osgEarth/Registry>
@@ -46,7 +47,6 @@ using namespace OpenThreads;
 
 /********************************************************************/
 
-
 class AGGLiteRasterizerTileSource : public FeatureTileSource
 {
 public:
@@ -72,7 +72,7 @@ public:
     bool preProcess(osg::Image* image, osg::Referenced* buildData)
     {
         agg::rendering_buffer rbuf( image->data(), image->s(), image->t(), image->s()*4 );
-		agg::renderer<agg::span_abgr32> ren(rbuf);
+        agg::renderer<agg::span_abgr32> ren(rbuf);
         ren.clear(agg::rgba8(0,0,0,0));
         //ren.clear(agg::rgba8(255,255,255,0));
         return true;
@@ -86,35 +86,49 @@ public:
         const GeoExtent& imageExtent,
         osg::Image* image )
     {
+
         BuildData* bd = static_cast<BuildData*>( buildData );
-        
-        // First, transform the features into the map's SRS:
+
+        // A processing context to use with the filters:
         FilterContext context;
         context.profile() = getFeatureSource()->getFeatureProfile();
-        TransformFilter xform( imageExtent.getSRS() );
-        context = xform.push( features, context );
-
-        // set up the AGG renderer:
-        agg::rendering_buffer rbuf( image->data(), image->s(), image->t(), image->s()*4 );
-
-		// Create the renderer and the rasterizer
-		agg::renderer<agg::span_abgr32> ren(rbuf);
-		agg::rasterizer ras;
-
-		// Setup the rasterizer
-		ras.gamma(1.3);
-        //ras.gamma(2.2);
-		//ras.filling_rule(agg::fill_non_zero);
-        ras.filling_rule(agg::fill_even_odd);
+        const osgEarth::Symbology::LineSymbol* line = style->getSymbol<osgEarth::Symbology::LineSymbol>();
 
         // initialize:
-
         double xmin = imageExtent.xMin();
         double ymin = imageExtent.yMin();
         double s = (double)image->s();
         double t = (double)image->t();
         double xf = (double)image->s() / imageExtent.width();
         double yf = (double)image->t() / imageExtent.height();
+
+        if (line) {
+            BufferFilter buffer;
+            buffer.capStyle() = line->stroke()->lineCap().value();
+            if (_settings->relativeLineSize().value()) {
+                double ratio = 1.0/xf;
+                buffer.distance() = ratio * line->stroke()->width().value();
+            } else {
+                buffer.distance() = line->stroke()->width().value();
+            }
+            context = buffer.push( features, context );
+        }
+
+        // First, transform the features into the map's SRS:
+        TransformFilter xform( imageExtent.getSRS() );
+        context = xform.push( features, context );
+
+        // set up the AGG renderer:
+        agg::rendering_buffer rbuf( image->data(), image->s(), image->t(), image->s()*4 );
+
+        // Create the renderer and the rasterizer
+        agg::renderer<agg::span_abgr32> ren(rbuf);
+        agg::rasterizer ras;
+
+        // Setup the rasterizer
+        ras.gamma(1.3);
+        ras.filling_rule(agg::fill_even_odd);
+
 
         GeoExtent cropExtent = GeoExtent(imageExtent);
         cropExtent.scale(1.1, 1.1);
@@ -125,13 +139,14 @@ public:
         cropPoly->push_back( osg::Vec3d( cropExtent.xMax(), cropExtent.yMax(), 0 ));
         cropPoly->push_back( osg::Vec3d( cropExtent.xMin(), cropExtent.yMax(), 0 ));
 
-        const LineSymbol* line = style->getSymbol<LineSymbol>();
         double lineWidth = 1.0;
         if (line)
             lineWidth = (double)line->stroke()->width().value();
 
-        //OE_NOTICE << "rendering " << features.size() << " features" << std::endl;
-
+        osg::Vec4 color = osg::Vec4(1, 1, 1, 1);
+        if (line) {
+            color = line->stroke()->color();
+        }
         // render the features
         for(FeatureList::iterator i = features.begin(); i != features.end(); i++)
         {
@@ -140,11 +155,15 @@ public:
             osg::ref_ptr< Geometry > croppedGeometry = Feature::cropGeometry(cropPoly.get(), i->get()->getGeometry());
             if (!croppedGeometry.valid()) continue;
 
+            osg::Vec4 c = color;
+            unsigned int a = 127+(c.a()*255)/2; // scale alpha up
+            agg::rgba8 fgColor( c.r()*255, c.g()*255, c.b()*255, a );
+
             GeometryIterator gi( croppedGeometry.get() );
             while( gi.hasMore() )
             {
+                c = color;
                 Geometry* g = gi.next();
-                osg::Vec4f c = osg::Vec4(1, 1, 1, 1);
                 if (g->getType() == Geometry::TYPE_POLYGON) {
                     const PolygonSymbol* symbol = style->getSymbol<PolygonSymbol>();
                     if (symbol)
@@ -155,90 +174,31 @@ public:
                         c = symbol->stroke()->color();
                 }
 
-                unsigned int a = 127+(c.a()*255)/2; // scale alpha up
-                agg::rgba8 fgColor( c.r()*255, c.g()*255, c.b()*255, a );
+                a = 127+(c.a()*255)/2; // scale alpha up
+                fgColor = agg::rgba8( c.r()*255, c.g()*255, c.b()*255, a );
 
-                if ( g->getType() == Geometry::TYPE_LINESTRING )
+                ras.filling_rule( agg::fill_even_odd );
+                for( Geometry::iterator p = g->begin(); p != g->end(); p++ )
                 {
-                    ras.filling_rule( agg::fill_non_zero );
+                    const osg::Vec3d& p0 = *p;
+                    double x0 = xf*(p0.x()-xmin);
+                    double y0 = yf*(p0.y()-ymin);
 
-                    double x1 = 0, y1 = 0, x2 = 0, y2 = 0;
-                    double dx = 0, dy = 0;
+                    const osg::Vec3d& p1 = p+1 != g->end()? *(p+1) : g->front();
+                    double x1 = xf*(p1.x()-xmin);
+                    double y1 = yf*(p1.y()-ymin);
 
-                    for( Geometry::iterator p = g->begin(); p != g->end()-1; p++ )
-                    {
-                        const osg::Vec3d& p1 = *p;
-                        x1 = xf*(p1.x()-xmin);
-                        y1 = yf*(p1.y()-ymin);
-
-                        const osg::Vec3d& p2 = *(p+1);
-                        x2 = xf*(p2.x()-xmin);
-                        y2 = yf*(p2.y()-ymin);
-                        
-                        dx = x2 - x1;
-                        dy = y2 - y1;
-                        double d = sqrt(dx*dx + dy*dy);
-                        dx = lineWidth * (y2 - y1) / d;
-                        dy = lineWidth * (x2 - x1) / d;
-
-                        if ( p == g->begin() )
-                            ras.move_to_d(x1-dx, y1+dy);
-                        
-                        ras.line_to_d(x2-dx, y2+dy);
-                    }
-
-                    // back the other way:
-                    for( Geometry::reverse_iterator p = g->rbegin(); p != g->rend()-1; p++ )
-                    {
-                        const osg::Vec3d& p1 = *p;
-                        x1 = xf*(p1.x()-xmin);
-                        y1 = yf*(p1.y()-ymin);
-
-                        const osg::Vec3d& p2 = *(p+1);
-                        x2 = xf*(p2.x()-xmin);
-                        y2 = yf*(p2.y()-ymin);
-                        
-                        dx = x2 - x1;
-                        dy = y2 - y1;
-                        double d = sqrt(dx*dx + dy*dy);
-                        dx = lineWidth * (y2 - y1) / d;
-                        dy = lineWidth * (x2 - x1) / d;
-
-                        if( p == g->rbegin() )
-                            ras.line_to_d(x1-dx, y1+dy);
-
-                        ras.line_to_d(x2-dx, y2+dy);
-                    }                        
-
-                    ras.render(ren, fgColor);
+                    if ( p == g->begin() )
+                        ras.move_to_d( x0, y0 );
+                    else
+                        ras.line_to_d( x0, y0 );
                 }
-                else // polygon
-                {
-                    for( Geometry::iterator p = g->begin(); p != g->end(); p++ )
-                    {
-                        const osg::Vec3d& p0 = *p;
-                        double x0 = xf*(p0.x()-xmin);
-                        double y0 = yf*(p0.y()-ymin);
-
-                        const osg::Vec3d& p1 = p+1 != g->end()? *(p+1) : g->front();
-                        double x1 = xf*(p1.x()-xmin);
-                        double y1 = yf*(p1.y()-ymin);
-
-                        if ( p == g->begin() )
-                            ras.move_to_d( x0, y0 );
-                        else
-                            ras.line_to_d( x0, y0 );
-                    }
-
-                    ras.render(ren, fgColor);
-                }
-
-                ras.reset();
-            }            
+            }
+            ras.render(ren, fgColor);
+            ras.reset();
         }
 
         bd->_pass++;
-
         return true;            
     }
 

@@ -37,8 +37,19 @@ _profileConf( ProfileConfig() )
     {
         std::string cachePath = getenv( "OSGEARTH_CACHE_PATH" );
         _cacheConf->setType( CacheConfig::TYPE_DEFAULT );
-        _cacheConf->getProperties()[ "path" ] = cachePath;
+        _cacheConf->getDriverConf().add( "path", cachePath );
+        //_cacheConf->getProperties()[ "path" ] = cachePath;
         OE_INFO << "Enabling map cache at " << cachePath << std::endl;
+    }
+
+    if ( getenv( "OSGEARTH_CACHE_TYPE" ) )
+    {
+        std::string cacheType = getenv( "OSGEARTH_CACHE_TYPE" );
+        if ( !cacheType.empty() )
+        {
+            _cacheConf->setType( cacheType );
+            OE_INFO << "Setting map cache type to: " << cacheType << std::endl;
+        }
     }
 }
 
@@ -52,7 +63,7 @@ Map::getId() const {
     return _id;
 }
 
-OpenThreads::ReadWriteMutex&
+Threading::ReadWriteMutex&
 Map::getMapDataMutex() {
     return _mapDataMutex;
 }
@@ -113,7 +124,7 @@ Map::getImageMapLayers() const {
 
 int
 Map::getImageMapLayers( MapLayerList& out_list ) const {
-    ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
     for( MapLayerList::const_iterator i = _imageMapLayers.begin(); i != _imageMapLayers.end(); ++i )
         out_list.push_back( i->get() );
     return _dataModelRevision;
@@ -124,12 +135,20 @@ Map::getHeightFieldMapLayers() const {
     return _heightFieldMapLayers;
 }
 
+int
+Map::getHeightFieldMapLayers( MapLayerList& out_list ) const {
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
+    for( MapLayerList::const_iterator i = _heightFieldMapLayers.begin(); i != _heightFieldMapLayers.end(); ++i )
+        out_list.push_back( i->get() );
+    return _dataModelRevision;
+}
+
 const ModelLayerList&
 Map::getModelLayers() const {
     return _modelLayers;
 }
 
-ModelLayer*
+MaskLayer*
 Map::getTerrainMaskLayer() const {
     return _terrainMaskLayer.get();
 }
@@ -146,7 +165,7 @@ Map::getName() const {
 
 int
 Map::getDataModelRevision() const {
-    ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
     return _dataModelRevision;
 }
 
@@ -175,7 +194,7 @@ Map::getCache() const
 void
 Map::setCache( Cache* cache)
 {
-    if (_cache != cache)
+    if (_cache.get() != cache)
     {
         _cache = cache;
         _cache->setMapConfigFilename( _referenceURI );
@@ -218,7 +237,7 @@ Map::addMapLayer( MapLayer* layer )
 		layer->setCache( this->getCache() );
 
         {
-            ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( getMapDataMutex() );
             MapLayerList& list = 
                 layer->getType() == MapLayer::TYPE_IMAGE? _imageMapLayers : _heightFieldMapLayers;
             list.push_back( layer );
@@ -243,7 +262,7 @@ Map::removeMapLayer( MapLayer* layer )
 
     if ( layerToRemove.get() )
     {
-        ScopedWriteLock lock( getMapDataMutex() );
+        Threading::ScopedWriteLock lock( getMapDataMutex() );
 
         MapLayerList& list = 
             layerToRemove->getType() == MapLayer::TYPE_IMAGE? _imageMapLayers :
@@ -279,7 +298,7 @@ Map::moveMapLayer( MapLayer* layer, unsigned int newIndex )
 
     if ( layer )
     {
-        ScopedWriteLock lock( getMapDataMutex() );
+        Threading::ScopedWriteLock lock( getMapDataMutex() );
 
         MapLayerList& list = 
             layer->getType() == MapLayer::TYPE_IMAGE? _imageMapLayers :
@@ -328,7 +347,7 @@ Map::addModelLayer( ModelLayer* layer )
     if ( layer )
     {
         {
-            ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( getMapDataMutex() );
             _modelLayers.push_back( layer );
             _dataModelRevision++;
         }
@@ -349,7 +368,7 @@ Map::removeModelLayer( ModelLayer* layer )
     if ( layer )
     {
         {
-            ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( getMapDataMutex() );
             for( ModelLayerList::iterator i = _modelLayers.begin(); i != _modelLayers.end(); ++i )
             {
                 if ( i->get() == layer )
@@ -369,12 +388,12 @@ Map::removeModelLayer( ModelLayer* layer )
 }
 
 void
-Map::setTerrainMaskLayer( ModelLayer* layer )
+Map::setTerrainMaskLayer( MaskLayer* layer )
 {
     if ( layer )
     {
         {
-            ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( getMapDataMutex() );
             _terrainMaskLayer = layer;
         }
 
@@ -383,7 +402,7 @@ Map::setTerrainMaskLayer( ModelLayer* layer )
         // a separate block b/c we don't need the mutex   
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onTerrainMaskLayerAdded( layer );
+            i->get()->onMaskLayerAdded( layer );
         }	
     }
     else
@@ -397,16 +416,16 @@ Map::removeTerrainMaskLayer()
 {
     if ( _terrainMaskLayer.valid() )
     {
-        osg::ref_ptr<ModelLayer> layer = _terrainMaskLayer.get();
+        osg::ref_ptr<MaskLayer> layer = _terrainMaskLayer.get();
         {
-            ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( getMapDataMutex() );
             _terrainMaskLayer = 0L;
         }
         
         // a separate block b/c we don't need the mutex   
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onTerrainMaskLayerRemoved( layer );
+            i->get()->onMaskLayerRemoved( layer );
         }	
     }
 }
@@ -484,7 +503,7 @@ Map::calculateProfile()
     // At this point, if we don't have a profile we need to search tile sources until we find one.
     if ( !_profile.valid() )
     {
-        ScopedReadLock lock( getMapDataMutex() );
+        Threading::ScopedReadLock lock( getMapDataMutex() );
 
         for( MapLayerList::iterator i = _imageMapLayers.begin(); i != _imageMapLayers.end() && !_profile.valid(); i++ )
         {
@@ -525,6 +544,7 @@ Map::calculateProfile()
 osg::HeightField*
 Map::createHeightField( const TileKey* key,
                         bool fallback,
+                        ElevationInterpolation interpolation,
                         SamplePolicy samplePolicy,
                         ProgressCallback* progress)
 {
@@ -614,7 +634,7 @@ Map::createHeightField( const TileKey* key,
         }
         else
         {
-            osg::ref_ptr<GeoHeightField> geoHF = heightFields[0]->createSubSample( key->getGeoExtent() );
+            osg::ref_ptr<GeoHeightField> geoHF = heightFields[0]->createSubSample( key->getGeoExtent(), interpolation);
             result = geoHF->takeHeightField();
             hfInitialized = true;
         }
@@ -652,7 +672,7 @@ Map::createHeightField( const TileKey* key,
                 for (GeoHeightFieldList::iterator itr = heightFields.begin(); itr != heightFields.end(); ++itr)
                 {
                     float elevation = 0.0f;
-                    if (itr->get()->getElevation(key->getGeoExtent().getSRS(), geoX, geoY, INTERP_BILINEAR, elevation))
+                    if (itr->get()->getElevation(key->getGeoExtent().getSRS(), geoX, geoY, interpolation, elevation))
                     {
                         if (elevation != NO_DATA_VALUE)
                         {

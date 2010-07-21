@@ -19,6 +19,7 @@
 
 
 #include <osgEarth/Registry>
+#include <osgEarth/Cube>
 #include <osg/Notify>
 #include <gdal_priv.h>
 #include <ogr_api.h>
@@ -42,10 +43,6 @@ _numGdalMutexGets( 0 )
 {
     OGRRegisterAll();
     GDALAllRegister();
-
-    //getGlobalGeodeticProfile();
-    //getGlobalMercatorProfile();
-    //getCubeProfile();
 
     // add built-in mime-type extension mappings
     for( int i=0; ; i+=2 )
@@ -138,8 +135,7 @@ Registry::getCubeProfile() const
 
         if ( !_cube_profile.valid() ) // double-check pattern
         {
-            const SpatialReference* srs = SpatialReference::create( "epsg:4326" );
-            const_cast<Registry*>(this)->_cube_profile = Profile::createCube( srs );
+            const_cast<Registry*>(this)->_cube_profile = new UnifiedCubeProfile();
         }
     }
     return _cube_profile.get();
@@ -182,6 +178,28 @@ Registry::getReaderWriterForMimeType(const std::string& mimeType)
     return i != _mimeTypeExtMap.end()?
         osgDB::Registry::instance()->getReaderWriterForExtension( i->second ) :
         NULL;
+}
+
+bool
+Registry::isBlacklisted(const std::string &filename)
+{
+    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_blacklistMutex);
+    return (_blacklistedFilenames.count(filename)==1);
+}
+
+void
+Registry::blacklist(const std::string& filename)
+{
+    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_blacklistMutex);
+    _blacklistedFilenames.insert( filename );
+    OE_DEBUG << "Blacklist size = " << _blacklistedFilenames.size() << std::endl;
+}
+
+unsigned int
+Registry::getNumBlacklistedFilenames()
+{
+    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_blacklistMutex);
+    return _blacklistedFilenames.size();
 }
 
 //Simple class used to add a file extension alias for the earth_tile to the earth plugin

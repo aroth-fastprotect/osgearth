@@ -20,6 +20,7 @@
 #include <osgEarth/MapNode>
 #include <osgEarth/Map>
 #include <osgEarth/EarthFile>
+#include <osgEarth/Registry>
 #include <osgDB/FileNameUtils>
 #include <osgDB/FileUtils>
 #include <osgDB/Registry>
@@ -133,8 +134,8 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
 
                 //The tile definition is formatted FACE_LOD_X_Y.MAPENGINE_ID
 
-                unsigned int face, lod, x, y, id;
-                sscanf(tileDef.c_str(), "%d_%d_%d_%d.%d", &face, &lod, &x, &y, &id);
+                unsigned int lod, x, y, id;
+                sscanf(tileDef.c_str(), "%d_%d_%d.%d", &lod, &x, &y, &id);
 
                 //Get the Map from the cache.  It is important that we use a ref_ptr here
                 //to prevent the Map from being deleted while it is is still in use.
@@ -143,8 +144,8 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
 
                 if ( mapNode.valid() )
                 {
-                    const Profile* face_profile = mapNode->getMap()->getProfile()->getFaceProfile( face );
-                    osg::ref_ptr<TileKey> key = new TileKey( face, lod, x, y, face_profile );
+                    const Profile* profile = mapNode->getMap()->getProfile();
+                    osg::ref_ptr<TileKey> key = new TileKey( lod, x, y, profile );
 
                     if ( ext == "earth_tile" )
                     {
@@ -153,9 +154,17 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
 
                         node = mapNode->getEngine()->createSubTiles(
                             mapNode->getMap(),
-                            mapNode->getTerrain( face ),
+                            mapNode->getTerrain(),
                             key.get(),
                             populateLayers );
+
+                        //Blacklist the tile if we couldn't load it
+                        if (!node)
+                        {
+                            OE_DEBUG << "Blacklisting " << file_name << std::endl;
+                            osgEarth::Registry::instance()->blacklist(file_name);
+                        }
+
                     }
                 }
                 else
@@ -163,6 +172,7 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
                     OE_NOTICE << "Error:  Could not find Map with id=" << id << std::endl;
                 }
             }
+
 
             return node ? ReadResult(node) : ReadResult::FILE_NOT_FOUND;                     
         }

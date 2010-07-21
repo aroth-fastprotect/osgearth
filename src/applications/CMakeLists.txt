@@ -24,3 +24,5 @@ IF(BUILD_OSG_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_symbology)
 	ADD_SUBDIRECTORY(osgearth_contour)
 ENDIF(BUILD_OSG_EXAMPLES)
+
+ADD_SUBDIRECTORY(osgearth_version)

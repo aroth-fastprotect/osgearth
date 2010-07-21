@@ -29,9 +29,20 @@
 #include <osgEarthUtil/Viewpoint>
 #include <osgEarthUtil/AutoClipPlaneHandler>
 #include <osgEarthUtil/Graticule>
+#include <osgEarth/EarthFile>
+
+#include <osgEarthSymbology/Style>
+#include <osgEarthSymbology/GeometrySymbol>
 #include <osgEarthDrivers/tms/TMSOptions>
+#include <osgEarthDrivers/model_feature_geom/FeatureGeomModelOptions>
+#include <osgEarthDrivers/model_feature_stencil/FeatureStencilModelOptions>
+
+#include <osgEarthDrivers/feature_ogr/OGRFeatureOptions>
+#include <osgEarthDrivers/agglite/AGGLiteOptions>
 
 using namespace osgEarth::Drivers;
+using namespace osgEarth::Symbology;
+using namespace osgEarth::Features;
 
 // some preset viewpoints.
 static osgEarthUtil::Viewpoint VPs[] = {
@@ -39,7 +50,8 @@ static osgEarthUtil::Viewpoint VPs[] = {
     osgEarthUtil::Viewpoint( "California",    osg::Vec3d( -121.0,  34.0, 0.0 ), 0.0, -90.0, 6e6 ),
     osgEarthUtil::Viewpoint( "Europe",        osg::Vec3d(    0.0,  45.0, 0.0 ), 0.0, -90.0, 4e6 ),
     osgEarthUtil::Viewpoint( "Washington DC", osg::Vec3d(  -77.0,  38.0, 0.0 ), 0.0, -90.0, 1e6 ),
-    osgEarthUtil::Viewpoint( "Australia",     osg::Vec3d(  135.0, -20.0, 0.0 ), 0.0, -90.0, 2e6 )
+    osgEarthUtil::Viewpoint( "Australia",     osg::Vec3d(  135.0, -20.0, 0.0 ), 0.0, -90.0, 2e6 ),
+    osgEarthUtil::Viewpoint( "Boston",        osg::Vec3d( -71.096936, 42.332771, 0 ), 0.0, -90, 1e5 )
 };
 
 // a simple handler that demonstrates the "viewpoint" functionality in 
@@ -50,7 +62,7 @@ struct FlyToViewpointHandler : public osgGA::GUIEventHandler
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
-        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() >= '1' && ea.getKey() <= '5' )
+        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() >= '1' && ea.getKey() <= '6' )
         {
             _manip->setViewpoint( VPs[ea.getKey()-'1'], 4.0 );
         }
@@ -77,6 +89,25 @@ struct NodeToggleHandler : public osgGA::GUIEventHandler
     osg::observer_ptr<osg::Node> _node;
     char _key;
 
+};
+
+// a simple handler that toggles a node mask on/off
+struct ToggleModelLayerHandler : public osgGA::GUIEventHandler 
+{
+    ToggleModelLayerHandler( ModelLayer* modelLayer) : _modelLayer(modelLayer)
+    {
+    }
+
+    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
+    {
+        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'q' )
+        {
+            _modelLayer->setEnabled( !_modelLayer->getEnabled() );
+        }
+        return false;
+    }
+
+    osg::observer_ptr< ModelLayer > _modelLayer;
 };
 
 
@@ -115,9 +146,34 @@ int main(int argc, char** argv)
             map->addMapLayer( new HeightFieldMapLayer( "SRTM", tms.get() ) );
         }
 
-        // The MapNode will render the Map object in the scene graph.
-        osgEarth::MapNode* mapNode = new osgEarth::MapNode( map );
+        //Add a shapefile to the map
+        {
+            //Configure the feature options
+            OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
+            featureOpt->url() = "../data/world.shp";
 
+            //FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
+            //AGGLiteOptions* opt = new AGGLiteOptions();
+            FeatureStencilModelOptions* opt = new FeatureStencilModelOptions();
+            opt->featureOptions() = featureOpt;
+
+            osgEarth::Symbology::Style* style = new osgEarth::Symbology::Style; 
+            osgEarth::Symbology::LineSymbol* ls = new osgEarth::Symbology::LineSymbol;
+            ls->stroke()->color() = osg::Vec4f( 1,1,0,1 );
+            ls->stroke()->width() = 1;
+            style->addSymbol(ls); 
+            opt->styles()->addStyle(style);
+            opt->geometryTypeOverride() = Geometry::TYPE_LINESTRING;
+
+            ModelLayer* modelLayer = new osgEarth::ModelLayer("shapefile", opt);
+            map->addModelLayer( modelLayer );               
+            //map->addMapLayer( new ImageMapLayer("world", opt) );
+            viewer.addEventHandler( new ToggleModelLayerHandler( modelLayer ) );
+
+        }
+
+        // The MapNode will render the Map object in the scene graph.
+        osgEarth::MapNode* mapNode = new osgEarth::MapNode( map );     
         earthNode = mapNode;
     }    
 
@@ -128,7 +184,9 @@ int main(int argc, char** argv)
     osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( earthNode );
     if ( mapNode )
     {
-        manip->setNode( mapNode );
+        if ( mapNode )
+            manip->setNode( mapNode->getTerrainContainer() );
+
         if ( mapNode->getMap()->isGeocentric() )
         {
             manip->setHomeViewpoint( 
@@ -148,6 +206,10 @@ int main(int argc, char** argv)
     viewer.setSceneData( root );
     viewer.setCameraManipulator( manip );
 
+    // NOTE: You have to call this AFTER setting the viewer's manipulator!
+    //if ( mapNode )
+    //    manip->setNode( mapNode->getTerrainContainer() );
+
     manip->getSettings()->bindMouseDoubleClick(
         osgEarthUtil::EarthManipulator::ACTION_GOTO,
         osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON );
@@ -162,6 +224,7 @@ int main(int argc, char** argv)
     // add some stock OSG handlers:
     viewer.addEventHandler(new osgViewer::StatsHandler());
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
+    viewer.addEventHandler(new osgViewer::ThreadingHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
 
     return viewer.run();

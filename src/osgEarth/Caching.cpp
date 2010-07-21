@@ -23,6 +23,7 @@
 #include <osgEarth/ImageToHeightFieldConverter>
 #include <osgEarth/FileUtils>
 #include <osgEarth/ImageUtils>
+#include <osgEarth/ThreadingUtils>
 
 #include <osgDB/FileUtils>
 #include <osgDB/FileNameUtils>
@@ -33,6 +34,10 @@
 
 using namespace osgEarth;
 
+
+const CacheConfig::CacheType CacheConfig::TYPE_DEFAULT   = "";
+const CacheConfig::CacheType CacheConfig::TYPE_TMS       = "tms";
+const CacheConfig::CacheType CacheConfig::TYPE_TILECACHE = "tilecache";
 
 
 /************************************************************************/
@@ -48,36 +53,45 @@ _runOffCacheOnly( false )
 CacheConfig::CacheConfig( const Config& conf ) :
 _runOffCacheOnly( false )
 {
-    _type =
-        conf.attr( "type" ) == "tilecache" ? TYPE_TILECACHE :
-        conf.attr( "type" ) == "tms" ? TYPE_TMS :
-        TYPE_DEFAULT;
+    fromConfig( conf );
 
-    if ( !conf.attr("cache_only").empty() )
-        _runOffCacheOnly = conf.attr("cache_only") == "true";
+    //_type = conf.value( "type" );
 
+    //if ( !conf.value("cache_only").empty() )
+    //    _runOffCacheOnly = conf.value("cache_only") == "true";
 
+    //for( ConfigSet::const_iterator i = conf.children().begin(); i != conf.children().end(); i++ )
+    //    if ( !i->value().empty() )
+    //        _properties[ i->key() ] = i->value();
+}
 
-    for( ConfigSet::const_iterator i = conf.children().begin(); i != conf.children().end(); i++ )
-        if ( !i->value().empty() )
-            _properties[ i->key() ] = i->value();
+void
+CacheConfig::fromConfig( const Config& conf )
+{
+    // copy the input configuration, extract the data we want, and remove it
+    // so that what's left is just the info for the driver.
+    _driverConf = conf;
+
+    _type = conf.value( "type" );
+    _driverConf.remove( "type" );
+
+    if ( !conf.value("cache_only").empty() )
+        _runOffCacheOnly = conf.value("cache_only") == "true";
+    _driverConf.remove( "cache_only" );
 }
 
 Config
 CacheConfig::toConfig( const std::string& name ) const
 {
-    Config conf( name.empty()? "cache" : name );
-    
-    conf.attr( "type" ) =
-        _type == TYPE_TILECACHE ? "tilecache" :
-        _type == TYPE_TMS ? "tms" :
-        "default";
+    Config conf( _driverConf );
+    conf.key() = name.empty() ? "cache" : name;
+    conf.attr( "type" ) = _type;
 
     if ( _runOffCacheOnly.isSet() )
         conf.attr("cache_only") = _runOffCacheOnly.get() ? "true" : "false";
 
-    for( Properties::const_iterator p = _properties.begin(); p != _properties.end(); p++ )
-        conf.add( p->first, p->second );
+    //for( Properties::const_iterator p = _properties.begin(); p != _properties.end(); p++ )
+    //    conf.add( p->first, p->second );
 
     return conf;
 }
@@ -106,40 +120,47 @@ CacheConfig::runOffCacheOnly() const {
 /**
 * Gets the collection of name/value pairs for the cache.
 */
-Properties&
-CacheConfig::getProperties()
-{
-    return _properties;
-}
+//Properties&
+//CacheConfig::getProperties()
+//{
+//    return _properties;
+//}
+//
+//const Properties& CacheConfig::getProperties() const
+//{
+//    return _properties;
+//}
 
-const Properties& CacheConfig::getProperties() const
-{
-    return _properties;
-}
-
-std::string
-CacheConfig::toString() const
-{
-    std::stringstream buf;
-    buf << "type=" << getType();    
-    buf << ", reproject=";
-    buf << ", caching=";
-    if (runOffCacheOnly().isSet()) buf << runOffCacheOnly().get(); else buf << "unset";
-
-    for (Properties::const_iterator i = _properties.begin(); i != _properties.end(); i++ )
-        buf << ", " << i->first << "=" << i->second;   
-
-	std::string bufStr;
-	bufStr = buf.str();
-    return bufStr;
-}
+//std::string
+//CacheConfig::toString() const
+//{
+//    std::stringstream buf;
+//    buf << "type=" << getType();    
+//    buf << ", reproject=";
+//    buf << ", caching=";
+//    if (runOffCacheOnly().isSet()) buf << runOffCacheOnly().get(); else buf << "unset";
+//
+//    for (Properties::const_iterator i = _properties.begin(); i != _properties.end(); i++ )
+//        buf << ", " << i->first << "=" << i->second;   
+//
+//	std::string bufStr;
+//	bufStr = buf.str();
+//    return bufStr;
+//}
 
 
 /*****************************************************************************/
 
-Cache::Cache():
-osg::Referenced(true)
+Cache::Cache() :
+osg::Object( true )
 {
+}
+
+Cache::Cache(const Cache& rhs, const osg::CopyOp& op) :
+osg::Object(rhs),
+_mapConfigFilename( rhs._mapConfigFilename )
+{
+    //NOP
 }
 
 void Cache::storeLayerProperties( const std::string& layerName,
@@ -191,7 +212,7 @@ Cache::setHeightField( const TileKey* key,
 
 /*****************************************************************************/
 
-static OpenThreads::ReadWriteMutex s_mutex;
+static Threading::ReadWriteMutex s_mutex;
 
 DiskCache::DiskCache():
 _writeWorldFiles(false)
@@ -202,6 +223,15 @@ DiskCache::DiskCache(const std::string& path):
 _path(path),
 _writeWorldFiles(false)
 {
+}
+
+DiskCache::DiskCache( const DiskCache& rhs, const osg::CopyOp& op ) :
+Cache( rhs, op ),
+_layerPropertiesCache( rhs._layerPropertiesCache ),
+_path( rhs._path ),
+_writeWorldFiles( rhs._writeWorldFiles )
+{
+    //NOP
 }
 
 bool
@@ -258,7 +288,7 @@ DiskCache::getImage( const TileKey* key,
 					 const std::string& layerName,
 					 const std::string& format)
 {
-    OpenThreads::ScopedReadLock lock(s_mutex);
+    Threading::ScopedReadLock lock(s_mutex);
 	std::string filename = getFilename(key,layerName,format);
 
     //If the path doesn't contain a zip file, check to see that it actually exists on disk
@@ -277,7 +307,7 @@ void
 DiskCache::setImage( const TileKey* key,
 					 const std::string& layerName,
 					 const std::string& format,
-					 osg::Image* image )
+					 osg::Image* image)
 {
 	std::string filename = getFilename( key, layerName, format );
     std::string path = osgDB::getFilePath(filename);
@@ -299,7 +329,7 @@ DiskCache::setImage( const TileKey* key,
 	}
 
     // serialize cache writes.
-    OpenThreads::ScopedWriteLock lock(s_mutex);
+    Threading::ScopedWriteLock lock(s_mutex);
 
     //If the path doesn't currently exist or we can't create the path, don't cache the file
     if (!osgDB::fileExists(path) && !osgEarth::isZipPath(path) && !osgDB::makeDirectory(path))
@@ -430,6 +460,11 @@ _maxNumTilesInCache(16)
 {
 }
 
+MemCache::MemCache( const MemCache& rhs, const osg::CopyOp& op ) :
+_maxNumTilesInCache( rhs._maxNumTilesInCache )
+{
+}
+
 unsigned int
 MemCache::getMaxNumTilesInCache() const
 {
@@ -466,20 +501,35 @@ osg::HeightField* MemCache::getHeightField( const TileKey* key,
 }
 
 void MemCache::setHeightField( const TileKey* key,
-  const std::string& layerName,
-  const std::string& format,
-  osg::HeightField* hf) {
-  setObject( key, layerName, format, hf );
+                              const std::string& layerName,
+                              const std::string& format,
+                              osg::HeightField* hf)
+{
+    setObject( key, layerName, format, hf );
 }
 
-osg::Referenced* MemCache::getObject( const TileKey* key, const std::string& layerName, const std::string& format) {
+bool
+MemCache::purge( const std::string& layerName, int olderThan, bool async )
+{
+    // MemCache does not support timestamps or async, so just clear it out altogether.
+    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
+
+    // MemCache does not support layerName...
+    _keyToIterMap.clear();
+    _objects.clear();
+
+    return true;
+}
+
+osg::Referenced* MemCache::getObject( const TileKey* key, const std::string& layerName, const std::string& format)
+{
   osg::Timer_t now = osg::Timer::instance()->tick();
 
   OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
 
   //OE_NOTICE << "List contains: " << _images.size() << std::endl;
 
-  std::string id = key->str();
+  std::string id = key->str() + layerName;
   //Find the image in the cache
   //ImageCache::iterator itr = _images.find(id);
   KeyToIteratorMap::iterator itr = _keyToIterMap.find(id);
@@ -498,7 +548,7 @@ osg::Referenced* MemCache::getObject( const TileKey* key, const std::string& lay
 void MemCache::setObject( const TileKey* key, const std::string& layerName, const std::string& format, osg::Referenced* referenced ) {
   OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_mutex);
 
-  std::string id = key->str();
+  std::string id = key->str() + layerName;
 
   CachedObject entry;
   entry._object = referenced;
@@ -531,6 +581,13 @@ TMSCache::TMSCache(const std::string &path):
 DiskCache(path),
 _invertY(false)
 {
+}
+
+TMSCache::TMSCache( const TMSCache& rhs, const osg::CopyOp& op ) :
+DiskCache( rhs, op ),
+_invertY( rhs._invertY )
+{
+    //nop
 }
 
 std::string
@@ -570,28 +627,41 @@ static bool getProp(const std::map<std::string,std::string> &map, const std::str
 
 /*****************************************************************************/
 
-Cache* CacheFactory::create(const CacheConfig &cacheConfig)
+Cache*
+CacheFactory::create(const CacheConfig &cacheConfig)
 {
 	CacheConfig::CacheType type = cacheConfig.getType();
+
+    OE_INFO << "Cache: initializing cache of type " << type << std::endl;
+
+    osg::ref_ptr<Cache> result;
+
     //Default to TMS if the default is selected.
     if (type == CacheConfig::TYPE_DEFAULT) type = CacheConfig::TYPE_TMS;
 
+
+    //TODO: move all this logic into TMS and TILECACHE cache drivers. (GW)
+    Config driverConf = cacheConfig.toConfig();
+
     if (type == CacheConfig::TYPE_TMS || type == CacheConfig::TYPE_TILECACHE )
     {
-        std::string path;
-
-        if ((!getProp(cacheConfig.getProperties(), "path", path)) || (path.empty()))
+        std::string path = driverConf.value( "path" );
+        if ( path.empty() )
         {
-            OE_NOTICE << "[osgEarth::Cache] No path specified for " << type << " cache " << std::endl;
-            return 0;
-        }      
+            OE_WARN << "[osgEarth::Cache] No path specified for " << type << " cache " << std::endl;
+        }
+        //if ((!getProp(cacheConfig.getProperties(), "path", path)) || (path.empty()))
+        //{
+        //    OE_NOTICE << "[osgEarth::Cache] No path specified for " << type << " cache " << std::endl;
+        //    return 0;
+        //}      
 
         DiskCache* cache = NULL;
         if (type == CacheConfig::TYPE_TMS ) //"tms" || type.empty())
         {
 			TMSCache* tms_cache = new TMSCache(path);
-            std::string tms_type; 
-            getProp(cacheConfig.getProperties(), "tms_type", tms_type);
+            std::string tms_type = driverConf.value( "tms_type" );
+            //getProp(cacheConfig.getProperties(), "tms_type", tms_type);
             if (tms_type == "google")
             {
                 OE_DEBUG << "[osgEarth::Cache] Inverting Y in TMS cache " << std::endl;
@@ -609,8 +679,8 @@ Cache* CacheFactory::create(const CacheConfig &cacheConfig)
 
         if (cache)
         {
-            std::string write_world_files;
-            getProp(cacheConfig.getProperties(), "write_world_files", write_world_files);
+            std::string write_world_files = driverConf.value( "write_world_files" );
+            //getProp(cacheConfig.getProperties(), "write_world_files", write_world_files);
             if (write_world_files == "true")
             {
                 cache->setWriteWorldFiles( true );
@@ -619,12 +689,58 @@ Cache* CacheFactory::create(const CacheConfig &cacheConfig)
             {
                 cache->setWriteWorldFiles( false );
             }
-            return cache;
         }
+
+        result = cache;
+    }
+
+    else // try to load the cache implementation from a plugin
+    {
+        // for now, create a temporary "DriverOptions" object for use with the plugin. Later
+        // we should probably convert the main CacheConfig into a true DriverOptions.
+        osg::ref_ptr<PluginOptions> settings = new PluginOptions( driverConf );
+        //for( Properties::const_iterator i = cacheConfig.getProperties().begin(); i != cacheConfig.getProperties().end(); ++i )
+        //{
+        //    settings->config().add( i->first, i->second );
+        //}
+
+        osgDB::ReaderWriter::ReadResult rr = osgDB::readObjectFile( ".osgearth_cache_" + type, settings.get() );
+        if ( rr.error() )
+        {
+            OE_WARN << "Failed to load cache plugin for type \"" << type << "\"" << std::endl;
+        }
+        else
+        {
+            result = dynamic_cast<Cache*>( rr.getObject() );
+        }
+    }
+
+    if ( !result )
+    {
+        OE_WARN << "[osgEarth::Cache] Unknown cache type: " << type << std::endl;
+    }
+
+    return result.release();
+}
+
+Cache*
+CacheFactory::create( const osgEarth::DriverOptions* options )
+{
+    Cache* result = 0L;
+
+    osgDB::ReaderWriter::ReadResult rr = osgDB::readObjectFile( ".osgearth_cache_" + options->driver(), options );
+    if ( rr.error() )
+    {
+        OE_WARN << "Failed to load cache plugin \"" << options->driver() << "\"" << std::endl;
     }
     else
     {
-        OE_WARN << "[osgEarth::Cache] Unknown cache type " << type << std::endl;
+        result = dynamic_cast<Cache*>( rr.getObject() );
+        if ( !result )
+        {
+            OE_WARN << "Internal error: plugin \"" << options->driver() << "\" is not a cache provider" << std::endl;
+        }
     }
-    return 0;
+
+    return result;
 }

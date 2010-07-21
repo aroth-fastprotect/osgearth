@@ -20,71 +20,36 @@
 
 using namespace osgEarth::Symbology;
 
-Symbolizer::Symbolizer() :
-_alwaysUpdate( false )
-{
-    //nop
-}
-
-/*************************************************************************/
-
-Symbolizer::State::State() :
-_styleRevision( -1 ),
-_dataSetRevision( -1 )
-{
-    //nop
-}
-
-bool
-Symbolizer::State::outOfSyncWith( const Style* style ) const
-{
-    return style && style->outOfSyncWith( _styleRevision );
-}
-
-bool
-Symbolizer::State::outOfSyncWith( const SymbolizerInput* dataSet ) const
-{
-    return dataSet && dataSet->outOfSyncWith( _dataSetRevision );
-}
-
-void
-Symbolizer::State::dirty()
-{
-    ++_styleRevision;
-    ++_dataSetRevision;
-}
-
-/*************************************************************************/
-
-//SymbolizerInput::SymbolizerInput()
+//Symbolizer::Symbolizer() :
+//_alwaysUpdate( false )
 //{
+//    //nop
 //}
 
-//int
-//SymbolizerInput::getRevision() const {
-//    int rev = _revision;
-//    if ( _alwaysDirty ) dirty();
-//    return rev;
-//}
+/*************************************************************************/
 
-//void
-//SymbolizerInput::dirty() {
-//    _revision++;
-//}
-
-//void 
-//SymbolizerInput::inSyncWith( int otherRevision ) {
-//    return revision == _revision;
-//}
-
-//void
-//Symbolizer::sync( int& revision ) {
-//    if ( !_alwaysDirty )
-//        revision = _revision;
+//State::State() :
+//_styleRevision( -1 ),
+//_contentRevision( -1 )
+//{
+//    //nop
 //}
 //
-//void SymbolizerInput::setAlwaysDirty( bool value ) {
-//    _alwaysDirty = value;
-//    if ( value ) dirty();
+//bool
+//State::outOfSyncWith( const Style* style ) const
+//{
+//    return style && style->outOfSyncWith( _styleRevision );
 //}
-
+//
+//bool
+//State::outOfSyncWith( const Content* content ) const
+//{
+//    return content && content->outOfSyncWith( _contentRevision );
+//}
+//
+//void
+//State::dirty()
+//{
+//    ++_styleRevision;
+//    ++_contentRevision;
+//}

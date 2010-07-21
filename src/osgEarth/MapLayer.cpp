@@ -50,7 +50,9 @@ _profileConf( ProfileConfig() ),
 _minLevel(0),
 _maxLevel(99),
 _noDataImageFilename(""),
-_transparentColor(osg::Vec4ub(0,0,0,0))
+_transparentColor(osg::Vec4ub(0,0,0,0)),
+_minFilter(osg::Texture::LINEAR_MIPMAP_LINEAR),
+_magFilter(osg::Texture::LINEAR)
 {
     if ( options )
         fromConfig( options->config() );
@@ -79,7 +81,9 @@ _minLevel(0),
 _maxLevel(99),
 _tileSize(256),
 _noDataImageFilename(""),
-_transparentColor(osg::Vec4ub(0,0,0,0))
+_transparentColor(osg::Vec4ub(0,0,0,0)),
+_minFilter(osg::Texture::LINEAR_MIPMAP_LINEAR),
+_magFilter(osg::Texture::LINEAR)
 {
     _driverOptions = new DriverOptions( driverConf );
     fromConfig( driverConf );
@@ -106,7 +110,9 @@ _minLevel(0),
 _maxLevel(99),
 _noDataImageFilename(""),
 _tileSize(256),
-_transparentColor(osg::Vec4ub(0,0,0,0))
+_transparentColor(osg::Vec4ub(0,0,0,0)),
+_minFilter(osg::Texture::LINEAR_MIPMAP_LINEAR),
+_magFilter(osg::Texture::LINEAR)
 {
     init();
 
@@ -173,6 +179,20 @@ MapLayer::fromConfig( const Config& conf )
 	{
 		_transparentColor = getColor( transparent_color, osg::Vec4ub(0,0,0,0));
 	}
+
+	//Load the filter settings
+	conf.getIfSet("mag_filter","LINEAR",                _magFilter,osg::Texture::LINEAR);
+    conf.getIfSet("mag_filter","LINEAR_MIPMAP_LINEAR",  _magFilter,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.getIfSet("mag_filter","LINEAR_MIPMAP_NEAREST", _magFilter,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.getIfSet("mag_filter","NEAREST",               _magFilter,osg::Texture::NEAREST);
+    conf.getIfSet("mag_filter","NEAREST_MIPMAP_LINEAR", _magFilter,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.getIfSet("mag_filter","NEAREST_MIPMAP_NEAREST",_magFilter,osg::Texture::NEAREST_MIPMAP_NEAREST);
+    conf.getIfSet("min_filter","LINEAR",                _minFilter,osg::Texture::LINEAR);
+    conf.getIfSet("min_filter","LINEAR_MIPMAP_LINEAR",  _minFilter,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.getIfSet("min_filter","LINEAR_MIPMAP_NEAREST", _minFilter,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.getIfSet("min_filter","NEAREST",               _minFilter,osg::Texture::NEAREST);
+    conf.getIfSet("min_filter","NEAREST_MIPMAP_LINEAR", _minFilter,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.getIfSet("min_filter","NEAREST_MIPMAP_NEAREST",_minFilter,osg::Texture::NEAREST_MIPMAP_NEAREST);
 }
 
 Config
@@ -200,6 +220,21 @@ MapLayer::toConfig() const
 	{
 		conf.update("transparent_color", colorToString( _transparentColor.value()));
 	}
+
+	//Save the filter settings
+	conf.addIfSet("mag_filter","LINEAR",                _magFilter,osg::Texture::LINEAR);
+    conf.addIfSet("mag_filter","LINEAR_MIPMAP_LINEAR",  _magFilter,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.addIfSet("mag_filter","LINEAR_MIPMAP_NEAREST", _magFilter,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.addIfSet("mag_filter","NEAREST",               _magFilter,osg::Texture::NEAREST);
+    conf.addIfSet("mag_filter","NEAREST_MIPMAP_LINEAR", _magFilter,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.addIfSet("mag_filter","NEAREST_MIPMAP_NEAREST",_magFilter,osg::Texture::NEAREST_MIPMAP_NEAREST);
+    conf.addIfSet("min_filter","LINEAR",                _minFilter,osg::Texture::LINEAR);
+    conf.addIfSet("min_filter","LINEAR_MIPMAP_LINEAR",  _minFilter,osg::Texture::LINEAR_MIPMAP_LINEAR);
+    conf.addIfSet("min_filter","LINEAR_MIPMAP_NEAREST", _minFilter,osg::Texture::LINEAR_MIPMAP_NEAREST);
+    conf.addIfSet("min_filter","NEAREST",               _minFilter,osg::Texture::NEAREST);
+    conf.addIfSet("min_filter","NEAREST_MIPMAP_LINEAR", _minFilter,osg::Texture::NEAREST_MIPMAP_LINEAR);
+    conf.addIfSet("min_filter","NEAREST_MIPMAP_NEAREST",_minFilter,osg::Texture::NEAREST_MIPMAP_NEAREST);
+
 
     return conf;
 }
@@ -296,38 +331,6 @@ MapLayer::getMaxDataLevel() const
 	return 20;
 }
 
-//optional<ProfileConfig>&
-//MapLayer::profileConfig() {
-//    return _profileConf;
-//}
-//const optional<ProfileConfig>&
-//MapLayer::profileConfig() const {
-//    return _profileConf;
-//}
-//
-//optional<std::string>& 
-//MapLayer::noDataImageFilename()
-//{
-//	return _nodata_image_filename;
-//}
-//const optional<std::string>&
-//MapLayer::noDataImageFilename() const
-//{
-//	return _nodata_image_filename;
-//}
-
-//const std::string&
-//MapLayer::getCacheFormat() const
-//{
-//	return _cacheFormat;
-//}
-//
-//void
-//MapLayer::setCacheFormat(const std::string& cacheFormat)
-//{
-//	_cacheFormat = cacheFormat;
-//}
-
 std::string
 MapLayer::suggestCacheFormat() const
 {
@@ -361,6 +364,7 @@ MapLayer::readEnvironmentalVariables()
 	{
 		_cacheOnlyEnv = true;
 		_cacheOnly = true;
+        OE_INFO << "CACHE-ONLY mode enabled!!" << std::endl;
 	}
 }
 
@@ -419,7 +423,11 @@ MapLayer::initTileSource()
 
     if (_tileSource.valid())
     {
-      _profile = _tileSource->getProfile();
+        // check this, because it's possible the profile was already set in setCache()
+        if ( !_profile.valid() )
+        {
+            _profile = _tileSource->getProfile();
+        }
     }
     else if (_cache.valid())
     {
@@ -447,6 +455,15 @@ MapLayer::getReferenceURI() const {
 void
 MapLayer::setReferenceURI( const std::string& uri ) {
     _referenceURI = uri;
+}
+
+void
+MapLayer::setOpacity( float value ) 
+{
+    _opacity = osg::clampBetween( value, 0.0f, 1.0f );
+    osg::ref_ptr<MapLayerController> _controllerSafe= _controller.get();
+    if ( _controllerSafe.valid() )
+        _controllerSafe->updateOpacity( this );
 }
 
 GeoImage*
@@ -481,7 +498,9 @@ MapLayer::postProcess( GeoImage* input )
         else if ( im->getPixelFormat() == GL_RGB )
         {
             for(unsigned int i=0; i<p; ++i, ++d)
+            {
                 *d = _gammaLUT[*d];
+            }
         }
         else
         {
@@ -498,16 +517,14 @@ MapLayer::createImage( const TileKey* key,
     //OE_NOTICE << "[MapLayer] createImage for " << key->str() << std::endl;
 
     osg::ref_ptr<GeoImage> result = NULL;
+    const Profile* layerProfile = getProfile();
     const Profile* mapProfile = key->getProfile();
-	const Profile* layerProfile = getProfile();
 
-	if (!layerProfile)
+	if ( !getProfile() )
 	{
 		OE_WARN << "Could not get a valid profile for Layer " << _name << std::endl;
 		return NULL;
 	}
-
-
 
 	//OE_NOTICE << "[osgEarth::MapLayer::createImage] " << key->str() << std::endl;
 	if (!getTileSource() && _cacheOnly == false )
@@ -519,7 +536,7 @@ MapLayer::createImage( const TileKey* key,
 	//Determine whether we should cache in the Map profile or the Layer profile.
 	
 	bool cacheInMapProfile = true;
-	if (mapProfile->isEquivalentTo( layerProfile) )
+	if (mapProfile->isEquivalentTo( layerProfile ))
 	{
 		OE_DEBUG << "Layer " << _name << ": Map and Layer profiles are equivalent " << std::endl;
 	}
@@ -554,7 +571,7 @@ MapLayer::createImage( const TileKey* key,
 	if (cacheInMapProfile && _cache.valid() && _cacheEnabled == true )
 	{
         osg::ref_ptr<osg::Image> image = _cache->getImage( key, _name, _cacheFormat.value() );
-		if (image)
+		if (image.valid())
 		{
 			OE_DEBUG << "Layer " << _name << " got tile " << key->str() << " from map cache " << std::endl;
 			return postProcess( new GeoImage( image.get(), key->getGeoExtent() ) );
@@ -707,7 +724,7 @@ MapLayer::createImage( const TileKey* key,
 				OE_DEBUG << "  Cropping image" << std::endl;
                 // crop to fit the map key extents
                 GeoExtent clampedMapExt = layerProfile->clampAndTransformExtent( key->getGeoExtent() );
-                if ( clampedMapExt.width() * clampedMapExt.height() > 0 )
+                if ( clampedMapExt.isValid() )
 				{
 					int size = _exactCropping == true ? _reprojectedTileSize.value() : 0;
                     result = mosaic->crop(clampedMapExt, _exactCropping.value(), size, size);
@@ -820,8 +837,7 @@ osg::HeightField*
 MapLayer::createHeightField(const osgEarth::TileKey *key,
                             ProgressCallback* progress)
 {
-    const Profile* layerProfile  =  getProfile();
-    const Profile* mapProfile    =  key->getProfile();
+    const Profile* mapProfile = key->getProfile();
 
 	osg::ref_ptr<osg::HeightField> result;
 
@@ -848,7 +864,7 @@ MapLayer::createHeightField(const osgEarth::TileKey *key,
 	if (!result.valid() && getTileSource() && getTileSource()->isOK() )
     {
 		//If the profiles are equivalent, get the HF from the TileSource.
-		if (key->getProfile()->isEquivalentTo( layerProfile ))
+		if (key->getProfile()->isEquivalentTo( getProfile() ))
 		{
 			if (isKeyValid( key ) )
 			{
@@ -867,7 +883,7 @@ MapLayer::createHeightField(const osgEarth::TileKey *key,
 
 			//Determine the intersecting keys
 			std::vector< osg::ref_ptr<const TileKey> > intersectingTiles;
-			layerProfile->getIntersectingTiles(key, intersectingTiles);
+			getProfile()->getIntersectingTiles(key, intersectingTiles);
 			if (intersectingTiles.size() > 0)
 			{
 				for (unsigned int i = 0; i < intersectingTiles.size(); ++i)

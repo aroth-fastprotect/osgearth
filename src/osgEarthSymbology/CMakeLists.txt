@@ -11,11 +11,11 @@ SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
 #   header files go here
     ${HEADER_PATH}/Common
+    ${HEADER_PATH}/Content
     ${HEADER_PATH}/CssUtils
     ${HEADER_PATH}/ExtrudedSymbol
     ${HEADER_PATH}/Geometry
     ${HEADER_PATH}/GeometryExtrudeSymbolizer
-    ${HEADER_PATH}/GeometryInput
     ${HEADER_PATH}/GeometrySymbolizer
     ${HEADER_PATH}/GeometrySymbol
     ${HEADER_PATH}/MarkerSymbolizer
@@ -31,6 +31,7 @@ SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/SymbolicNode
     ${HEADER_PATH}/Symbolizer
 	${HEADER_PATH}/Text
+	${HEADER_PATH}/TextMarkup
 )
 
 SET(TARGET_SRC
@@ -38,7 +39,6 @@ SET(TARGET_SRC
     ExtrudedSymbol.cpp
     Geometry.cpp
     GeometryExtrudeSymbolizer.cpp
-    GeometryInput.cpp
     GeometrySymbolizer.cpp
     GeometrySymbol.cpp
     MarkerSymbolizer.cpp
@@ -54,6 +54,7 @@ SET(TARGET_SRC
     SymbolicNode.cpp
     Symbolizer.cpp
 	Text.cpp
+    TextMarkup.cpp
 )
 
 

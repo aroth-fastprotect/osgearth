@@ -27,7 +27,7 @@ using namespace OpenThreads;
 
 void CacheSeed::seed( Map* map )
 {
-    ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     osg::ref_ptr<MapEngine> engine = new MapEngine(); //map->createMapEngine();
 
@@ -128,7 +128,7 @@ void CacheSeed::processKey( Map* map, MapEngine* engine, TileKey* key )
     {
         OE_NOTICE << "Caching tile = " << key->str() << std::endl; //<< lod << " (" << x << ", " << y << ") " << std::endl;
         bool validData;
-		osg::ref_ptr<osg::Node> node = engine->createTile( map, terrain.get(), key, true, false, validData );        
+		osg::ref_ptr<osg::Node> node = engine->createTile( map, terrain.get(), key, true, false, false, validData );        
     }
 
     if (key->getLevelOfDetail() <= _maxLevel)

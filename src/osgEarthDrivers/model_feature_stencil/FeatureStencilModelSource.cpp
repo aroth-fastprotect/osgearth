@@ -31,7 +31,6 @@
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/GeometrySymbol>
 #include <osgEarthSymbology/StencilVolumeNode>
-#include <osgEarthSymbology/GeometryInput>
 #include <osgEarthSymbology/SymbolicNode>
 #include <osg/Notify>
 #include <osg/MatrixTransform>
@@ -51,6 +50,8 @@ using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 using namespace osgEarth::Drivers;
 using namespace OpenThreads;
+
+#define LC "[osgEarth::FeatureStencilModelSource] "
 
 #define RENDER_BIN_START 100
 #define MAX_NUM_STYLES   100
@@ -364,7 +365,8 @@ public:
             featureList.push_back(osg::clone((*it).get(),osg::CopyOp::DEEP_COPY_ALL));
 
 
-        const FeatureStencilModelOptions* options = dynamic_cast<const FeatureStencilModelOptions*>(context->getModelSource()->getFeatureModelOptions());
+        const FeatureStencilModelOptions* options = dynamic_cast<const FeatureStencilModelOptions*>(
+            context->getModelSource()->getFeatureModelOptions());
 
         double extrusionDistance = 1;
         double densificationThreshold = 1.0;
@@ -487,7 +489,11 @@ public:
             {
                 if ( !styleNodeAlreadyCreated )
                 {
-                    OE_NOTICE << "Creating new style group for '" << style->getName() << "'" << std::endl;
+                    if ( options->mask() == true )
+                        OE_INFO << LC << "Creating MASK LAYER for feature group" << std::endl;
+                    else
+                        OE_INFO << LC << "Creating new style group for '" << style->getName() << "'" << std::endl;
+
                     styleNode = new osgEarth::Symbology::StencilVolumeNode( options->mask().value(), options->inverted().value() );
                     if ( options->mask() == false )
                     {
@@ -545,6 +551,12 @@ public:
             osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
         }
     }
+    
+    //override
+    virtual const FeatureModelSourceOptions* getFeatureModelOptions() const
+    {
+        return _options.get();
+    }
 
     //override
     void initialize( const std::string& referenceURI, const Map* map )
@@ -559,16 +571,26 @@ public:
         return new BuildData( _renderBinStart );
     }
 
+    //override
     osg::Node* createNode( ProgressCallback* progress )
     {
         if ( !_features.valid() || !_features->getFeatureProfile() )
             return 0L;
 
-        return new FeatureSymbolizerGraph(new StencilVolumeSymbolizerFactory(this));
+        FeatureSymbolizerGraph* graph = new FeatureSymbolizerGraph( new StencilVolumeSymbolizerFactory(this) );
+
+        // for Mask models, we need to immediately traverse the new graph and generate the mask
+        if ( _options->mask() == true )
+        {
+            graph->compile();
+        }
+
+        return graph;
     }
 
 protected:
     int _renderBinStart;
+    osg::ref_ptr<const FeatureStencilModelOptions> _options;
 };
 
 

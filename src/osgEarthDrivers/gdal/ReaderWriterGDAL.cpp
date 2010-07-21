@@ -1244,7 +1244,7 @@ public:
         //Create a transparent image if we don't have an image
         if (!image.valid())
         {
-            return ImageUtils::getEmptyImage();
+            return ImageUtils::createEmptyImage();
         }
         return image.release();
     }
@@ -1452,11 +1452,6 @@ public:
         }
         return hf.release();
     }
-
-    //virtual int getPixelsPerTile() const
-    //{
-    //    return _settings->tileSize().value();
-    //}
 
     bool intersects(const TileKey* key)
     {

@@ -65,6 +65,7 @@ using namespace OpenThreads;
 #   define USE_NEW_OSGTERRAIN_298_API 1 
 #endif
 
+//#define DEBUG_SHOW_TILEKEY_LABELS
 
 EarthTerrainTechnique::EarthTerrainTechnique( Locator* masterLocator ) :
 TerrainTechnique(),
@@ -73,7 +74,8 @@ _currentReadOnlyBuffer(1),
 _currentWriteBuffer(0),
 _verticalScaleOverride(1.0f),
 _swapPending( false ),
-_initCount(0)
+_initCount(0),
+_optimizeTriangleOrientation(true)
 {
     this->setThreadSafeRefUnref(true);
 }
@@ -86,7 +88,8 @@ _currentReadOnlyBuffer( gt._currentReadOnlyBuffer ),
 _currentWriteBuffer( gt._currentWriteBuffer ),
 _verticalScaleOverride( gt._verticalScaleOverride ),
 _swapPending( gt._swapPending ),
-_initCount( gt._initCount )
+_initCount( gt._initCount ),
+_optimizeTriangleOrientation(gt._optimizeTriangleOrientation)
 {
     _bufferData[0] = gt._bufferData[0];
     _bufferData[1] = gt._bufferData[1];
@@ -107,6 +110,19 @@ EarthTerrainTechnique::getVerticalScaleOverride() const
 {
     return _verticalScaleOverride;
 }
+
+void
+EarthTerrainTechnique::setOptimizeTriangleOrientation(bool optimizeTriangleOrientation)
+{
+    _optimizeTriangleOrientation = optimizeTriangleOrientation;
+}
+
+bool
+EarthTerrainTechnique::getOptimizeTriangleOrientation() const
+{
+    return _optimizeTriangleOrientation;
+}
+
 
 void
 EarthTerrainTechnique::clearBuffer( int b )
@@ -136,7 +152,7 @@ void
 EarthTerrainTechnique::init( bool swapNow, ProgressCallback* progress )
 {
     // lock changes to the layers while we're rendering them
-    ScopedReadLock lock( getMutex() );
+    Threading::ScopedReadLock lock( getMutex() );
 
     _initCount++;
     //if ( _initCount > 1 ) 
@@ -159,7 +175,9 @@ EarthTerrainTechnique::init( bool swapNow, ProgressCallback* progress )
     
     if (!_terrainTile) return;
 
-    OpenThreads::ScopedLock<OpenThreads::Mutex> wbLock(_writeBufferMutex);
+    //GW: this does not appear to do anything, since 2 threads should not be calling init()
+    // at the same time. 2010-06-28
+    //OpenThreads::ScopedLock<OpenThreads::Mutex> wbLock(_writeBufferMutex);
 
     BufferData& buffer = getWriteBuffer();
     
@@ -177,9 +195,6 @@ EarthTerrainTechnique::init( bool swapNow, ProgressCallback* progress )
     
     applyColorLayers();
     applyTransparency();
-    
-// don't call this here
-//    smoothGeometry();
 
     if (buffer._transform.valid())
         buffer._transform->setThreadSafeRefUnref(true);
@@ -207,9 +222,9 @@ EarthTerrainTechnique::swapIfNecessary()
 {
     bool swapped = false;
 
-    ScopedReadLock lock( getMutex() );
+    Threading::ScopedReadLock lock( getMutex() );
     if ( _swapPending )
-    {
+    {        
         swapBuffers();
         swapped = true;
     }
@@ -239,7 +254,7 @@ Locator* EarthTerrainTechnique::computeMasterLocator()
     return masterLocator;
 }
 
-ReadWriteMutex&
+Threading::ReadWriteMutex&
 EarthTerrainTechnique::getMutex()
 {
     return static_cast<VersionedTile*>(_terrainTile)->getTileLayersMutex();
@@ -361,6 +376,11 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
     }
     
     buffer._geometry = new osg::Geometry;
+
+    // setting the geometry to DYNAMIC means its draw will not overlap the next frame's update/cull
+    // traversal - which could access the buffer without a mutex
+    buffer._geometry->setDataVariance( osg::Object::DYNAMIC );
+
     buffer._geode->addDrawable(buffer._geometry.get());
         
     osg::Geometry* geometry = buffer._geometry.get();
@@ -811,7 +831,7 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
                 osg::Vec3f &v01 = (*vertices)[i01];
                 osg::Vec3f &v11 = (*vertices)[i11];
 
-                if (fabsf(e00-e11)<fabsf(e01-e10))
+                if (!_optimizeTriangleOrientation || (e00-e11)<fabsf(e01-e10))
                 {
                     elements->push_back(i01);
                     elements->push_back(i00);
@@ -934,7 +954,8 @@ void EarthTerrainTechnique::generateGeometry(Locator* masterLocator, const osg::
     
 
     //DEBUGGING
-#if 0
+#ifdef DEBUG_SHOW_TILEKEY_LABELS
+
     static osgText::Font* s_font = osgText::readFontFile( "arialbd.ttf" );
     osgText::Text* text = new osgText::Text();
     text->setThreadSafeRefUnref( true );
@@ -1201,7 +1222,7 @@ EarthTerrainTechnique::releaseGLObjects(osg::State* state) const
 {
     EarthTerrainTechnique* ncThis = const_cast<EarthTerrainTechnique*>(this);
 
-    ScopedWriteLock lock( ncThis->getMutex() );
+    Threading::ScopedWriteLock lock( ncThis->getMutex() );
 
     if (_bufferData[0]._transform.valid())
     {

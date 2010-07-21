@@ -23,6 +23,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/CacheSeed
 	${HEADER_PATH}/Common
 	${HEADER_PATH}/Compositing
+	${HEADER_PATH}/CompositingTerrainTechnique
 	${HEADER_PATH}/Config
 	${HEADER_PATH}/Cube
 	${HEADER_PATH}/DriverOptions
@@ -45,6 +46,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/MapNode
 	${HEADER_PATH}/MapEngine
 	${HEADER_PATH}/MapEngineProperties
+	${HEADER_PATH}/MaskLayer
 	${HEADER_PATH}/MaskNode
 	${HEADER_PATH}/ModelLayer
 	${HEADER_PATH}/ModelSource
@@ -60,6 +62,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/TileSource
 	${HEADER_PATH}/TileSourceFactory
 	${HEADER_PATH}/TMS
+	${HEADER_PATH}/Version
 	${HEADER_PATH}/VersionedTerrain
 	${HEADER_PATH}/XmlUtils
 )
@@ -68,6 +71,7 @@ SET(TARGET_SRC
     Caching.cpp
     CacheSeed.cpp
     Compositing.cpp
+    CompositingTerrainTechnique.cpp
     Config.cpp
     Cube.cpp
     DriverOptions.cpp
@@ -86,6 +90,7 @@ SET(TARGET_SRC
     MapNode.cpp
     MapEngine.cpp
     MapEngineProperties.cpp
+    MaskLayer.cpp
     MaskNode.cpp
 	MimeTypes.cpp
 	ModelLayer.cpp

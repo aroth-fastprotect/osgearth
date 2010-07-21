@@ -21,8 +21,109 @@
 #include <osg/Notify>
 #include <string.h>
 
+#define LC "[osgEarth::ImageUtils] "
+
 using namespace osgEarth;
 
+static const float r10= 1.0f/1023.0f;
+static const float r8 = 1.0f/255.0f;
+static const float r6 = 1.0f/63.0f;
+static const float r5 = 1.0f/31.0f;
+static const float r4 = 1.0f/15.0f;
+static const float r3 = 1.0f/7.0f;
+static const float r2 = 1.0f/3.0f;
+
+
+// todo: add support for other data types as needed.
+osg::Vec4
+ImageUtils::getColor(const osg::Image* image, int s, int t, int r)
+{
+    switch( image->getDataType() )
+    {
+    case( GL_UNSIGNED_SHORT_5_5_5_1 ):
+        {
+            unsigned short p = *(unsigned short*)image->data( s, t, r );
+            //internal format GL_RGB5_A1 is implied
+            return osg::Vec4( r5*(float)(p>>11), r5*(float)((p&0x7c0)>>6), r5*((p&0x3e)>>1), (float)(p&0x1) );
+        }         
+    case( GL_UNSIGNED_BYTE_3_3_2 ):
+        {
+            unsigned char p = *(unsigned char*)image->data( s, t, r );
+            // internal format GL_R3_G3_B2 is implied
+            return osg::Vec4( r3*(float)(p>>5), r3*(float)((p&0x28)>>2), r2*(float)(p&0x3), 1.0f );
+        }
+    }
+
+    // default: let osg::Image handle the usual types
+    return image->getColor( s, t, r );
+}
+
+bool
+ImageUtils::setColor(osg::Image* image, int s, int t, int r, const osg::Vec4& color)
+{
+    if ( image->getDataType() == GL_UNSIGNED_BYTE )
+    {
+        unsigned char* p = image->data(s, t, r);
+        *p++ = (char)(color.r() * 255.0f);
+        *p++ = (char)(color.g() * 255.0f);
+        *p++ = (char)(color.b() * 255.0f);
+        if ( image->getPixelFormat() == GL_RGBA )
+            *p++ = (char)(color.a() * 255.0f);
+        return true;
+    }
+    else 
+    if ( image->getDataType() == GL_UNSIGNED_SHORT_5_5_5_1 )
+    {
+        //TODO
+        OE_WARN << LC << "setColor(GL_UNSIGNED_SHORT_5_5_5_1) not yet implemented!" << std::endl;
+    }
+    else
+    if ( image->getDataType() == GL_UNSIGNED_BYTE_3_3_2 )
+    {
+        //TODO
+        OE_WARN << LC << "setColor(GL_UNSIGNED_BYTE_3_3_2) not yet implemented!" << std::endl;
+    }
+
+    return false;
+}
+
+bool
+ImageUtils::copyAsSubImage(const osg::Image* src, osg::Image* dst, int dst_start_col, int dst_start_row )
+{
+    if (!src || !dst ||
+        dst_start_col + src->s() > dst->s() ||
+        dst_start_row + src->t() > dst->t() )
+    {
+        return false;
+    }
+
+    // check for fast bytewise copy:
+    if (src->getPacking() == dst->getPacking() &&
+        src->getDataType() == dst->getDataType() &&
+        src->getPixelFormat() == dst->getPixelFormat() )
+    {
+        for( int src_row=0, dst_row=dst_start_row; src_row < src->t(); src_row++, dst_row++ )
+        {
+            const void* src_data = src->data( 0, src_row, 0 );
+            void* dst_data = dst->data( dst_start_col, dst_row, 0 );
+            memcpy( dst_data, src_data, src->getRowSizeInBytes() );
+        }
+    }
+
+    // otherwise loop through an convert pixel-by-pixel.
+    else
+    {
+        for( int src_t=0, dst_t=dst_start_row; src_t < src->t(); src_t++, dst_t++ )
+        {
+            for( int src_s=0, dst_s=dst_start_col; src_s < src->s(); src_s++, dst_s++ )
+            {
+                setColor( dst, dst_s, dst_t, 0, getColor(src, src_s, src_t) );                
+            }
+        }
+    }
+}
+
+#if 0
 bool
 ImageUtils::copyAsSubImage( const osg::Image* src, osg::Image* dst, int dst_start_col, int dst_start_row )
 {
@@ -45,6 +146,7 @@ ImageUtils::copyAsSubImage( const osg::Image* src, osg::Image* dst, int dst_star
 
     return true;
 }
+#endif
 
 osg::Image*
 ImageUtils::resizeImage( const osg::Image* input, unsigned int new_s, unsigned int new_t )
@@ -53,8 +155,13 @@ ImageUtils::resizeImage( const osg::Image* input, unsigned int new_s, unsigned i
 
     GLenum pf = input->getPixelFormat();
 
-    if ( input && new_s > 0 && new_t > 0 && 
-        (pf == GL_RGBA || pf == GL_RGB || pf == GL_LUMINANCE || pf == GL_LUMINANCE_ALPHA) )
+    //if ( pf != GL_RGBA && pf != GL_RGB && pf != GL_LUMINANCE && pf != GL_RED && pf != GL_LUMINANCE_ALPHA )
+    //{
+    //    OE_WARN << LC << "resizeImage: unsupported pixel format " << std::hex << pf << std::endl;
+    //    return 0L;
+    //}
+
+    if ( new_s > 0 && new_t > 0 )
     {
         float s_ratio = (float)input->s()/(float)new_s;
         float t_ratio = (float)input->t()/(float)new_t;
@@ -65,18 +172,18 @@ ImageUtils::resizeImage( const osg::Image* input, unsigned int new_s, unsigned i
 
         unsigned int pixel_size_bytes = input->getRowSizeInBytes() / input->s();
 
-        for( unsigned int output_row=0; output_row < output->t(); output_row++ )
+        for( int output_row=0; output_row < output->t(); output_row++ )
         {
             // get an appropriate input row
             float output_row_ratio = (float)output_row/(float)output->t();
-            unsigned int input_row = (unsigned int)( output_row_ratio * (float)input->t() );
+            int input_row = (unsigned int)( output_row_ratio * (float)input->t() );
             if ( input_row >= input->t() ) input_row = input->t()-1;
             else if ( input_row < 0 ) input_row = 0;
 
-            for( unsigned int output_col = 0; output_col < output->s(); output_col++ )
+            for( int output_col = 0; output_col < output->s(); output_col++ )
             {
                 float output_col_ratio = (float)output_col/(float)output->s();
-                unsigned int input_col = (unsigned int)( output_col_ratio * (float)input->s() );
+                int input_col = (unsigned int)( output_col_ratio * (float)input->s() );
                 if ( input_col >= input->s() ) input_col = input->s()-1;
                 else if ( input_row < 0 ) input_row = 0;
                 
@@ -184,7 +291,7 @@ ImageUtils::sharpenImage( const osg::Image* input )
 
 
 osg::Image*
-ImageUtils::getEmptyImage()
+ImageUtils::createEmptyImage()
 {
     osg::Image* image = new osg::Image;
     image->allocateImage(1,1,1, GL_RGBA, GL_UNSIGNED_BYTE);
@@ -199,16 +306,19 @@ ImageUtils::convertToRGB(const osg::Image *image)
 	if (image)
 	{
 		//If the image is already RGB, clone it and return
-		if (image->getPixelFormat() == GL_RGB) return new osg::Image(*image);
+		if (image->getPixelFormat() == GL_RGB)
+        {
+            return new osg::Image(*image);
+        }
 
-		if (image->getPixelFormat() == GL_RGBA)
+		else if (image->getPixelFormat() == GL_RGBA)
 		{
 			osg::Image* result = new osg::Image();
 			result->allocateImage(image->s(), image->t(), image->r(), GL_RGB, GL_UNSIGNED_BYTE);
 
-			for (unsigned int s = 0; s < image->s(); ++s)
+			for (int s = 0; s < image->s(); ++s)
 			{
-				for (unsigned int t = 0; t < image->t(); ++t)
+				for (int t = 0; t < image->t(); ++t)
 				{
 					result->data(s,t)[0] = image->data(s, t)[0];
 					result->data(s,t)[1] = image->data(s, t)[1];
@@ -221,12 +331,49 @@ ImageUtils::convertToRGB(const osg::Image *image)
 		else
 		{
 			//TODO:  Handle other cases
-			OE_NOTICE << "[osgEarth::ImageUtils::convertToRGB] pixelFormat " << image->getPixelFormat() << " not yet supported " << std::endl;
+            OE_WARN << LC << "convertToRGB: pixelFormat " << std::hex << image->getPixelFormat() << " not yet supported " << std::endl;
 		}
 	}
 
 	return NULL;
 }
+//
+//osg::Image* convertToRGBA(const osg::Image* image)
+//{
+//    if ( image )
+//    {
+//        if ( image->getPixelFormat() == GL_RGBA )
+//        {
+//            return new osg::Image( *image );
+//        }
+//
+//        else
+//        {
+//            osg::Image* result = new osg::Image();
+//            result->allocateImage( image->s(), image->t(), image->r(), GL_RGBA, GL_UNSIGNED_BYTE );
+//
+//            for( int r=0; r<image->r(); ++r )
+//            {
+//                for( int s=0; s<image->s(); ++s )
+//                {
+//                    for( int t=0; t<image->t(); ++t )
+//                    {
+//                        osg::Vec4f color = image->getColor( s, t, r );
+//                        unsigned char* data = result->data( s, t, r );
+//                        *data++ = (unsigned char)(color.r()*255.0f);
+//                        *data++ = (unsigned char)(color.g()*255.0f);
+//                        *data++ = (unsigned char)(color.b()*255.0f);
+//                        *data++ = (unsigned char)(color.a()*255.0f);
+//                    }
+//                }
+//            }
+//             
+//            return result;
+//        }
+//
+//    }
+//    return 0L;
+//}
 
 bool 
 ImageUtils::areEquivalent(const osg::Image *lhs, const osg::Image *rhs)

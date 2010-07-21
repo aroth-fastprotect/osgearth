@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <sstream>
 #include <expat.h>
+#include <ctype.h>
 
 using namespace osgEarth;
 

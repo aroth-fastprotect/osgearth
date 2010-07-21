@@ -145,30 +145,55 @@ MapEngine::createSubTiles( Map* map, VersionedTerrain* terrain, const TileKey* k
 
     bool hasValidData = false;
     bool validData;
-    osg::ref_ptr<osg::Node> q0 = createTile( map, terrain, k0.get(), populateLayers, true, validData);
+
+    bool fallback = false;
+    osg::ref_ptr<osg::Node> q0 = createTile( map, terrain, k0.get(), populateLayers, true, fallback, validData);
     if (!hasValidData && validData) hasValidData = true;
     
-    osg::ref_ptr<osg::Node> q1 = createTile( map, terrain, k1.get(), populateLayers, true, validData );
+    osg::ref_ptr<osg::Node> q1 = createTile( map, terrain, k1.get(), populateLayers, true, fallback, validData );
     if (!hasValidData && validData) hasValidData = true;
     
-    osg::ref_ptr<osg::Node> q2 = createTile( map, terrain, k2.get(), populateLayers, true, validData );
+    osg::ref_ptr<osg::Node> q2 = createTile( map, terrain, k2.get(), populateLayers, true, fallback, validData );
     if (!hasValidData && validData) hasValidData = true;
     
-    osg::ref_ptr<osg::Node> q3 = createTile( map, terrain, k3.get(), populateLayers, true, validData );
+    osg::ref_ptr<osg::Node> q3 = createTile( map, terrain, k3.get(), populateLayers, true, fallback, validData );
     if (!hasValidData && validData) hasValidData = true;
 
-    if (hasValidData && q0.valid() && q1.valid() && q2.valid() && q3.valid())
+    if (!hasValidData)
     {
-        osg::Group* tile_parent = new osg::Group();
-        tile_parent->addChild( q0.get() );
-        tile_parent->addChild( q1.get() );
-        tile_parent->addChild( q2.get() );
-        tile_parent->addChild( q3.get() );
-        return tile_parent;
+        OE_DEBUG << "Couldn't create any quadrants for " << key->str() << " time to stop subdividing!" << std::endl;
+        return NULL;
     }
 
-    OE_DEBUG << "[osgEarth::MapEngine] Couldn't create all quadrants for " << key->str() << " time to stop subdividing!" << std::endl;
-    return NULL;
+    osg::Group* tile_parent = new osg::Group();
+    
+    fallback = true;
+    //Fallback on tiles if we couldn't create any
+    if (!q0.valid())
+    {
+        q0 = createTile( map, terrain, k0.get(), populateLayers, true, fallback, validData);
+    }
+
+    if (!q1.valid())
+    {
+        q1 = createTile( map, terrain, k1.get(), populateLayers, true, fallback, validData);
+    }
+
+    if (!q2.valid())
+    {
+        q2 = createTile( map, terrain, k2.get(), populateLayers, true, fallback, validData);
+    }
+
+    if (!q3.valid())
+    {        
+        q3 = createTile( map, terrain, k3.get(), populateLayers, true, fallback, validData);
+    }
+
+    tile_parent->addChild( q0.get() );
+    tile_parent->addChild( q1.get() );
+    tile_parent->addChild( q2.get() );
+    tile_parent->addChild( q3.get() );
+    return tile_parent;
 }
 
 GeoImage*
@@ -197,7 +222,7 @@ MapEngine::createValidGeoImage(MapLayer* layer,
 bool
 MapEngine::hasMoreLevels( Map* map, const TileKey* key )
 {
-    OpenThreads::ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     bool more_levels = false;
     int max_level = 0;
@@ -228,7 +253,7 @@ MapEngine::hasMoreLevels( Map* map, const TileKey* key )
 bool
 MapEngine::isCached(Map* map, const osgEarth::TileKey *key)
 {
-    OpenThreads::ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     const Profile* mapProfile = key->getProfile();
 
@@ -356,7 +381,7 @@ MapEngine::addPlaceholderHeightfieldLayer(VersionedTile* tile,
                 osg::HeightField* newHF = HeightFieldUtils::createSubSample(
                     ancestorHF.get(),
                     ancestorKey->getGeoExtent(),
-                    key->getGeoExtent() );
+                    key->getGeoExtent());
 
                 newHFLayer = new osgTerrain::HeightFieldLayer( newHF );
                 newHFLayer->setLocator( defaultLocator );
@@ -403,11 +428,11 @@ MapEngine::createPlaceholderHeightfieldLayer(osg::HeightField* ancestorHF,
 }
 
 osg::Node*
-MapEngine::createTile( Map* map, VersionedTerrain* terrain, const TileKey* key, bool populateLayers, bool wrapInPagedLOD, bool &validData )
+MapEngine::createTile( Map* map, VersionedTerrain* terrain, const TileKey* key, bool populateLayers, bool wrapInPagedLOD, bool fallback, bool &validData )
 {
     if ( populateLayers )
     {        
-        return createPopulatedTile( map, terrain, key, wrapInPagedLOD, validData);
+        return createPopulatedTile( map, terrain, key, wrapInPagedLOD, fallback, validData);
     }
     else
     {
@@ -440,7 +465,7 @@ MapEngine::createPlaceholderTile( Map* map, VersionedTerrain* terrain, const Til
     }
 
     OE_DEBUG << "Creating placeholder for " << key->str() << std::endl;
-    ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     bool isProjected = map->getCoordinateSystemType() == Map::CSTYPE_PROJECTED;
     bool isPlateCarre = isProjected && map->getProfile()->getSRS()->isGeographic();
@@ -476,7 +501,7 @@ MapEngine::createPlaceholderTile( Map* map, VersionedTerrain* terrain, const Til
     // Generate placeholder imagery and elevation layers. These "inherit" data from an
     // ancestor tile.
     {
-        ScopedReadLock parentLock( ancestorTile->getTileLayersMutex() );
+        Threading::ScopedReadLock parentLock( ancestorTile->getTileLayersMutex() );
         addPlaceholderImageLayers( tile, ancestorTile.get(), imageMapLayers, locator.get(), key );
         addPlaceholderHeightfieldLayer( tile, ancestorTile.get(), locator.get(), key, ancestorKey.get() );
     }
@@ -511,7 +536,8 @@ MapEngine::createPlaceholderTile( Map* map, VersionedTerrain* terrain, const Til
     // install a tile switcher:
     tile->setTerrainRevision( terrain->getRevision() );
     tile->setTerrain( terrain );
-    //terrain->registerTile( tile );
+    terrain->registerTile( tile );
+
     osg::Node* result = 0L;
 
 
@@ -556,9 +582,9 @@ MapEngine::createPlaceholderTile( Map* map, VersionedTerrain* terrain, const Til
 }
 
 osg::Node*
-MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileKey* key, bool wrapInPagedLOD, bool &validData )
+MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileKey* key, bool wrapInPagedLOD, bool fallback, bool &validData )
 {
-    ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     bool isProjected = map->getCoordinateSystemType() == Map::CSTYPE_PROJECTED;
     bool isPlateCarre = isProjected && map->getProfile()->getSRS()->isGeographic();
@@ -584,7 +610,6 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
         MapLayer* layer = i->get();
 
         osg::ref_ptr<GeoImage> image;
-        TileSource* source = layer->getTileSource();
 		//Only create images if the key is valid
         if ( layer->isKeyValid( key ) )
         {
@@ -606,7 +631,7 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
     osg::ref_ptr<osg::HeightField> hf;
     if ( hfMapLayers.size() > 0 )
     {
-        hf = map->createHeightField( key, false );
+        hf = map->createHeightField( key, false, _engineProps.elevationInterpolation().value());
         hasElevation = hf.valid();
     }
 
@@ -623,6 +648,12 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
     {
         OE_DEBUG << "[osgEarth::MapEngine] Could not create any imagery or heightfields for " << key->str() <<".  Not building tile" << std::endl;
         validData = false;
+
+        //If we're not asked to fallback on previous LOD's and we have no data, return NULL
+        if (!fallback)
+        {
+            return NULL;
+        }
     }
     else
     {
@@ -645,7 +676,7 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
 			if (!image)
 			{
 				//If the image is not valid, create an empty texture as a placeholder
-				image = new GeoImage(ImageUtils::getEmptyImage(), key->getGeoExtent());
+                image = new GeoImage(ImageUtils::createEmptyImage(), key->getGeoExtent());
 			}
 
 			//Assign the new image to the proper place in the list
@@ -664,7 +695,7 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
         else
         {
             //Try to get a heightfield again, but this time fallback on parent tiles
-            hf = map->createHeightField( key, true );
+            hf = map->createHeightField( key, true, _engineProps.elevationInterpolation().value());
             if (!hf.valid())
             {
                 //We couldn't get any heightfield, so just create an empty one.
@@ -718,8 +749,8 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
     {
       osgTerrain::ContourLayer* contourLayer(new osgTerrain::ContourLayer(map->getContourTransferFunction()));
 
-      contourLayer->setMagFilter(_engineProps.getMagFilterMode().value());
-      contourLayer->setMinFilter(_engineProps.getMinFilterMode().value());
+      contourLayer->setMagFilter(_engineProps.getContourMagFilter().value());
+      contourLayer->setMinFilter(_engineProps.getContourMinFilter().value());
       tile->setColorLayer(layer,contourLayer);
       ++layer;
     }
@@ -760,6 +791,8 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
             img_layer->setLevelOfDetail( key->getLevelOfDetail() );
             img_layer->setName( imageMapLayers[i]->getName() );
             img_layer->setLocator( img_locator.get());
+			img_layer->setMinFilter( imageMapLayers[i]->getMinFilter().value());
+			img_layer->setMagFilter( imageMapLayers[i]->getMagFilter().value());
 
 			double upp = geo_image->getUnitsPerPixel();
 
@@ -808,7 +841,7 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
     // If there's already a placeholder tile registered, this will be ignored. If there isn't,
     // this will register the new tile.
     tile->setTerrain( terrain );
-    //terrain->registerTile( tile );
+    terrain->registerTile( tile );
 
     // Set the tile's revision to the current terrain revision
     tile->setTerrainRevision( static_cast<VersionedTerrain*>(terrain)->getRevision() );
@@ -866,7 +899,7 @@ MapEngine::createImageLayer(Map* map,
                             const TileKey* key,
                             ProgressCallback* progress)
 {
-    ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     osg::ref_ptr< GeoImage > geoImage;
     
@@ -878,7 +911,7 @@ MapEngine::createImageLayer(Map* map,
     else
     {
         //If the key is not valid, simply make a transparent tile
-        geoImage = new GeoImage(ImageUtils::getEmptyImage(), key->getGeoExtent());
+        geoImage = new GeoImage(ImageUtils::createEmptyImage(), key->getGeoExtent());
     }
 
     if (geoImage.valid())
@@ -911,6 +944,8 @@ MapEngine::createImageLayer(Map* map,
         TransparentLayer* imgLayer = new TransparentLayer(geoImage->getImage(), layer);
         imgLayer->setLocator( imgLocator.get() );
         imgLayer->setLevelOfDetail( key->getLevelOfDetail() );
+		imgLayer->setMinFilter( layer->getMinFilter().value());
+		imgLayer->setMagFilter( layer->getMagFilter().value());
         return imgLayer;
     }
     return NULL;
@@ -919,13 +954,13 @@ MapEngine::createImageLayer(Map* map,
 osgTerrain::HeightFieldLayer* 
 MapEngine::createHeightFieldLayer( Map* map, const TileKey* key, bool exactOnly )
 {
-    ScopedReadLock lock( map->getMapDataMutex() );
+    Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     bool isProjected = map->getCoordinateSystemType() == Map::CSTYPE_PROJECTED;
     bool isPlateCarre = isProjected && map->getProfile()->getSRS()->isGeographic();
 
     // try to create a heightfield at native res:
-    osg::ref_ptr<osg::HeightField> hf = map->createHeightField( key, !exactOnly );
+    osg::ref_ptr<osg::HeightField> hf = map->createHeightField( key, !exactOnly, _engineProps.elevationInterpolation().value());
     if ( !hf )
     {
         if ( exactOnly )

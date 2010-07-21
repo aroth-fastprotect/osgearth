@@ -95,7 +95,7 @@ struct TileColorLayerRequest : public TileLayerRequest
     {
         osg::ref_ptr<MapLayer> mapLayer = 0L;
         {
-            ScopedReadLock lock( _map->getMapDataMutex() );
+            Threading::ScopedReadLock lock( _map->getMapDataMutex() );
             for (unsigned int i = 0; i < _map->getImageMapLayers().size(); ++i)
             {
                 if ( _map->getImageMapLayers()[i]->getId() == _layerId)
@@ -296,7 +296,7 @@ VersionedTile::cancelRequests()
 }
 
 
-OpenThreads::ReadWriteMutex&
+Threading::ReadWriteMutex&
 VersionedTile::getTileLayersMutex()
 {
     return _tileLayersMutex;
@@ -563,14 +563,14 @@ VersionedTile::installRequests( int stamp )
     VersionedTerrain* terrain = getVersionedTerrain();
 
     Map* map = terrain->getMap();
-    OpenThreads::ScopedReadLock lock( map->getMapDataMutex() );
+   Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
     MapEngine* engine = terrain->getEngine();
 
     bool hasElevationLayer;
     int numColorLayers;
     {
-        ScopedReadLock lock( _tileLayersMutex );
+        Threading::ScopedReadLock lock( _tileLayersMutex );
         hasElevationLayer = this->getElevationLayer() != NULL;
         numColorLayers = this->getNumColorLayers();
     }
@@ -857,7 +857,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
     //Get the image map layers
     MapLayerList imageMapLayers;
     {
-        OpenThreads::ScopedReadLock mapDataLock(map->getMapDataMutex());
+        Threading::ScopedReadLock mapDataLock(map->getMapDataMutex());
         map->getImageMapLayers(imageMapLayers);
     }
 
@@ -892,7 +892,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
                             //Get the parent color layer
                             osg::ref_ptr<osgTerrain::Layer> parentColorLayer;
                             {
-                                ScopedReadLock l2( parentTile->getTileLayersMutex() );
+                                Threading::ScopedReadLock l2( parentTile->getTileLayersMutex() );
                                 if (i < parentTile->getNumColorLayers())
                                 {
                                     parentColorLayer = parentTile->getColorLayer(i);
@@ -901,7 +901,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
 
                             //Set the parent color layer
                             {
-                                ScopedWriteLock lock( getTileLayersMutex() );
+                                Threading::ScopedWriteLock lock( getTileLayersMutex() );
                                 if (parentColorLayer.valid())
                                 {
                                     setColorLayer(i, parentColorLayer.get());
@@ -945,7 +945,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
                             int index = -1;
                             {
                                 // Lock the map data mutex, since we are querying the map model:
-                                ScopedReadLock mapDataLock( map->getMapDataMutex() );
+                                Threading::ScopedReadLock mapDataLock( map->getMapDataMutex() );
 
                                 //See if we even care about the request
                                 for (unsigned int j = 0; j < map->getImageMapLayers().size(); ++j)
@@ -972,7 +972,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
                                 {
                                     // update the color layer safely:
                                     {
-                                        OpenThreads::ScopedWriteLock layerLock( getTileLayersMutex() );
+                                        Threading::ScopedWriteLock layerLock( getTileLayersMutex() );
                                         this->setColorLayer( index, newImgLayer.get() );
                                     }
 
@@ -997,14 +997,14 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
 											newLayer->setLevelOfDetail(_key->getLevelOfDetail());
 											// update the color layer safely:
 											{
-												OpenThreads::ScopedWriteLock layerLock( getTileLayersMutex() );
+												Threading::ScopedWriteLock layerLock( getTileLayersMutex() );
 												this->setColorLayer( index, newLayer );
 											}
 
 											//static_cast<osgEarth::TransparentLayer*>(this->getColorLayer(index))->setLevelOfDetail( _key->getLevelOfDetail());										
 											itr = _requests.erase( itr );
 											increment = false;
-											OE_NOTICE << "Tried (" << _key->str() << ") (layer " << r->_layerId << "), too many times, moving on...." << std::endl;
+											OE_INFO << "Tried (" << _key->str() << ") (layer " << r->_layerId << "), too many times, moving on...." << std::endl;
 										}
 									}
 									else
@@ -1056,7 +1056,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
 
                     // need to write-lock the layer data since we'll be changing it:
                     {
-                        ScopedWriteLock lock( _tileLayersMutex );
+                        Threading::ScopedWriteLock lock( _tileLayersMutex );
                         this->setElevationLayer( newHFLayer.get() );
                         this->dirtyBound();
                     }
@@ -1105,7 +1105,7 @@ VersionedTile::serviceCompletedRequests( bool tileTableLocked )
                 {
                     // install the new elevation layer.
                     {
-                        ScopedWriteLock lock( _tileLayersMutex );
+                        Threading::ScopedWriteLock lock( _tileLayersMutex );
                         this->setElevationLayer( newPhLayer.get() );
                         this->dirtyBound();
                     }
@@ -1146,16 +1146,10 @@ VersionedTile::traverse( osg::NodeVisitor& nv )
     bool isUpdate = nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR;
     if ( !_hasBeenTraversed && isUpdate )
     {
-        ScopedWriteLock lock( this->_tileLayersMutex );
+        Threading::ScopedWriteLock lock( this->_tileLayersMutex );
         {
             if ( !_hasBeenTraversed && getVersionedTerrain() )
             {
-                // register this tile with its terrain if we've not already done it.
-                // we want to be sure that the tile is already in the scene graph at the
-                // time of registration (otherwise VersionedTerrain will see its refcount
-                // at 1 and schedule it for removal as soon as it's added. Therefore, we
-                // make sure this is either a CULL or UPDATE traversal.
-                getVersionedTerrain()->registerTile( this );
                 _hasBeenTraversed = true;
 
                 // we constructed this tile with an update traversal count of 1 so it would get
@@ -1216,23 +1210,76 @@ VersionedTile::releaseGLObjects(osg::State* state) const
 
 /****************************************************************************/
 
-// a simple draw callback, to be installed on a Camera, that tells the
-// versionedterrain to release GL memory on any expired tiles.
+// a simple draw callback, to be installed on a Camera, that tells all VersionedTerrains to
+// release GL memory on any expired tiles.
 struct ReleaseGLCallback : public osg::Camera::DrawCallback
 {
-    ReleaseGLCallback(VersionedTerrain* terrain) : _terrain(terrain) { }
-    void operator()( osg::RenderInfo& renderInfo ) const {
-        _terrain->releaseGLObjectsForTiles(renderInfo.getState());
+	typedef std::vector< osg::observer_ptr< VersionedTerrain > > ObserverTerrainList;
+
+    ReleaseGLCallback()
+	{
+        //nop
+	}
+
+    void operator()( osg::RenderInfo& renderInfo ) const
+    {
+        // first release GL objects as necessary
+        {
+		    OpenThreads::ScopedLock<OpenThreads::Mutex> lock(const_cast<ReleaseGLCallback*>(this)->_terrainMutex);
+		    for (ObserverTerrainList::const_iterator itr = _terrains.begin(); itr != _terrains.end(); ++itr)
+		    { 
+			    osg::ref_ptr< VersionedTerrain > vt = itr->get();
+			    if (vt.valid())
+			    {
+				    (*itr)->releaseGLObjectsForTiles(renderInfo.getState());
+			    }
+		    }
+        }
+
+        // then call the previous CB if there is one
+        if ( _previousCB.valid() )
+            _previousCB->operator ()( renderInfo );
     }
-    osg::ref_ptr< VersionedTerrain >  _terrain;
+
+	void registerTerrain(VersionedTerrain *terrain)
+	{
+		OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_terrainMutex);
+		ObserverTerrainList::iterator itr = std::find(_terrains.begin(), _terrains.end(), terrain);
+		//Avoid double registration
+		if (itr == _terrains.end())
+		{
+			//OE_NOTICE << "ReleaseGLCallback::registerTerrain " << std::endl;
+			_terrains.push_back( terrain );
+		}
+	}
+
+	void unregisterTerrain(VersionedTerrain* terrain)
+	{
+		OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_terrainMutex);
+		ObserverTerrainList::iterator itr = std::find(_terrains.begin(), _terrains.end(), terrain);
+		if (itr != _terrains.end())
+		{
+			//OE_NOTICE << "ReleaseGLCallback::unregisterTerrain " << std::endl;
+			_terrains.erase(itr);
+		}
+	}
+
+	OpenThreads::Mutex _terrainMutex;
+	ObserverTerrainList _terrains;    
+    osg::ref_ptr<osg::Camera::DrawCallback> _previousCB;
 };
 
+static bool s_releaseCBInstalled = false;
+static osg::ref_ptr< ReleaseGLCallback > s_releaseCB = new ReleaseGLCallback();
+
+
+//TODO:  Register with the callback when we are first created...
 // immediately release GL memory for any expired tiles.
 // called from the DRAW thread
 void
 VersionedTerrain::releaseGLObjectsForTiles(osg::State* state)
 {
-    ScopedReadLock lock( _tilesMutex );
+    Threading::ScopedReadLock lock( _tilesMutex );
 
     while( _tilesToRelease.size() > 0 )
     {
@@ -1247,7 +1294,7 @@ _map( map ),
 _engine( engine ),
 _revision(0),
 _numAsyncThreads( 0 ),
-_releaseCBInstalled( false )
+_registeredWithReleaseGLCallback( false )
 {
     this->setThreadSafeRefUnref( true );
 
@@ -1273,11 +1320,14 @@ _releaseCBInstalled( false )
 
         OE_INFO << "VT: using " << _numAsyncThreads << " loading threads " << std::endl;
     }
-    else
-    {
-        // osgTerrain 2.9.8 explicity sets NCURT=1 .. negate that here in standard mode
-        setNumChildrenRequiringUpdateTraversal( 0 );
-    }
+}
+
+VersionedTerrain::~VersionedTerrain()
+{
+	if (s_releaseCBInstalled)
+	{
+		s_releaseCB->unregisterTerrain(this);
+	}
 }
 
 void
@@ -1301,7 +1351,7 @@ VersionedTerrain::getVersionedTile( const osgTerrain::TileID& tileID,
 {
     if ( lock )
     {
-        ScopedReadLock lock( _tilesMutex );
+        Threading::ScopedReadLock lock( _tilesMutex );
         TileTable::iterator i = _tiles.find( tileID );
         out_tile = i != _tiles.end()? i->second.get() : 0L;
     }
@@ -1315,7 +1365,7 @@ VersionedTerrain::getVersionedTile( const osgTerrain::TileID& tileID,
 void
 VersionedTerrain::getVersionedTiles( TileList& out_list )
 {
-    ScopedReadLock lock( _tilesMutex );
+    Threading::ScopedReadLock lock( _tilesMutex );
     for( TileTable::iterator i = _tiles.begin(); i != _tiles.end(); i++ )
         out_list.push_back( i->second.get() );
 }
@@ -1323,7 +1373,7 @@ VersionedTerrain::getVersionedTiles( TileList& out_list )
 void
 VersionedTerrain::getTerrainTiles( TerrainTileList& out_list )
 {
-    ScopedReadLock lock( _tilesMutex );
+    Threading::ScopedReadLock lock( _tilesMutex );
     for( TileTable::iterator i = _tiles.begin(); i != _tiles.end(); i++ )
     {
         out_list.push_back( i->second.get() );
@@ -1481,7 +1531,7 @@ VersionedTerrain::addTerrainCallback( TerrainCallback* cb )
 void
 VersionedTerrain::registerTile( VersionedTile* newTile )
 {
-    ScopedWriteLock lock( _tilesMutex );
+    Threading::ScopedWriteLock lock( _tilesMutex );
     //Register the new tile immediately, but also add it to the queue so that
     _tiles[ newTile->getTileID() ] = newTile;
     _tilesToAdd.push( newTile );
@@ -1504,16 +1554,24 @@ void
 VersionedTerrain::traverse( osg::NodeVisitor &nv )
 {
 #ifdef EXPLICIT_RELEASE_GL_OBJECTS
-    if ( !_releaseCBInstalled )
+    if ( !s_releaseCBInstalled )
     {
         osg::Camera* cam = findFirstParentOfType<osg::Camera>( this );
         if ( cam )
         {
             OE_INFO << "Explicit releaseGLObjects() enabled" << std::endl;
-            cam->setPostDrawCallback( new ReleaseGLCallback(this) );
-            _releaseCBInstalled = true;
+            osg::ref_ptr<osg::Camera::DrawCallback> previousCB = cam->getPostDrawCallback();
+			cam->setPostDrawCallback( s_releaseCB.get() );
+            s_releaseCB->_previousCB = previousCB.get();
+            s_releaseCBInstalled = true;
         }
     }
+
+	if (s_releaseCBInstalled && !_registeredWithReleaseGLCallback) 
+	{
+		s_releaseCB->registerTerrain(this);
+		_registeredWithReleaseGLCallback = true;
+	}
 #endif // EXPLICIT_RELEASE_GL_OBJECTS
 
     if ( nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR )
@@ -1527,7 +1585,7 @@ VersionedTerrain::traverse( osg::NodeVisitor &nv )
         // write-locked is in registerTile(), which simply pushes a new tile on to
         // the _tilesToAdd queue.
         {
-            ScopedWriteLock lock( _tilesMutex );
+            Threading::ScopedWriteLock lock( _tilesMutex );
 
             int oldSize = _tiles.size();
 
@@ -1556,7 +1614,7 @@ VersionedTerrain::traverse( osg::NodeVisitor &nv )
                 {
 #ifdef EXPLICIT_RELEASE_GL_OBJECTS
                     //Only add the tile to be released if we could actually install the callback.
-                    if (_releaseCBInstalled)
+                    if (s_releaseCBInstalled)
                     {
                         //OE_NOTICE << "Tile (" << i->get()->getKey()->str() << ") shut down." << std::endl;
                         _tilesToRelease.push( i->get() );
@@ -1600,7 +1658,7 @@ VersionedTerrain::traverse( osg::NodeVisitor &nv )
 
         // should probably find a way to not hold this mutex during the loop.. oh well
         {
-            ScopedReadLock lock( _tilesMutex );
+            Threading::ScopedReadLock lock( _tilesMutex );
 
             // grow the vector if necessary:
             //_tilesToServiceElevation.reserve( _tiles.size() );
@@ -1707,7 +1765,7 @@ VersionedTerrain::getTileGenerationTaskSerivce()
 void
 VersionedTerrain::updateTaskServiceThreads()
 {
-    OpenThreads::ScopedReadLock lock(_map->getMapDataMutex());    
+    Threading::ScopedReadLock lock(_map->getMapDataMutex());    
 
     //Get the maximum elevation weight
     float elevationWeight = 0.0f;

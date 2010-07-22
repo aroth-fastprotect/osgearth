@@ -1,4 +1,5 @@
 SET(TARGET_SRC FeatureGeomModelSource.cpp)
-SET(TARGET_PUBLIC_H FeatureGeomModelOptions)
+SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/model_feature_geom/FeatureGeomModelOptions)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/model_feature_geom)
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarthSymbology)
 SETUP_PLUGIN(osgearth_model_feature_geom)

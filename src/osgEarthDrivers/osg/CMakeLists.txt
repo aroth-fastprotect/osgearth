@@ -1,6 +1,8 @@
 SET(TARGET_PUBLIC_H
-    OSGOptions
+    ../../../../include/osgEarthDrivers/osg/OSGOptions
 )
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/osg)
+
 SET(TARGET_SRC 
     OSGTileSource.cpp
 )

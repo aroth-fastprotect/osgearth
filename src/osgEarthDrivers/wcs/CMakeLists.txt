@@ -18,8 +18,8 @@ SET(TARGET_SRC
 SET(TARGET_H
     WCS11Source.h
 )
-SET(TARGET_PUBLIC_H WCSOptions)
+SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/wcs/WCSOptions)
 SET(TARGET_LIBRARIES_VARS)
-
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/wcs)
 
 SETUP_PLUGIN(osgearth_wcs)

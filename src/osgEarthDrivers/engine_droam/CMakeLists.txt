@@ -12,20 +12,18 @@ SET(TARGET_SRC
 )
 
 SET(TARGET_H
-    Common
-    CubeManifold
-    Diamond
-    DRoamNode
-    Manifold
-    MeshManager
-    AMRGeometry
     AMRShaders.h
-)
+	)
+SET(TARGET_PUBLIC_H
+    ../../../../include/osgEarthDrivers/engine_droam/Common
+    ../../../../include/osgEarthDrivers/engine_droam/CubeManifold
+    ../../../../include/osgEarthDrivers/engine_droam/Diamond
+    ../../../../include/osgEarthDrivers/engine_droam/DRoamNode
+    ../../../../include/osgEarthDrivers/engine_droam/Manifold
+    ../../../../include/osgEarthDrivers/engine_droam/MeshManager
+    ../../../../include/osgEarthDrivers/engine_droam/AMRGeometry
+	)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/engine_droam)
 
 SETUP_PLUGIN(osgearth_engine_droam)
-
-# to install public driver includes:
-SET(LIB_NAME engine_droam)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
 

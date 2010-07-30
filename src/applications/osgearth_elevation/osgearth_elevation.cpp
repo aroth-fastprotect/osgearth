@@ -36,6 +36,11 @@
 #include <osgEarthDrivers/tms/TMSOptions>
 #include <sstream>
 
+#include <osgDB/ReaderWriter>
+#include <osgDB/WriteFile>
+#include <osgGA/FirstPersonManipulator>
+#include <osgEarth/Registry>
+
 using namespace osgEarth::Drivers;
 
 static
@@ -64,11 +69,11 @@ osg::MatrixTransform* createFlag()
 }
 
 static void
-updateFlag( osg::MatrixTransform* xf, const osg::Matrix& mat, double elev )
+updateFlag( osg::MatrixTransform* xf, const osg::Matrix& mat, double lat, double lon, double elev )
 {
     osg::Geode* g = static_cast<osg::Geode*>( xf->getChild(0)->asGroup()->getChild(0) );
     std::stringstream buf;
-    buf << elev;
+	buf << lat << ", " << lon << '\n' << elev;
 	std::string bufStr;
 	bufStr = buf.str();
     static_cast<osgText::Text*>( g->getDrawable(1) )->setText( bufStr );
@@ -108,7 +113,7 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
                 query_resolution, NULL,
                 out_mat, out_elevation, out_resolution ) )
             {
-                updateFlag( _flag.get(), out_mat, out_elevation );
+                updateFlag( _flag.get(), out_mat, lat_deg, lon_deg, out_elevation );
             }
             else
             {
@@ -121,11 +126,22 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
+		osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
         if ( ea.getEventType() == osgGA::GUIEventAdapter::MOVE )
         {
-            osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
             update( ea.getX(), ea.getY(), view );
         }
+		else if(ea.getEventType() == osgGA::GUIEventAdapter::KEYDOWN)
+		{
+			switch(ea.getKey())
+			{
+			case 'e': 
+				{
+					update( ea.getX(), ea.getY(), view );
+				}
+				break;
+			}
+		}
 
         return false;
     }
@@ -135,15 +151,107 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
     osg::ref_ptr<osg::MatrixTransform> _flag;
 };
 
+osg::Vec3d toGPSCoordinate(const osg::EllipsoidModel & ellipsoid, const osg::Vec3d & v)
+{
+	osg::Vec3d ret;
+	double lon;
+	double lat;
+	ellipsoid.convertXYZToLatLongHeight(v.x(), v.y(), v.z(), lat, lon, ret.z());
+	ret.x() = osg::RadiansToDegrees(lat);
+	ret.y() = osg::RadiansToDegrees(lon);
+	return ret;
+}
+
+bool writeHeightField(const osg::EllipsoidModel & ellipsoid, const GeoExtent& extent, const osg::HeightField * hf, const std::string & filename)
+{
+	if(!hf)
+		return false;
+
+	std::ofstream file(filename.c_str());
+
+
+	osg::Vec3d origin = toGPSCoordinate(ellipsoid, hf->getOrigin());
+	double xmin, ymin, xmax, ymax;
+	extent.getBounds(xmin, ymin, xmax, ymax);
+
+	file << "ncols " << hf->getNumColumns() << std::endl;
+	file << "nrows " << hf->getNumRows() << std::endl;
+
+	file << "xllcorner " << xmin << std::endl;
+	file << "yllcorner " << ymin << std::endl;
+	file << "cellsize " << hf->getXInterval() << std::endl;
+	file << "nodata_value -9999" << std::endl;
+
+	unsigned numRows = hf->getNumRows();
+	for(unsigned r = 0; r < numRows; r++)
+	{
+		for(unsigned c = 0; c < hf->getNumColumns(); c++)
+		{
+			float elev = hf->getHeight(c, numRows - r - 1);
+			file << elev << ' ';
+		}
+		file << std::endl;
+	}
+	file.close();
+	return true;
+}
+
+class MyReadFileCallback : public osgDB::ReadFileCallback
+{
+public:
+
+	virtual osgDB::ReaderWriter::ReadResult openArchive(const std::string& filename,osgDB::ReaderWriter::ArchiveStatus status, unsigned int indexBlockSizeHint, const osgDB::Options* useObjectCache)
+	{
+		std::cout << "openArchive " << filename << std::endl;
+		return osgDB::ReadFileCallback::openArchive(filename, status, indexBlockSizeHint, useObjectCache);
+	}
+
+	virtual osgDB::ReaderWriter::ReadResult readObject(const std::string& filename, const osgDB::Options* options)
+	{
+		std::cout << "readObject " << filename << std::endl;
+		return osgDB::ReadFileCallback::readObject(filename, options);
+	}
+
+	virtual osgDB::ReaderWriter::ReadResult readImage(const std::string& filename, const osgDB::Options* options)
+	{
+		std::cout << "readImage " << filename << std::endl;
+		return osgDB::ReadFileCallback::readImage(filename, options);
+	}
+
+	virtual osgDB::ReaderWriter::ReadResult readHeightField(const std::string& filename, const osgDB::Options* options)
+	{
+		std::cout << "readHeightField " << filename << std::endl;
+		return osgDB::ReadFileCallback::readHeightField(filename, options);
+	}
+
+	virtual osgDB::ReaderWriter::ReadResult readNode(const std::string& filename, const osgDB::Options* options)
+	{
+		std::cout << "readNode " << filename << std::endl;
+		return osgDB::ReadFileCallback::readNode(filename, options);
+	}
+
+	virtual osgDB::ReaderWriter::ReadResult readShader(const std::string& filename, const osgDB::Options* options)
+	{
+		std::cout << "readShader " << filename << std::endl;
+		return osgDB::ReadFileCallback::readShader(filename, options);
+	}
+
+protected:
+	virtual ~MyReadFileCallback() {}
+};
+
 
 int main(int argc, char** argv)
 {
     osg::ArgumentParser arguments(&argc,argv);
 
+	osgDB::Registry::instance()->setReadFileCallback(new MyReadFileCallback);
+
     osgViewer::Viewer viewer(arguments);
 
     // install the programmable manipulator.
     osgEarthUtil::EarthManipulator* manip = new osgEarthUtil::EarthManipulator();
+	//osgGA::FirstPersonManipulator * manip = new osgGA::FirstPersonManipulator();
     viewer.setCameraManipulator( manip );
 
 	osgEarth::MapNode* mapNode = NULL;
@@ -173,6 +281,53 @@ int main(int argc, char** argv)
 	{
 		mapNode = findTopMostNodeOfType<osgEarth::MapNode>( loadedNode );
 	}
+	osgEarth::Map *map = mapNode->getMap();
+
+	map->getImageMapLayers();
+
+	// save the current osgEarth configuration to a file for checking
+	EarthFile earthFile(map, mapNode->getMapEngineProperties());
+	earthFile.writeXML("C:\\tmp\\elev1.earth");
+
+
+	mapNode->getEllipsoidModel();
+
+	osg::ref_ptr<TileKey> key;
+	osg::ref_ptr<osg::HeightField> hf;
+	osg::ref_ptr<osgTerrain::TerrainTile> tile;
+
+	double x = 11.566667, y = 48.133333;
+	for(int level = 0; level < 12; level++)
+	{
+		char sz[256];
+		sprintf(sz, "C:\\tmp\\munich_%i.asc", level);
+
+		// get the tilekey corresponding to the tile we need:
+		key = map->getProfile()->createTileKey( x, y, level );
+		const GeoExtent& extent = key->getGeoExtent();
+
+		hf = map->createHeightField( key.get(), true, osgEarth::INTERP_BILINEAR);
+
+		if(hf.valid())
+		{
+			double map_x = x, map_y = y;
+			double xInterval = extent.width()  / (double)(hf->getNumColumns()-1);
+			double yInterval = extent.height() / (double)(hf->getNumRows()-1);
+
+			double out_elevation = (double) HeightFieldUtils::getHeightAtLocation( hf.get(), map_x, map_y, extent.xMin(), extent.yMin(), xInterval, yInterval );
+
+			std::cerr << "createTileKey(" << x << ", " << y << " , " << level << ") " << key->str() << " " 
+				<< extent.toString() << " elev " << out_elevation << std::endl;
+
+			bool ok = writeHeightField(*mapNode->getEllipsoidModel(), extent, hf.get(), sz);
+		}
+		else
+		{
+			std::cerr << "createTileKey(" << x << ", " << y << " , " << level << ") " << key->str() << " " 
+				<< extent.toString() << " elev <nohightfield>" << std::endl;
+			unlink(sz);
+		}
+	}
 
     osg::Group* root = new osg::Group();
 
@@ -191,6 +346,12 @@ int main(int argc, char** argv)
     osgEarthUtil::ElevationManager* elevMan = new osgEarthUtil::ElevationManager( mapNode->getMap() );
     elevMan->setTechnique( osgEarthUtil::ElevationManager::TECHNIQUE_PARAMETRIC );
     elevMan->setMaxTilesToCache( 10 );
+
+	double out_elev, out_res;
+	elevMan->getElevation(11.566667, 48.133333, 0.5, NULL, out_elev, out_res);
+	std::cerr << "getElevation(11.566667, 48.133333, 0.5, NULL, out_elev, out_res) " << out_elev << " " << out_res << std::endl;
+
+	osgDB::writeNodeFile(*root, "C:\\tmp\\evas.osg");
 
     // An event handler that will respond to mouse clicks:
     viewer.addEventHandler( new QueryElevationHandler( elevMan, flag ) );

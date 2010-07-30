@@ -230,6 +230,10 @@ MapNode::init()
 
     setNumChildrenRequiringUpdateTraversal(1);
 
+    // Since we have global uniforms in the stateset, mark it dynamic so it is immune to
+    // multi-threaded overlap
+    getOrCreateStateSet()->setDataVariance(osg::Object::DYNAMIC);
+
     //Set the layer unit uniforms
     getOrCreateStateSet()->getOrCreateUniform("osgEarth_Layer0_unit", osg::Uniform::INT)->set(0);
     getOrCreateStateSet()->getOrCreateUniform("osgEarth_Layer1_unit", osg::Uniform::INT)->set(1);
@@ -500,22 +504,33 @@ MapNode::onMapProfileEstablished( const Profile* mapProfile )
 		terrain->setTerrainTechniquePrototype( new osgEarth::MultiPassTerrainTechnique());
         OE_INFO << LC << "Layering technique = MULTIPASS" << std::endl;
     }
-    else if ( _engineProps.layeringTechnique() == MapEngineProperties::LAYERING_MULTITEXTURE )
+    else
     {
-        EarthTerrainTechnique *et = new osgEarth::EarthTerrainTechnique();
-        //If we are using triangulate interpolation, tell the terrain technique to just create simple triangles with
-        //consistent orientation rather than trying to optimize the orientation
-        if (_engineProps.elevationInterpolation() == INTERP_TRIANGULATE)
+        ExtendedTerrainTechnique* tech = 0;
+
+        if ( _engineProps.layeringTechnique() == MapEngineProperties::LAYERING_MULTITEXTURE )
         {
-            et->setOptimizeTriangleOrientation(false);
+            tech = new EarthTerrainTechnique();
+            OE_INFO << LC << "Layering technique = MULTITEXTURE" << std::endl;
         }
-		terrain->setTerrainTechniquePrototype( et  );
-        OE_INFO << LC << "Layering technique = MULTITEXTURE" << std::endl;
-    }
-    else if ( _engineProps.layeringTechnique() == MapEngineProperties::LAYERING_COMPOSITE )
-    {
-        terrain->setTerrainTechniquePrototype( new osgEarth::CompositingTerrainTechnique() );
-        OE_INFO << LC << "Layering technique = COMPOSITE" << std::endl;
+
+        else if ( _engineProps.layeringTechnique() == MapEngineProperties::LAYERING_COMPOSITE )
+        {
+            tech = new CompositingTerrainTechnique();
+            OE_INFO << LC << "Layering technique = COMPOSITE" << std::endl;
+        }
+
+        if ( tech )
+        {
+            //If we are using triangulate interpolation, tell the terrain technique to just create simple triangles with
+            //consistent orientation rather than trying to optimize the orientation
+            if ( _engineProps.elevationInterpolation() == INTERP_TRIANGULATE )
+            {
+                tech->setOptimizeTriangleOrientation( false );
+            }
+            
+            terrain->setTerrainTechniquePrototype( tech );
+        }
     }
 
     // apply any pending callbacks:

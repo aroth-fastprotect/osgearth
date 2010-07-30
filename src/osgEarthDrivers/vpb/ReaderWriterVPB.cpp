@@ -32,6 +32,8 @@
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
 
+#include <crtdbg.h>
+
 #include <sstream>
 
 #include "VPBOptions"
@@ -250,6 +252,7 @@ public:
     
     std::string createTileName( int level, int tile_x, int tile_y )
     {
+		_ASSERTE(level >= 0);
         std::stringstream buf;
         if ( _options->directoryStructure() == VPBOptions::DS_FLAT )
         {
@@ -259,6 +262,9 @@ public:
         {
             int psl = _options->primarySplitLevel().value();
             int ssl = _options->secondarySplitLevel().value();
+
+			_ASSERTE(psl >= 0);
+			_ASSERTE(ssl >= 0);
 
             if (level<psl)
             {
@@ -358,7 +364,7 @@ public:
         HTTPClient::ResultCode result = HTTPClient::readNodeFile( filename, node, localOptions.get(), progress );
         if ( result == HTTPClient::RESULT_OK && node.valid() )
         {
-            //OE_INFO<<"Loaded model "<<filename<<std::endl;
+            OE_INFO<<"Loaded model "<<filename<<std::endl;
             CollectTiles ct;
             node->accept(ct);
 
@@ -396,7 +402,7 @@ public:
             // in the case of an "unrecoverable" error, black-list the URL for this tile.
             if ( ! HTTPClient::isRecoverable( result ) )
             {
-                //OE_INFO<<"Black listing : "<< filename<< " (" << result << ")" << std::endl;
+                OE_INFO<<"Black listing : "<< filename<< " (" << result << ")" << std::endl;
                 OpenThreads::ScopedLock<OpenThreads::Mutex> lock(_blacklistMutex);
                 _blacklistedFilenames.insert(filename);
             }

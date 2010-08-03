@@ -150,7 +150,7 @@ int main(int argc, char** argv)
         {
             //Configure the feature options
             OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
-            featureOpt->url() = "../data/world.shp";
+			featureOpt->url() = "c:/work/trac/data/world.shp";
 
             //FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
             //AGGLiteOptions* opt = new AGGLiteOptions();

@@ -18,7 +18,7 @@
  */
 #ifdef OSGEARTH_HAVE_GEOS
 
-#include <osgEarthFeatures/GEOS>
+#include <osgEarthSymbology/GEOS>
 #include <osg/Notify>
 
 #include <geos/geom/PrecisionModel.h>
@@ -38,7 +38,7 @@
 #include <geos/util/IllegalArgumentException.h>
 
 using namespace osgEarth;
-using namespace osgEarth::Features;
+using namespace osgEarth::Symbology;
 using namespace geos;
 using namespace geos::operation;
 

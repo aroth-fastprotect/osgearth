@@ -24,7 +24,6 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/FeatureSymbolizer
 	${HEADER_PATH}/FeatureTileSource
 	${HEADER_PATH}/Filter
-    ${HEADER_PATH}/GEOS
 	${HEADER_PATH}/ResampleFilter
 	${HEADER_PATH}/ScaleFilter
 	${HEADER_PATH}/BuildTextOperator
@@ -43,7 +42,6 @@ SET(TARGET_SRC
     FeatureSymbolizer.cpp
     FeatureTileSource.cpp
     Filter.cpp
-    GEOS.cpp
     ResampleFilter.cpp
 	ScaleFilter.cpp
 	BuildTextOperator.cpp

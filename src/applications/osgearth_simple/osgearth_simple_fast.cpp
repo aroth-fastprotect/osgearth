@@ -33,6 +33,7 @@
 
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/GeometrySymbol>
+#include <osgEarthSymbology/MarkerSymbol>
 #include <osgEarthDrivers/tms/TMSOptions>
 #include <osgEarthDrivers/model_feature_geom/FeatureGeomModelOptions>
 #include <osgEarthDrivers/model_feature_stencil/FeatureStencilModelOptions>
@@ -150,7 +151,7 @@ int main(int argc, char** argv)
         {
             //Configure the feature options
             OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
-            featureOpt->url() = "../data/world.shp";
+			featureOpt->url() = "c:/work/trac/data/world.shp";
 
             //FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
             //AGGLiteOptions* opt = new AGGLiteOptions();
@@ -160,18 +161,50 @@ int main(int argc, char** argv)
             osgEarth::Symbology::Style* style = new osgEarth::Symbology::Style; 
             osgEarth::Symbology::LineSymbol* ls = new osgEarth::Symbology::LineSymbol;
             ls->stroke()->color() = osg::Vec4f( 1,1,0,1 );
-            ls->stroke()->width() = 1;
+            ls->stroke()->width() = 1.5;
+			ls->stroke()->lineCap() = osgEarth::Symbology::Stroke::LINECAP_DEFAULT;
+			ls->stroke()->lineJoin() = osgEarth::Symbology::Stroke::LINEJOIN_DEFAULT;
             style->addSymbol(ls); 
             opt->styles()->addStyle(style);
             opt->geometryTypeOverride() = Geometry::TYPE_LINESTRING;
 
-            ModelLayer* modelLayer = new osgEarth::ModelLayer("shapefile", opt);
+            ModelLayer* modelLayer = new osgEarth::ModelLayer("world.shp", opt);
+			modelLayer->setLightingEnabled(false);
             map->addModelLayer( modelLayer );               
+
             //map->addMapLayer( new ImageMapLayer("world", opt) );
             viewer.addEventHandler( new ToggleModelLayerHandler( modelLayer ) );
 
         }
+/*
+		//Add a shapefile to the map
+		{
+			//Configure the feature options
+			OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
+			featureOpt->url() = "c:/work/data/media/110m_populated_places.shp";
 
+			FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
+			//AGGLiteOptions* opt = new AGGLiteOptions();
+			//FeatureStencilModelOptions* opt = new FeatureStencilModelOptions();
+			opt->featureOptions() = featureOpt;
+
+			osgEarth::Symbology::Style* style = new osgEarth::Symbology::Style; 
+			osgEarth::Symbology::MarkerSymbol* ps = new osgEarth::Symbology::MarkerSymbol;
+			ps->marker() = "c:/work/data/media/tree.ive";
+			ps->fill()->color() = osg::Vec4f( 1,0,0,1 );
+			ps->size() = 10; // 10 pixel
+			style->addSymbol(ps); 
+			opt->styles()->addStyle(style);
+			opt->geometryTypeOverride() = Geometry::TYPE_POINTSET;
+
+			ModelLayer* modelLayer = new osgEarth::ModelLayer("110m_populated_places.shp", opt);
+			modelLayer->setLightingEnabled(false);
+			map->addModelLayer( modelLayer );               
+			//map->addMapLayer( new ImageMapLayer("world", opt) );
+			viewer.addEventHandler( new ToggleModelLayerHandler( modelLayer ) );
+
+		}
+*/
         // The MapNode will render the Map object in the scene graph.
         osgEarth::MapNode* mapNode = new osgEarth::MapNode( map );     
         earthNode = mapNode;
@@ -199,7 +232,7 @@ int main(int argc, char** argv)
 
         // create a graticle, and start it in the OFF position
         graticule = new osgEarthUtil::Graticule( mapNode->getMap() );
-        graticule->setNodeMask(0);
+        //graticule->setNodeMask(0);
         root->addChild( graticule );
     }
 

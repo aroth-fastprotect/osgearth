@@ -10,6 +10,7 @@ SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/AutoClipPlaneHandler
 	${HEADER_PATH}/Common
+	${HEADER_PATH}/Controls
 	${HEADER_PATH}/ClampCallback
 	${HEADER_PATH}/EarthManipulator
 	${HEADER_PATH}/ElevationFadeCallback
@@ -28,6 +29,7 @@ SET(TARGET_PUBLIC_H
 SET(TARGET_SRC
 	AutoClipPlaneHandler.cpp
 	ClampCallback.cpp
+    Controls.cpp
 	EarthManipulator.cpp
 	ElevationFadeCallback.cpp
 	ElevationManager.cpp

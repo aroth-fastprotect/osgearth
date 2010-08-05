@@ -4,12 +4,16 @@ ELSE (DYNAMIC_OSGEARTH)
     ADD_DEFINITIONS(-DOSGEARTHSYMBOLOGY_LIBRARY_STATIC)
 ENDIF(DYNAMIC_OSGEARTH)
 
+IF (GEOS_FOUND)
+    ADD_DEFINITIONS(-DOSGEARTH_HAVE_GEOS)
+ENDIF(GEOS_FOUND)
 
 SET(LIB_NAME osgEarthSymbology)
 
 SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
 #   header files go here
+	${HEADER_PATH}/AGG.h
     ${HEADER_PATH}/Common
     ${HEADER_PATH}/Content
     ${HEADER_PATH}/CssUtils
@@ -41,6 +45,8 @@ SET(TARGET_SRC
     GeometryExtrudeSymbolizer.cpp
     GeometrySymbolizer.cpp
     GeometrySymbol.cpp
+    GEOS.cpp
+    GeometryRasterizer.cpp
     MarkerSymbolizer.cpp
     MarkerSymbol.cpp
     ModelSymbolizer.cpp
@@ -71,6 +77,10 @@ SET(TARGET_ADDED_LIBRARIES
 	osgGA
     OpenThreads
     )
+
+IF(GEOS_FOUND)
+	LIST(APPEND TARGET_ADDED_LIBRARIES GEOS_LIBRARY)
+ENDIF(GEOS_FOUND)
 
 SETUP_OSG_LIB(osgEarthSymbology)
 

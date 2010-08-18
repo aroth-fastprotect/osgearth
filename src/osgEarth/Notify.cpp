@@ -130,8 +130,8 @@ protected:
 
 static bool s_NeedNotifyInit = true;
 static osg::NotifySeverity g_NotifyLevel = osg::NOTICE;
-static osgEarth::NullStream *g_NullStream;
-static osgEarth::NotifyStream *g_NotifyStream;
+static osgEarth::NullStream *g_NullStream = NULL;
+static osgEarth::NotifyStream *g_NotifyStream = NULL;
 
 void
 osgEarth::setNotifyLevel(osg::NotifySeverity severity)
@@ -207,6 +207,7 @@ bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 
 void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
 {
+	if (s_NeedNotifyInit) osgEarth::initNotifyLevel();
 	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
 	if (buffer)
 		buffer->setNotifyHandler(handler);

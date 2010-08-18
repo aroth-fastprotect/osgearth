@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -67,14 +67,17 @@ public:
         contextFilter.profile() = context->getModelSource()->getFeatureSource()->getFeatureProfile();
 
         // Transform them into the map's SRS:
-        TransformFilter xform( context->getModelSource()->getMap()->getProfile()->getSRS(), context->getModelSource()->getMap()->isGeocentric() );
+        TransformFilter xform( context->getModelSource()->getMap()->getProfile()->getSRS() );
+        xform.setMakeGeocentric( context->getModelSource()->getMap()->isGeocentric() );
+        xform.setLocalizeCoordinates( true );
+
         const FeatureGeomModelOptions* options = dynamic_cast<const FeatureGeomModelOptions*>(context->getModelSource()->getFeatureModelOptions());
 
         FeatureList featureList;
         for (FeatureList::const_iterator it = features.begin(); it != features.end(); ++it)
             featureList.push_back(osg::clone((*it).get(),osg::CopyOp::DEEP_COPY_ALL));
 
-        xform.heightOffset() = options->heightOffset().value();
+        xform.setHeightOffset( options->heightOffset().value() );
         contextFilter = xform.push( featureList, contextFilter );
 
         GeometryList geometryList;

@@ -1,6 +1,6 @@
 /* --*-c++-*-- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -74,8 +74,6 @@ FeatureSymbolizerGraph::update()
     if (_dirty && _factory.valid())
     {
         removeChildren(0, getNumChildren());
-
-        osg::Timer_t start = osg::Timer::instance()->tick();
 
         FeatureModelSource* model = _factory->getFeatureModelSource();
         // implementation-specific data

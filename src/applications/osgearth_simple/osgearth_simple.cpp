@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2009 Pelican Ventures, Inc.
+* Copyright 2008-2010 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -152,11 +152,13 @@ int main(int argc, char** argv)
         {
             //Configure the feature options
             OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
+			featureOpt->setName("states");
             featureOpt->url() = "../data/world.shp";
+			featureOpt->ogrDriver() = "ESRI Shapefile";
 
-            //FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
+            FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
             //AGGLiteOptions* opt = new AGGLiteOptions();
-            FeatureStencilModelOptions* opt = new FeatureStencilModelOptions();
+            //FeatureStencilModelOptions* opt = new FeatureStencilModelOptions();
             opt->featureOptions() = featureOpt;
 
             osgEarth::Symbology::Style* style = new osgEarth::Symbology::Style; 
@@ -167,7 +169,8 @@ int main(int argc, char** argv)
             opt->styles()->addStyle(style);
             opt->geometryTypeOverride() = Geometry::TYPE_LINESTRING;
 
-            ModelLayer* modelLayer = new osgEarth::ModelLayer("shapefile", opt);
+            ModelLayer* modelLayer = new osgEarth::ModelLayer("states", opt);
+			modelLayer->setLightingEnabled(false);
             map->addModelLayer( modelLayer );               
             //map->addMapLayer( new ImageMapLayer("world", opt) );
             viewer.addEventHandler( new ToggleModelLayerHandler( modelLayer ) );
@@ -177,11 +180,17 @@ int main(int argc, char** argv)
         // The MapNode will render the Map object in the scene graph.
         osgEarth::MapNode* mapNode = new osgEarth::MapNode( map );     
         earthNode = mapNode;
+#if 1
+		// save the current osgEarth configuration to a file for checking
+		EarthFile earthFile(map, mapNode->getMapEngineProperties());
+		earthFile.writeXML("C:\\tmp\\simple.earth");
+#endif
+		
     }    
 
     root->addChild( earthNode );
     
-    osgEarthUtil::Graticule* graticule = 0L;
+    //osgEarthUtil::Graticule* graticule = 0L;
 
     osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( earthNode );
     if ( mapNode )
@@ -198,27 +207,29 @@ int main(int argc, char** argv)
             // for a geocentric map:
             //viewer.addEventHandler( new osgEarthUtil::AutoClipPlaneHandler( mapNode ) );
         }
-
+/*
         // create a graticle, and start it in the OFF position
         graticule = new osgEarthUtil::Graticule( mapNode->getMap() );
         graticule->setNodeMask(0);
         root->addChild( graticule );
+		*/
     }
 
     viewer.setSceneData( root );
     viewer.setCameraManipulator( manip );
 
+    // bind "double-click" to the zoom-to function in the EarthManipulator
     manip->getSettings()->bindMouseDoubleClick(
         osgEarthUtil::EarthManipulator::ACTION_GOTO,
         osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON );
 
     // add our fly-to handler
     viewer.addEventHandler(new FlyToViewpointHandler( manip ));
-
+/*
     // add a handler to toggle the graticle
     if ( graticule )
         viewer.addEventHandler(new NodeToggleHandler( graticule, 'g' ));
-
+*/
     // add some stock OSG handlers:
     viewer.addEventHandler(new osgViewer::StatsHandler());
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
@@ -226,54 +237,6 @@ int main(int argc, char** argv)
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
 
     viewer.realize();
-
-    osgEarthUtil::Controls::ControlSurface* cs = new osgEarthUtil::Controls::ControlSurface( &viewer );
-    root->addChild( cs );
-
-
-    osgEarthUtil::Controls::VBox* vbox = new osgEarthUtil::Controls::VBox();
-    //vbox->setX( 15 );
-    vbox->setY( 15 );
-    vbox->setPadding( osgEarthUtil::Controls::Gutter(10) );
-    vbox->setSpacing( 5 );
-    cs->addControl( vbox );
-
-    vbox->setFrame( new osgEarthUtil::Controls::RoundedFrame() );
-    vbox->getFrame()->setBackColor( osg::Vec4f(0,0,0,0.5) );
-
-    vbox->setHorizAlign( osgEarthUtil::Controls::ALIGN_CENTER );
-    vbox->setVertAlign( osgEarthUtil::Controls::ALIGN_CENTER );
-
-    osg::Image* i = osgDB::readImageFile( "http://www.osgearth.org/chrome/site/osgearth.gif" );
-    osgEarthUtil::Controls::ImageControl* ic = new osgEarthUtil::Controls::ImageControl( i );
-    ic->setHorizAlign( osgEarthUtil::Controls::ALIGN_CENTER );
-    vbox->addControl( ic );
-
-    osgEarthUtil::Controls::HBox* hbox = new osgEarthUtil::Controls::HBox();
-    {    
-        hbox->setPadding( osgEarthUtil::Controls::Gutter(10) );
-        hbox->setSpacing( 45 );
-        hbox->setFrame( new osgEarthUtil::Controls::RoundedFrame() );
-        hbox->getFrame()->setBackColor( osg::Vec4f(0,1,0,0.5) );
-
-        osgEarthUtil::Controls::LabelControl* label = new osgEarthUtil::Controls::LabelControl();
-        label->setText( "osgEarthUtil Controls" );
-        label->setFontSize( 32 );
-        hbox->addControl( label );
-
-        osgEarthUtil::Controls::LabelControl* label2 = new osgEarthUtil::Controls::LabelControl();
-        label2->setText( "The ultimate control library for OSG" );
-        label2->setFontSize( 22 );
-        label2->setForeColor( osg::Vec4f(1,1,0,1) );
-        hbox->addControl( label2 );
-    }
-    vbox->addControl( hbox );
-
-    osgEarthUtil::Controls::LabelControl* label3 = new osgEarthUtil::Controls::LabelControl();
-    label3->setText( "For is the time for all good men to come to the aid of their country." );
-    label3->setFontSize( 18 );
-    vbox->addControl( label3 );
-
 
     return viewer.run();
 }

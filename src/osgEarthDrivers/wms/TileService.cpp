@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -184,7 +184,7 @@ TileService::createProfile(TilePatternList &patterns)
       double ymax = topLeftMax.y();
       double ymin = ymax - (double)h * tileHeight;
       
-      profile = Profile::create( patterns[0].getSRS(), xmin, ymin, xmax, ymax, w, h);
+      profile = Profile::create( patterns[0].getSRS(), xmin, ymin, xmax, ymax, "", w, h);
     }
 
     return profile;

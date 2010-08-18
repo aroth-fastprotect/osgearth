@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -298,7 +298,8 @@ Graticule::createGridLevel( unsigned int levelNum ) const
                 cx = resample.push( features, cx );
             }
 
-            TransformFilter xform( mapProfile->getSRS(), _map->isGeocentric() );
+            TransformFilter xform( mapProfile->getSRS() );
+            xform.setMakeGeocentric( _map->isGeocentric() );
             cx = xform.push( features, cx );
 
             Bounds bounds = feature->getGeometry()->getBounds();

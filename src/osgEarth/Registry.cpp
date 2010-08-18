@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -98,6 +98,7 @@ Registry::getGlobalGeodeticProfile() const
             const_cast<Registry*>(this)->_global_geodetic_profile = Profile::create(
                 "epsg:4326",
                 -180.0, -90.0, 180.0, 90.0,
+                "",
                 2, 1 );
         }
     }
@@ -120,7 +121,7 @@ Registry::getGlobalMercatorProfile() const
             srs->getGeographicSRS()->transform( 180.0, 0.0, srs, e, dummy );
             
             const_cast<Registry*>(this)->_global_mercator_profile = Profile::create(
-                srs, -e, -e, e, e, 1, 1 );
+                srs, -e, -e, e, e, 0L, 1, 1 );
         }
     }
     return _global_mercator_profile.get();
@@ -152,6 +153,14 @@ Registry::getNamedProfile( const std::string& name ) const
         return getCubeProfile();
     else
         return NULL;
+}
+
+const VerticalSpatialReference*
+Registry::getDefaultVSRS() const
+{
+    if ( !_defaultVSRS.valid() )
+        const_cast<Registry*>(this)->_defaultVSRS = new VerticalSpatialReference( Units::METERS );
+    return _defaultVSRS.get();
 }
 
 osgEarth::Cache*
@@ -209,12 +218,7 @@ public:
     RegisterEarthTileExtension()
     {
         osg::Referenced::setThreadSafeReferenceCounting( true );
-
         osgDB::Registry::instance()->addFileExtensionAlias("earth_tile", "earth");
-
-        Registry::instance()->getGlobalGeodeticProfile();
-        Registry::instance()->getGlobalMercatorProfile();
-        Registry::instance()->getCubeProfile();
     }
 };
 static RegisterEarthTileExtension s_registerEarthTileExtension;

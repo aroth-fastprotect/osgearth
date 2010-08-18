@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -579,6 +579,7 @@ UnifiedCubeProfile::UnifiedCubeProfile() :
 Profile(SpatialReference::create( "unified-cube" ),
         0.0, 0.0, 6.0, 1.0,
         -180.0, -90.0, 180.0, 90.0,
+        0L, // let it automatically create a VSRS
         6, 1 )
 
 {

@@ -25,12 +25,13 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_loadmaps)
 	ADD_SUBDIRECTORY(osgearth_earthfile)
 	ADD_SUBDIRECTORY(osgearth_features)
-	ADD_SUBDIRECTORY(osgearth_symbology)
 	ADD_SUBDIRECTORY(osgearth_contour)
+	ADD_SUBDIRECTORY(osgearth_controls)
+	#ADD_SUBDIRECTORY(osgearth_symbology)
 ENDIF(BUILD_OSGEARTH_EXAMPLES)
 
 
 SET(TARGET_DEFAULT_PREFIX "")
 SET(TARGET_DEFAULT_LABEL_PREFIX "Applications")
-
+# always build osgearth_version
 ADD_SUBDIRECTORY(osgearth_version)

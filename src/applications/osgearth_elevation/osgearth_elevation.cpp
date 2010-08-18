@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2009 Pelican Ventures, Inc.
+* Copyright 2008-2010 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -126,22 +126,11 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
-		osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
         if ( ea.getEventType() == osgGA::GUIEventAdapter::MOVE )
         {
+            osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
             update( ea.getX(), ea.getY(), view );
         }
-		else if(ea.getEventType() == osgGA::GUIEventAdapter::KEYDOWN)
-		{
-			switch(ea.getKey())
-			{
-			case 'e': 
-				{
-					update( ea.getX(), ea.getY(), view );
-				}
-				break;
-			}
-		}
 
         return false;
     }

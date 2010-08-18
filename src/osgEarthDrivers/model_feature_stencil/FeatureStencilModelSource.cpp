@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -422,7 +422,9 @@ public:
         }
 
         // Transform them into the map's SRS, localizing the verts along the way:
-        TransformFilter xform( context->getModelSource()->getMap()->getProfile()->getSRS(), isGeocentric );
+        TransformFilter xform( context->getModelSource()->getMap()->getProfile()->getSRS() );
+        xform.setMakeGeocentric( isGeocentric );
+        xform.setLocalizeCoordinates( !isGeocentric );
         filterContext = xform.push( featureList, filterContext );
 
         if ( isGeocentric )

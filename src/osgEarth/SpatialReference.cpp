@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -228,12 +228,6 @@ replaceIn( std::string& s, const std::string& sub, const std::string& other)
     }
     return s;
 }
-
-//std::string
-//SpatialReference::getAttributeValue( const std::string& name ) const
-//{
-//    return getOGRAttrValue( _handle, name, 0 );
-//}
 
 SpatialReference*
 SpatialReference::validate()

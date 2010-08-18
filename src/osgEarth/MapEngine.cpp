@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2009 Pelican Ventures, Inc.
+* Copyright 2008-2010 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -322,20 +322,25 @@ MapEngine::isCached(Map* map, const osgEarth::TileKey *key)
 osg::HeightField*
 MapEngine::createEmptyHeightField( const TileKey* key, int numCols, int numRows )
 {
-    //Get the bounds of the key
-    double minx, miny, maxx, maxy;
-    key->getGeoExtent().getBounds(minx, miny, maxx, maxy);
+    osg::HeightField* hf = key->getProfile()->getVerticalSRS()->createReferenceHeightField(
+        key->getGeoExtent(), numCols, numRows );
 
-    osg::HeightField *hf = new osg::HeightField();
-    hf->allocate( numCols, numRows );
-    for(unsigned int i=0; i<hf->getHeightList().size(); i++ )
-        hf->getHeightList()[i] = 0.0;
-
-    hf->setOrigin( osg::Vec3d( minx, miny, 0.0 ) );
-    hf->setXInterval( (maxx - minx)/(double)(hf->getNumColumns()-1) );
-    hf->setYInterval( (maxy - miny)/(double)(hf->getNumRows()-1) );
-    hf->setBorderWidth( 0 );
     return hf;
+
+    ////Get the bounds of the key
+    //double minx, miny, maxx, maxy;
+    //key->getGeoExtent().getBounds(minx, miny, maxx, maxy);
+
+    //osg::HeightField *hf = new osg::HeightField();
+    //hf->allocate( numCols, numRows );
+    //for(unsigned int i=0; i<hf->getHeightList().size(); i++ )
+    //    hf->getHeightList()[i] = 0.0;
+
+    //hf->setOrigin( osg::Vec3d( minx, miny, 0.0 ) );
+    //hf->setXInterval( (maxx - minx)/(double)(hf->getNumColumns()-1) );
+    //hf->setYInterval( (maxy - miny)/(double)(hf->getNumRows()-1) );
+    //hf->setBorderWidth( 0 );
+    //return hf;
 }
 
 void
@@ -864,9 +869,13 @@ MapEngine::createPopulatedTile( Map* map, VersionedTerrain* terrain, const TileK
         plod->setCenter( bs.center() );
         plod->addChild( tile, min_range, max_range );
 
-        if ( key->getLevelOfDetail() < this->getEngineProperties().maxLOD().value() && validData )
+        std::string filename = createURI( map->getId(), key );
+
+        //Only add the next tile if it hasn't been blacklisted
+        bool isBlacklisted = osgEarth::Registry::instance()->isBlacklisted( filename );
+        if (!isBlacklisted && key->getLevelOfDetail() < this->getEngineProperties().maxLOD().value() && validData )
         {
-            plod->setFileName( 1, createURI( map->getId(), key ) );
+            plod->setFileName( 1, filename  );
             plod->setRange( 1, 0.0, min_range );
         }
         else

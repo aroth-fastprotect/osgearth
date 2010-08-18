@@ -22,6 +22,8 @@ SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/GeometryExtrudeSymbolizer
     ${HEADER_PATH}/GeometrySymbolizer
     ${HEADER_PATH}/GeometrySymbol
+    ${HEADER_PATH}/GEOS
+    ${HEADER_PATH}/GeometryRasterizer
     ${HEADER_PATH}/MarkerSymbolizer
     ${HEADER_PATH}/MarkerSymbol
     ${HEADER_PATH}/ModelSymbolizer

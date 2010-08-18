@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -230,6 +230,7 @@ public:
                         osg::RadiansToDegrees(min_y), 
                         osg::RadiansToDegrees(max_x), 
                         osg::RadiansToDegrees(max_y),
+                        "",
                         numTilesWideAtLod0,
                         numTilesHighAtLod0 );
                 }

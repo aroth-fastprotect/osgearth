@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -241,10 +241,7 @@ HTTPClient::HTTPClient()
 		userAgent = std::string(userAgentEnv);        
     }
 
-	OE_INFO << "HTTPClient setting userAgent=" << userAgent << std::endl;
-
-	
-
+	OE_DEBUG << "HTTPClient setting userAgent=" << userAgent << std::endl;
 
     curl_easy_setopt( _curl_handle, CURLOPT_USERAGENT, userAgent.c_str() );
     curl_easy_setopt( _curl_handle, CURLOPT_WRITEFUNCTION, osgEarth::StreamObjectReadCallback );

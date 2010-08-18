@@ -29,8 +29,8 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/DriverOptions
 	${HEADER_PATH}/EarthFile
 	${HEADER_PATH}/EarthTerrainTechnique
-	${HEADER_PATH}/EarthTerrain
 	${HEADER_PATH}/Export
+	${HEADER_PATH}/EGM
 	${HEADER_PATH}/FileUtils
 	${HEADER_PATH}/FileLocationCallback
 	${HEADER_PATH}/FindNode
@@ -51,9 +51,11 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ModelLayer
 	${HEADER_PATH}/ModelSource
 	${HEADER_PATH}/MultiPassTerrainTechnique
+	${HEADER_PATH}/Notify
 	${HEADER_PATH}/Profile
 	${HEADER_PATH}/Progress
 	${HEADER_PATH}/Registry
+	${HEADER_PATH}/Revisioning
 	${HEADER_PATH}/SpatialReference
 	${HEADER_PATH}/StringUtils
 	${HEADER_PATH}/TaskService
@@ -61,9 +63,12 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/TileKey
 	${HEADER_PATH}/TileSource
 	${HEADER_PATH}/TileSourceFactory
+	${HEADER_PATH}/ThreadingUtils
 	${HEADER_PATH}/TMS
+	${HEADER_PATH}/Units
 	${HEADER_PATH}/Version
 	${HEADER_PATH}/VersionedTerrain
+	${HEADER_PATH}/VerticalSpatialReference
 	${HEADER_PATH}/XmlUtils
 )
 
@@ -77,6 +82,7 @@ SET(TARGET_SRC
     DriverOptions.cpp
     EarthFile.cpp
     EarthTerrainTechnique.cpp
+    EGM.cpp
     FileUtils.cpp
     GeoData.cpp
     HeightFieldUtils.cpp
@@ -107,8 +113,10 @@ SET(TARGET_SRC
     TileSource.cpp
     TileSourceFactory.cpp
     TMS.cpp
+    Units.cpp
     Version.cpp
     VersionedTerrain.cpp
+    VerticalSpatialReference.cpp
     XmlUtils.cpp
 )
 

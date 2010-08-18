@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,14 +24,16 @@ using namespace osgEarth::Symbology;
 
 TransformFilter::TransformFilter() :
 _makeGeocentric( false ),
+_localize( false ),
 _heightOffset( 0.0 )
 {
     // nop
 }
 
-TransformFilter::TransformFilter(const SpatialReference* outputSRS, bool makeGeocentric ) :
+TransformFilter::TransformFilter(const SpatialReference* outputSRS ) :
 _outputSRS( outputSRS ),
-_makeGeocentric( makeGeocentric ),
+_makeGeocentric( false ),
+_localize( false ),
 _heightOffset( 0.0 )
 {
     //NOP
@@ -70,11 +72,12 @@ TransformFilter::push( Feature* input, const FilterContext& context )
                     _bbox.expandBy( x, y, z );
                 }
             }
-            else if ( _heightOffset != 0.0 )
+            else
             {
                 for( int i=0; i<geom->size(); i++ )
                 {
-                    (*geom)[i].z() += _heightOffset;
+                    if ( _heightOffset != 0.0 )
+                        (*geom)[i].z() += _heightOffset;
                     _bbox.expandBy( (*geom)[i] );
                 }
             }
@@ -119,7 +122,7 @@ TransformFilter::push( FeatureList& input, const FilterContext& incx )
     // set the reference frame to shift data to the centroid. This will
     // prevent floating point precision errors in the openGL pipeline for
     // properly gridded data.
-    if ( _bbox.valid() )
+    if ( _bbox.valid() && _localize )
     {       
         osg::Matrixd localizer = osg::Matrixd::translate( -_bbox.center() );
         for( FeatureList::iterator i = input.begin(); i != input.end(); i++ ) {

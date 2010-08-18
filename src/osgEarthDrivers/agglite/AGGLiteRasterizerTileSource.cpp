@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -118,6 +118,7 @@ public:
 
         // First, transform the features into the map's SRS:
         TransformFilter xform( imageExtent.getSRS() );
+        xform.setLocalizeCoordinates( false );
         context = xform.push( features, context );
 
         // set up the AGG renderer:

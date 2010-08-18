@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2009 Pelican Ventures, Inc.
+ * Copyright 2008-2010 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -46,7 +46,7 @@ public:
     // Yahoo! uses spherical mercator, but the top LOD is a 2x2 tile set.
     void initialize( const std::string& referenceURI, const Profile* overrideProfile)
     {
-        setProfile( Profile::create( "spherical-mercator", 2, 2 ) );
+        setProfile( Profile::create( "spherical-mercator", "", 2, 2 ) );
     }
 
     osg::Image* createImage( const TileKey* key,

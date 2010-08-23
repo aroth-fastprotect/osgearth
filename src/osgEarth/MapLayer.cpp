@@ -597,7 +597,12 @@ MapLayer::createImage( const TileKey* key,
     // Otherwise, we need to process the tiles.
     else
     {
-		OE_DEBUG << "Key and source profiles are different, creating mosaic" << std::endl;
+		bool extentCompare = mapProfile->getExtent() == layerProfile->getExtent();
+		bool wideCompare = 0;//mapProfile->_numTilesWideAtLod0 == layerProfile->_numTilesWideAtLod0;
+		bool highCompare = 0;//mapProfile->_numTilesHighAtLod0 == layerProfile->_numTilesHighAtLod0;
+
+		OE_DEBUG << "Key and source profiles are different (" << mapProfile->toString() << "!=" << layerProfile->toString() << ", creating mosaic" << std::endl;
+		OE_DEBUG << "Key and source profiles are different (extent=" << extentCompare << ";wide=" << wideCompare << ";high=" << highCompare << std::endl;
 		osg::ref_ptr<GeoImage> mosaic;
 
 		// Determine the intersecting keys and create and extract an appropriate image from the tiles

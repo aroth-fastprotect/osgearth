@@ -129,7 +129,7 @@ protected:
 } // namespace osgEarth
 
 static bool s_NeedNotifyInit = true;
-static osg::NotifySeverity g_NotifyLevel = osg::NOTICE;
+static osg::NotifySeverity g_osgEarthNotifyLevel = osg::NOTICE;
 static osgEarth::NullStream *g_NullStream = NULL;
 static osgEarth::NotifyStream *g_NotifyStream = NULL;
 
@@ -137,14 +137,14 @@ void
 osgEarth::setNotifyLevel(osg::NotifySeverity severity)
 {
     osgEarth::initNotifyLevel();
-    g_NotifyLevel = severity;
+    g_osgEarthNotifyLevel = severity;
 }
 
 osg::NotifySeverity
 osgEarth::getNotifyLevel()
 {
     osgEarth::initNotifyLevel();
-    return g_NotifyLevel;
+    return g_osgEarthNotifyLevel;
 }
 
 bool
@@ -159,7 +159,7 @@ osgEarth::initNotifyLevel()
 	// g_NotifyLevel
 	// =============
 
-	g_NotifyLevel = osg::NOTICE; // Default value
+	g_osgEarthNotifyLevel = osg::NOTICE; // Default value
 
 	char* OSGNOTIFYLEVEL=getenv("OSGEARTH_NOTIFY_LEVEL");
 	if (!OSGNOTIFYLEVEL) OSGNOTIFYLEVEL=getenv("OSGEARTHNOTIFYLEVEL");
@@ -176,14 +176,14 @@ osgEarth::initNotifyLevel()
 			*i=toupper(*i);
 		}
 
-		if(stringOSGNOTIFYLEVEL.find("ALWAYS")!=std::string::npos)          g_NotifyLevel=osg::ALWAYS;
-		else if(stringOSGNOTIFYLEVEL.find("FATAL")!=std::string::npos)      g_NotifyLevel=osg::FATAL;
-		else if(stringOSGNOTIFYLEVEL.find("WARN")!=std::string::npos)       g_NotifyLevel=osg::WARN;
-		else if(stringOSGNOTIFYLEVEL.find("NOTICE")!=std::string::npos)     g_NotifyLevel=osg::NOTICE;
-		else if(stringOSGNOTIFYLEVEL.find("DEBUG_INFO")!=std::string::npos) g_NotifyLevel=osg::DEBUG_INFO;
-		else if(stringOSGNOTIFYLEVEL.find("DEBUG_FP")!=std::string::npos)   g_NotifyLevel=osg::DEBUG_FP;
-		else if(stringOSGNOTIFYLEVEL.find("DEBUG")!=std::string::npos)      g_NotifyLevel=osg::DEBUG_INFO;
-		else if(stringOSGNOTIFYLEVEL.find("INFO")!=std::string::npos)       g_NotifyLevel=osg::INFO;
+		if(stringOSGNOTIFYLEVEL.find("ALWAYS")!=std::string::npos)          g_osgEarthNotifyLevel=osg::ALWAYS;
+		else if(stringOSGNOTIFYLEVEL.find("FATAL")!=std::string::npos)      g_osgEarthNotifyLevel=osg::FATAL;
+		else if(stringOSGNOTIFYLEVEL.find("WARN")!=std::string::npos)       g_osgEarthNotifyLevel=osg::WARN;
+		else if(stringOSGNOTIFYLEVEL.find("NOTICE")!=std::string::npos)     g_osgEarthNotifyLevel=osg::NOTICE;
+		else if(stringOSGNOTIFYLEVEL.find("DEBUG_INFO")!=std::string::npos) g_osgEarthNotifyLevel=osg::DEBUG_INFO;
+		else if(stringOSGNOTIFYLEVEL.find("DEBUG_FP")!=std::string::npos)   g_osgEarthNotifyLevel=osg::DEBUG_FP;
+		else if(stringOSGNOTIFYLEVEL.find("DEBUG")!=std::string::npos)      g_osgEarthNotifyLevel=osg::DEBUG_INFO;
+		else if(stringOSGNOTIFYLEVEL.find("INFO")!=std::string::npos)       g_osgEarthNotifyLevel=osg::INFO;
 		else std::cout << "Warning: invalid OSG_NOTIFY_LEVEL set ("<<stringOSGNOTIFYLEVEL<<")"<<std::endl;
 
 	}
@@ -201,7 +201,7 @@ osgEarth::initNotifyLevel()
 bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 {
 	if (s_NeedNotifyInit) osgEarth::initNotifyLevel();
-	return severity<=g_NotifyLevel;
+	return severity<=g_osgEarthNotifyLevel;
 }
 
 
@@ -246,13 +246,6 @@ osgEarth::notify(const osg::NotifySeverity severity)
         std::cout<<""; // dummy op to force construction of cout, before a reference is passed back to calling code.
         initialized = osgEarth::initNotifyLevel();
     }
-
-	if (osg::isNotifyEnabled(severity))
-	{
-		g_NotifyStream->setCurrentSeverity(severity);
-		return *g_NotifyStream;
-	}
-	return s_NotifyNulStream;
 
     if (severity<=osgearth_g_NotifyLevel)
     {

@@ -21,6 +21,7 @@ SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/Caching
 	${HEADER_PATH}/CacheSeed
+	${HEADER_PATH}/Capabilities
 	${HEADER_PATH}/Common
 	${HEADER_PATH}/Compositing
 	${HEADER_PATH}/CompositingTerrainTechnique
@@ -75,6 +76,7 @@ SET(TARGET_PUBLIC_H
 SET(TARGET_SRC
     Caching.cpp
     CacheSeed.cpp
+	Capabilities.cpp
     Compositing.cpp
     CompositingTerrainTechnique.cpp
     Config.cpp

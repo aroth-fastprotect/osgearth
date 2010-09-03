@@ -161,17 +161,14 @@ public:
             Layer* layer = capabilities->getLayerByName( _settings->layers().value() );
             if ( layer )
             {
-                double minx, miny, maxx, maxy;
-                layer->getExtents(minx, miny, maxx, maxy);
+                double minx, miny, maxx, maxy;                
+                minx = miny = maxx = maxy = 0;
 
                 //Check to see if the profile is equivalent to global-geodetic
                 if (wms_srs->isGeographic())
                 {
 					//Try to get the lat lon extents if they are provided
-					if (minx == 0 && miny == 0 && maxx == 0 && maxy == 0)
-					{
-						layer->getLatLonExtents(minx, miny, maxx, maxy);
-					}
+				    layer->getLatLonExtents(minx, miny, maxx, maxy);
 
 					//If we still don't have any extents, just default to global geodetic.
 					if (!result.valid() && minx == 0 && miny == 0 && maxx == 0 && maxy == 0)
@@ -179,6 +176,11 @@ public:
 						result = osgEarth::Registry::instance()->getGlobalGeodeticProfile();
 					}
                 }	
+
+                if (minx == 0 && miny == 0 && maxx == 0 && maxy == 0)
+                {
+                    layer->getExtents(minx, miny, maxx, maxy);
+                }
 
 
                 if (!result.valid())
@@ -261,7 +263,6 @@ public:
             uri = uri + delim + extraAttrs;
         }
 
-        //OE_NOTICE << "WMS: URL = " << uri << std::endl;
 
         out_response = HTTPClient::get( uri, getOptions(), progress );
 

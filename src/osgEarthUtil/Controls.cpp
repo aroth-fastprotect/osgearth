@@ -760,7 +760,7 @@ struct ControlUpdater : public osg::NodeCallback
 {
     void operator()( osg::Node* node, osg::NodeVisitor* nv )
     {
-        static_cast<ControlSurface*>(node)->update();
+        static_cast<ControlCanvas*>(node)->update();
     }
 };
 
@@ -768,41 +768,44 @@ struct ControlUpdater : public osg::NodeCallback
 // We need this info since controls position from the upper-left corner.
 struct ViewportHandler : public osgGA::GUIEventHandler
 {
-    ViewportHandler( ControlSurface* cs ) : _cs(cs), _width(0), _height(0), _first(true) { }
+    ViewportHandler( ControlCanvas* cs ) : _cs(cs), _width(0), _height(0), _first(true) { }
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
         if ( ea.getEventType() == osgGA::GUIEventAdapter::RESIZE || _first )
         {
-            int w = ea.getWindowWidth();
-            int h = ea.getWindowHeight();
-            if ( w != _width || h != _height )
+            osg::Camera* cam = aa.asView()->getCamera();
+            if ( cam && cam->getViewport() )
             {
-                _cs->setProjectionMatrix(osg::Matrix::ortho2D( 0, w-1, 0, h-1 ) );
+                const osg::Viewport* vp = cam->getViewport();
+                if ( _first || vp->width() != _width || vp->height() != _height )
+                {
+                    _cs->setProjectionMatrix(osg::Matrix::ortho2D( 0, vp->width()-1, 0, vp->height()-1 ) );
 
-                ControlContext cx;
-                cx._vp = new osg::Viewport( 0, 0, w, h );
-                cx._viewContextID = aa.asView()->getCamera()->getGraphicsContext()->getState()->getContextID();
-                _cs->setControlContext( cx );
+                    ControlContext cx;
+                    cx._vp = new osg::Viewport( 0, 0, vp->width(), vp->height() );
+                    cx._viewContextID = aa.asView()->getCamera()->getGraphicsContext()->getState()->getContextID();
+                    _cs->setControlContext( cx );
 
-                _width = w;
-                _height = h;
-            }
-            if ( w != 0 && h != 0 )
-            {
-                _first = false;
+                    _width = vp->width();
+                    _height = vp->height();
+                }
+                if ( vp->width() != 0 && vp->height() != 0 )
+                {
+                    _first = false;
+                }
             }
         }
         return false;
     }
-    ControlSurface* _cs;
+    ControlCanvas* _cs;
     int _width, _height;
     bool _first;
 };
 
 // ---------------------------------------------------------------------------
 
-ControlSurface::ControlSurface( osgViewer::View* view ) :
+ControlCanvas::ControlCanvas( osgViewer::View* view ) :
 _contextDirty(true)
 {
     view->addEventHandler( new ViewportHandler(this) );
@@ -822,7 +825,7 @@ _contextDirty(true)
 }
 
 void
-ControlSurface::addControl( Control* control )
+ControlCanvas::addControl( Control* control )
 {
     osg::Geode* geode = new osg::Geode();
     _geodeTable[control] = geode;
@@ -832,7 +835,7 @@ ControlSurface::addControl( Control* control )
 }
 
 void
-ControlSurface::removeControl( Control* control )
+ControlCanvas::removeControl( Control* control )
 {
     GeodeTable::iterator i = _geodeTable.find( control );
     if ( i != _geodeTable.end() )
@@ -846,7 +849,7 @@ ControlSurface::removeControl( Control* control )
 }
 
 void
-ControlSurface::update()
+ControlCanvas::update()
 {
     //int bin = 999999;
     for( ControlList::iterator i = _controls.begin(); i != _controls.end(); ++i )
@@ -877,7 +880,7 @@ ControlSurface::update()
 }
 
 void
-ControlSurface::setControlContext( const ControlContext& cx )
+ControlCanvas::setControlContext( const ControlContext& cx )
 {
     _context = cx;
     _contextDirty = true;

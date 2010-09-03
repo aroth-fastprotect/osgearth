@@ -25,6 +25,7 @@
 #include <osgDB/FileNameUtils>
 #include <algorithm>
 #include <sstream>
+#include <iomanip>
 
 using namespace osgEarth;
 
@@ -102,10 +103,10 @@ ProfileConfig::toConfig( const std::string& name ) const
 
         if ( _bounds.isSet() )
         {
-            conf.add( "xmin", toString(_bounds->xMin()) );
-            conf.add( "ymin", toString(_bounds->yMin()) );
-            conf.add( "xmax", toString(_bounds->xMax()) );
-            conf.add( "ymax", toString(_bounds->yMax()) );
+            conf.add( "xmin", toString(_bounds->xMin(), 12) );
+            conf.add( "ymin", toString(_bounds->yMin(), 12) );
+            conf.add( "xmax", toString(_bounds->xMax(), 12) );
+            conf.add( "ymax", toString(_bounds->yMax(), 12) );
         }
 
         conf.addIfSet( "num_tiles_wide_at_lod_0", _numTilesWideAtLod0 );
@@ -336,7 +337,8 @@ std::string
 Profile::toString() const
 {
     std::stringstream buf;
-    buf << "[srs=" << _extent.getSRS()->getName() << ", min=" << _extent.xMin() << "," << _extent.yMin()
+	buf << std::setprecision(8)
+		<< "[srs=" << _extent.getSRS()->getName() << ", min=" << _extent.xMin() << "," << _extent.yMin()
         << " max=" << _extent.xMax() << "," << _extent.yMax()
         << " lod0=" << _numTilesWideAtLod0 << "," << _numTilesHighAtLod0
         << " vsrs=" << ( _vsrs.valid() ? _vsrs->getName() : "default" )

@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthSymbology/Query>
+#include <iomanip>
 
 using namespace osgEarth::Symbology;
 
@@ -51,10 +52,10 @@ Query::toConfig() const
     conf.addIfSet( "expr", _expression );
     if ( _bounds.isSet() ) {
         Config bc( "extent" );
-        bc.add( "xmin", toString(_bounds->xMin()) );
-        bc.add( "ymin", toString(_bounds->yMin()) );
-        bc.add( "xmax", toString(_bounds->xMax()) );
-        bc.add( "ymax", toString(_bounds->yMax()) );
+        bc.add( "xmin", toString(_bounds->xMin(), 12) );
+        bc.add( "ymin", toString(_bounds->yMin(), 12) );
+        bc.add( "xmax", toString(_bounds->xMax(), 12) );
+        bc.add( "ymax", toString(_bounds->yMax(), 12) );
         conf.add( bc );
     }
     return conf;

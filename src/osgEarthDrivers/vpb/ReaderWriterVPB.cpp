@@ -496,28 +496,56 @@ public:
 			setProfile(_vpbDatabase->_profile.get());
 		}
     }
+
+	osg::Image* readImageLayer(osgTerrain::ImageLayer* imageLayer, const osgDB::ReaderWriter::Options* options) const
+	{
+		if (!imageLayer->getImage() && 
+			!imageLayer->getFileName().empty())
+		{
+			osg::ref_ptr<osg::Image> image = osgDB::readImageFile(imageLayer->getFileName(), options);
+			imageLayer->setImage(image.get());
+		}
+		return imageLayer->getImage();
+	}
     
     osg::Image* createImage( const TileKey* key,
                              ProgressCallback* progress)
     {
+		osg::Image * ret = NULL;
         //TODO:  Make VPB driver use progress callback
         osg::ref_ptr<osgTerrain::TerrainTile> tile = _vpbDatabase->getTerrainTile(key, progress);                
         if (tile.valid())
         {        
             int layerNum = _options->layer().value();
+			const optional<std::string> & layerSetName = _options->layerSetName();
 
-            if (layerNum < tile->getNumColorLayers())
+            if (layerNum < (int)tile->getNumColorLayers())
             {
-                osgTerrain::Layer* layer = tile->getColorLayer(layerNum);
+				osgTerrain::Layer* layer = tile->getColorLayer(layerNum);
+
                 osgTerrain::ImageLayer* imageLayer = dynamic_cast<osgTerrain::ImageLayer*>(layer);
+				if(!imageLayer)
+				{
+					osgTerrain::SwitchLayer* switchLayer = dynamic_cast<osgTerrain::SwitchLayer*>(layer);
+					if (switchLayer && layerSetName.isSet())
+					{
+						for(unsigned int si=0; !imageLayer && si<switchLayer->getNumLayers(); ++si)
+						{
+							if(switchLayer->getSetName(si) == layerSetName.value())
+							{
+								imageLayer = dynamic_cast<osgTerrain::ImageLayer*>(switchLayer->getLayer(si));
+							}
+						}
+					}
+				}
                 if (imageLayer)
                 {
-                    return new osg::Image( *imageLayer->getImage() );
+					ret = readImageLayer(imageLayer, NULL);
                 }
             }
         }
         
-        return 0;
+        return ret;
     }
 
     osg::HeightField* createHeightField( const TileKey* key,

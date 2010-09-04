@@ -555,15 +555,15 @@ tileMapToXmlDocument(const TileMap* tileMap)
     osg::ref_ptr<XmlElement> e_bounding_box = new XmlElement( ELEM_BOUNDINGBOX );
     double minX, minY, maxX, maxY;
     tileMap->getExtents( minX, minY, maxX, maxY );
-    e_bounding_box->getAttrs()[ATTR_MINX] = toString(minX, 12);
-    e_bounding_box->getAttrs()[ATTR_MINY] = toString(minY, 12);
-    e_bounding_box->getAttrs()[ATTR_MAXX] = toString(maxX, 12);
-    e_bounding_box->getAttrs()[ATTR_MAXY] = toString(maxY, 12);
+    e_bounding_box->getAttrs()[ATTR_MINX] = toString(minX, OSGEARTH_DEFAULT_PRECISION);
+    e_bounding_box->getAttrs()[ATTR_MINY] = toString(minY, OSGEARTH_DEFAULT_PRECISION);
+    e_bounding_box->getAttrs()[ATTR_MAXX] = toString(maxX, OSGEARTH_DEFAULT_PRECISION);
+    e_bounding_box->getAttrs()[ATTR_MAXY] = toString(maxY, OSGEARTH_DEFAULT_PRECISION);
     doc->getChildren().push_back(e_bounding_box.get() );
 
     osg::ref_ptr<XmlElement> e_origin = new XmlElement( ELEM_ORIGIN );
-    e_origin->getAttrs()[ATTR_X] = toString(tileMap->getOriginX(), 12);
-    e_origin->getAttrs()[ATTR_Y] = toString(tileMap->getOriginY(), 12);
+    e_origin->getAttrs()[ATTR_X] = toString(tileMap->getOriginX(), OSGEARTH_DEFAULT_PRECISION);
+    e_origin->getAttrs()[ATTR_Y] = toString(tileMap->getOriginY(), OSGEARTH_DEFAULT_PRECISION);
     doc->getChildren().push_back(e_origin.get());
 
     osg::ref_ptr<XmlElement> e_tile_format = new XmlElement( ELEM_TILE_FORMAT );
@@ -609,10 +609,10 @@ tileMapToXmlDocument(const TileMap* tileMap)
         for (DataExtentList::const_iterator itr = tileMap->getDataExtents().begin(); itr != tileMap->getDataExtents().end(); ++itr)
         {
             osg::ref_ptr<XmlElement> e_data_extent = new XmlElement( ELEM_DATA_EXTENT );
-            e_data_extent->getAttrs()[ATTR_MINX] = toString(itr->xMin(), 12);
-            e_data_extent->getAttrs()[ATTR_MINY] = toString(itr->yMin(), 12);
-            e_data_extent->getAttrs()[ATTR_MAXX] = toString(itr->xMax(), 12);
-            e_data_extent->getAttrs()[ATTR_MAXY] = toString(itr->yMax(), 12);
+            e_data_extent->getAttrs()[ATTR_MINX] = toString(itr->xMin(), OSGEARTH_DEFAULT_PRECISION);
+            e_data_extent->getAttrs()[ATTR_MINY] = toString(itr->yMin(), OSGEARTH_DEFAULT_PRECISION);
+            e_data_extent->getAttrs()[ATTR_MAXX] = toString(itr->xMax(), OSGEARTH_DEFAULT_PRECISION);
+            e_data_extent->getAttrs()[ATTR_MAXY] = toString(itr->yMax(), OSGEARTH_DEFAULT_PRECISION);
             e_data_extent->getAttrs()[ATTR_MIN_LEVEL] = toString<unsigned int>(itr->getMinLevel());
             e_data_extent->getAttrs()[ATTR_MAX_LEVEL] = toString<unsigned int>(itr->getMaxLevel());
             e_data_extents->getChildren().push_back( e_data_extent );

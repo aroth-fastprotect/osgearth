@@ -52,10 +52,10 @@ Query::toConfig() const
     conf.addIfSet( "expr", _expression );
     if ( _bounds.isSet() ) {
         Config bc( "extent" );
-        bc.add( "xmin", toString(_bounds->xMin(), 12) );
-        bc.add( "ymin", toString(_bounds->yMin(), 12) );
-        bc.add( "xmax", toString(_bounds->xMax(), 12) );
-        bc.add( "ymax", toString(_bounds->yMax(), 12) );
+        bc.add( "xmin", toString(_bounds->xMin(), OSGEARTH_DEFAULT_PRECISION) );
+        bc.add( "ymin", toString(_bounds->yMin(), OSGEARTH_DEFAULT_PRECISION) );
+        bc.add( "xmax", toString(_bounds->xMax(), OSGEARTH_DEFAULT_PRECISION) );
+        bc.add( "ymax", toString(_bounds->yMax(), OSGEARTH_DEFAULT_PRECISION) );
         conf.add( bc );
     }
     return conf;

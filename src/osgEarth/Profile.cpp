@@ -103,10 +103,10 @@ ProfileConfig::toConfig( const std::string& name ) const
 
         if ( _bounds.isSet() )
         {
-            conf.add( "xmin", toString(_bounds->xMin(), 12) );
-            conf.add( "ymin", toString(_bounds->yMin(), 12) );
-            conf.add( "xmax", toString(_bounds->xMax(), 12) );
-            conf.add( "ymax", toString(_bounds->yMax(), 12) );
+            conf.add( "xmin", toString(_bounds->xMin(), OSGEARTH_DEFAULT_PRECISION) );
+            conf.add( "ymin", toString(_bounds->yMin(), OSGEARTH_DEFAULT_PRECISION) );
+            conf.add( "xmax", toString(_bounds->xMax(), OSGEARTH_DEFAULT_PRECISION) );
+            conf.add( "ymax", toString(_bounds->yMax(), OSGEARTH_DEFAULT_PRECISION) );
         }
 
         conf.addIfSet( "num_tiles_wide_at_lod_0", _numTilesWideAtLod0 );

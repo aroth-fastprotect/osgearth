@@ -337,7 +337,7 @@ std::string
 Profile::toString() const
 {
     std::stringstream buf;
-	buf << std::setprecision(8)
+	buf << std::setprecision(OSGEARTH_DEFAULT_PRECISION)
 		<< "[srs=" << _extent.getSRS()->getName() << ", min=" << _extent.xMin() << "," << _extent.yMin()
         << " max=" << _extent.xMax() << "," << _extent.yMax()
         << " lod0=" << _numTilesWideAtLod0 << "," << _numTilesHighAtLod0

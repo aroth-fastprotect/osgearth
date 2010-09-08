@@ -971,7 +971,7 @@ void MultiPassTerrainTechnique::updateTransparency()
 		{
 			float opacity = layer->getOpacity();
 			osg::Geode* geode = static_cast<osg::Geode*>(_passes->getChild(layerNum));
-			if (geode && geode->getNumDrawables())
+			if (geode)
 			{
 				osg::Geometry* geometry = geode->getDrawable(0)->asGeometry();
 				osg::Vec4Array* colors = static_cast<osg::Vec4Array*>(geometry->getColorArray());

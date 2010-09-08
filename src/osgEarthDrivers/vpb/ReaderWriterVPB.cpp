@@ -519,7 +519,8 @@ public:
             int layerNum = _options->layer().value();
 			const optional<std::string> & layerSetName = _options->layerSetName();
 
-            if (layerNum < (int)tile->getNumColorLayers())
+			int numColorLayers = (int)tile->getNumColorLayers();
+            if (layerNum < numColorLayers)
             {
 				osgTerrain::Layer* layer = tile->getColorLayer(layerNum);
 

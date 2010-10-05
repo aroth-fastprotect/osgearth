@@ -10,5 +10,7 @@ SET(TARGET_H
 )
 SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/wms/WMSOptions)
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/wms)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include)
 
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthUtil)
 SETUP_PLUGIN(osgearth_wms)

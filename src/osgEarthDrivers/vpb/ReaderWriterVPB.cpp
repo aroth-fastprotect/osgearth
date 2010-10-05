@@ -505,7 +505,8 @@ public:
 			osg::ref_ptr<osg::Image> image = osgDB::readImageFile(imageLayer->getFileName(), options);
 			imageLayer->setImage(image.get());
 		}
-		return imageLayer->getImage();
+		osg::Image * ret = imageLayer->getImage();
+		return ret;
 	}
     
     osg::Image* createImage( const TileKey* key,
@@ -520,6 +521,8 @@ public:
 			const optional<std::string> & layerSetName = _options->layerSetName();
 
 			int numColorLayers = (int)tile->getNumColorLayers();
+			if(layerNum > numColorLayers)
+				layerNum = 0;
             if (layerNum < numColorLayers)
             {
 				osgTerrain::Layer* layer = tile->getColorLayer(layerNum);
@@ -544,8 +547,19 @@ public:
 					ret = readImageLayer(imageLayer, NULL);
                 }
             }
+			if(!ret)
+			{
+				OE_DEBUG<<"VPB: createImage(" << key->str() << " layerSet=" << layerSetName.value() << " layerNum=" << layerNum << ") failed." <<std::endl;
+			}
         }
-        
+		else
+		{
+			if(!ret)
+			{
+				OE_DEBUG<<"VPB: createImage(" << key->str() << ") database retrieval failed." <<std::endl;
+			}
+		}
+
         return ret;
     }
 

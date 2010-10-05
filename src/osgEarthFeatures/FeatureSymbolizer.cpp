@@ -75,6 +75,8 @@ FeatureSymbolizerGraph::update()
     {
         removeChildren(0, getNumChildren());
 
+        osg::Timer_t start = osg::Timer::instance()->tick();
+
         FeatureModelSource* model = _factory->getFeatureModelSource();
         // implementation-specific data
         osg::ref_ptr<osg::Referenced> buildData = model->createBuildData();

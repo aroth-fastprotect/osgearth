@@ -31,13 +31,8 @@
 #include <osgEarthUtil/Graticule>
 #include <osgEarth/EarthFile>
 
-#include <osgEarthUtil/Controls>
-
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/GeometrySymbol>
-#include <osgEarthDrivers/tms/TMSOptions>
-#include <osgEarthDrivers/model_feature_geom/FeatureGeomModelOptions>
-#include <osgEarthDrivers/model_feature_stencil/FeatureStencilModelOptions>
 
 #include <osgEarthDrivers/feature_ogr/OGRFeatureOptions>
 #include <osgEarthDrivers/agglite/AGGLiteOptions>
@@ -90,26 +85,6 @@ struct NodeToggleHandler : public osgGA::GUIEventHandler
 
     osg::observer_ptr<osg::Node> _node;
     char _key;
-
-};
-
-// a simple handler that toggles a node mask on/off
-struct ToggleModelLayerHandler : public osgGA::GUIEventHandler 
-{
-    ToggleModelLayerHandler( ModelLayer* modelLayer) : _modelLayer(modelLayer)
-    {
-    }
-
-    bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
-    {
-        if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'q' )
-        {
-            _modelLayer->setEnabled( !_modelLayer->getEnabled() );
-        }
-        return false;
-    }
-
-    osg::observer_ptr< ModelLayer > _modelLayer;
 };
 
 
@@ -123,74 +98,17 @@ int main(int argc, char** argv)
     // install the programmable manipulator.
     osgEarthUtil::EarthManipulator* manip = new osgEarthUtil::EarthManipulator();
 
-    osg::Group* root = new osg::Group();
     osg::Node* earthNode = osgDB::readNodeFiles( arguments );
-
     if (!earthNode)
     {
-        // Create a "Map" dynamically if no nodes were loaded
-        // The "Map" is the data model object that we will be visualizing. It will be
-        // geocentric by default, but you can specify a projected map in the constructor.
-        osgEarth::Map* map = new osgEarth::Map();
+        OE_WARN << "Unable to load earth model." << std::endl;
+        return -1;
+    }
 
-        // Add an image layer to the map.
-        {
-            osg::ref_ptr<TMSOptions> tms = new TMSOptions();
-            tms->url() = "http://demo.pelicanmapping.com/rmweb/data/bluemarble-tms/tms.xml";
-            map->addMapLayer( new ImageMapLayer( "NASA", tms.get() ) );
-        }
-
-        // Add a heightfield layer to the map. You can add any number of heightfields and
-        // osgEarth will composite them automatically.
-        {
-            osg::ref_ptr<TMSOptions> tms = new TMSOptions();
-            tms->url() = "http://demo.pelicanmapping.com/rmweb/data/srtm30_plus_tms/tms.xml";
-            map->addMapLayer( new HeightFieldMapLayer( "SRTM", tms.get() ) );
-        }
-
-        //Add a shapefile to the map
-        {
-            //Configure the feature options
-            OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
-			featureOpt->setName("states");
-            featureOpt->url() = "../data/world.shp";
-			featureOpt->ogrDriver() = "ESRI Shapefile";
-
-            FeatureGeomModelOptions* opt = new FeatureGeomModelOptions();
-            //AGGLiteOptions* opt = new AGGLiteOptions();
-            //FeatureStencilModelOptions* opt = new FeatureStencilModelOptions();
-            opt->featureOptions() = featureOpt;
-
-            osgEarth::Symbology::Style* style = new osgEarth::Symbology::Style; 
-            osgEarth::Symbology::LineSymbol* ls = new osgEarth::Symbology::LineSymbol;
-            ls->stroke()->color() = osg::Vec4f( 1,1,0,1 );
-            ls->stroke()->width() = 1;
-            style->addSymbol(ls); 
-            opt->styles()->addStyle(style);
-            opt->geometryTypeOverride() = Geometry::TYPE_LINESTRING;
-
-            ModelLayer* modelLayer = new osgEarth::ModelLayer("states", opt);
-			modelLayer->setLightingEnabled(false);
-            map->addModelLayer( modelLayer );               
-            //map->addMapLayer( new ImageMapLayer("world", opt) );
-            viewer.addEventHandler( new ToggleModelLayerHandler( modelLayer ) );
-
-        }
-
-        // The MapNode will render the Map object in the scene graph.
-        osgEarth::MapNode* mapNode = new osgEarth::MapNode( map );     
-        earthNode = mapNode;
-#if 1
-		// save the current osgEarth configuration to a file for checking
-		EarthFile earthFile(map, mapNode->getMapEngineProperties());
-		earthFile.writeXML("C:\\tmp\\simple.earth");
-#endif
-		
-    }    
-
+    osg::Group* root = new osg::Group();
     root->addChild( earthNode );
-    
-    //osgEarthUtil::Graticule* graticule = 0L;
+
+    osgEarthUtil::Graticule* graticule = 0L;
 
     osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( earthNode );
     if ( mapNode )
@@ -204,15 +122,13 @@ int main(int argc, char** argv)
                 osgEarthUtil::Viewpoint( osg::Vec3d( -90, 0, 0 ), 0.0, -90.0, 5e7 ) );
 
             // add a handler that will automatically calculate good clipping planes
-            // for a geocentric map:
-            //viewer.addEventHandler( new osgEarthUtil::AutoClipPlaneHandler( mapNode ) );
+            viewer.addEventHandler( new osgEarthUtil::AutoClipPlaneHandler() );
         }
-/*
+
         // create a graticle, and start it in the OFF position
         graticule = new osgEarthUtil::Graticule( mapNode->getMap() );
         graticule->setNodeMask(0);
         root->addChild( graticule );
-		*/
     }
 
     viewer.setSceneData( root );
@@ -225,11 +141,11 @@ int main(int argc, char** argv)
 
     // add our fly-to handler
     viewer.addEventHandler(new FlyToViewpointHandler( manip ));
-/*
+
     // add a handler to toggle the graticle
     if ( graticule )
         viewer.addEventHandler(new NodeToggleHandler( graticule, 'g' ));
-*/
+
     // add some stock OSG handlers:
     viewer.addEventHandler(new osgViewer::StatsHandler());
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());

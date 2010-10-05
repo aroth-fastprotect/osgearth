@@ -24,6 +24,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/OceanSurfaceNode
 	${HEADER_PATH}/Popups
 	${HEADER_PATH}/Viewpoint
+	${HEADER_PATH}/WMS
 )
 
 SET(TARGET_SRC
@@ -41,6 +42,7 @@ SET(TARGET_SRC
     OceanSurfaceNode.cpp
     Popups.cpp
 	Viewpoint.cpp
+    WMS.cpp
 )
 
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})

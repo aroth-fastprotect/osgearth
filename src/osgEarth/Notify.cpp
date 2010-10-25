@@ -150,7 +150,8 @@ osgEarth::getNotifyLevel()
 bool
 osgEarth::initNotifyLevel()
 {
-	if (s_osgEarthNeedNotifyInit) return true;
+	if (!s_osgEarthNeedNotifyInit)
+		return true;
 
 	static osgEarth::NullStream s_NullStream;
 	static osgEarth::NotifyStream s_NotifyStream;

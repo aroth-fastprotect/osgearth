@@ -517,8 +517,8 @@ Diamond::refreshDrawable()
     if ( _level > _currentStateSetOwner->_level ) //_currentStateSetOwner != _targetStateSetOwner )
     {
         span = 1.0/(double)(1 << ((_level-_currentStateSetOwner->_level)/2));
-        offset.x() = (_key->getExtent().xMin()-ssaKey->getExtent().xMin())/ssaKey->getExtent().width();
-        offset.y() = (_key->getExtent().yMin()-ssaKey->getExtent().yMin())/ssaKey->getExtent().height();
+        offset.x() = (_key->getGeoExtent().xMin()-ssaKey->getGeoExtent().xMin())/ssaKey->getGeoExtent().width();
+        offset.y() = (_key->getGeoExtent().yMin()-ssaKey->getGeoExtent().yMin())/ssaKey->getGeoExtent().height();
     }
 
     int o = _orientation;
@@ -806,7 +806,7 @@ Diamond::getOrCreateChild( ChildIndex c )
                 qa->q(2) == child ? 3 : 1;
         }
 
-        child->_key = qa->_key->createChildKey( quadrant );
+        child->_key = qa->_key->createSubkey( quadrant );
 
         child->_orientation = 
             quadrant == 1 ? 0 :

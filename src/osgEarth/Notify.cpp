@@ -128,7 +128,7 @@ protected:
 
 } // namespace osgEarth
 
-static bool s_NeedNotifyInit = true;
+static bool s_osgEarthNeedNotifyInit = true;
 static osg::NotifySeverity g_osgEarthNotifyLevel = osg::NOTICE;
 static osgEarth::NullStream *g_NullStream = NULL;
 static osgEarth::NotifyStream *g_NotifyStream = NULL;
@@ -136,14 +136,14 @@ static osgEarth::NotifyStream *g_NotifyStream = NULL;
 void
 osgEarth::setNotifyLevel(osg::NotifySeverity severity)
 {
-    osgEarth::initNotifyLevel();
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
     g_osgEarthNotifyLevel = severity;
 }
 
 osg::NotifySeverity
 osgEarth::getNotifyLevel()
 {
-    osgEarth::initNotifyLevel();
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
     return g_osgEarthNotifyLevel;
 }
 
@@ -193,21 +193,21 @@ osgEarth::initNotifyLevel()
 	if (buffer && !buffer->getNotifyHandler())
 		buffer->setNotifyHandler(new osg::StandardNotifyHandler);
 
-	s_NeedNotifyInit = false;
+	s_osgEarthNeedNotifyInit = false;
 
 	return true;
 }
 
 bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 {
-	if (s_NeedNotifyInit) osgEarth::initNotifyLevel();
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
 	return severity<=g_osgEarthNotifyLevel;
 }
 
 
 void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
 {
-	if (s_NeedNotifyInit) osgEarth::initNotifyLevel();
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
 	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
 	if (buffer)
 		buffer->setNotifyHandler(handler);
@@ -215,7 +215,7 @@ void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
 
 osg::NotifyHandler* osgEarth::getNotifyHandler()
 {
-	if (s_NeedNotifyInit) osg::initNotifyLevel();
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
 	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
 	return buffer ? buffer->getNotifyHandler() : 0;
 }
@@ -223,7 +223,7 @@ osg::NotifyHandler* osgEarth::getNotifyHandler()
 
 std::ostream& osgEarth::notify(const osg::NotifySeverity severity)
 {
-	if (s_NeedNotifyInit) osgEarth::initNotifyLevel();
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
 
 	if (osgEarth::isNotifyEnabled(severity))
 	{

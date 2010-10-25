@@ -39,24 +39,23 @@ using namespace osgEarth;
 class AGSMapCacheSource : public TileSource
 {
 public:
-    AGSMapCacheSource( const PluginOptions* options ) :
+    AGSMapCacheSource( const TileSourceOptions& options ) :
       TileSource( options )
     {
-        if ( options )
-        {
-            // this is the AGS virtual directory pointing to the map cache
-            _url = options->config().value( PROPERTY_URL );
+        const Config& conf = options.getConfig();
 
-            // the name of the map service cache
-            _map = options->config().value( PROPERTY_MAP );
+        // this is the AGS virtual directory pointing to the map cache
+        _url = conf.value( PROPERTY_URL );
 
-            // the layer, or null to use the fused "_alllayers" cache
-            _layer = options->config().value( PROPERTY_LAYER );
+        // the name of the map service cache
+        _map = conf.value( PROPERTY_MAP );
 
-            // the image format (defaults to "png")
-            // TODO: read this from the XML tile schema file
-            _format = options->config().value( PROPERTY_FORMAT );
-        }
+        // the layer, or null to use the fused "_alllayers" cache
+        _layer = conf.value( PROPERTY_LAYER );
+
+        // the image format (defaults to "png")
+        // TODO: read this from the XML tile schema file
+        _format = conf.value( PROPERTY_FORMAT );
 
         // validate dataset
         if ( _layer.empty() )
@@ -73,23 +72,22 @@ public:
     }
 
     // override
-    osg::Image* createImage( const TileKey* key,
-                             ProgressCallback* progress)
+    osg::Image* createImage( const TileKey& key, ProgressCallback* progress)
     {
         //If we are given a PlateCarreTileKey, use the MercatorTileConverter to create the image
-        //if ( dynamic_cast<const PlateCarreTileKey*>( key ) )
+        //if ( dynamic_cast<const PlateCarreTileKey&>( key ) )
         //{
         //    MercatorTileConverter converter( this );
-        //    return converter.createImage( static_cast<const PlateCarreTileKey*>( key ) );
+        //    return converter.createImage( static_cast<const PlateCarreTileKey&>( key ) );
         //}
 
         std::stringstream buf;
 
-        //int level = key->getLevelOfDetail();
-        int level = key->getLevelOfDetail()-1;
+        //int level = key.getLevelOfDetail();
+        int level = key.getLevelOfDetail()-1;
 
         unsigned int tile_x, tile_y;
-        key->getTileXY( tile_x, tile_y );
+        key.getTileXY( tile_x, tile_y );
 
         buf << _url << "/" << _map 
             << "/Layers/" << _layer
@@ -97,19 +95,19 @@ public:
             << "/R" << std::hex << std::setw(8) << std::setfill('0') << tile_y
             << "/C" << std::hex << std::setw(8) << std::setfill('0') << tile_x << "." << _format;
 
-        //OE_NOTICE << "Key = " << key->str() << ", URL = " << buf.str() << std::endl;
+        //OE_NOTICE << "Key = " << key.str() << ", URL = " << buf.str() << std::endl;
         //return osgDB::readImageFile( buf.str(), getOptions() );
         //return HTTPClient::readImageFile( buf.str(), getOptions(), progress);
         
         osg::ref_ptr<osg::Image> image;
 		std::string bufStr;
 		bufStr = buf.str();
-        HTTPClient::readImageFile( bufStr, image, getOptions(), progress );
+        HTTPClient::readImageFile( bufStr, image, 0L, progress ); //getOptions(), progress );
         return image.release();
     }
 
     // override
-    osg::HeightField* createHeightField( const TileKey* key,
+    osg::HeightField* createHeightField( const TileKey& key,
                                          ProgressCallback* progress)
     {
         //TODO
@@ -130,7 +128,7 @@ private:
 };
 
 
-class ReaderWriterAGSMapCache : public osgDB::ReaderWriter
+class ReaderWriterAGSMapCache : public TileSourceDriver
 {
     public:
         ReaderWriterAGSMapCache()
@@ -148,7 +146,7 @@ class ReaderWriterAGSMapCache : public osgDB::ReaderWriter
             if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
                 return ReadResult::FILE_NOT_HANDLED;
 
-            return new AGSMapCacheSource( static_cast<const PluginOptions*>(options) );
+            return new AGSMapCacheSource( getTileSourceOptions(options) );
         }
 };
 

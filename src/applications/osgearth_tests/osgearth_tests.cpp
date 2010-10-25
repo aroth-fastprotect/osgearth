@@ -24,7 +24,6 @@
 #include <osgDB/WriteFile>
 
 #include <osgEarth/Map>
-#include <osgEarth/MapLayer>
 #include <osgEarth/Registry>
 
 #include <osgEarthDrivers/gdal/GDALOptions>
@@ -44,85 +43,79 @@ int main(int argc, char** argv)
 
   //One to one test.  Read a single 1 to 1 tile out of a MapLayer
   {
-      GDALOptions* opt = new GDALOptions();
-      opt->url() = "../data/world.tif";
-      osg::ref_ptr<MapLayer> layer = new ImageMapLayer( "test_simple", opt );
+      GDALOptions driverOpt;
+      driverOpt.url() = "../data/world.tif";
 
-	  osg::ref_ptr<TileKey> key = new TileKey(0, 0, 0, layer->getProfile());
-	  osg::ref_ptr<GeoImage> image = layer->createImage( key );
-	  osgDB::writeImageFile(*image->getImage(), layer->getName()+key->str() + std::string(".png"));
+      ImageLayerOptions layerOpt;
+      layerOpt.driver() = driverOpt;
+      layerOpt.name() = "test_simple";
+
+      osg::ref_ptr<ImageLayer> layer = new ImageLayer( layerOpt );
+
+      TileKey key(0, 0, 0, layer->getProfile());
+	  GeoImage image = layer->createImage( key );
+	  osgDB::writeImageFile(*image.getImage(), layer->getName()+key.str() + std::string(".png"));
   }
 
   //Mosaic test.  Request a tile in the global geodetic profile from a layer with a geographic SRS but a different tiling scheme.
   {
-      ArcGISOptions* opt = new ArcGISOptions();
-      opt->url() = "http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer";
-      osg::ref_ptr<MapLayer> layer = new ImageMapLayer( "test_mosaic", opt );
+      ArcGISOptions driverOpt;
+      driverOpt.url() = "http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer";
 
-	  osg::ref_ptr<TileKey> key = new TileKey(0, 0, 0, osgEarth::Registry::instance()->getGlobalGeodeticProfile());
-	  osg::ref_ptr<GeoImage> image = layer->createImage( key );
-	  osgDB::writeImageFile(*image->getImage(), layer->getName()+key->str() + std::string(".png"));
+      ImageLayerOptions layerOpt;
+      layerOpt.driver() = driverOpt;
+      layerOpt.name() = "test_mosaic";
+
+      osg::ref_ptr<ImageLayer> layer = new ImageLayer( layerOpt );
+
+      TileKey key(0, 0, 0, osgEarth::Registry::instance()->getGlobalGeodeticProfile());
+	  GeoImage image = layer->createImage( key );
+	  osgDB::writeImageFile(*image.getImage(), layer->getName()+key.str() + std::string(".png"));
   }
 
   //Reprojection.  Request a UTM image from a global geodetic profile
   {
-      ArcGISOptions* opt = new ArcGISOptions();
-      opt->url() = "http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer";
-      osg::ref_ptr<MapLayer> layer = new ImageMapLayer( "test_reprojected_utm", opt );
+      ArcGISOptions driverOpt;
+      driverOpt.url() = "http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer";
 
-	  //Tell the layer that if reprojection is necessary, the reprojected image should be the given tile size.
-	  //Otherwise, the optimal tile size will be computed.
-	  layer->reprojectedTileSize() = 512;
+      ImageLayerOptions layerOpt;
+      layerOpt.name() = "test_reprojected_utm";
+      layerOpt.driver() = driverOpt;
+      layerOpt.reprojectedTileSize() = 512;
 
-      osg::ref_ptr<TileKey> key = new TileKey(0, 0, 0, Profile::create("epsg:26917", 560725, 4385762, 573866, 4400705));
-	  osg::ref_ptr<GeoImage> image = layer->createImage( key );
-	  osgDB::writeImageFile(*image->getImage(), layer->getName()+key->str() + std::string(".png"));
+      osg::ref_ptr<ImageLayer> layer = new ImageLayer( layerOpt );
+
+      TileKey key(0, 0, 0, Profile::create("epsg:26917", 560725, 4385762, 573866, 4400705));
+	  GeoImage image = layer->createImage( key );
+	  osgDB::writeImageFile(*image.getImage(), layer->getName()+key.str() + std::string(".png"));
   }
 
-  //Mercator.  Test Mercator fast path.
+
+  //Mercator.  Request a geodetic reprojected image from a mercator source
   {
-      TMSOptions* opt = new TMSOptions();
-      opt->url() = "http://tile.openstreetmap.org";
-      opt->format() = "png";
-      opt->tileSize() = 256;
-      opt->tmsType() = "google";
-      osg::ref_ptr<MapLayer> layer = new ImageMapLayer( "test_mercator", opt );
+      TMSOptions driverOpt;
+      driverOpt.url() = "http://tile.openstreetmap.org";
+      driverOpt.format() = "png";
+      driverOpt.tileSize() = 256;
+      driverOpt.tmsType() = "google";
 
-	  layer->profileConfig() = ProfileConfig( "global-mercator" );
-      layer->useMercatorFastPath() = true;
+      ImageLayerOptions layerOpt;
+      layerOpt.driver() = driverOpt;
+      layerOpt.name() = "test_mercator_reprojected";
+      layerOpt.reprojectedTileSize() = 256;
+      layerOpt.exactCropping() = true;
+      layerOpt.profile() = ProfileOptions( "global-mercator" );
 
-	  //Request a mercator image using the mercator fast path, the default
-	  osg::ref_ptr<TileKey> key = new TileKey(0, 0, 0, osgEarth::Registry::instance()->getGlobalGeodeticProfile());
-	  osg::ref_ptr<GeoImage> image = layer->createImage( key );
-	  if (!image->getSRS()->isMercator())
-	  {
-		  OE_NOTICE << "Error:  Should be using mercator fast path but returned SRS is " << image->getSRS()->getWKT() << std::endl;
-	  }
-	  osgDB::writeImageFile(*image->getImage(), layer->getName()+key->str() + std::string(".png"));
-  }
-
-    //Mercator.  Request a geodetic reprojected image from a mercator source
-  {
-      TMSOptions* opt = new TMSOptions();
-      opt->url() = "http://tile.openstreetmap.org";
-      opt->format() = "png";
-      opt->tileSize() = 256;
-      opt->tmsType() = "google";
-      osg::ref_ptr<MapLayer> layer = new ImageMapLayer( "test_mercator_reprojected", opt );
-
-	  layer->useMercatorFastPath() = false;
-	  layer->reprojectedTileSize() = 256;
-	  layer->exactCropping() = true;
-	  layer->profileConfig() = ProfileConfig( "global-mercator" );
+      osg::ref_ptr<ImageLayer> layer = new ImageLayer( layerOpt );
 
 	  //Request an image from the mercator source.  Should be reprojected to geodetic
-	  osg::ref_ptr<TileKey> key = new TileKey(0, 0, 0, osgEarth::Registry::instance()->getGlobalGeodeticProfile());
-	  osg::ref_ptr<GeoImage> image = layer->createImage( key );
-	  if (!image->getSRS()->isGeographic())
+	  TileKey key(0, 0, 0, osgEarth::Registry::instance()->getGlobalGeodeticProfile());
+	  GeoImage image = layer->createImage( key );
+	  if (!image.getSRS()->isGeographic())
 	  {
-		  OE_NOTICE << "Error:  Should have reprojected image to geodetic but returned SRS is  " << image->getSRS()->getWKT() << std::endl;
+		  OE_NOTICE << "Error:  Should have reprojected image to geodetic but returned SRS is  " << image.getSRS()->getWKT() << std::endl;
 	  }
-	  osgDB::writeImageFile(*image->getImage(), layer->getName()+key->str() + std::string(".png"));
+	  osgDB::writeImageFile(*image.getImage(), layer->getName()+key.str() + std::string(".png"));
   }
 
   return 0;

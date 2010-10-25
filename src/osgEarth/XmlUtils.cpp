@@ -20,10 +20,10 @@
 #include <osgEarth/XmlUtils>
 #include <osgEarth/StringUtils>
 #include <osg/Notify>
+#include "tinyxml.h"
 #include <algorithm>
 #include <sstream>
-#include <expat.h>
-#include <ctype.h>
+
 
 using namespace osgEarth;
 
@@ -216,7 +216,7 @@ XmlElement::addSubElement(const std::string& tag, const Properties& attrs, const
 }
 
 Config
-XmlElement::toConfig() const
+XmlElement::getConfig() const
 {
     Config conf( name );
     for( XmlAttributes::const_iterator a = attrs.begin(); a != attrs.end(); a++ )
@@ -225,7 +225,7 @@ XmlElement::toConfig() const
     {
         XmlNode* n = c->get();
         if ( n->isElement() )
-            conf.children().push_back( static_cast<const XmlElement*>(n)->toConfig() );
+            conf.children().push_back( static_cast<const XmlElement*>(n)->getConfig() );
     }
 
     conf.value() = getText();
@@ -280,78 +280,117 @@ getAttributes( const char** attrs )
     return map;
 }
 
-
-static void XMLCALL
-startElement( void* user_data, const XML_Char* c_tag, const XML_Char** c_attrs )
+void processNode(XmlElement* parent, TiXmlNode* node)
 {
-    XmlElementNoRefStack& stack = *(XmlElementNoRefStack*)user_data;
-    XmlElement* top = stack.top();
-
-    std::string tag( c_tag );
-    std::transform( tag.begin(), tag.end(), tag.begin(), tolower );
-    XmlAttributes attrs = getAttributes( c_attrs );
-
-    XmlElement* new_element = new XmlElement( tag, attrs );
-    top->getChildren().push_back( new_element );
-    stack.push( new_element );
-}
-
-static void XMLCALL
-endElement( void* user_data, const XML_Char* c_tag )
-{
-    XmlElementNoRefStack& stack = *(XmlElementNoRefStack*)user_data;
-    XmlElement* top = stack.top();
-    stack.pop();
-} 
-
-static void XMLCALL
-handleCharData( void* user_data, const XML_Char* c_data, int len )
-{
-    if ( len > 0 )
+    XmlElement* new_element = 0;
+    switch (node->Type())
     {
-        XmlElementNoRefStack& stack = *(XmlElementNoRefStack*)user_data;
-        XmlElement* top = stack.top();
-        std::string data( c_data, len );
-        top->getChildren().push_back( new XmlText( data ) );
+    case TiXmlNode::TINYXML_ELEMENT:
+        {
+            TiXmlElement* element = node->ToElement();
+            std::string tag = element->Value();
+            std::transform( tag.begin(), tag.end(), tag.begin(), tolower);
+
+            //Get all the attributes
+            XmlAttributes attrs;
+            TiXmlAttribute* attr = element->FirstAttribute();
+            while (attr)
+            {
+                std::string name  = attr->Name();
+                std::string value = attr->Value();
+                std::transform( name.begin(), name.end(), name.begin(), tolower);
+                attrs[name] = value;
+                attr = attr->Next();
+            }
+
+            //All the element to the stack
+            new_element = new XmlElement( tag, attrs );
+            parent->getChildren().push_back( new_element );
+        }
+        break;
+    case TiXmlNode::TINYXML_TEXT:
+        {
+            TiXmlText* text = node->ToText();
+            std::string data( text->Value());
+            parent->getChildren().push_back( new XmlText( data ) );
+        }
+        break;
+    }    
+
+    XmlElement* new_parent = new_element ? new_element : parent;
+    TiXmlNode* child;
+    for (child = node->FirstChild(); child != 0; child = child->NextSibling())
+    {    
+        processNode( new_parent, child );
     }
 }
+
+void
+removeDocType(std::string &xmlStr)
+{
+    //TinyXML has an issue with parsing DTDs.  See http://www.grinninglizard.com/tinyxmldocs/index.html
+    //We need to remove any !DOCTYPE block that appears in the XML before parsing to avoid errors.
+    std::string::size_type startIndex = xmlStr.find("<!DOCTYPE");
+    if (startIndex == xmlStr.npos) return;
+
+    std::string::size_type endIndex = startIndex;
+    int numChildElements = 0;
+    //We've found the first index of the <!DOCTYPE, now find the index of the closing >
+    while (endIndex < xmlStr.size())
+    {
+        endIndex+=1;
+        if (xmlStr[endIndex] == '<')
+        {
+            numChildElements++;
+        }
+        else if (xmlStr[endIndex] == '>')
+        {
+            if (numChildElements == 0)
+            {
+                break;
+            }
+            else
+            {
+                numChildElements--;
+            }
+        }
+    }
+
+    //Now, replace the <!DOCTYPE> element with whitespace
+    xmlStr.erase(startIndex, endIndex - startIndex + 1);
+}
+
+
 
 XmlDocument*
 XmlDocument::load( std::istream& in )
 {
-    XmlElementNoRefStack tree;
+    TiXmlDocument xmlDoc;
 
-    XmlDocument* doc = new XmlDocument();
-    tree.push( doc );
+    //Read the entire document into a string
+    in.seekg(0, std::ios::end);
+    int length   = in.tellg();
+    in.seekg(0, std::ios::beg);
+    char *buffer = new char[length+1];
+    in.read(buffer, length);
+    //Null terminate the string
+    buffer[length] = '\0';    
 
-#define BUFSIZE 1024
-    char buf[BUFSIZE];
-    XML_Parser parser = XML_ParserCreate( NULL );
-    bool done = false;
-    XML_SetUserData( parser, &tree );
-    XML_SetElementHandler( parser, startElement, endElement );
-    XML_SetCharacterDataHandler( parser, (XML_CharacterDataHandler)handleCharData );
-    while( !in.eof() )
+    std::string xmlStr(buffer);
+
+    //Delete the buffer
+    delete[] buffer;    
+    removeDocType( xmlStr );
+    //OE_NOTICE << xmlStr;
+
+    XmlDocument* doc = NULL;
+    xmlDoc.Parse(xmlStr.c_str());    
+    if (!xmlDoc.Error() && xmlDoc.RootElement())
     {
-        in.read( buf, BUFSIZE );
-        int bytes_read = in.gcount();
-        if ( bytes_read > 0 )
-        {
-            if ( XML_Parse( parser, buf, bytes_read, in.eof() ) == XML_STATUS_ERROR )
-            {
-                OE_WARN
-                    << XML_ErrorString( XML_GetErrorCode( parser ) )
-                    << ", "
-                    << XML_GetCurrentLineNumber( parser ) 
-                    << std::endl;
-
-                XML_ParserFree( parser );
-                return NULL;
-            }
-        }
+        doc = new XmlDocument();
+        processNode( doc,  xmlDoc.RootElement() );
     }
-    XML_ParserFree( parser );
-    return doc;
+    return doc;    
 }
 
 #define INDENT 4

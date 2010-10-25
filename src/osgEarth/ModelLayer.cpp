@@ -22,31 +22,15 @@
 
 using namespace osgEarth;
 
-// to be depcreated
-ModelLayer::ModelLayer( const std::string& name, const std::string& driver, const Config& driverConf ) :
-osg::Referenced( true ),
-_name( name ),
-_driver( driver ),
-_driverConf( driverConf ),
-_enabled(true)
-{
-    _driverConf.attr("name") = name;
-    _driverConf.attr("driver") = driver;
-    _driverOptions = new DriverOptions( _driverConf );
-}
-
-ModelLayer::ModelLayer( const std::string& name, const DriverOptions* options ) :
-osg::Referenced( true ),
+ModelLayer::ModelLayer( const std::string& name, const ModelSourceOptions& options ) :
 _name( name ),
 _driverOptions( options ),
 _enabled(true)
 {
-    if (options)
-        fromConfig( options->config() );
+    mergeConfig( options.getConfig() );
 }
 
 ModelLayer::ModelLayer( const std::string& name, ModelSource* source ) :
-osg::Referenced( true ),
 _name( name ),
 _modelSource( source ),
 _enabled(true)
@@ -61,12 +45,7 @@ ModelLayer::initialize( const std::string& referenceURI, const Map* map )
 
     if ( !_modelSource.valid() )
     {
-        _modelSource = ModelSourceFactory::create( _driverOptions.get() );
-    }
-
-    if ( !_modelSource.valid() )
-    {
-        _modelSource = ModelSourceFactory::create( _name, _driver, _driverConf );
+        _modelSource = ModelSourceFactory::create( _driverOptions );
     }
 
     if ( _modelSource.valid() )
@@ -88,7 +67,7 @@ ModelLayer::getOrCreateNode( ProgressCallback* progress )
         if ( _lighting.isSet() )
             setLightingEnabled( _lighting.value() );
 
-        if ( _modelSource->getOptions()->depthTestEnabled() == false )            
+        if ( _modelSource->getOptions().depthTestEnabled() == false )            
         {
             if ( _node )
                 _node->getOrCreateStateSet()->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS ) );
@@ -98,10 +77,9 @@ ModelLayer::getOrCreateNode( ProgressCallback* progress )
 }
 
 Config
-ModelLayer::toConfig() const
+ModelLayer::getConfig() const
 {
-    Config conf = 
-        _driverOptions.valid() ? _driverOptions->toConfig() : Config();
+    Config conf = _driverOptions.getConfig();
 
     conf.key() = "model";
     conf.attr("name") = _name;
@@ -109,6 +87,13 @@ ModelLayer::toConfig() const
     conf.updateIfSet( "lighting", _lighting );
 
     return conf;
+}
+
+void
+ModelLayer::mergeConfig(const osgEarth::Config &conf)
+{
+    conf.getIfSet( "enabled", _enabled );
+    conf.getIfSet( "lighting", _lighting );
 }
 
 bool
@@ -131,11 +116,4 @@ ModelLayer::setLightingEnabled( bool value )
     _lighting = value;
     if ( _node.valid() )
         _node->getOrCreateStateSet()->setMode( GL_LIGHTING, value ? 1 : 0 );
-}
-
-void
-ModelLayer::fromConfig(const osgEarth::Config &conf)
-{
-    conf.getIfSet( "enabled", _enabled );
-    conf.getIfSet( "lighting", _lighting );
 }

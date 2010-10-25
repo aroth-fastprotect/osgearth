@@ -28,28 +28,17 @@ using namespace osgEarth::Symbology;
 
 /*************************************************************************/
 
-FeatureTileSourceOptions::FeatureTileSourceOptions( const PluginOptions* opt ) :
-TileSourceOptions( opt ),
+FeatureTileSourceOptions::FeatureTileSourceOptions( const ConfigOptions& options ) :
+TileSourceOptions( options ),
 _geomTypeOverride( Geometry::TYPE_UNKNOWN )
 {
-    if ( config().hasChild("features") )
-        _featureOptions = new FeatureSourceOptions( new PluginOptions( config().child("features") ) );
-
-    config().getObjIfSet( "styles", _styles );
-    
-    std::string gt = config().value( "geometry_type" );
-    if ( gt == "line" || gt == "lines" || gt == "linestring" )
-        _geomTypeOverride = Geometry::TYPE_LINESTRING;
-    else if ( gt == "point" || gt == "pointset" || gt == "points" )
-        _geomTypeOverride = Geometry::TYPE_POINTSET;
-    else if ( gt == "polygon" || gt == "polygons" )
-        _geomTypeOverride = Geometry::TYPE_POLYGON;
+    fromConfig( _conf );
 }
 
 Config
-FeatureTileSourceOptions::toConfig() const
+FeatureTileSourceOptions::getConfig() const
 {
-    Config conf = TileSourceOptions::toConfig();
+    Config conf = TileSourceOptions::getConfig();
 
     conf.updateObjIfSet( "features", _featureOptions );
     conf.updateObjIfSet( "styles", _styles );
@@ -66,23 +55,44 @@ FeatureTileSourceOptions::toConfig() const
     return conf;
 }
 
+void
+FeatureTileSourceOptions::mergeConfig( const Config& conf )
+{
+    TileSourceOptions::mergeConfig( conf );
+    fromConfig( conf );
+}
+
+void
+FeatureTileSourceOptions::fromConfig( const Config& conf )
+{
+    if ( conf.hasChild("features") )
+        _featureOptions->merge( ConfigOptions(conf.child("features")) );
+
+    conf.getObjIfSet( "styles", _styles );
+    
+    std::string gt = conf.value( "geometry_type" );
+    if ( gt == "line" || gt == "lines" || gt == "linestring" )
+        _geomTypeOverride = Geometry::TYPE_LINESTRING;
+    else if ( gt == "point" || gt == "pointset" || gt == "points" )
+        _geomTypeOverride = Geometry::TYPE_POINTSET;
+    else if ( gt == "polygon" || gt == "polygons" )
+        _geomTypeOverride = Geometry::TYPE_POLYGON;
+}
+
 /*************************************************************************/
 
-FeatureTileSource::FeatureTileSource( const PluginOptions* options ) :
+FeatureTileSource::FeatureTileSource( const TileSourceOptions& options ) :
 TileSource( options ),
-_initialized( false )
+_initialized( false ),
+_options( options.getConfig() )
 {
-    _options = dynamic_cast<const FeatureTileSourceOptions*>( options );
-    if ( !_options.valid() )
-        _options = new FeatureTileSourceOptions( options );
-
-    if ( _options->featureSource().valid() )
+    if ( _options.featureSource().valid() )
     {
-        _features = _options->featureSource().get();
+        _features = _options.featureSource().get();
     }
-    else if ( _options->featureOptions().valid() )
+    else if ( _options.featureOptions().isSet() )
     {
-        _features = FeatureSourceFactory::create( _options->featureOptions() );
+        _features = FeatureSourceFactory::create( _options.featureOptions().value() );
         if ( !_features.valid() )
         {
             OE_WARN << LC << "Failed to create FeatureSource from options" << std::endl;
@@ -107,7 +117,7 @@ FeatureTileSource::initialize( const std::string& referenceURI, const Profile* o
     if ( _features.valid() )
     {
         _features->initialize( referenceURI );
-}
+    }
     else
     {
         OE_WARN << LC << "No FeatureSource provided; nothing will be rendered (" << getName() << ")" << std::endl;
@@ -130,13 +140,13 @@ FeatureTileSource::setFeatureSource( FeatureSource* source )
 }
 
 osg::Image*
-FeatureTileSource::createImage( const TileKey* key, ProgressCallback* progress )
+FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
 {
     if ( !_features.valid() || !_features->getFeatureProfile() )
         return 0L;
 
     // style data
-    const StyleCatalog* styles = _options->styles();
+    const StyleCatalog* styles = _options.styles();
 
     // implementation-specific data
     osg::ref_ptr<osg::Referenced> buildData = createBuildData();
@@ -161,7 +171,7 @@ FeatureTileSource::createImage( const TileKey* key, ProgressCallback* progress )
                 list.push_back( feature );
                 renderFeaturesForStyle( 
                     feature->style().get(), list, buildData.get(),
-                    key->getGeoExtent(), image.get() );
+                    key.getExtent(), image.get() );
             }
         }
     }
@@ -174,18 +184,18 @@ FeatureTileSource::createImage( const TileKey* key, ProgressCallback* progress )
                 const StyleSelector& sel = *i;
                 Style* style;
                 styles->getStyle( sel.getSelectedStyleName(), style );
-                queryAndRenderFeaturesForStyle( style, sel.query().value(), buildData.get(), key->getGeoExtent(), image.get() );
+                queryAndRenderFeaturesForStyle( style, sel.query().value(), buildData.get(), key.getExtent(), image.get() );
             }
         }
         else
         {
             const Style* style = styles->getDefaultStyle();
-            queryAndRenderFeaturesForStyle( style, Query(), buildData.get(), key->getGeoExtent(), image.get() );
+            queryAndRenderFeaturesForStyle( style, Query(), buildData.get(), key.getExtent(), image.get() );
         }
     }
     else
     {
-        queryAndRenderFeaturesForStyle( new Style, Query(), buildData.get(), key->getGeoExtent(), image.get() );
+        queryAndRenderFeaturesForStyle( new Style, Query(), buildData.get(), key.getExtent(), image.get() );
     }
 
     // final tile processing after all styles are done
@@ -234,10 +244,10 @@ FeatureTileSource::queryAndRenderFeaturesForStyle(const Style* style,
             if ( geom )
             {
                 // apply a type override if requested:
-                if (_options->geometryTypeOverride().isSet() &&
-                    _options->geometryTypeOverride() != geom->getComponentType() )
+                if (_options.geometryTypeOverride().isSet() &&
+                    _options.geometryTypeOverride() != geom->getComponentType() )
                 {
-                    geom = geom->cloneAs( _options->geometryTypeOverride().value() );
+                    geom = geom->cloneAs( _options.geometryTypeOverride().value() );
                     if ( geom )
                         feature->setGeometry( geom );
                 }

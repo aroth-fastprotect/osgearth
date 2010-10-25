@@ -17,17 +17,17 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthSymbology/Query>
-#include <iomanip>
 
+using namespace osgEarth;
 using namespace osgEarth::Symbology;
 
 Query::Query( const Config& conf )
 {
-    fromConfig( conf );
+    mergeConfig( conf );
 }
 
 void
-Query::fromConfig( const Config& conf )
+Query::mergeConfig( const Config& conf )
 {
     if ( !conf.getIfSet( "expr", _expression ) )
         if ( !conf.getIfSet( "where", _expression ) )
@@ -46,16 +46,16 @@ Query::fromConfig( const Config& conf )
 }
 
 Config
-Query::toConfig() const
+Query::getConfig() const
 {
     Config conf( "query" );
     conf.addIfSet( "expr", _expression );
     if ( _bounds.isSet() ) {
         Config bc( "extent" );
-        bc.add( "xmin", toString(_bounds->xMin(), OSGEARTH_DEFAULT_PRECISION) );
-        bc.add( "ymin", toString(_bounds->yMin(), OSGEARTH_DEFAULT_PRECISION) );
-        bc.add( "xmax", toString(_bounds->xMax(), OSGEARTH_DEFAULT_PRECISION) );
-        bc.add( "ymax", toString(_bounds->yMax(), OSGEARTH_DEFAULT_PRECISION) );
+        bc.add( "xmin", toString(_bounds->xMin()) );
+        bc.add( "ymin", toString(_bounds->yMin()) );
+        bc.add( "xmax", toString(_bounds->xMax()) );
+        bc.add( "ymax", toString(_bounds->yMax()) );
         conf.add( bc );
     }
     return conf;

@@ -44,5 +44,6 @@ IF(SQLITE3_FOUND)
   ADD_SUBDIRECTORY(cache_sqlite3)
 ENDIF(SQLITE3_FOUND)
 
-ADD_SUBDIRECTORY(engine_droam)
+ADD_SUBDIRECTORY(engine_osgterrain)
+#ADD_SUBDIRECTORY(engine_droam)
     

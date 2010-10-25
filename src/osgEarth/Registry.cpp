@@ -16,8 +16,6 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-
-
 #include <osgEarth/Registry>
 #include <osgEarth/Cube>
 #include <osg/Notify>
@@ -53,6 +51,8 @@ _caps( 0L )
             break;
         addMimeTypeExtensionMapping( mimeType, builtinMimeTypeExtMappings[i+1] );
     }
+
+    _shaderLib = new ShaderFactory();
 }
 
 Registry::~Registry()
@@ -216,9 +216,31 @@ const Capabilities&
 Registry::getCapabilities() const
 {
     if ( !_caps )
-        const_cast<Registry*>(this)->_caps = new Capabilities();
+        const_cast<Registry*>(this)->initCapabilities();
 
     return *_caps;
+}
+
+static OpenThreads::Mutex s_initCapsMutex;
+void
+Registry::initCapabilities()
+{
+    ScopedLock<Mutex> lock( s_initCapsMutex ); // double-check pattern (see getCapabilities)
+    if ( !_caps )
+        _caps = new Capabilities();
+}
+
+const ShaderFactory*
+Registry::getShaderFactory() const
+{
+    return _shaderLib.get();
+}
+
+void
+Registry::setShaderFactory( ShaderFactory* lib )
+{
+    if ( lib != 0L && lib != _shaderLib.get() )
+        _shaderLib = lib;
 }
 
 //Simple class used to add a file extension alias for the earth_tile to the earth plugin

@@ -25,13 +25,16 @@
 #include <osgEarth/Common>
 #include <osgEarth/Map>
 #include <osgEarth/CacheSeed>
-#include <osgEarth/EarthFile>
 #include <osgEarth/Registry>
+
+#include <osgEarth/Caching>
 
 #include <iostream>
 #include <sstream>
 
 using namespace osgEarth;
+
+#define LC "[osgearth_seed] "
 
 int main(int argc, char** argv)
 {
@@ -90,7 +93,7 @@ int main(int argc, char** argv)
     //Make sure the user specified a file
     if ( filename.empty() )
     {
-        OE_NOTICE << "Please specify a .earth file to seed." << std::endl;
+        OE_WARN << LC << "Please specify a .earth file to seed." << std::endl;
         return 1;
     }
 
@@ -100,13 +103,17 @@ int main(int argc, char** argv)
         osg::ref_ptr< Cache > cache;
         if (cacheType == "disk")
         {
-            OE_NOTICE << "Creating DiskCache" << std::endl;
-            cache = new DiskCache( cachePath );
+            OE_NOTICE << LC << "Creating DiskCache" << std::endl;
+            DiskCacheOptions options;
+            options.setPath( cachePath );
+            cache = new DiskCache( options );
         }
         else
         {
-            OE_NOTICE << "Creating TMSCache" << std::endl;
-            cache = new TMSCache( cachePath );
+            OE_NOTICE << LC << "Creating TMSCache" << std::endl;
+            TMSCacheOptions options;
+            options.setPath( cachePath );
+            cache = new TMSCache( options );
         }
 
         OE_NOTICE <<"Override Cache Path: "<<cachePath<<std::endl;
@@ -114,20 +121,24 @@ int main(int argc, char** argv)
     }
 
     //Load the map file
-    EarthFile earthFile;
-    if ( earthFile.readXML( filename ) )
+    osg::ref_ptr<osg::Node> node = osgDB::readNodeFile( filename );
+    if ( node.valid() )
     {
-        //Create the CacheSeed
-        CacheSeed seed;
-        seed.setMinLevel(minLevel);
-        seed.setMaxLevel(maxLevel);
-        seed.setBounds(bounds);
-        seed.seed( earthFile.getMap() );
-        return 0;
+        MapNode* mapNode = MapNode::findMapNode( node.get() );
+        if ( mapNode )
+        {
+            //Create the CacheSeed
+            CacheSeed seed;
+            seed.setMinLevel(minLevel);
+            seed.setMaxLevel(maxLevel);
+            seed.setBounds(bounds);
+            seed.seed( mapNode->getMap() );
+        }
+        else
+            OE_WARN << LC << "No osgEarth MapNode found in input file" << std::endl;
     }
     else
-    {
-        OE_NOTICE << "Could not load earth file from " << filename << std::endl;
-        return 1;
-    }
+        OE_WARN << LC << "Unable to load earth file from " << filename << std::endl;
+
+    return 0;
 }

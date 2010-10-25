@@ -27,17 +27,18 @@ using namespace OpenThreads;
 
 void CacheSeed::seed( Map* map )
 {
-    Threading::ScopedReadLock lock( map->getMapDataMutex() );
+    //Threading::ScopedReadLock lock( map->getMapDataMutex() );
 
-    if (!map->getCache())
+    if ( !map->getMapOptions().cache().isSet() )
+    //if (!map->getCache())
     {
         OE_WARN << "Warning:  Map does not have a cache defined, please define a cache." << std::endl;
         return;
     }
 
-    osg::ref_ptr<MapEngine> engine = new MapEngine(); //map->createMapEngine();
+//    osg::ref_ptr<MapEngine> engine = new MapEngine(); //map->createMapEngine();
 
-    std::vector< osg::ref_ptr<TileKey> > keys;
+    std::vector<TileKey> keys;
     map->getProfile()->getRootKeys(keys);
 
     //Set the default bounds to the entire profile if the user didn't override the bounds
@@ -53,13 +54,16 @@ void CacheSeed::seed( Map* map )
     int src_min_level = INT_MAX;
     int src_max_level = 0;
 
-    //Assumes the the TileSource will perform the caching for us when we call createImage
-    for( MapLayerList::const_iterator i = map->getImageMapLayers().begin(); i != map->getImageMapLayers().end(); i++ )
-    {
-		MapLayer* layer = i->get();
-        TileSource* src = i->get()->getTileSource();
+    MapFrame mapf( map, Map::TERRAIN_LAYERS, "CacheSeed::seed" );
 
-        if (layer->cacheOnly().get())
+    //Assumes the the TileSource will perform the caching for us when we call createImage
+    for( ImageLayerVector::const_iterator i = mapf.imageLayers().begin(); i != mapf.imageLayers().end(); i++ )
+    {
+		ImageLayer* layer = i->get();
+        TileSource* src = i->get()->getTileSource();
+        const ImageLayerOptions& opt = layer->getImageLayerOptions();
+
+        if ( opt.cacheOnly() == true )
         {
             OE_WARN << "Warning:  Cannot seed b/c Layer \"" << layer->getName() << "\" is cache only." << std::endl;
             return;
@@ -80,19 +84,20 @@ void CacheSeed::seed( Map* map )
         {
             hasCaches = true;
 
-			if (layer->minLevel().isSet() && layer->minLevel().get() < src_min_level)
-                src_min_level = layer->minLevel().get();
-			if (layer->maxLevel().isSet() && layer->maxLevel().get() > src_max_level)
-                src_max_level = layer->maxLevel().get();
+			if (opt.minLevel().isSet() && opt.minLevel().get() < src_min_level)
+                src_min_level = opt.minLevel().get();
+			if (opt.maxLevel().isSet() && opt.maxLevel().get() > src_max_level)
+                src_max_level = opt.maxLevel().get();
         }
     }
 
-    for( MapLayerList::const_iterator i = map->getHeightFieldMapLayers().begin(); i != map->getHeightFieldMapLayers().end(); i++ )
+    for( ElevationLayerVector::const_iterator i = mapf.elevationLayers().begin(); i != mapf.elevationLayers().end(); i++ )
     {
-		MapLayer* layer = i->get();
+		ElevationLayer* layer = i->get();
         TileSource* src = i->get()->getTileSource();
+        const ElevationLayerOptions& opt = layer->getElevationLayerOptions();
 
-        if (layer->cacheOnly().get())
+        if ( opt.cacheOnly().get())
         {
             OE_WARN << "Warning:  Cannot seed b/c Layer \"" << layer->getName() << "\" is cache only." << std::endl;
             return;
@@ -113,10 +118,10 @@ void CacheSeed::seed( Map* map )
         {
             hasCaches = true;
 
-			if (layer->minLevel().isSet() && layer->minLevel().get() < src_min_level)
-                src_min_level = layer->minLevel().get();
-			if (layer->maxLevel().isSet() && layer->maxLevel().get() > src_max_level)
-                src_max_level = layer->maxLevel().get();
+			if (opt.minLevel().isSet() && opt.minLevel().get() < src_min_level)
+                src_min_level = opt.minLevel().get();
+			if (opt.maxLevel().isSet() && opt.maxLevel().get() > src_max_level)
+                src_max_level = opt.maxLevel().get();
 		}
     }
 
@@ -135,42 +140,63 @@ void CacheSeed::seed( Map* map )
 
     for (unsigned int i = 0; i < keys.size(); ++i)
     {
-        processKey( map, engine.get(), keys[i].get() );
+        processKey( mapf, keys[i] );
     }
 }
 
 
-void CacheSeed::processKey( Map* map, MapEngine* engine, TileKey* key )
+void
+CacheSeed::processKey(const MapFrame& mapf, const TileKey& key ) const
 {
     unsigned int x, y, lod;
-    key->getTileXY(x, y);
-    lod = key->getLevelOfDetail();
+    key.getTileXY(x, y);
+    lod = key.getLevelOfDetail();
 
-	osg::ref_ptr<osgEarth::VersionedTerrain> terrain = new osgEarth::VersionedTerrain( map, engine );
+//	osg::ref_ptr<osgEarth::VersionedTerrain> terrain = new osgEarth::VersionedTerrain( map, engine );
 
     if ( _minLevel <= lod && _maxLevel >= lod )
     {
-        OE_NOTICE << "Caching tile = " << key->str() << std::endl; //<< lod << " (" << x << ", " << y << ") " << std::endl;
-        bool validData;
-		osg::ref_ptr<osg::Node> node = engine->createTile( map, terrain.get(), key, true, false, false, validData );        
+        OE_NOTICE << "Caching tile = " << key.str() << std::endl; //<< lod << " (" << x << ", " << y << ") " << std::endl;
+        cacheTile( mapf, key );
+  //      bool validData;
+		//osg::ref_ptr<osg::Node> node = engine->createTile( map, terrain.get(), key, true, false, false, validData );        
     }
 
-    if (key->getLevelOfDetail() <= _maxLevel)
+    if (lod <= _maxLevel)
     {
-        osg::ref_ptr<TileKey> k0 = key->createSubkey(0);
-        osg::ref_ptr<TileKey> k1 = key->createSubkey(1);
-        osg::ref_ptr<TileKey> k2 = key->createSubkey(2);
-        osg::ref_ptr<TileKey> k3 = key->createSubkey(3);        
+        TileKey k0 = key.createChildKey(0);
+        TileKey k1 = key.createChildKey(1);
+        TileKey k2 = key.createChildKey(2);
+        TileKey k3 = key.createChildKey(3);        
 
         //Check to see if the bounds intersects ANY of the tile's children.  If it does, then process all of the children
         //for this level
-        if (_bounds.intersects( k0->getGeoExtent().bounds() ) || _bounds.intersects(k1->getGeoExtent().bounds()) ||
-            _bounds.intersects( k2->getGeoExtent().bounds() ) || _bounds.intersects(k3->getGeoExtent().bounds()) )
+        if (_bounds.intersects( k0.getExtent().bounds() ) || _bounds.intersects(k1.getExtent().bounds()) ||
+            _bounds.intersects( k2.getExtent().bounds() ) || _bounds.intersects(k3.getExtent().bounds()) )
         {
-            processKey(map, engine, k0.get()); 
-            processKey(map, engine, k1.get()); 
-            processKey(map, engine, k2.get()); 
-            processKey(map, engine, k3.get()); 
+            processKey(mapf, k0);
+            processKey(mapf, k1);
+            processKey(mapf, k2);
+            processKey(mapf, k3);
         }
     }
 }
+
+void
+CacheSeed::cacheTile(const MapFrame& mapf, const TileKey& key ) const
+{
+    for( ImageLayerVector::const_iterator i = mapf.imageLayers().begin(); i != mapf.imageLayers().end(); i++ )
+    {
+        ImageLayer* layer = i->get();
+        if ( layer->isKeyValid( key ) )
+        {
+            GeoImage image = layer->createImage( key );
+        }
+    }
+
+    if ( mapf.elevationLayers().size() > 0 )
+    {
+        osg::ref_ptr<osg::HeightField> hf = mapf.createHeightField( key, false );
+    }
+}
+

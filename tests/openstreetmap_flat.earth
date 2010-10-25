@@ -11,11 +11,15 @@ In this case, we also specify the "google" tms_type, which will
 invert the Y tile index.
 -->
 
-<map name="OpenStreetMap" type="projected">
+<map name="OpenStreetMap" type="projected" version="2">
 
-    <profile>global-mercator</profile>
-    <loading_policy mode="preemptive"/>
-    <lighting>false</lighting>
+    <options>
+        <profile>global-mercator</profile>
+        <lighting>false</lighting>
+        <terrain>
+            <loading_policy mode="preemptive"/>
+        </terrain>
+    </options>
     
     <image name="OSM on Mapnik" driver="tms">
         <url>http://tile.openstreetmap.org/</url>

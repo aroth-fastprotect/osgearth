@@ -8,7 +8,12 @@ SET(OSGEARTH_VERSION ${OSGEARTH_MAJOR_VERSION}.${OSGEARTH_MINOR_VERSION}.${OSGEA
 # We want to build SONAMES shared librariess
 SET(OSGEARTH_SONAMES TRUE)
 
-FIND_PACKAGE(GEOS)
+FAST_PACKAGE_GEOS()
+
+IF(MSVC)
+	# disable warning C4505: 'xxx' : unreferenced local function has been removed
+    set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd4505" )
+ENDIF()
 
 # Dynamic vs Static Linking
 OPTION(DYNAMIC_OSGEARTH "Set to ON to build OSGEARTH for dynamic linking.  Use OFF for static." ON)

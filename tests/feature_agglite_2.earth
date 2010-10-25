@@ -3,13 +3,17 @@ osgEarth Sample
 Demonstrates use of the "agglite" feature rasterization driver.
 -->
 
-<map name="Geometry Rasterizer Demo" type="round">
+<map name="Geometry Rasterizer Demo" type="round" version="2">
+  
+    <options>
+        <lighting>false</lighting>
+    </options>
 
     <image name="world" driver="gdal">
         <url>../data/world.tif</url>
     </image>
     
-    <image name="world" driver="agglite">
+    <image name="world_boundaries" driver="agglite">
 
         <!-- Configure the OGR feature driver to read the shapefile. -->             
         <features name="world" driver="ogr">

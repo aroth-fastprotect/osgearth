@@ -36,11 +36,9 @@ using namespace osgEarth::Drivers;
 class YahooSource : public TileSource
 {
 public:
-    YahooSource( const PluginOptions* options ) : TileSource( options )
+    YahooSource( const TileSourceOptions& options ) : TileSource( options ), _options(options)
     {
-        _settings = dynamic_cast<const YahooOptions*>( options );
-        if ( !_settings.valid() )
-            _settings = new YahooOptions( options );
+        //nop
     }
 
     // Yahoo! uses spherical mercator, but the top LOD is a 2x2 tile set.
@@ -49,25 +47,25 @@ public:
         setProfile( Profile::create( "spherical-mercator", "", 2, 2 ) );
     }
 
-    osg::Image* createImage( const TileKey* key,
+    osg::Image* createImage( const TileKey& key,
                              ProgressCallback* progress )
     {
         //Return NULL if we are given a non-mercator key
-        if ( !key->isMercator() ) return 0;
+        if ( !key.isMercator() ) return 0;
 
         std::stringstream buf;
 
         std::string dataset = 
-            _settings->dataset().isSet() ? _settings->dataset().value() : "roads";
+            _options.dataset().isSet() ? _options.dataset().value() : "roads";
         
         if ( dataset == "roads" || dataset == "map" )
         {            
             // http://us.maps1.yimg.com/us.tile.maps.yimg.com/tl?v=4.1&md=2&x=0&y=0&z=2&r=1
             unsigned int tile_x, tile_y;
-            key->getTileXY( tile_x, tile_y );
-            unsigned int zoom = key->getLevelOfDetail();
+            key.getTileXY( tile_x, tile_y );
+            unsigned int zoom = key.getLevelOfDetail();
             unsigned int size_x, size_y;
-            key->getProfile()->getNumTiles( zoom, size_x, size_y );
+            key.getProfile()->getNumTiles( zoom, size_x, size_y );
 
             buf << "http://us.maps1.yimg.com/us.tile.maps.yimg.com/tl"
                 << "?v=4.1&md=2&r=1"
@@ -78,10 +76,10 @@ public:
         else if ( dataset == "aerial" || dataset == "satellite" )
         {
             unsigned int tile_x, tile_y;
-            key->getTileXY( tile_x, tile_y );
-            unsigned int zoom = key->getLevelOfDetail();
+            key.getTileXY( tile_x, tile_y );
+            unsigned int zoom = key.getLevelOfDetail();
             unsigned int size_x, size_y;
-            key->getProfile()->getNumTiles( zoom, size_x, size_y );
+            key.getProfile()->getNumTiles( zoom, size_x, size_y );
 
             buf << "http://us.maps3.yimg.com/aerial.maps.yimg.com/ximg"
                 << "?v=1.8&s=256&t=a&r=1"
@@ -93,14 +91,14 @@ public:
 		std::string base;
 		base = buf.str();
 
-        OE_DEBUG << key->str() << "=" << base << std::endl;
+        OE_DEBUG << key.str() << "=" << base << std::endl;
         
         osg::ref_ptr<osg::Image> image;
-        HTTPClient::readImageFile( base, image, getOptions(), progress );
+        HTTPClient::readImageFile( base, image, 0L, progress ); //getOptions(), progress );
         return image.release();
     }
 
-    osg::HeightField* createHeightField( const TileKey* key,
+    osg::HeightField* createHeightField( const TileKey& key,
                                          ProgressCallback* progress)
     {
         //NI
@@ -120,11 +118,11 @@ public:
     }
 
 private:
-    osg::ref_ptr<const YahooOptions> _settings;
+    const YahooOptions _options;
 };
 
 
-class ReaderWriterYahoo : public osgDB::ReaderWriter
+class ReaderWriterYahoo : public TileSourceDriver
 {
     public:
         ReaderWriterYahoo()
@@ -142,7 +140,7 @@ class ReaderWriterYahoo : public osgDB::ReaderWriter
             if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
                 return ReadResult::FILE_NOT_HANDLED;
 
-            return new YahooSource( static_cast<const PluginOptions*>(options) );
+            return new YahooSource( getTileSourceOptions(options) );
         }
 };
 

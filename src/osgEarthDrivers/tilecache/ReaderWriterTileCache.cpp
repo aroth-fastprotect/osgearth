@@ -40,11 +40,8 @@ using namespace osgEarth::Drivers;
 class TileCacheSource : public TileSource
 {
 public:
-    TileCacheSource( const PluginOptions* options ) : TileSource( options )
+    TileCacheSource( const TileSourceOptions& options ) : TileSource( options ), _options( options )
     {
-        _settings = dynamic_cast<const TileCacheOptions*>( options );
-        if ( !_settings.valid() )
-            _settings = new TileCacheOptions();
     }
 
     void initialize( const std::string& referenceURI, const Profile* overrideProfile)
@@ -63,23 +60,23 @@ public:
 		}            
     }
 
-    osg::Image* createImage( const TileKey* key,
+    osg::Image* createImage( const TileKey& key,
                              ProgressCallback* progress)
     {
         unsigned int level, tile_x, tile_y;
-        level = key->getLevelOfDetail() +1;
-        key->getTileXY( tile_x, tile_y );
+        level = key.getLevelOfDetail() +1;
+        key.getTileXY( tile_x, tile_y );
 
         unsigned int numCols, numRows;
-        key->getProfile()->getNumTiles(level, numCols, numRows);
+        key.getProfile()->getNumTiles(level, numCols, numRows);
         
         // need to invert the y-tile index
         tile_y = numRows - tile_y - 1;
 
         char buf[2048];
         sprintf( buf, "%s/%s/%02d/%03d/%03d/%03d/%03d/%03d/%03d.%s",
-            _settings->url()->c_str(),
-            _settings->layer()->c_str(),
+            _options.url()->c_str(),
+            _options.layer()->c_str(),
             level,
             (tile_x / 1000000),
             (tile_x / 1000) % 1000,
@@ -87,7 +84,7 @@ public:
             (tile_y / 1000000),
             (tile_y / 1000) % 1000,
             (tile_y % 1000),
-            _settings->format()->c_str() );
+            _options.format()->c_str() );
 
        
         std::string path = buf;
@@ -105,7 +102,7 @@ public:
         }
         
         osg::ref_ptr<osg::Image> image;
-        HTTPClient::readImageFile(path, image, getOptions(), progress );
+        HTTPClient::readImageFile(path, image, 0L, progress ); //getOptions(), progress );
         return image.release();
 
         //if (osgDB::containsServerAddress(path))
@@ -119,16 +116,16 @@ public:
 
     virtual std::string getExtension()  const 
     {
-        return _settings->format().value();
+        return _options.format().value();
     }
 
 private:
     std::string _configPath;
-    osg::ref_ptr<const TileCacheOptions> _settings;
+    const TileCacheOptions _options;
 };
 
 // Reads tiles from a TileCache disk cache.
-class TileCacheSourceFactory : public osgDB::ReaderWriter
+class TileCacheSourceFactory : public TileSourceDriver
 {
     public:
         TileCacheSourceFactory() {}
@@ -151,7 +148,7 @@ class TileCacheSourceFactory : public osgDB::ReaderWriter
                 return ReadResult::FILE_NOT_HANDLED;
             }
 
-            return new TileCacheSource( static_cast<const PluginOptions*>(options) );
+            return new TileCacheSource( getTileSourceOptions(options) );
         }
 };
 

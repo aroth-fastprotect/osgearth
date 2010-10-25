@@ -40,16 +40,10 @@ using namespace osgEarth::Drivers;
 class TileServiceSource : public TileSource
 {
 public:
-	TileServiceSource( const PluginOptions* options ) : TileSource( options )
-    {
-        _settings = dynamic_cast<const TileServiceOptions*>( options );
-        if ( !_settings.valid() )
-        {
-            _settings = new TileServiceOptions( options );
-        }
-        
+	TileServiceSource( const TileSourceOptions& options ) : TileSource( options ), _options(options)
+    {        
         _formatToUse =
-            _settings->format()->empty() ? "png" : _settings->format().value();
+            _options.format()->empty() ? "png" : _options.format().value();
     }
 
 public:
@@ -68,35 +62,31 @@ public:
     }
 
 public:
-    osg::Image* createImage( const TileKey* key ,
-                             ProgressCallback* progress)
-    {
-        //return osgDB::readImageFile(  createURI( key ), getOptions() );
-        //return HTTPClient::readImageFile( createURI( key ), getOptions(), progress );
-        
+    osg::Image* createImage( const TileKey& key, ProgressCallback* progress)
+    {        
         osg::ref_ptr<osg::Image> image;
-        HTTPClient::readImageFile( createURI( key ), image, getOptions(), progress );
+        HTTPClient::readImageFile( createURI( key ), image, 0L, progress ); //getOptions(), progress );
         return image.release();
     }
 
-    osg::HeightField* createHeightField( const TileKey* key,
+    osg::HeightField* createHeightField( const TileKey& key,
                                          ProgressCallback* progress)
     {
         //NOP
         return NULL;
     }
 
-    std::string createURI( const TileKey* key ) const
+    std::string createURI( const TileKey& key ) const
     {
         unsigned int x, y;
-        key->getTileXY(x, y);
+        key.getTileXY(x, y);
 
-        unsigned int lod = key->getLevelOfDetail()+1;
+        unsigned int lod = key.getLevelOfDetail()+1;
 
         std::stringstream buf;
         //http://s0.tileservice.worldwindcentral.com/getTile?interface=map&version=1&dataset=bmng.topo.bathy.200401&level=0&x=0&y=0
-        buf << _settings->url().value() << "interface=map&version=1"
-            << "&dataset=" << _settings->dataset().value()
+        buf << _options.url().value() << "interface=map&version=1"
+            << "&dataset=" << _options.dataset().value()
             << "&level=" << lod
             << "&x=" << x
             << "&y=" << y
@@ -113,11 +103,11 @@ public:
 
 private:
     std::string _formatToUse;
-    osg::ref_ptr<const TileServiceOptions> _settings;
+    const TileServiceOptions _options;
 };
 
 
-class TileServiceSourceFactory : public osgDB::ReaderWriter
+class TileServiceSourceFactory : public TileSourceDriver
 {
     public:
         TileServiceSourceFactory() {}
@@ -140,7 +130,7 @@ class TileServiceSourceFactory : public osgDB::ReaderWriter
                 return ReadResult::FILE_NOT_HANDLED;
             }
 
-            return new TileServiceSource( static_cast<const PluginOptions*>(opt) );
+            return new TileServiceSource( getTileSourceOptions(opt) );
         }
 };
 

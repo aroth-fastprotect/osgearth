@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Capabilities>
+#include <osg/FragmentProgram>
 #include <osg/GraphicsContext>
 #include <osg/GL>
 #include <osg/GLExtensions>
@@ -93,7 +94,10 @@ struct MyGraphicsContext
 
 Capabilities::Capabilities() :
 _maxFFPTextureUnits     ( 1 ),
+_maxGPUTextureUnits     ( 1 ),
+_maxGPUTextureCoordSets ( 1 ),
 _maxTextureSize         ( 256 ),
+_maxLights              ( 1 ),
 _supportsGLSL           ( false ),
 _supportsTextureArrays  ( false ),
 _supportsMultiTexture   ( false ),
@@ -115,6 +119,12 @@ _supportsTwoSidedStencil( false )
         glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
         OE_INFO << LC << "  Max FFP texture units = " << _maxFFPTextureUnits << std::endl;
 
+        glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &_maxGPUTextureUnits );
+        OE_INFO << LC << "  Max GPU texture units = " << _maxGPUTextureUnits << std::endl;
+
+        glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
+        OE_INFO << LC << "  Max GPU texture coordinate sets = " << _maxGPUTextureCoordSets << std::endl;
+
         // Use the texture-proxy method to determine the maximum texture size 
         for( int s = 16; s < 65536; s *= 2 )
         {
@@ -129,23 +139,32 @@ _supportsTwoSidedStencil( false )
         }
         OE_INFO << LC << "  Max texture size = " << _maxTextureSize << std::endl;
 
-        _supportsGLSL = GL2->isGlslSupported();
-        OE_INFO << LC << "  Supports GLSL = " << SAYBOOL(_supportsGLSL) << std::endl;
+        glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
+        OE_INFO << LC << "  Max lights = " << _maxLights << std::endl;
 
-        _supportsTextureArrays = osg::isGLExtensionSupported( id, "GL_EXT_texture_array" );
-        OE_INFO << LC << "  Supports texture arrays = " << SAYBOOL(_supportsTextureArrays) << std::endl;
+        _supportsGLSL = GL2->isGlslSupported();
+        OE_INFO << LC << "  GLSL = " << SAYBOOL(_supportsGLSL) << std::endl;
+
+        _supportsTextureArrays = 
+            _supportsGLSL &&
+            osg::getGLVersionNumber() >= 2.0 && // hopefully this will detect Intel cards
+            osg::isGLExtensionSupported( id, "GL_EXT_texture_array" );
+        OE_INFO << LC << "  Texture arrays = " << SAYBOOL(_supportsTextureArrays) << std::endl;
+
+        _supportsTexture3D = osg::isGLExtensionSupported( id, "GL_EXT_texture3D" );
+        OE_INFO << LC << "  3D textures = " << SAYBOOL(_supportsTexture3D) << std::endl;
 
         _supportsMultiTexture = 
             osg::getGLVersionNumber() >= 1.3 ||
             osg::isGLExtensionSupported( id, "GL_ARB_multitexture") ||
             osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
-        OE_INFO << LC << "  Supports multitexturing = " << SAYBOOL(_supportsMultiTexture) << std::endl;
+        OE_INFO << LC << "  Multitexturing = " << SAYBOOL(_supportsMultiTexture) << std::endl;
 
         _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
-        OE_INFO << LC << "  Supports stencil wrapping = " << SAYBOOL(_supportsStencilWrap) << std::endl;
+        OE_INFO << LC << "  Stencil wrapping = " << SAYBOOL(_supportsStencilWrap) << std::endl;
 
         _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
-        OE_INFO << LC << "  Supports 2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
+        OE_INFO << LC << "  2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
     }
 }
 

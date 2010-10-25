@@ -42,14 +42,11 @@ using namespace osgEarth::Drivers;
 class ArcGISSource : public TileSource
 {
 public:
-    ArcGISSource( const PluginOptions* options ) :
+    ArcGISSource( const TileSourceOptions& options ) :
       TileSource( options ),
-      _profileConf( ProfileConfig() )
+      _options( options ),
+      _profileConf( ProfileOptions() )
     {
-        _settings = dynamic_cast<const ArcGISOptions*>( options );
-        if ( !_settings.valid() )
-            _settings = new ArcGISOptions( options );
-
         //if ( options )
         //{
         //    const Config& conf = options->config();
@@ -61,7 +58,7 @@ public:
         //    // force a profile type
         //    // TODO? do we need this anymore? doesn't this happen with overrideprofile now?
         //    if ( conf.hasChild( PROPERTY_PROFILE ) )
-        //        _profileConf = ProfileConfig( conf.child( PROPERTY_PROFILE ) );
+        //        _profileConf = ProfileOptions( conf.child( PROPERTY_PROFILE ) );
         //}
 
         //TODO: allow single layers vs. "fused view"
@@ -73,7 +70,7 @@ public:
             _format = "png";
 
         // read metadata from the server
-        if ( !_map_service.init( _settings->url().value(), getOptions()) )
+        if ( !_map_service.init( _options.url().value() ) ) //, getOptions()) )
         {
             OE_WARN << "[osgearth] [ArcGIS] map service initialization failed: "
                 << _map_service.getError() << std::endl;
@@ -137,15 +134,15 @@ public:
     }
 
     // override
-    osg::Image* createImage( const TileKey* key,
+    osg::Image* createImage( const TileKey& key,
                              ProgressCallback* progress)
     {
         std::stringstream buf;
 
-        int level = key->getLevelOfDetail();
+        int level = key.getLevelOfDetail();
 
         unsigned int tile_x, tile_y;
-        key->getTileXY( tile_x, tile_y );
+        key.getTileXY( tile_x, tile_y );
 
         std::string f = _map_service.getTileInfo().getFormat();
         std::transform( f.begin(), f.end(), f.begin(), tolower );
@@ -154,23 +151,34 @@ public:
 
         if ( _map_service.isTiled() )
         {
-            buf << _settings->url().value() << "/tile"
+            buf << _options.url().value() << "/tile"
                 << "/" << level
                 << "/" << tile_y
                 << "/" << tile_x << "." << f;
         }
         else
         {
-            const GeoExtent& ex = key->getGeoExtent();
+            const GeoExtent& ex = key.getExtent();
 
             buf << std::setprecision(16)
-                << _settings->url().value() << "/export"
+                << _options.url().value() << "/export"
                 << "?bbox=" << ex.xMin() << "," << ex.yMin() << "," << ex.xMax() << "," << ex.yMax()
                 << "&format=" << f 
                 << "&size=256,256"
                 << "&transparent=true"
                 << "&f=image"
                 << "&" << "." << f;
+        }
+
+        //Add the token if necessary
+        if (_options.token().isSet())
+        {
+            std::string token = _options.token().value();
+            if (!token.empty())
+            {
+                std::string sep = buf.str().find( "?" ) == std::string::npos ? "?" : "&";
+                buf << sep << "token=" << token;
+            }
         }
 
         //OE_NOTICE << "Key = " << key->str() << ", URL = " << buf.str() << std::endl;
@@ -180,12 +188,12 @@ public:
         osg::ref_ptr<osg::Image> image;
 		std::string bufStr;
 		bufStr = buf.str();
-        HTTPClient::readImageFile( bufStr, image, getOptions(), progress );
+        HTTPClient::readImageFile( bufStr, image, 0L, progress ); //getOptions(), progress );
         return image.release();
     }
 
     // override
-    osg::HeightField* createHeightField( const TileKey* key,
+    osg::HeightField* createHeightField( const TileKey& key,
                                          ProgressCallback* progress)
     {
         //TODO
@@ -199,20 +207,16 @@ public:
     }
 
 private:
-    osg::ref_ptr<const ArcGISOptions> _settings;
-    //osg::ref_ptr<const osgDB::ReaderWriter::Options> _options;
-    //std::string _url;
-    //std::string _profile_str;
-    optional<ProfileConfig> _profileConf;
+    const ArcGISOptions _options;
+    optional<ProfileOptions> _profileConf;
     std::string _map;
     std::string _layer;
     std::string _format;
     MapService _map_service;
-    //osg::ref_ptr<const Profile> manual_profile;
 };
 
 
-class ArcGISTileSourceFactory : public osgDB::ReaderWriter
+class ArcGISTileSourceFactory : public TileSourceDriver
 {
 public:
     ArcGISTileSourceFactory()
@@ -230,7 +234,7 @@ public:
         if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
             return ReadResult::FILE_NOT_HANDLED;
 
-        return new ArcGISSource( static_cast<const PluginOptions*>( options ));
+        return new ArcGISSource( getTileSourceOptions(options) );
     }
 };
 

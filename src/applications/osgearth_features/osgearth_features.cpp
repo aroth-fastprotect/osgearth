@@ -23,7 +23,6 @@
 #include <osgViewer/ViewerEventHandlers>
 #include <osgEarth/Map>
 #include <osgEarth/MapNode>
-#include <osgEarth/EarthFile>
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/AutoClipPlaneHandler>
 
@@ -54,14 +53,14 @@ int main(int argc, char** argv)
 
     // Start with a basemap imagery layer; we'll be using the GDAL driver
     // to load a local GeoTIFF file:
-    GDALOptions* basemapOpt = new GDALOptions();
-    basemapOpt->url() = "../data/world.tif";
-    map->addMapLayer( new ImageMapLayer( "basemap", basemapOpt ) );
+    GDALOptions basemapOpt;
+    basemapOpt.url() = "../data/world.tif";
+    map->addImageLayer( new ImageLayer( ImageLayerOptions("basemap", basemapOpt) ) );
 
     // Next we add a feature layer. First configure a feature driver to 
     // load the vectors from a shapefile:
-    OGRFeatureOptions* featureOpt = new OGRFeatureOptions();
-    featureOpt->url() = "../data/world.shp";
+    OGRFeatureOptions featureOpt;
+    featureOpt.url() = "../data/world.shp";
 
     // Define a style for the feature data. Since we are going to render the
     // vectors as lines, configure the line symbolizer:
@@ -75,11 +74,11 @@ int main(int argc, char** argv)
     // Now we'll choose the AGG-Lite driver to render the features. By the way, the
     // feature data is actually polygons, so we override that to treat it as lines.
     // We apply the feature driver and set the style as well.
-    AGGLiteOptions* worldOpt = new AGGLiteOptions();
-    worldOpt->featureOptions() = featureOpt;
-    worldOpt->geometryTypeOverride() = Geometry::TYPE_LINESTRING;
-    worldOpt->styles()->addStyle( style );
-    map->addMapLayer( new ImageMapLayer("world", worldOpt) );
+    AGGLiteOptions worldOpt;
+    worldOpt.featureOptions() = featureOpt;
+    worldOpt.geometryTypeOverride() = Geometry::TYPE_LINESTRING;
+    worldOpt.styles()->addStyle( style );
+    map->addImageLayer( new ImageLayer( ImageLayerOptions("world", worldOpt) ) );
 
     // That's it, the map is ready; now create a MapNode to render the Map:
     MapNode* mapNode = new MapNode( map );

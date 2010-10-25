@@ -3,9 +3,15 @@ Demonstrates how to take a spherical mercator data source and display it as
 Plate Carre (y=lat, x=lon) by applying the <profile> tag.
 -->
 
-<map name="OpenStreetMap" type="projected">
+<map name="OpenStreetMap" type="projected" version="2">
 
-    <profile>global-geodetic</profile>    
+    <options>
+        <profile>global-geodetic</profile>    
+        <lighting>false</lighting>
+        <terrain>
+            <loading_policy mode="preemptive"/>
+        </terrain>
+    </options>
     
     <image name="OSM on Mapnik" driver="tms">
         <url>http://tile.openstreetmap.org/</url>
@@ -15,7 +21,5 @@ Plate Carre (y=lat, x=lon) by applying the <profile> tag.
         <tms_type>google</tms_type>
     </image>
     
-    <loading_policy mode="standard"/>
-    <lighting>false</lighting>
     
 </map>

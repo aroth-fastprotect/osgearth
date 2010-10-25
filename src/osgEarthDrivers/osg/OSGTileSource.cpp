@@ -56,24 +56,23 @@ osg::Image* makeRGBA(osg::Image* image)
 class OSGTileSource : public TileSource
 {
 public:
-    OSGTileSource( const PluginOptions* options ) :
+    OSGTileSource( const TileSourceOptions& options ) :
       TileSource( options ),
+      _options( options ),
       _maxDataLevel( 21 )
     {
-        _settings = dynamic_cast<const OSGOptions*>( options );
-        if ( !_settings.valid() )
-            _settings = new OSGOptions( options );
+        //nop
     }
 
     void initialize( const std::string& referenceURI, const Profile* overrideProfile)
     {
         setProfile( overrideProfile );
 
-        _url = _settings->url().value();
+        _url = _options.url().value();
         if ( !_url.empty() )
         {
-            _url = osgEarth::getFullPath( osgDB::getFilePath(referenceURI), _url );
-            HTTPClient::readImageFile( _url, _image, getOptions() );
+            _url = osgEarth::getFullPath( referenceURI, _url );
+            HTTPClient::readImageFile( _url, _image ); //, getOptions() );
         }
 
         if ( !_image.valid() )
@@ -83,11 +82,11 @@ public:
         if ( _image.valid() )
         {
             int minSpan = osg::minimum( _image->s(), _image->t() );
-            int tileSize = _settings->tileSize().value();
+            int tileSize = _options.tileSize().value();
             _maxDataLevel = LOG2((minSpan/tileSize)+1);
             //OE_NOTICE << "[osgEarth::OSG driver] minSpan=" << minSpan << ", _tileSize=" << tileSize << ", maxDataLevel = " << _maxDataLevel << std::endl;
 
-            if ( _settings->convertLuminanceToRGBA() == true && _image->getPixelFormat() == GL_LUMINANCE )
+            if ( _options.convertLuminanceToRGBA() == true && _image->getPixelFormat() == GL_LUMINANCE )
             {
                 _image = makeRGBA( _image.get() );
             }
@@ -101,13 +100,13 @@ public:
     }
 
     osg::Image*
-    createImage( const TileKey* key, ProgressCallback* progress )
+    createImage( const TileKey& key, ProgressCallback* progress )
     {
-        if ( !_image.valid() || !getProfile() || key->getLevelOfDetail() > getMaxDataLevel() )
+        if ( !_image.valid() || !getProfile() || key.getLevelOfDetail() > getMaxDataLevel() )
             return NULL;
 
         const GeoExtent& imageEx = getProfile()->getExtent();
-        const GeoExtent& keyEx = key->getGeoExtent();
+        const GeoExtent& keyEx = key.getExtent();
 
         double x0r = (keyEx.xMin()-imageEx.xMin())/imageEx.width();
         double x1r = (keyEx.xMax()-imageEx.xMin())/imageEx.width();
@@ -140,7 +139,7 @@ private:
     std::string _url;
     int _maxDataLevel;
     osg::ref_ptr<osg::Image> _image;
-    osg::ref_ptr<const OSGOptions> _settings;
+    const OSGOptions _options;
 };
 
 
@@ -151,7 +150,7 @@ private:
  * For example, use this driver to load a simple jpeg file; then set the profile to
  * tell osgEarth its projection.
  */
-class OSGTileSourceFactory : public osgDB::ReaderWriter
+class OSGTileSourceFactory : public TileSourceDriver
 {
 public:
     OSGTileSourceFactory()
@@ -169,8 +168,7 @@ public:
         if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
             return ReadResult::FILE_NOT_HANDLED;
 
-        return new OSGTileSource(
-            static_cast<const PluginOptions*>(options) );
+        return new OSGTileSource( getTileSourceOptions(options) );
     }
 };
 

@@ -57,6 +57,7 @@
 
 #include <osgEarthDrivers/arcgis/ArcGISOptions>
 #include <osgEarthDrivers/tms/TMSOptions>
+#include <osgEarthDrivers/engine_osgterrain/OSGTerrainOptions>
 
 #include <osgGA/StateSetManipulator>
 #include <osgGA/TrackballManipulator>
@@ -67,14 +68,11 @@
 #include <osgGA/AnimationPathManipulator>
 #include <osgGA/TerrainManipulator>
 
-
 #include <osgWidget/Util>
 #include <osgWidget/WindowManager>
 #include <osgWidget/Box>
 #include <osgWidget/Label>
 #include <osgWidget/ViewerEventHandlers>
-
-
 
 #include <osgViewer/ViewerEventHandlers>
 
@@ -84,7 +82,6 @@
 
 using namespace osg;
 using namespace osgDB;
-using namespace osgTerrain;
 using namespace osgEarth;
 using namespace osgEarthUtil;
 using namespace osgEarth::Drivers;
@@ -101,7 +98,7 @@ const unsigned int MASK_2D = 0xF0000000;
 
 struct BlankTileSource : public osgEarth::TileSource 
 {
-    BlankTileSource(const PluginOptions* options =0L) : osgEarth::TileSource( options )
+    BlankTileSource(const TileSourceOptions& options =TileSourceOptions()) : osgEarth::TileSource( options )
 	{
 	}
 
@@ -118,7 +115,7 @@ struct BlankTileSource : public osgEarth::TileSource
 	}
 
 
-    virtual osg::Image* createImage( const TileKey* key, ProgressCallback* progress ) {
+    virtual osg::Image* createImage( const TileKey& key, ProgressCallback* progress ) {
         osg::Image* image = new osg::Image();
         image->setName("BlankTileSource");
         image->setAllocationMode( osg::Image::USE_NEW_DELETE );
@@ -143,7 +140,9 @@ struct BlankTileSource : public osgEarth::TileSource
         {
             osg::ref_ptr<BlankTileSource> tileSource = new BlankTileSource();
             tileSource->initialize( "" );
-            _layer = new MapLayer( "Green", MapLayer::TYPE_IMAGE,tileSource );
+            ImageLayerOptions layerOpt;
+            layerOpt.name() = "Green";
+            _layer = new ImageLayer( layerOpt, tileSource );
         }
 
         /** Callback method called by the NodeVisitor when visiting a node.*/
@@ -162,12 +161,14 @@ struct BlankTileSource : public osgEarth::TileSource
 
                 }
 
+                MapFrame mapf(_map);
+
                 if (_nbLog % 15 == 7 && !_layerActive) {
-                    _map->addMapLayer( _layer.get() );
+                    _map->addImageLayer( _layer.get() );
                     _layerActive = true;
                 }
                 if (_nbLog % 15 == 14 && _layerActive) {
-                    _map->removeMapLayer( _map->getImageMapLayers()[0] );
+                    _map->removeImageLayer( mapf.imageLayers()[0] );
                     _layerActive = false;
                 }
             }
@@ -176,7 +177,7 @@ struct BlankTileSource : public osgEarth::TileSource
             // scene graph subtree (and associated callbacks) are traversed.
             traverse(node,nv);
         }
-        osg::ref_ptr<MapLayer> _layer;
+        osg::ref_ptr<ImageLayer> _layer;
         osg::ref_ptr<Map> _map;
 
     };
@@ -216,32 +217,28 @@ int main(int argc, char** argv)
 {
     osg::ArgumentParser arguments(&argc,argv);
 
-    MapEngineProperties engineProps;
+    OSGTerrainOptions terrainOptions;
 
-    engineProps.loadingPolicy()->mode() = LoadingPolicy::MODE_SEQUENTIAL;
+    terrainOptions.loadingPolicy()->mode() = LoadingPolicy::MODE_SEQUENTIAL;
 
     if ( arguments.read( "--preemptive" ) || arguments.read( "--preemptive=ON" ) )
     {
-        engineProps.loadingPolicy()->mode() = LoadingPolicy::MODE_PREEMPTIVE;
+        terrainOptions.loadingPolicy()->mode() = LoadingPolicy::MODE_PREEMPTIVE;
     }
     else if ( arguments.read( "--standard" ) || arguments.read( "--standard=ON" ) )
     {
-        engineProps.loadingPolicy()->mode() = LoadingPolicy::MODE_STANDARD;
+        terrainOptions.loadingPolicy()->mode() = LoadingPolicy::MODE_STANDARD;
     }
     else if ( arguments.read( "--sequential" ) || arguments.read( "--sequential=ON" ) )
     {
-        engineProps.loadingPolicy()->mode() = LoadingPolicy::MODE_SEQUENTIAL;
+        terrainOptions.loadingPolicy()->mode() = LoadingPolicy::MODE_SEQUENTIAL;
     }
-    //else 
-    //{
-    //    //engineProps.setPreemptiveLOD( false );
-    //}
 
     if (arguments.read( "--multipass") )
     {
-        engineProps.layeringTechnique() = MapEngineProperties::LAYERING_MULTIPASS;
+        terrainOptions.compositingTechnique() = TerrainOptions::COMPOSITING_MULTIPASS;
         //Multipass mode is currently only available in STANDARD mode.
-        engineProps.loadingPolicy()->mode() = LoadingPolicy::MODE_STANDARD;
+        terrainOptions.loadingPolicy()->mode() = LoadingPolicy::MODE_STANDARD;
     }
     {
 
@@ -275,12 +272,14 @@ int main(int argc, char** argv)
         osg::ref_ptr<osg::Group> group = new osg::Group;
         group->setName("root");
 
+        MapNodeOptions mapOptions;
+        mapOptions.setTerrainOptions( terrainOptions );
 
-        osg::ref_ptr<MapNode> mapNode = new MapNode(engineProps);
+        osg::ref_ptr<MapNode> mapNode = new MapNode(mapOptions);
         osg::ref_ptr<osg::Node> loadedModel = mapNode;
 
 
-        osg::ref_ptr<FadeLayerNode> fadeLayerNode = new FadeLayerNode( mapNode->getMap(), mapNode->getEngine()->getEngineProperties());
+        osg::ref_ptr<FadeLayerNode> fadeLayerNode = new FadeLayerNode( mapNode->getMap(), mapOptions ); //mapNode->getEngine()->getEngineProperties());
         fadeLayerNode->addChild(loadedModel.get());
         group->addChild(fadeLayerNode);
 
@@ -288,11 +287,12 @@ int main(int argc, char** argv)
         group->addUpdateCallback(new LogUpdateCallback(fadeLayerNode->getMap()));
         viewer.addEventHandler(new PrintObjectReference());
 
+        MapFrame mapf(mapNode->getMap());
 
-        for (unsigned int i = 0; i < mapNode->getMap()->getImageMapLayers().size(); ++i)
+        for (unsigned int i = 0; i < mapf.imageLayers().size(); ++i)
         {
-            mapNode->getMap()->getImageMapLayers()[i]->setOpacity( 1.0f );
-            mapNode->getMap()->getImageMapLayers()[i]->setEnabled( true );
+            mapf.imageLayers()[i]->setOpacity( 1.0f );
+            mapf.imageLayers()[i]->setEnabled( true );
         }
 
         //Setup the osgWidget interface

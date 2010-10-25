@@ -211,18 +211,18 @@ TileMap::createProfile() const
 
 
 std::string
-TileMap::getURL(const osgEarth::TileKey *tileKey, bool invertY)
+TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
 {
-    if (!intersectsKey(tileKey))
+    if (!intersectsKey(tilekey))
     {
-        //OE_NOTICE << LC << "No key intersection for tile key " << tileKey->str() << std::endl;
+        //OE_NOTICE << LC << "No key intersection for tile key " << tilekey.str() << std::endl;
         return "";
     }
 
-    unsigned int zoom = tileKey->getLevelOfDetail();
+    unsigned int zoom = tilekey.getLevelOfDetail();
 
     unsigned int x, y;
-    tileKey->getTileXY(x, y);
+    tilekey.getTileXY(x, y);
 
     //Some TMS like services swap the Y coordinate so 0,0 is the upper left rather than the lower left.  The normal TMS
     //specification has 0,0 at the bottom left, so inverting Y will make 0,0 in the upper left.
@@ -230,11 +230,11 @@ TileMap::getURL(const osgEarth::TileKey *tileKey, bool invertY)
     if (!invertY)
     {
         unsigned int numRows, numCols;
-        tileKey->getProfile()->getNumTiles(tileKey->getLevelOfDetail(), numCols, numRows);
+        tilekey.getProfile()->getNumTiles(tilekey.getLevelOfDetail(), numCols, numRows);
         y  = numRows - y - 1;
     }
 
-    //OE_NOTICE << LC << "KEY: " << tileKey->str() << " level " << zoom << " ( " << x << ", " << y << ")" << std::endl;
+    //OE_NOTICE << LC << "KEY: " << tilekey.str() << " level " << zoom << " ( " << x << ", " << y << ")" << std::endl;
 
     //Select the correct TileSet
     if ( _tileSets.size() > 0 )
@@ -267,21 +267,21 @@ TileMap::getURL(const osgEarth::TileKey *tileKey, bool invertY)
 }
 
 bool
-TileMap::intersectsKey(const TileKey *tileKey)
+TileMap::intersectsKey(const TileKey& tilekey)
 {
     double keyMinX, keyMinY, keyMaxX, keyMaxY;
 
     //Check to see if the key overlaps the bounding box using lat/lon.  This is necessary to check even in 
     //Mercator situations in case the BoundingBox is described using lat/lon coordinates such as those produced by GDAL2Tiles
     //This should be considered a bug on the TMS production side, but we can work around it for now...
-    tileKey->getGeoExtent().getBounds(keyMinX, keyMinY, keyMaxX, keyMaxY);
+    tilekey.getExtent().getBounds(keyMinX, keyMinY, keyMaxX, keyMaxY);
 
     bool inter = intersects(_minX, _minY, _maxX, _maxY, keyMinX, keyMinY, keyMaxX, keyMaxY);
 
-    if (!inter && tileKey->isMercator())
+    if (!inter && tilekey.isMercator())
     {
-        tileKey->getProfile()->getSRS()->transform(keyMinX, keyMinY, tileKey->getProfile()->getSRS()->getGeographicSRS(), keyMinX, keyMinY);
-        tileKey->getProfile()->getSRS()->transform(keyMaxX, keyMaxY, tileKey->getProfile()->getSRS()->getGeographicSRS(), keyMaxX, keyMaxY);
+        tilekey.getProfile()->getSRS()->transform(keyMinX, keyMinY, tilekey.getProfile()->getSRS()->getGeographicSRS(), keyMinX, keyMinY);
+        tilekey.getProfile()->getSRS()->transform(keyMaxX, keyMaxY, tilekey.getProfile()->getSRS()->getGeographicSRS(), keyMaxX, keyMaxY);
         inter = intersects(_minX, _minY, _maxX, _maxY, keyMinX, keyMinY, keyMaxX, keyMaxY);
     }
 
@@ -524,7 +524,7 @@ TileMapReaderWriter::read(std::istream &in)
             unsigned int minLevel = as<unsigned int>(e_data_extent->getAttr( ATTR_MIN_LEVEL ), 0);
             unsigned int maxLevel = as<unsigned int>(e_data_extent->getAttr( ATTR_MAX_LEVEL ), 0);            
 
-            OE_DEBUG << LC << "Read area " << minX << ", " << minY << ", " << maxX << ", " << maxY << ", minlevel=" << minLevel << " maxlevel=" << maxLevel << std::endl;
+            //OE_DEBUG << LC << "Read area " << minX << ", " << minY << ", " << maxX << ", " << maxY << ", minlevel=" << minLevel << " maxlevel=" << maxLevel << std::endl;
             tileMap->getDataExtents().push_back( DataExtent(GeoExtent(profile->getSRS(), minX, minY, maxX, maxY), 0, maxLevel));
         }
     }
@@ -555,15 +555,15 @@ tileMapToXmlDocument(const TileMap* tileMap)
     osg::ref_ptr<XmlElement> e_bounding_box = new XmlElement( ELEM_BOUNDINGBOX );
     double minX, minY, maxX, maxY;
     tileMap->getExtents( minX, minY, maxX, maxY );
-    e_bounding_box->getAttrs()[ATTR_MINX] = toString(minX, OSGEARTH_DEFAULT_PRECISION);
-    e_bounding_box->getAttrs()[ATTR_MINY] = toString(minY, OSGEARTH_DEFAULT_PRECISION);
-    e_bounding_box->getAttrs()[ATTR_MAXX] = toString(maxX, OSGEARTH_DEFAULT_PRECISION);
-    e_bounding_box->getAttrs()[ATTR_MAXY] = toString(maxY, OSGEARTH_DEFAULT_PRECISION);
+    e_bounding_box->getAttrs()[ATTR_MINX] = toString(minX);
+    e_bounding_box->getAttrs()[ATTR_MINY] = toString(minY);
+    e_bounding_box->getAttrs()[ATTR_MAXX] = toString(maxX);
+    e_bounding_box->getAttrs()[ATTR_MAXY] = toString(maxY);
     doc->getChildren().push_back(e_bounding_box.get() );
 
     osg::ref_ptr<XmlElement> e_origin = new XmlElement( ELEM_ORIGIN );
-    e_origin->getAttrs()[ATTR_X] = toString(tileMap->getOriginX(), OSGEARTH_DEFAULT_PRECISION);
-    e_origin->getAttrs()[ATTR_Y] = toString(tileMap->getOriginY(), OSGEARTH_DEFAULT_PRECISION);
+    e_origin->getAttrs()[ATTR_X] = toString(tileMap->getOriginX());
+    e_origin->getAttrs()[ATTR_Y] = toString(tileMap->getOriginY());
     doc->getChildren().push_back(e_origin.get());
 
     osg::ref_ptr<XmlElement> e_tile_format = new XmlElement( ELEM_TILE_FORMAT );
@@ -609,10 +609,10 @@ tileMapToXmlDocument(const TileMap* tileMap)
         for (DataExtentList::const_iterator itr = tileMap->getDataExtents().begin(); itr != tileMap->getDataExtents().end(); ++itr)
         {
             osg::ref_ptr<XmlElement> e_data_extent = new XmlElement( ELEM_DATA_EXTENT );
-            e_data_extent->getAttrs()[ATTR_MINX] = toString(itr->xMin(), OSGEARTH_DEFAULT_PRECISION);
-            e_data_extent->getAttrs()[ATTR_MINY] = toString(itr->yMin(), OSGEARTH_DEFAULT_PRECISION);
-            e_data_extent->getAttrs()[ATTR_MAXX] = toString(itr->xMax(), OSGEARTH_DEFAULT_PRECISION);
-            e_data_extent->getAttrs()[ATTR_MAXY] = toString(itr->yMax(), OSGEARTH_DEFAULT_PRECISION);
+            e_data_extent->getAttrs()[ATTR_MINX] = toString(itr->xMin());
+            e_data_extent->getAttrs()[ATTR_MINY] = toString(itr->yMin());
+            e_data_extent->getAttrs()[ATTR_MAXX] = toString(itr->xMax());
+            e_data_extent->getAttrs()[ATTR_MAXY] = toString(itr->yMax());
             e_data_extent->getAttrs()[ATTR_MIN_LEVEL] = toString<unsigned int>(itr->getMinLevel());
             e_data_extent->getAttrs()[ATTR_MAX_LEVEL] = toString<unsigned int>(itr->getMaxLevel());
             e_data_extents->getChildren().push_back( e_data_extent );

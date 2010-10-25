@@ -29,14 +29,11 @@
 using namespace osgEarth;
 
 
-WCS11Source::WCS11Source( const PluginOptions* options ) :
-TileSource( options )
+WCS11Source::WCS11Source( const TileSourceOptions& options ) :
+TileSource( options ),
+_options(options)
 {
-    _settings = dynamic_cast<const WCSOptions*>( options );
-    if ( !_settings.valid() )
-        _settings = new WCSOptions( options );
-
-    _covFormat = _settings->format().value();
+    _covFormat = _options.format().value();
     
     if ( _covFormat.empty() )
         _covFormat = "image/GeoTIFF";
@@ -67,18 +64,18 @@ WCS11Source::getExtension() const
 
 
 osg::Image*
-WCS11Source::createImage( const TileKey* key,
+WCS11Source::createImage( const TileKey& key,
                          ProgressCallback* progress)
 {
     HTTPRequest request = createRequest( key );
 
-    OE_INFO << "[osgEarth::WCS1.1] Key=" << key->str() << " URL = " << request.getURL() << std::endl;
+    OE_INFO << "[osgEarth::WCS1.1] Key=" << key.str() << " URL = " << request.getURL() << std::endl;
 
     double lon0,lat0,lon1,lat1;
-    key->getGeoExtent().getBounds( lon0, lat0, lon1, lat1 );
+    key.getExtent().getBounds( lon0, lat0, lon1, lat1 );
 
     // download the data
-    HTTPResponse response = HTTPClient::get( request, getOptions(), progress );
+    HTTPResponse response = HTTPClient::get( request, 0L, progress ); //getOptions(), progress );
     if ( !response.isOK() )
     {
         OE_WARN << "[osgEarth::WCS1.1] WARNING: HTTP request failed" << std::endl;
@@ -98,7 +95,7 @@ WCS11Source::createImage( const TileKey* key,
         return NULL;
     }
 
-    osgDB::ReaderWriter::ReadResult result = reader->readImage( input_stream, getOptions() );
+    osgDB::ReaderWriter::ReadResult result = reader->readImage( input_stream ); //, getOptions() );
     if ( !result.success() )
     {
         OE_NOTICE << "[osgEarth::WCS1.1] WARNING: readImage() failed for Reader " << reader->getName() << std::endl;
@@ -113,7 +110,7 @@ WCS11Source::createImage( const TileKey* key,
 
 
 osg::HeightField*
-WCS11Source::createHeightField( const TileKey* key,
+WCS11Source::createHeightField( const TileKey& key,
                                 ProgressCallback* progress)
 {
     osg::HeightField* field = NULL;
@@ -147,24 +144,24 @@ http://server/ArcGIS/services/WorldElevation/MapServer/WCSServer
 
 
 HTTPRequest
-WCS11Source::createRequest( const TileKey* key ) const
+WCS11Source::createRequest( const TileKey& key ) const
 {
     std::stringstream buf;
 
     double lon_min, lat_min, lon_max, lat_max;
-    key->getGeoExtent().getBounds( lon_min, lat_min, lon_max, lat_max );
+    key.getExtent().getBounds( lon_min, lat_min, lon_max, lat_max );
 
-    int lon_samples = _settings->tileSize().value();
-    int lat_samples = _settings->tileSize().value();
+    int lon_samples = _options.tileSize().value();
+    int lat_samples = _options.tileSize().value();
     double lon_interval = (lon_max-lon_min)/(double)(lon_samples-1);
     double lat_interval = (lat_max-lat_min)/(double)(lat_samples-1);
 
-    HTTPRequest req( _settings->url().value() );
+    HTTPRequest req( _options.url().value() );
 
     req.addParameter( "SERVICE",    "WCS" );
     req.addParameter( "VERSION",    "1.1.0" );
     req.addParameter( "REQUEST",    "GetCoverage" );
-    req.addParameter( "IDENTIFIER", _settings->identifier().value() );
+    req.addParameter( "IDENTIFIER", _options.identifier().value() );
     req.addParameter( "FORMAT",     _covFormat );
 
     req.addParameter( "GridBaseCRS", "urn:ogc:def:crs:EPSG::4326" );
@@ -215,8 +212,8 @@ WCS11Source::createRequest( const TileKey* key ) const
 	bufStr = buf.str();
     req.addParameter( "GridOffsets", bufStr );
 
-    if ( !_settings->rangeSubset()->empty() )
-        req.addParameter( "RangeSubset", _settings->rangeSubset().value() );
+    if ( !_options.rangeSubset()->empty() )
+        req.addParameter( "RangeSubset", _options.rangeSubset().value() );
 
     return req;
 }

@@ -63,23 +63,30 @@ _inverseCalculated(false)
     _y1 = osg::clampBetween( (displayExtent.yMax()-dataExtent.yMin())/dataExtent.height(), 0.0, 1.0 );
 }
 
-GeoLocator*
-GeoLocator::createForKey( const TileKey* key, Map* map )
+bool
+GeoLocator::isEquivalentTo( const GeoLocator& rhs ) const
 {
-    bool isProjected = map->getCoordinateSystemType() == Map::CSTYPE_PROJECTED;
-    bool isPlateCarre = isProjected && map->getProfile()->getSRS()->isGeographic();
-    bool isGeocentric = !isProjected;
+    return
+        _transform == rhs._transform &&
+        _coordinateSystemType == rhs._coordinateSystemType &&
+        _cs == rhs._cs;
+}
 
-    const GeoExtent& ex = key->getGeoExtent();
+GeoLocator*
+GeoLocator::createForKey( const TileKey& key, const MapInfo& map )
+{
+    //bool isPlateCarre =  !map.isGeocentric() && map.isGeographicSRS(); //map->getProfile()->getSRS()->isGeographic();
+
+    const GeoExtent& ex = key.getExtent();
     double xmin, ymin, xmax, ymax;
-    key->getGeoExtent().getBounds( xmin, ymin, xmax, ymax );
+    key.getExtent().getBounds( xmin, ymin, xmax, ymax );
 
     // A locator will place the tile on the globe:
-    GeoLocator* locator = key->getProfile()->getSRS()->createLocator(
+    GeoLocator* locator = key.getProfile()->getSRS()->createLocator(
         ex.xMin(), ex.yMin(), ex.xMax(), ex.yMax(),
-        isPlateCarre );
+        map.isPlateCarre() );
 
-    if ( isGeocentric )
+    if ( map.isGeocentric() )
         locator->setCoordinateSystemType( osgTerrain::Locator::GEOCENTRIC );
 
     return locator;

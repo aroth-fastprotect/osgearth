@@ -116,6 +116,38 @@ EarthManipulator::Action::getDoubleOption( int option, double defaultValue ) con
 
 EarthManipulator::Action EarthManipulator::NullAction( EarthManipulator::ACTION_NULL );
 
+static std::string s_actionNames[] = {
+    "null",
+    "home",
+    "goto",
+    "pan",
+    "pan-left",
+    "pan-right",
+    "pan-up",
+    "pan-down",
+    "rotate",
+    "rotate-left",
+    "rotate-right",
+    "rotate-up",
+    "rotate-down",
+    "zoom",
+    "zoom-in",
+    "zoom-out",
+    "earth-drag"
+};
+
+static std::string s_actionOptionNames[] = {
+    "scale-x",
+    "scale-y",
+    "continuous",
+    "single-axis",
+    "goto-range-factor",
+    "duration"
+};
+
+static short s_actionOptionTypes[] = { 1, 1, 0, 0, 1, 1 }; // 0=bool, 1=double
+
+//------------------------------------------------------------------------
 
 EarthManipulator::Settings::Settings() :
 _throwing( false ),
@@ -333,6 +365,7 @@ EarthManipulator::configureDefaultSettings()
     _settings->bindKey( ACTION_HOME, osgGA::GUIEventAdapter::KEY_Space );
 
     _settings->bindMouse( ACTION_PAN, osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON );
+    //_settings->bindMouse( ACTION_EARTH_DRAG, osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON );
 
     // zoom as you hold the right button:
     options.clear();
@@ -483,7 +516,7 @@ EarthManipulator::established()
         // track the local angles.
         recalculateLocalPitchAndAzimuth();
 
-        OE_INFO << "[EarthManip] new CSN established." << std::endl;
+        OE_DEBUG << "[EarthManip] new CSN established." << std::endl;
     }
 
     return _csn.valid() && _node.valid();
@@ -562,7 +595,7 @@ EarthManipulator::getSRS() const
     {
         EarthManipulator* nonconst_this = const_cast<EarthManipulator*>(this);
 
-        nonconst_this->_is_geocentric = true;
+        nonconst_this->_is_geocentric = false;
 
         // first try to find a map node:
         osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( _node.get() );
@@ -951,6 +984,9 @@ EarthManipulator::resetMouse( osgGA::GUIActionAdapter& aa )
 bool
 EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa)
 {
+    if ( ea.getHandled() )
+        return false;
+
     bool handled = false;
     
     // first order of business: make sure the CSN is established.
@@ -995,7 +1031,7 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
 
         if ( _thrown || _continuous )
         {
-            handleContinuousAction( _last_action );
+            handleContinuousAction( _last_action, aa.asView() );
             aa.requestRedraw();
         }
 
@@ -1100,11 +1136,14 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
             break;
 
         case osgGA::GUIEventAdapter::KEYDOWN:
-            resetMouse( aa );
-            action = _settings->getAction( ea.getEventType(), ea.getKey(), ea.getModKeyMask() );
-            if ( handleKeyboardAction( action ) )
-                aa.requestRedraw();
-            handled = true;
+            if ( ea.getKey() < osgGA::GUIEventAdapter::KEY_Shift_L )
+            {
+                resetMouse( aa );
+                action = _settings->getAction( ea.getEventType(), ea.getKey(), ea.getModKeyMask() );
+                if ( handleKeyboardAction( action ) )
+                    aa.requestRedraw();
+                handled = true;
+            }
             break;
             
         case osgGA::GUIEventAdapter::KEYUP:
@@ -1288,13 +1327,13 @@ EarthManipulator::setByMatrix(const osg::Matrixd& matrix)
     osg::Vec3d lookVector(- matrix(2,0),-matrix(2,1),-matrix(2,2));
     osg::Vec3d eye(matrix(3,0),matrix(3,1),matrix(3,2));
 
-	_centerRotation = getRotation( _center ).getRotate().inverse();
+    _centerRotation = makeCenterRotation(_center);
 
     if (!_node)
     {
         _center = eye+ lookVector;
-		setDistance( lookVector.length() );
-		_rotation = matrix.getRotate().inverse() * _centerRotation.inverse();	
+        setDistance( lookVector.length() );
+        _rotation = matrix.getRotate().inverse() * _centerRotation.inverse();	
         return;
     }
 
@@ -1309,6 +1348,7 @@ EarthManipulator::setByMatrix(const osg::Matrixd& matrix)
     if (intersect(start_segment, end_segment, ip))
     {
         _center = ip;
+        _centerRotation = makeCenterRotation(_center);
         setDistance( (eye-ip).length());
 
         osg::Matrixd rotation_matrix = osg::Matrixd::translate(0.0,0.0,-_distance)*
@@ -1327,6 +1367,7 @@ EarthManipulator::setByMatrix(const osg::Matrixd& matrix)
                       ip))
         {
             _center = ip;
+            _centerRotation = makeCenterRotation(_center);
             setDistance((eye-ip).length());
 			_rotation.set(0,0,0,1);
             hitFound = true;
@@ -1647,7 +1688,26 @@ EarthManipulator::setDistance( double distance )
 }
 
 void
-EarthManipulator::handleMovementAction( const ActionType& type, double dx, double dy )
+EarthManipulator::dumpActionInfo( const EarthManipulator::Action& action, osg::NotifySeverity level ) const
+{
+    osgEarth::notify(level) << "action: " << s_actionNames[action._type] << "; options: ";
+    for( ActionOptions::const_iterator i = action._options.begin(); i != action._options.end(); ++i )
+    {
+        const ActionOption& option = *i;
+        std::string val;
+        if ( s_actionOptionTypes[option.option()] == 0 )
+            val = option.boolValue() ? "true" : "false";
+        else
+            val = option.doubleValue();
+
+        osgEarth::notify(level)
+            << s_actionOptionNames[option.option()] << "=" << val << ", ";
+    }
+    osgEarth::notify(level) << std::endl;        
+}
+
+void
+EarthManipulator::handleMovementAction( const ActionType& type, double dx, double dy, osg::View* view )
 {
     switch( type )
     {
@@ -1669,6 +1729,10 @@ EarthManipulator::handleMovementAction( const ActionType& type, double dx, doubl
 
     case ACTION_ZOOM:
         zoom( dx, dy );
+        break;
+
+    case ACTION_EARTH_DRAG:
+        drag( dx, dy, view );
         break;
     }
 }
@@ -1707,9 +1771,9 @@ EarthManipulator::handlePointAction( const Action& action, float mx, float my, o
 }
 
 void
-EarthManipulator::handleContinuousAction( const Action& action )
+EarthManipulator::handleContinuousAction( const Action& action, osg::View* view )
 {
-    handleMovementAction( action._type, _continuous_dx * _t_factor, _continuous_dy * _t_factor );
+    handleMovementAction( action._type, _continuous_dx * _t_factor, _continuous_dy * _t_factor, view );
 }
 
 void
@@ -1733,6 +1797,9 @@ EarthManipulator::handleMouseAction( const Action& action, osg::View* view )
     // return if less then two events have been added.
     if (_ga_t0.get()==NULL || _ga_t1.get()==NULL) return false;
 
+    if ( osgEarth::getNotifyLevel() > osg::INFO )
+        dumpActionInfo( action, osg::DEBUG_INFO );
+
     double dx = _ga_t0->getXnormalized()-_ga_t1->getXnormalized();
     double dy = _ga_t0->getYnormalized()-_ga_t1->getYnormalized();
 
@@ -1754,7 +1821,7 @@ EarthManipulator::handleMouseAction( const Action& action, osg::View* view )
     }
     else
     {
-        handleMovementAction( action._type, dx, dy );
+        handleMovementAction( action._type, dx, dy, view );
     }
 
     return true;
@@ -1815,6 +1882,9 @@ bool
 EarthManipulator::handleAction( const Action& action, double dx, double dy, double duration )
 {
     bool handled = true;
+
+    if ( osgEarth::getNotifyLevel() > osg::INFO )
+        dumpActionInfo( action, osg::DEBUG_INFO );
 
     //OE_NOTICE << "action=" << action << ", dx=" << dx << ", dy=" << dy << std::endl;
 
@@ -1935,4 +2005,330 @@ EarthManipulator::setHomeViewpoint( const Viewpoint& vp, double duration_s )
 {
     _homeViewpoint = vp;
     _homeViewpointDuration = duration_s;
+}
+
+// Find the point on a line, specified by p1 and v, closest to another
+// point.
+osg::Vec3d closestPtOnLine(const osg::Vec3d& p1, const osg::Vec3d& v,
+                           const osg::Vec3d& p)
+{
+    double u = (p - p1) * v / v.length2();
+    return p1 + v * u;
+}
+
+// Intersection of line and plane
+bool findIntersectionWithPlane(const osg::Vec3d& normal, const osg::Vec3d& pt,
+                               const osg::Vec3d& p1, const osg::Vec3d& v,
+                               osg::Vec3d& result)
+{
+    double denom = normal * v;
+    if (osg::equivalent(0, denom))
+        return false;
+    double u = normal * (pt - p1) / denom;
+    result = p1 + v * u;
+    return true;
+}
+
+// Circle of intersection of two spheres. The circle is in the plane
+// normal to the line between the centers.
+bool sphereInterection(const osg::Vec3d& p0, double r0,
+                       const osg::Vec3d& p1, double r1,
+                       osg::Vec3d& resultCenter, double& r)
+{
+    using namespace osg;
+    Vec3d ptvec = (p1 - p0);
+    double d = ptvec.normalize();
+    if (d > r0 + r1)
+        return false;               // spheres are too far apart
+    else if (d < fabs(r0 - r1))
+        return false;               // One sphere is contained in the other
+    else if (equivalent(0, d) && equivalent(r0, r1))
+    {
+        resultCenter = p0;
+        r = r0;
+        return true;              // circles are coincident.
+    }
+    // distance from p0 to the line through the interection points
+    double a = (r0 * r0 - r1 * r1 + d * d) / (2 * d);
+    // distance from bisection of that line to the intersections
+    resultCenter = p0 + ptvec * a;
+    r = sqrt(r0 * r0 - a * a);
+    return true;
+}
+
+// Find a point on the sphere (center, radius) through which the tangent
+// through pt passes. The point lies in the plane defined by
+//the line pt->center and ray.
+osg::Vec3d calcTangentPoint(const osg::Vec3d& pt, const osg::Vec3d& center,
+                            double radius, const osg::Vec3d& ray)
+{
+    using namespace osg;
+    // new sphere with center at midpoint between pt and input sphere
+    Vec3d center2 = (pt + center) / 2.0;
+    double rad2 = (pt - center2).length();
+    Vec3d resCtr;
+    double resRad;
+    // Use Thales' theorem, which states that a triangle inscribed in
+    // a circle, with two points on a diameter of the circle and the
+    // third on the circle, is a right triangle. Since one endpoint is
+    // the center of the original sphere (the earth) and the other is
+    // pt, we can get our tangent from that.
+    bool valid = sphereInterection(center, radius, center2, rad2, resCtr,
+                                   resRad);
+    if (!valid)
+        return Vec3d(0.0, 0.0, 0.0);
+    // Get the tangent point that lies in the plane of the ray and the
+    // center line. The sequence of cross products gives us the point
+    // that is closest to the ray, rather than the one on the other
+    // side of the sphere.
+    Vec3d toCenter = center - pt;
+    toCenter.normalize();
+    Vec3d normal = ray ^ toCenter;
+    normal.normalize();
+    Vec3d radial = toCenter ^ normal;
+    radial = radial * resRad;
+    Vec3d result = resCtr + radial;
+    return result;
+    
+}
+// Calculate a pointer click in eye coordinates
+osg::Vec3d getWindowPoint(osgViewer::View* view, float x, float y)
+{
+    float local_x, local_y;
+    const osg::Camera* camera
+        = view->getCameraContainingPosition(x, y, local_x, local_y);
+    if (!camera)
+        camera = view->getCamera();
+    osg::Matrix winMat;
+    if (camera->getViewport())
+        winMat = camera->getViewport()->computeWindowMatrix();
+    osg::Matrix projMat = camera->getProjectionMatrix();
+    // ray from eye through pointer in camera coordinate system goes
+    // from origin through transformed pointer coordinates
+    osg::Matrix win2camera = projMat * winMat;
+    win2camera.invert(win2camera);
+    osg::Vec4d winpt4 = osg::Vec4d(x, y, 0.0, 1.0) * win2camera;
+    winpt4 = winpt4 / winpt4.w();
+    return osg::Vec3d(winpt4.x(), winpt4.y(), winpt4.z());
+}
+
+// Decompose  _center and _centerRotation into a longitude rotation
+// and a latitude rotation + translation in the longitudinal plane.
+
+void decomposeCenter(const osg::Vec3d& center, const osg::Quat& centerRotation,
+                     osg::Matrix& Me, osg::Matrix& Mlon)
+{
+    using namespace osg;
+    Mlon.makeIdentity();
+    Matrix Mtotal(centerRotation);
+    Mtotal.setTrans(center);
+    // Use the X axis to determine longitude rotation. Due to the
+    // OpenGL camera rotation, this axis will be the Y axis of the
+    // longitude matrix.
+    Mlon(1, 0) = Mtotal(0, 0);  Mlon(1, 1) = Mtotal(0, 1);
+    // X axis is rotated 90 degrees, obviously
+    Mlon(0, 0) = Mlon(1, 1);  Mlon(0, 1) = -Mlon(1, 0);
+    Matrix MlonInv = Matrixd::inverse(Mlon);
+    Me = Mtotal * MlonInv;
+}
+
+osg::Matrixd rotateAroundPoint(const osg::Vec3d& pt, double theta,
+                               const osg::Vec3d& axis)
+{
+    return (osg::Matrixd::translate(pt)
+            * osg::Matrixd::rotate(theta, axis)
+            * osg::Matrixd::translate(pt * -1.0));
+}
+
+// Theory of operation for the manipulator drag motion
+//
+// The mouse drag is transformed to a vector on the surface of the
+// earth i.e., in the surface plane at the start of the drag. This is
+// treated as a displacement along the arc of a great circle. The
+// earth will be rotated by the equivalent rotation around the axis of
+// the circle. However, the manipulator controls the camera, not the
+// earth, so the camera's placement matrix (inverse view matrix)
+// should be rotated by the inverse of the calculated
+// rotation. EarthManipulator represents the placement matrix as the
+// concatenation of 4 transformations: distance from focal point,
+// local heading and pitch, rotation to frame of focal point, focal
+// point. To change the camera placement we rotate the frame rotation
+// (_centerRotation) and focal point (_center).
+//
+// When the start or end drag click is not on the earth, we choose the
+// nearest tangent point on the earth to the ray from the eye and
+// proceed.
+
+void
+EarthManipulator::drag(double dx, double dy, osg::View* theView)
+{
+    using namespace osg;
+    osgViewer::View* view = dynamic_cast<osgViewer::View*>(theView);
+    float x = _ga_t0->getX(), y = _ga_t0->getY();
+    float local_x, local_y;
+    const osg::Camera* camera
+        = view->getCameraContainingPosition(x, y, local_x, local_y);
+    if (!camera)
+        camera = view->getCamera();
+    osg::Matrix viewMat = camera->getViewMatrix();
+    osg::Matrix viewMatInv = camera->getInverseViewMatrix();
+    if (!_ga_t1.valid())
+        return;
+    osg::Vec3d worldStartDrag;
+    // drag start in camera coordinate system.
+    osg::Vec3d startDrag;
+    const osg::Vec3d zero(0.0, 0.0, 0.0);
+    bool onEarth;
+    if ((onEarth = screenToWorld(_ga_t1->getX(), _ga_t1->getY(),
+                                  view, worldStartDrag)))
+    {
+        startDrag = worldStartDrag * viewMat;
+    }
+    else if (_is_geocentric)
+    {
+        const osg::Vec3d startWinPt = getWindowPoint(view, _ga_t1->getX(),
+                                                     _ga_t1->getY());
+        startDrag = calcTangentPoint(
+            zero, zero * viewMat, _csn->getEllipsoidModel()->getRadiusEquator(),
+            startWinPt);
+        worldStartDrag = startDrag * viewMatInv;
+    }
+    else
+        return;
+    // ray from eye through pointer in camera coordinate system goes
+    // from origin through transformed pointer coordinates
+    const osg::Vec3d winpt = getWindowPoint(view, x, y);
+    // Find new point to which startDrag has been moved
+    osg::Vec3d endDrag;
+    osg::Vec3d worldEndDrag;
+    osg::Quat worldRot;
+    bool endOnEarth = screenToWorld(x, y, view, worldEndDrag);
+    if (! endOnEarth)
+    {
+        Vec3d earthOrigin = zero * viewMat;
+        //endDrag = closestPtOnLine(zero, winpt, earthOrigin);
+        endDrag = calcTangentPoint(
+            zero, earthOrigin, _csn->getEllipsoidModel()->getRadiusEquator(),
+            winpt);
+        worldEndDrag = endDrag * viewMatInv;
+    }
+    if (_is_geocentric)
+    {
+        worldRot.makeRotate(worldStartDrag, worldEndDrag);
+        // Move the camera by the inverse rotation
+        Quat cameraRot = worldRot.conj();
+        Vec3d center = cameraRot * _center;
+        Quat centerRotation = _centerRotation * cameraRot;
+        Matrixd Me = Matrixd::rotate(centerRotation);
+        Me.setTrans(center);
+        // In order for the Viewpoint settings to make sense, the
+        // inverse camera matrix must have an x axis parallel to the
+        // z = 0 plane. The strategy for doing that is different if
+        // the azimuth is locked.
+        // Actually, the part of the camera rotation defined by
+        // _centerRotation must be oriented with the local frame of
+        // _center on the ellipsoid. For the purposes of the drag
+        // motion this is nearly identical to the frame obtained by
+        // the trackball motion, so we just fix it up at the end.
+        if (_settings->getLockAzimuthWhilePanning())
+        {
+            // The camera now needs to be rotated that _centerRotation
+            // is a rotation only around the global Z axis and the
+            // camera frame X axis. We don't change _rotation, so that
+            // azimuth and pitch will stay constant, but the drag must
+            // still look correct, so the rotation must be around the
+            // point that was dragged i.e., worldEndDrag.
+            //
+            // Rotate Me so that its x axis is parallel to the z=0
+            // plane. 
+            // Find cone with worldEndDrag->center axis and x
+            // axis of coordinate frame as generator of the conical
+            // surface.
+            Vec3d coneAxis = worldEndDrag * -1;
+            coneAxis.normalize();
+            Vec3d xAxis(Me(0, 0), Me(0, 1), Me(0, 2));
+            // Center of disk: project xAxis onto coneAxis
+            double diskDist = xAxis * coneAxis;
+            Vec3d P1 = coneAxis * diskDist;
+            // Basis of disk equation:
+            // p = P1 + R * r * cos(theta) + S * r * sin(theta)
+            Vec3d R = xAxis - P1;
+            Vec3d S = R ^ coneAxis;
+            double r = R.normalize();
+            S.normalize();
+            // Solve for angle that rotates xAxis into z = 0 plane.
+            // soln to 0 = P1.z + r cos(theta) R.z + r sin(theta) S.z
+            double temp1 = r * (square(S.z()) + square(R.z()));
+            if (equivalent(temp1, 0.0))
+                return;
+            double radical = r * temp1 - square(P1.z());
+            if (radical < 0)
+                return;
+            double temp2 = R.z() * sqrt(radical) / temp1;
+            double temp3 = S.z() * P1.z() / temp1;
+            double sin1 = temp2 + temp3;
+            double sin2 = temp2 - temp3;
+            double theta1 = DBL_MAX;
+            double theta2 = DBL_MAX;
+            Matrixd cm1, cm2;
+            if (fabs(sin1) <= 1.0)
+            {
+                theta1 = -asin(sin1);
+                Matrixd m = rotateAroundPoint(worldEndDrag, -theta1, coneAxis);
+                cm1 = Me * m;
+            }
+            if (fabs(sin2) <= 1.0)
+            {
+                theta2 = asin(sin2);
+                Matrix m = rotateAroundPoint(worldEndDrag, -theta2, coneAxis);
+                cm2 = Me * m;
+            }
+            if (theta1 == DBL_MAX && theta2 == DBL_MAX)
+                return;
+            Matrixd* CameraMat = 0;
+            if (theta1 != DBL_MAX && cm1(1, 2) >= 0.0)
+                CameraMat = &cm1;
+            else if (theta2 != DBL_MAX && cm2(1, 2) >= 0.0)
+                CameraMat = &cm2;
+            else
+                return;
+            _center = CameraMat->getTrans();
+        }
+        else
+        {
+            // The camera matrix must be rotated around the local Z axis so
+            // that the X axis is parallel to the global z = 0
+            // plane. Then, _rotation is rotated by the inverse
+            // rotation to preserve the total transformation.
+            double theta = atan2(-Me(0, 2), Me(1, 2));
+            double s = sin(theta), c = cos(theta);
+            if (c * Me(1, 2) - s * Me(0, 2) < 0.0)
+            {
+                s = -s;
+                c = -c;
+            }
+            Matrixd m(c, s, 0, 0,
+                      -s, c, 0, 0,
+                      0, 0, 1, 0,
+                      0, 0, 0, 1);
+            Matrixd CameraMat = m * Me;
+            _center = CameraMat.getTrans();
+            // It's not necessary to include the translation
+            // component, but it's useful for debugging.
+            Matrixd headMat
+                = (Matrixd::translate(-_offset_x, -_offset_y, _distance)
+		   * Matrixd::rotate(_rotation));
+            headMat = headMat * Matrixd::inverse(m);
+            _rotation = headMat.getRotate();
+            recalculateLocalPitchAndAzimuth();
+        }
+        _centerRotation = makeCenterRotation(_center);
+        CoordinateFrame local_frame = getMyCoordinateFrame(_center);
+        _previousUp = getUpVector(local_frame);
+    }
+    else
+    {
+        // This is obviously not correct.
+        _center = _center + (worldStartDrag - worldEndDrag);
+    }
 }

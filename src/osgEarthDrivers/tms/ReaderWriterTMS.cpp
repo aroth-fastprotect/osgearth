@@ -45,13 +45,9 @@ using namespace osgEarth::Drivers;
 class TMSSource : public TileSource
 {
 public:
-    TMSSource(const PluginOptions* options) : TileSource(options)
+    TMSSource(const TileSourceOptions& options) : TileSource(options), _options(options)
     {
-        _settings = dynamic_cast<const TMSOptions*>( options );
-        if ( !_settings.valid() )
-            _settings = new TMSOptions( options );
-
-        _invertY = _settings->tmsType() == "google";
+        _invertY = _options.tmsType() == "google";
     }
 
 
@@ -59,7 +55,12 @@ public:
     {
         const Profile* result = NULL;
 
-        std::string tmsPath = _settings->url().value();
+        std::string tmsPath = _options.url().value();
+        if ( tmsPath.empty() )
+        {
+            OE_WARN << LC << "Fail: TMS driver requires a valid \"url\" property" << std::endl;
+            return;
+        }
 
         //Find the full path to the URL
         //If we have a relative path and the map file contains a server address, just concat the server path and the url together
@@ -75,7 +76,7 @@ public:
         }
 
 		// Attempt to read the tile map parameters from a TMS TileMap XML tile on the server:
-    	_tileMap = TileMapReaderWriter::read( tmsPath, getOptions() );
+    	_tileMap = TileMapReaderWriter::read( tmsPath, 0L ); //getOptions() );
 
 
 		//Take the override profile if one is given
@@ -84,11 +85,11 @@ public:
 		    OE_INFO << LC << "Using override profile " << overrideProfile->toString() << std::endl;				
 			result = overrideProfile;
 			_tileMap = TileMap::create( 
-                _settings->url().value(), 
+                _options.url().value(), 
                 overrideProfile, 
-                _settings->format().value(),
-                _settings->tileSize().value(), 
-                _settings->tileSize().value() );
+                _options.format().value(),
+                _options.tileSize().value(), 
+                _options.tileSize().value() );
 		}
 		else
 		{
@@ -98,7 +99,7 @@ public:
 			}
 			else
 			{
-		      OE_WARN << LC << "Error reading TileMap and no overrides set" << std::endl;		
+		      OE_WARN << LC << "Error reading TMS TileMap, and no overrides set (url=" << tmsPath << ")" << std::endl;		
 			  return;
 			}
 		}
@@ -125,21 +126,21 @@ public:
     }
 
 
-    osg::Image* createImage(const osgEarth::TileKey *key,
+    osg::Image* createImage(const osgEarth::TileKey& key,
                             ProgressCallback* progress)
     {
-        if (_tileMap.valid() && key->getLevelOfDetail() <= getMaxDataLevel() )
+        if (_tileMap.valid() && key.getLevelOfDetail() <= getMaxDataLevel() )
         {
             std::string image_url = _tileMap->getURL( key, _invertY );
                 
-            //OE_NOTICE << "TMSSource: Key=" << key->str() << ", URL=" << image_url << std::endl;
+            //OE_NOTICE << "TMSSource: Key=" << key.str() << ", URL=" << image_url << std::endl;
 
             
             osg::ref_ptr<osg::Image> image;
             
             if (!image_url.empty())
             {
-                HTTPClient::readImageFile( image_url, image, getOptions(), progress );
+                HTTPClient::readImageFile( image_url, image, 0L, progress ); //getOptions(), progress );
             }
 
             if (!image.valid())
@@ -148,7 +149,7 @@ public:
                 {
                     //We couldn't read the image from the URL or the cache, so check to see if the given key is less than the max level
                     //of the tilemap and create a transparent image.
-                    if (key->getLevelOfDetail() <= _tileMap->getMaxLevel())
+                    if (key.getLevelOfDetail() <= _tileMap->getMaxLevel())
                     {
                         OE_INFO << LC << "Returning empty image " << std::endl;
                         return ImageUtils::createEmptyImage();
@@ -174,20 +175,13 @@ private:
 
     osg::ref_ptr<TileMap> _tileMap;
     bool _invertY;
-
-    //std::string _url;
-
-    // these are backups in case no tilemap definition is found
-    //std::string _format;
-    //int _tile_size;
-
-    osg::ref_ptr<const TMSOptions> _settings;
+    const TMSOptions _options;
 };
 
 
 
 
-class ReaderWriterTMS : public osgDB::ReaderWriter
+class ReaderWriterTMS : public TileSourceDriver
 {
 private:
     typedef std::map< std::string,osg::ref_ptr<TileMap> > TileMapCache;
@@ -209,7 +203,7 @@ public:
         if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
             return ReadResult::FILE_NOT_HANDLED;
 
-        return new TMSSource( static_cast<const PluginOptions*>(options) );
+        return new TMSSource( getTileSourceOptions(options) );
     }
 };
 

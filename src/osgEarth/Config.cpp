@@ -22,14 +22,18 @@
 
 using namespace osgEarth;
 
-static Config emptyConfig;
+Config& emptyConfig()
+{
+    static Config _emptyConfig;
+    return _emptyConfig;
+}
 
 bool
 Config::loadXML( std::istream& in )
 {
     osg::ref_ptr<XmlDocument> xml = XmlDocument::load( in );
     if ( xml.valid() )
-        *this = xml->toConfig();
+        *this = xml->getConfig();
     return xml.valid();
 }
 
@@ -40,7 +44,17 @@ Config::child( const std::string& childName ) const
         if ( i->key() == childName )
             return *i;
     }
-    return emptyConfig;
+    return emptyConfig();
+}
+
+void
+Config::merge( const Config& rhs ) 
+{
+    for( Properties::const_iterator a = rhs._attrs.begin(); a != rhs._attrs.end(); ++a )
+        _attrs[ a->first ] = a->second;
+
+    for( ConfigSet::const_iterator c = rhs._children.begin(); c != rhs._children.end(); ++c )
+        addChild( *c );
 }
 
 std::string

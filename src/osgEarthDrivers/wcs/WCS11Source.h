@@ -35,12 +35,12 @@ using namespace osgEarth::Drivers;
 class WCS11Source : public TileSource
 {
 public:
-    WCS11Source( const PluginOptions* options );
+    WCS11Source( const TileSourceOptions& opt );
     
-    osg::Image* createImage( const TileKey* key,
+    osg::Image* createImage( const TileKey& key,
                              ProgressCallback* progress = 0 );
 
-    osg::HeightField* createHeightField( const TileKey* key, 
+    osg::HeightField* createHeightField( const TileKey& key, 
                                          ProgressCallback* progress = 0 );
     
     std::string getExtension() const;
@@ -51,20 +51,10 @@ public: // TileSource interface
     void initialize( const std::string& referenceURI, const Profile* overrideProfile);
 
 private:
-    osg::ref_ptr<const WCSOptions> _settings;
-
-    //std::string _url;
-    //std::string _identifier;
-    //std::string _cov_format;
-    //std::string _osg_format;
-    //std::string _srs;
-    //std::string _elevation_unit;
-    //std::string _range_subset;
-    //int         _tile_size;
-
+    const WCSOptions _options;
     std::string _covFormat, _osgFormat;
 
-    HTTPRequest createRequest( const TileKey* key ) const;
+    HTTPRequest createRequest( const TileKey& key ) const;
 };
 
 #endif // OSGEARTH_WCS_PLUGIN_WCS11SOURCE_H_

@@ -5,12 +5,21 @@ This example demonstrates a floating cloud layer. Use this together with another
 e.g.: osgviewer tiff.earth clouds.earth
 -->
 
-<map name="Clouds" type="geocentric">     
+<map name="Clouds" type="geocentric" version="2">     
     
-    <!-- create an ellipsoid that's slightly larger than the earth -->
-    <profile>
-        <srs>+proj=latlong +a=6610000 +b=6600000</srs>
-    </profile>   
+    
+    <options>
+        <!-- create an ellipsoid that's slightly larger than the earth -->
+        <profile>
+            <srs>+proj=latlong +a=6610000 +b=6600000</srs>
+        </profile>
+        <lighting>false</lighting>
+        <terrain>
+            <!-- don't want a terrain skirt on the clouds -->
+            <skirt_ratio>0</skirt_ratio>
+            <sample_ratio>0.5</sample_ratio>
+        </terrain>
+    </options>
     
     <!-- the OSG driver allows us to use non-geoferenced data -->
     <image name="test" driver="osg">
@@ -18,9 +27,5 @@ e.g.: osgviewer tiff.earth clouds.earth
         <profile>global-geodetic</profile>
         <luminance_to_rgba>true</luminance_to_rgba>
     </image>
-  
-    <!-- don't want a terrain skirt on the clouds -->
-    <skirt_ratio>0</skirt_ratio>
-    <sample_ratio>0.5</sample_ratio>
-       
+         
 </map>

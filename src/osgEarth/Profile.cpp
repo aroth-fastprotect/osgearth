@@ -25,15 +25,15 @@
 #include <osgDB/FileNameUtils>
 #include <algorithm>
 #include <sstream>
-#include <iomanip>
 
 using namespace osgEarth;
 
 #define LC "[Profile] "
 
-/***********************************************************************/
+//------------------------------------------------------------------------
 
-ProfileConfig::ProfileConfig() :
+ProfileOptions::ProfileOptions( const ConfigOptions& options ) :
+ConfigOptions( options ),
 _namedProfile( "" ),
 _srsInitString( "" ),
 _vsrsInitString( "" ),
@@ -41,36 +41,27 @@ _bounds( Bounds() ),
 _numTilesWideAtLod0( 1 ),
 _numTilesHighAtLod0( 1 )
 {
-    //NOP
+    fromConfig( _conf );
 }
 
-ProfileConfig::ProfileConfig( const std::string& namedProfile ) :
-_namedProfile( namedProfile, namedProfile ),
+ProfileOptions::ProfileOptions( const std::string& namedProfile ) :
 _srsInitString( "" ),
 _vsrsInitString( "" ),
 _bounds( Bounds() ),
 _numTilesWideAtLod0( 1 ),
 _numTilesHighAtLod0( 1 )
 {
-    //nop
+    _namedProfile = namedProfile; // don't set above
 }
 
-ProfileConfig::ProfileConfig( const Config& conf ) :
-_namedProfile( "" ),
-_srsInitString( "" ),
-_vsrsInitString( "" ),
-_bounds( Bounds() ),
-_numTilesWideAtLod0( 1 ),
-_numTilesHighAtLod0( 1 )
+void
+ProfileOptions::fromConfig( const Config& conf )
 {
     if ( !conf.value().empty() )
         _namedProfile = conf.value();
 
-    if ( !conf.value( "srs" ).empty() )
-        _srsInitString = conf.value( "srs" );
-
-    if ( !conf.value( "vsrs" ).empty() )
-        _vsrsInitString = conf.value( "vsrs" );
+    conf.getIfSet( "srs", _srsInitString );
+    conf.getIfSet( "vsrs", _vsrsInitString );
 
     if ( conf.hasValue( "xmin" ) && conf.hasValue( "ymin" ) && conf.hasValue( "xmax" ) && conf.hasValue( "ymax" ) )
     {
@@ -81,42 +72,39 @@ _numTilesHighAtLod0( 1 )
             conf.value<double>( "ymax", 0 ) );
     }
 
-    conf.getIfSet<int>( "num_tiles_wide_at_lod_0", _numTilesWideAtLod0 );
-    conf.getIfSet<int>( "num_tiles_high_at_lod_0", _numTilesHighAtLod0 );
+    conf.getIfSet( "num_tiles_wide_at_lod_0", _numTilesWideAtLod0 );
+    conf.getIfSet( "num_tiles_high_at_lod_0", _numTilesHighAtLod0 );
 }
 
 Config
-ProfileConfig::toConfig( const std::string& name ) const
+ProfileOptions::getConfig() const
 {
-    Config conf( name.empty() ? "profile" : name );
+    Config conf( "profile" );
     if ( _namedProfile.isSet() )
     {
         conf.value() = _namedProfile.value();
     }
     else
     {
-        if ( _srsInitString.isSet() )
-            conf.add( "srs", _srsInitString.value() );
-
-        if ( _vsrsInitString.isSet() )
-            conf.add( "vsrs", _vsrsInitString.value() );
+        conf.updateIfSet( "srs", _srsInitString );
+        conf.updateIfSet( "vsrs", _vsrsInitString );
 
         if ( _bounds.isSet() )
         {
-            conf.add( "xmin", toString(_bounds->xMin(), OSGEARTH_DEFAULT_PRECISION) );
-            conf.add( "ymin", toString(_bounds->yMin(), OSGEARTH_DEFAULT_PRECISION) );
-            conf.add( "xmax", toString(_bounds->xMax(), OSGEARTH_DEFAULT_PRECISION) );
-            conf.add( "ymax", toString(_bounds->yMax(), OSGEARTH_DEFAULT_PRECISION) );
+            conf.update( "xmin", toString(_bounds->xMin()) );
+            conf.update( "ymin", toString(_bounds->yMin()) );
+            conf.update( "xmax", toString(_bounds->xMax()) );
+            conf.update( "ymax", toString(_bounds->yMax()) );
         }
 
-        conf.addIfSet( "num_tiles_wide_at_lod_0", _numTilesWideAtLod0 );
-        conf.addIfSet( "num_tiles_high_at_lod_0", _numTilesHighAtLod0 );
+        conf.updateIfSet( "num_tiles_wide_at_lod_0", _numTilesWideAtLod0 );
+        conf.updateIfSet( "num_tiles_high_at_lod_0", _numTilesHighAtLod0 );
     }
     return conf;
 }
 
 bool
-ProfileConfig::defined() const
+ProfileOptions::defined() const
 {
     return _namedProfile.isSet() || _srsInitString.isSet();
 }
@@ -208,49 +196,49 @@ Profile::create(const std::string& srsInitString,
 }
 
 const Profile*
-Profile::create( const ProfileConfig& conf )
+Profile::create( const ProfileOptions& options )
 {
     const Profile* result = 0L;
 
     // Check for a "well known named" profile:
-    if ( conf.namedProfile().isSet() )
+    if ( options.namedProfile().isSet() )
     {
-        result = osgEarth::Registry::instance()->getNamedProfile( conf.namedProfile().value() );
+        result = osgEarth::Registry::instance()->getNamedProfile( options.namedProfile().value() );
     }
 
     // Next check for a user-defined extents:
-    else if ( conf.srsString().isSet() && conf.bounds().isSet() )
+    else if ( options.srsString().isSet() && options.bounds().isSet() )
     {
-        if ( conf.numTilesWideAtLod0().isSet() && conf.numTilesHighAtLod0().isSet() )
+        if ( options.numTilesWideAtLod0().isSet() && options.numTilesHighAtLod0().isSet() )
         {
             result = Profile::create(
-                conf.srsString().value(),
-                conf.bounds()->xMin(),
-                conf.bounds()->yMin(),
-                conf.bounds()->xMax(),
-                conf.bounds()->yMax(),
-                conf.vsrsString().value(),
-                conf.numTilesWideAtLod0().value(),
-                conf.numTilesHighAtLod0().value() );
+                options.srsString().value(),
+                options.bounds()->xMin(),
+                options.bounds()->yMin(),
+                options.bounds()->xMax(),
+                options.bounds()->yMax(),
+                options.vsrsString().value(),
+                options.numTilesWideAtLod0().value(),
+                options.numTilesHighAtLod0().value() );
         }
         else
         {
             result = Profile::create(
-                conf.srsString().value(),
-                conf.bounds()->xMin(),
-                conf.bounds()->yMin(),
-                conf.bounds()->xMax(),
-                conf.bounds()->yMax(),
-                conf.vsrsString().value() );
+                options.srsString().value(),
+                options.bounds()->xMin(),
+                options.bounds()->yMin(),
+                options.bounds()->xMax(),
+                options.bounds()->yMax(),
+                options.vsrsString().value() );
         }
     }
 
     // Next try SRS with default extents
-    else if ( conf.srsString().isSet() )
+    else if ( options.srsString().isSet() )
     {
         result = Profile::create(
-            conf.srsString().value(),
-            conf.vsrsString().value() );
+            options.srsString().value(),
+            options.vsrsString().value() );
     }
 
     return result;
@@ -337,8 +325,7 @@ std::string
 Profile::toString() const
 {
     std::stringstream buf;
-	buf << std::setprecision(OSGEARTH_DEFAULT_PRECISION)
-		<< "[srs=" << _extent.getSRS()->getName() << ", min=" << _extent.xMin() << "," << _extent.yMin()
+    buf << "[srs=" << _extent.getSRS()->getName() << ", min=" << _extent.xMin() << "," << _extent.yMin()
         << " max=" << _extent.xMax() << "," << _extent.yMax()
         << " lod0=" << _numTilesWideAtLod0 << "," << _numTilesHighAtLod0
         << " vsrs=" << ( _vsrs.valid() ? _vsrs->getName() : "default" )
@@ -349,7 +336,7 @@ Profile::toString() const
 }
 
 void
-Profile::getRootKeys(std::vector< osg::ref_ptr<osgEarth::TileKey> >& out_keys ) const
+Profile::getRootKeys( std::vector<TileKey>& out_keys ) const
 {
     out_keys.clear();
 
@@ -358,7 +345,7 @@ Profile::getRootKeys(std::vector< osg::ref_ptr<osgEarth::TileKey> >& out_keys ) 
         for (unsigned int r = 0; r < _numTilesHighAtLod0; ++r)
         {
             //TODO: upgrade to support multi-face profile:
-            out_keys.push_back( new TileKey(0, c, r, this) ); // face, lod, x, y, profile
+            out_keys.push_back( TileKey(0, c, r, this) ); // lod, x, y, profile
         }
     }
 }
@@ -441,7 +428,7 @@ Profile::getLevelOfDetailForHorizResolution( double resolution, int tileSize ) c
     return level;
 }
 
-TileKey*
+TileKey
 Profile::createTileKey( double x, double y, unsigned int level ) const
 {
     if ( _extent.contains( x, y ) )
@@ -454,11 +441,11 @@ Profile::createTileKey( double x, double y, unsigned int level ) const
         double ry = (y - _extent.yMin()) / _extent.height();
         int tileY = osg::clampBelow( (int)((1.0-ry) * (double)tilesY), tilesY-1 );
 
-        return new TileKey( level, tileX, tileY, this );
+        return TileKey( level, tileX, tileY, this );
     }
     else
     {
-        return 0L;
+        return TileKey::INVALID;
     }
 }
 
@@ -498,7 +485,7 @@ Profile::clampAndTransformExtent( const GeoExtent& input ) const
 
 
 void
-Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<osg::ref_ptr<const TileKey> >& out_intersectingKeys) const
+Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<TileKey>& out_intersectingKeys) const
 {
     // assume a non-crossing extent here.
     if ( key_ext.crossesDateLine() )
@@ -537,7 +524,7 @@ Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<osg::ref_ptr
         destTileHeight = h;
     }
 
-    //OE_DEBUG << std::fixed << "  Source Tile: " << key->getLevelOfDetail() << " (" << keyWidth << ", " << keyHeight << ")" << std::endl;
+    //OE_DEBUG << std::fixed << "  Source Tile: " << key.getLevelOfDetail() << " (" << keyWidth << ", " << keyHeight << ")" << std::endl;
     OE_DEBUG << std::fixed << "  Dest Size: " << destLOD << " (" << destTileWidth << ", " << destTileHeight << ")" << std::endl;
 
     int tileMinX = (int)((key_ext.xMin() - _extent.xMin()) / destTileWidth);
@@ -561,7 +548,7 @@ Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<osg::ref_ptr
         for (int j = tileMinY; j <= tileMaxY; ++j)
         {
             //TODO: does not support multi-face destination keys.
-            out_intersectingKeys.push_back( new TileKey(destLOD, i, j, this) );
+            out_intersectingKeys.push_back( TileKey(destLOD, i, j, this) );
         }
     }
 
@@ -570,12 +557,12 @@ Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<osg::ref_ptr
 
 
 void
-Profile::getIntersectingTiles(const TileKey* key, std::vector<osg::ref_ptr<const TileKey> >& out_intersectingKeys) const
+Profile::getIntersectingTiles(const TileKey& key, std::vector<TileKey>& out_intersectingKeys) const
 {
-    OE_DEBUG << "GET ISECTING TILES for key " << key->str() << " -----------------" << std::endl;
+    OE_DEBUG << "GET ISECTING TILES for key " << key.str() << " -----------------" << std::endl;
 
     //If the profiles are exactly equal, just add the given tile key.
-    if ( isEquivalentTo( key->getProfile() ) )
+    if ( isEquivalentTo( key.getProfile() ) )
     {
         //Clear the incoming list
         out_intersectingKeys.clear();
@@ -583,11 +570,11 @@ Profile::getIntersectingTiles(const TileKey* key, std::vector<osg::ref_ptr<const
         out_intersectingKeys.push_back(key);
         return;
     }
-    return getIntersectingTiles(key->getGeoExtent(), out_intersectingKeys);
+    return getIntersectingTiles(key.getExtent(), out_intersectingKeys);
 }
 
 void
-Profile::getIntersectingTiles(const GeoExtent& extent, std::vector<osg::ref_ptr<const TileKey> >& out_intersectingKeys) const
+Profile::getIntersectingTiles(const GeoExtent& extent, std::vector<TileKey>& out_intersectingKeys) const
 {
     GeoExtent ext = extent;
 

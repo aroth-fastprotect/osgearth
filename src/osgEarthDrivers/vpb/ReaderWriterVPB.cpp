@@ -139,7 +139,7 @@ public:
 class VPBDatabase : public osg::Referenced
 {
 public:
-    VPBDatabase( const VPBOptions* in_options ) :
+    VPBDatabase( const VPBOptions& in_options ) :
         _options( in_options ),
         //_directory_structure( FLAT_TASK_DIRECTORIES ),
         _maxNumTilesInCache( 128 ),
@@ -149,7 +149,7 @@ public:
         _profile->getNumTiles(0, numTilesWideAtLod0, numTilesHighAtLod0);
 
         // validate dataset
-        _url = _options->url().value();
+        _url = _options.url().value();
 
         if ( !_url.empty() )
         {
@@ -161,7 +161,7 @@ public:
 
             if ( rc == HTTPClient::RESULT_OK && _rootNode.valid() )
             {
-                _baseNameToUse = _options->baseName().value();
+                _baseNameToUse = _options.baseName().value();
 
                 _path = osgDB::getFilePath(_url);
                 if ( _baseNameToUse.empty() )
@@ -212,13 +212,13 @@ public:
                     OE_DEBUG<<"VPB: computed numTilesWideAtLod0 = "<<numTilesWideAtLod0<<std::endl;
                     OE_DEBUG<<"VPB: computed numTilesHightAtLod0 = "<<numTilesHighAtLod0<<std::endl;
                     
-                    if ( _options.valid() )
+                    //if ( _options.valid() )
                     {
-                        if ( _options->numTilesWideAtLod0().isSet() )
-                            numTilesWideAtLod0 = _options->numTilesWideAtLod0().value();
+                        if ( _options.numTilesWideAtLod0().isSet() )
+                            numTilesWideAtLod0 = _options.numTilesWideAtLod0().value();
 
-                        if ( _options->numTilesHighAtLod0().isSet() )
-                            numTilesHighAtLod0 = _options->numTilesHighAtLod0().value();
+                        if ( _options.numTilesHighAtLod0().isSet() )
+                            numTilesHighAtLod0 = _options.numTilesHighAtLod0().value();
                     }
 
                     OE_DEBUG<<"VPB: final numTilesWideAtLod0 = "<<numTilesWideAtLod0<<std::endl;
@@ -252,14 +252,14 @@ public:
     std::string createTileName( int level, int tile_x, int tile_y )
     {
         std::stringstream buf;
-        if ( _options->directoryStructure() == VPBOptions::DS_FLAT )
+        if ( _options.directoryStructure() == VPBOptions::DS_FLAT )
         {
              buf<<_path<<"/"<<_baseNameToUse<<"_L"<<level<<"_X"<<tile_x/2<<"_Y"<<tile_y/2<<"_subtile."<<_extension;
         }
         else
         {
-            int psl = _options->primarySplitLevel().value();
-            int ssl = _options->secondarySplitLevel().value();
+            int psl = _options.primarySplitLevel().value();
+            int ssl = _options.secondarySplitLevel().value();
 
             if (level<psl)
             {
@@ -278,7 +278,7 @@ public:
                 buf<<_path<<"/"<<_baseNameToUse<<"_subtile_L"<<psl<<"_X"<<split_x<<"_Y"<<split_y<<"/"<<
                      _baseNameToUse<<"_L"<<level<<"_X"<<tile_x<<"_Y"<<tile_y<<"_subtile."<<_extension;
             }
-            else if ( _options->directoryStructure() == VPBOptions::DS_TASK )
+            else if ( _options.directoryStructure() == VPBOptions::DS_TASK )
             {
                 tile_x /= 2;
                 tile_y /= 2;
@@ -313,11 +313,11 @@ public:
 		return bufStr;
     }
     
-    osgTerrain::TerrainTile* getTerrainTile( const TileKey* key, ProgressCallback* progress )
+    osgTerrain::TerrainTile* getTerrainTile( const TileKey& key, ProgressCallback* progress )
     {
-        int level = key->getLevelOfDetail();
+        int level = key.getLevelOfDetail();
         unsigned int tile_x, tile_y;
-        key->getTileXY( tile_x, tile_y );
+        key.getTileXY( tile_x, tile_y );
         
         int max_x = (2 << level) - 1;
         int max_y = (1 << level) - 1;
@@ -450,7 +450,7 @@ public:
         return 0;
     }
 
-    osg::ref_ptr<const VPBOptions> _options;
+    const VPBOptions _options;
     std::string _url;
     std::string _path;
     std::string _extension;
@@ -478,11 +478,12 @@ public:
 class VPBSource : public TileSource
 {
 public:
-    VPBSource( VPBDatabase* vpbDatabase, const VPBOptions* in_options) :  
+    VPBSource( VPBDatabase* vpbDatabase, const VPBOptions& in_options ) : //const VPBOptions* in_options) :  
         TileSource(in_options),
-        _vpbDatabase(vpbDatabase)
+        _vpbDatabase(vpbDatabase),
+        _options( in_options )
     {
-        _options = in_options;
+        //nop
     }
 
     void initialize( const std::string& referenceURI, const Profile* overrideProfile)
@@ -496,39 +497,31 @@ public:
 			setProfile(_vpbDatabase->_profile.get());
 		}
     }
-
-	osg::Image* readImageLayer(osgTerrain::ImageLayer* imageLayer, const osgDB::ReaderWriter::Options* options) const
-	{
-		if (!imageLayer->getImage() && 
-			!imageLayer->getFileName().empty())
-		{
-			osg::ref_ptr<osg::Image> image = osgDB::readImageFile(imageLayer->getFileName(), options);
-			imageLayer->setImage(image.get());
-		}
-		osg::Image * ret = imageLayer->getImage();
-		return ret;
-	}
     
-    osg::Image* createImage( const TileKey* key,
-                             ProgressCallback* progress)
-    {
+	osg::Image* createImage( const TileKey& key,
+		ProgressCallback* progress)
+	{
 		osg::Image * ret = NULL;
-        //TODO:  Make VPB driver use progress callback
-        osg::ref_ptr<osgTerrain::TerrainTile> tile = _vpbDatabase->getTerrainTile(key, progress);                
-        if (tile.valid())
-        {        
-            int layerNum = _options->layer().value();
-			const optional<std::string> & layerSetName = _options->layerSetName();
+		//TODO:  Make VPB driver use progress callback
+		osg::ref_ptr<osgTerrain::TerrainTile> tile = _vpbDatabase->getTerrainTile(key, progress);                
+		if (tile.valid())
+		{        
+			int layerNum = _options.layer().value();
+			const optional<std::string> & layerSetName = _options.layerSetName();
 
 			int numColorLayers = (int)tile->getNumColorLayers();
 			if(layerNum > numColorLayers)
 				layerNum = 0;
-            if (layerNum < numColorLayers)
-            {
+			if (layerNum < numColorLayers)
+			{
 				osgTerrain::Layer* layer = tile->getColorLayer(layerNum);
 
-                osgTerrain::ImageLayer* imageLayer = dynamic_cast<osgTerrain::ImageLayer*>(layer);
-				if(!imageLayer)
+				osgTerrain::ImageLayer* imageLayer = dynamic_cast<osgTerrain::ImageLayer*>(layer);
+				if (imageLayer)
+				{
+					ret = new osg::Image( *imageLayer->getImage() );
+				}
+				else
 				{
 					osgTerrain::SwitchLayer* switchLayer = dynamic_cast<osgTerrain::SwitchLayer*>(layer);
 					if (switchLayer && layerSetName.isSet())
@@ -541,29 +534,23 @@ public:
 							}
 						}
 					}
+					if(imageLayer)
+						ret = new osg::Image( *imageLayer->getImage() );
 				}
-                if (imageLayer)
-                {
-					ret = readImageLayer(imageLayer, NULL);
-                }
-            }
-			if(!ret)
-			{
-				OE_DEBUG<<"VPB: createImage(" << key->str() << " layerSet=" << layerSetName.value() << " layerNum=" << layerNum << ") failed." <<std::endl;
 			}
-        }
-		else
-		{
 			if(!ret)
 			{
-				OE_DEBUG<<"VPB: createImage(" << key->str() << ") database retrieval failed." <<std::endl;
+				OE_DEBUG<<"VPB: createImage(" << key.str() << " layerSet=" << layerSetName.value() << " layerNum=" << layerNum << ") failed." <<std::endl;
 			}
 		}
+		else
+		{
+			OE_DEBUG<<"VPB: createImage(" << key.str() << ") database retrieval failed." <<std::endl;
+		}
+		return ret;
+	}
 
-        return ret;
-    }
-
-    osg::HeightField* createHeightField( const TileKey* key,
+    osg::HeightField* createHeightField( const TileKey& key,
                                          ProgressCallback* progress
                                          )
     {
@@ -590,12 +577,12 @@ public:
 
 private:
     osg::ref_ptr<VPBDatabase> _vpbDatabase;
-    osg::ref_ptr<const VPBOptions>  _options;
+    const VPBOptions _options;
     //unsigned int                                        layerNum;
 };
 
 
-class VPBSourceFactory : public osgDB::ReaderWriter
+class VPBSourceFactory : public TileSourceDriver
 {
     public:
         VPBSourceFactory()
@@ -613,26 +600,18 @@ class VPBSourceFactory : public osgDB::ReaderWriter
             if ( !acceptsExtension(osgDB::getLowerCaseFileExtension( file_name )))
                 return ReadResult::FILE_NOT_HANDLED;
 
-            const PluginOptions* pluginOpts = static_cast<const PluginOptions*>( options );
+            VPBOptions vpbOptions( getTileSourceOptions(options) );
 
-            osg::ref_ptr<const VPBOptions> settings = dynamic_cast<const VPBOptions*>( pluginOpts );
-            if ( !settings.valid() )
-            {
-                settings = new VPBOptions( pluginOpts );
-            }
-
-            //OE_NOTICE << pluginOpts->config().toString() << std::endl;
-
-            std::string url = settings->url().value();
+            std::string url = vpbOptions.url().value();
             if ( !url.empty() )
             {                
                 OpenThreads::ScopedLock<OpenThreads::Mutex> lock(vpbDatabaseMapMutex);
                 osg::observer_ptr<VPBDatabase>& db_ptr = vpbDatabaseMap[url]; //get or create
                 
-                if (!db_ptr) db_ptr = new VPBDatabase( settings.get() );
+                if (!db_ptr) db_ptr = new VPBDatabase( vpbOptions );
                 
                 if (db_ptr.valid())
-                    return new VPBSource( db_ptr.get(), settings.get() );
+                    return new VPBSource( db_ptr.get(), vpbOptions );
                 else
                     return ReadResult::FILE_NOT_FOUND;               
             }

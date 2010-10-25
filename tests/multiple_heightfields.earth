@@ -8,7 +8,7 @@ files. This is not a bug! A good technique for fixing this would be to provide a
 lo-res heightfield underlay.
 -->
 
-<map type="geocentric">
+<map type="geocentric" version="2">
       
     <image name="arcgisonline esri imagery" driver="arcgis">
         <url>http://server.arcgisonline.com/ArcGIS/rest/services/ESRI_Imagery_World_2D/MapServer</url>
@@ -25,7 +25,11 @@ lo-res heightfield underlay.
     <heightfield name = "mt_everest" driver = "gdal">
       <url>..\data\terrain\mt_everest_90m.tif</url>
      </heightfield>
-    
-    <vertical_scale>1.5</vertical_scale>
+
+    <options>
+        <terrain>
+            <vertical_scale>1.5</vertical_scale>
+        </terrain>
+    </options>
     
 </map>

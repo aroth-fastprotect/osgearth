@@ -18,7 +18,7 @@
  */
 #include <osgEarth/Map>
 #include <osgEarth/Registry>
-#include <osgEarth/TileSourceFactory>
+#include <osgEarth/TileSource>
 #include <OpenThreads/ScopedLock>
 
 using namespace osgEarth;
@@ -26,60 +26,52 @@ using namespace OpenThreads;
 
 #define LC "[Map] "
 
-
-Map::Map(const CoordinateSystemType& cstype) :
-osg::Referenced(true),
-_cstype( cstype ),
-_id(-1),
-_dataModelRevision(0),
-_cacheConf( CacheConfig() ),
-_profileConf( ProfileConfig() )
-{
-    // see if a cache if configured via env-var(s).
-    if ( getenv( "OSGEARTH_CACHE_PATH" ) )
-    {
-        std::string cachePath = getenv( "OSGEARTH_CACHE_PATH" );
-        _cacheConf->setType( CacheConfig::TYPE_DEFAULT );
-        _cacheConf->getDriverConf().add( "path", cachePath );
-        //_cacheConf->getProperties()[ "path" ] = cachePath;
-        OE_INFO << LC << "Enabling map cache at " << cachePath << std::endl;
-    }
-
-    if ( getenv( "OSGEARTH_CACHE_TYPE" ) )
-    {
-        std::string cacheType = getenv( "OSGEARTH_CACHE_TYPE" );
-        if ( !cacheType.empty() )
-        {
-            _cacheConf->setType( cacheType );
-            OE_INFO << LC << "Setting map cache type to: " << cacheType << std::endl;
-        }
-    }
-}
+//------------------------------------------------------------------------
 
 void
-Map::setId( unsigned int id ) {
-    _id = id;
+MapCallback::onMapModelChanged( const MapModelChange& change )
+{
+    switch( change.getAction() )
+    {
+    case MapModelChange::ADD_ELEVATION_LAYER: 
+        onElevationLayerAdded( change.getElevationLayer(), change.getFirstIndex() ); break;
+    case MapModelChange::ADD_IMAGE_LAYER:
+        onImageLayerAdded( change.getImageLayer(), change.getFirstIndex() ); break;
+    case MapModelChange::ADD_MASK_LAYER:
+        onMaskLayerAdded( change.getMaskLayer() ); break;
+    case MapModelChange::ADD_MODEL_LAYER:
+        onModelLayerAdded( change.getModelLayer() ); break;
+    case MapModelChange::REMOVE_ELEVATION_LAYER:
+        onElevationLayerRemoved( change.getElevationLayer(), change.getFirstIndex() ); break;
+    case MapModelChange::REMOVE_IMAGE_LAYER:
+        onImageLayerRemoved( change.getImageLayer(), change.getFirstIndex() ); break;
+    case MapModelChange::REMOVE_MASK_LAYER:
+        onMaskLayerRemoved( change.getMaskLayer() ); break;
+    case MapModelChange::REMOVE_MODEL_LAYER:
+        onModelLayerRemoved( change.getModelLayer() ); break;
+    case MapModelChange::MOVE_ELEVATION_LAYER:
+        onElevationLayerMoved( change.getElevationLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
+    case MapModelChange::MOVE_IMAGE_LAYER:
+        onImageLayerMoved( change.getImageLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
+    }
 }
 
-unsigned int
-Map::getId() const {
-    return _id;
-}
+//------------------------------------------------------------------------
 
-Threading::ReadWriteMutex&
-Map::getMapDataMutex() {
-    return _mapDataMutex;
-}
-
-const Map::CoordinateSystemType&
-Map::getCoordinateSystemType() const {
-    return _cstype;
+Map::Map( const MapOptions& options ) :
+osg::Referenced( true ),
+_mapOptions( options ),
+_dataModelRevision(0)
+{
+    //NOP
 }
 
 bool
 Map::isGeocentric() const
 {
-    return _cstype == CSTYPE_GEOCENTRIC || _cstype == CSTYPE_GEOCENTRIC_CUBE;
+    return 
+        _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC ||
+        _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC_CUBE;
 }
 
 const osgDB::ReaderWriter::Options*
@@ -92,63 +84,64 @@ Map::setGlobalOptions( const osgDB::ReaderWriter::Options* options ) {
     _globalOptions = options;
 }
 
-const std::string&
-Map::getReferenceURI() const { 
-    return _referenceURI;
-}
-
-void
-Map::setReferenceURI( const std::string& uri ) {
-    _referenceURI = uri;
-}
-
-optional<CacheConfig>&
-Map::cacheConfig() {
-    return _cacheConf;
-}
-const optional<CacheConfig>&
-Map::cacheConfig() const {
-    return _cacheConf;
-}
-
-optional<ProfileConfig>&
-Map::profileConfig() {
-    return _profileConf;
-}
-const optional<ProfileConfig>&
-Map::profileConfig() const {
-    return _profileConf;
-}
-
-const MapLayerList& 
-Map::getImageMapLayers() const {
-    return _imageMapLayers;
-}
-
 int
-Map::getImageMapLayers( MapLayerList& out_list ) const {
-    Threading::ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
-    for( MapLayerList::const_iterator i = _imageMapLayers.begin(); i != _imageMapLayers.end(); ++i )
-        out_list.push_back( i->get() );
+Map::getImageLayers( ImageLayerVector& out_list, bool validLayersOnly ) const
+{
+    out_list.reserve( _imageLayers.size() );
+
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    for( ImageLayerVector::const_iterator i = _imageLayers.begin(); i != _imageLayers.end(); ++i )
+        if ( !validLayersOnly || i->get()->getProfile() )
+            out_list.push_back( i->get() );
+
     return _dataModelRevision;
 }
 
-const MapLayerList& 
-Map::getHeightFieldMapLayers() const {
-    return _heightFieldMapLayers;
+int
+Map::getNumImageLayers() const
+{
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    return _imageLayers.size();
 }
 
 int
-Map::getHeightFieldMapLayers( MapLayerList& out_list ) const {
-    Threading::ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
-    for( MapLayerList::const_iterator i = _heightFieldMapLayers.begin(); i != _heightFieldMapLayers.end(); ++i )
-        out_list.push_back( i->get() );
+Map::getElevationLayers( ElevationLayerVector& out_list, bool validLayersOnly ) const
+{
+    out_list.reserve( _elevationLayers.size() );
+
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    for( ElevationLayerVector::const_iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); ++i )
+        if ( !validLayersOnly || i->get()->getProfile() )
+            out_list.push_back( i->get() );
+
     return _dataModelRevision;
 }
 
-const ModelLayerList&
-Map::getModelLayers() const {
-    return _modelLayers;
+int
+Map::getNumElevationLayers() const
+{
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    return _elevationLayers.size();
+}
+
+int
+Map::getModelLayers( ModelLayerVector& out_list, bool validLayersOnly ) const
+{
+    out_list.reserve( _modelLayers.size() );
+
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    for( ModelLayerVector::const_iterator i = _modelLayers.begin(); i != _modelLayers.end(); ++i )
+        //if ( !validLayersOnly || i->get()->i->get()->getProfile() )
+            out_list.push_back( i->get() );
+
+    return _dataModelRevision;
+}
+
+int
+Map::getNumModelLayers() const
+{
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    return _modelLayers.size();
 }
 
 MaskLayer*
@@ -161,14 +154,10 @@ Map::setName( const std::string& name ) {
     _name = name;
 }
 
-const std::string&
-Map::getName() const {
-    return _name;
-}
-
-int
-Map::getDataModelRevision() const {
-    Threading::ScopedReadLock lock( const_cast<Map*>(this)->getMapDataMutex() );
+Revision
+Map::getDataModelRevision() const
+{
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
     return _dataModelRevision;
 }
 
@@ -183,11 +172,24 @@ Map::getProfile() const
 Cache*
 Map::getCache() const
 {
-    if ( !_cache.valid() && _cacheConf.isSet() )
+    if ( !_cache.valid() && _mapOptions.cache().isSet() )
     {
-        CacheFactory factory;
-        Cache* cache = factory.create( _cacheConf.value() );
-        if ( cache ) {
+        Cache* cache = 0L;
+
+        // if there's a cache override in the registry, install it now.
+	    if ( osgEarth::Registry::instance()->getCacheOverride() )
+	    {
+		    OE_INFO << LC << "Overriding map cache with global cache override" << std::endl;
+		    cache = osgEarth::Registry::instance()->getCacheOverride();
+	    }
+
+        if ( !cache )
+        {
+            cache = CacheFactory::create( _mapOptions.cache().get() );
+        }
+
+        if ( cache )
+        {
             const_cast<Map*>(this)->setCache( cache );
         }
     }
@@ -195,20 +197,20 @@ Map::getCache() const
 }
 
 void
-Map::setCache( Cache* cache)
+Map::setCache( Cache* cache )
 {
     if (_cache.get() != cache)
     {
         _cache = cache;
-        _cache->setMapConfigFilename( _referenceURI );
+        _cache->setReferenceURI( _mapOptions.referenceURI().value() );
 
         //Propagate the cache to any of our layers
-        for (MapLayerList::iterator i = _imageMapLayers.begin(); i != _imageMapLayers.end(); ++i)
+        for (ImageLayerVector::iterator i = _imageLayers.begin(); i != _imageLayers.end(); ++i)
         {
             i->get()->setCache( _cache.get() );
         }
 
-        for (MapLayerList::iterator i = _heightFieldMapLayers.begin(); i != _heightFieldMapLayers.end(); ++i)
+        for (ElevationLayerVector::iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); ++i)
         {
             i->get()->setCache( _cache.get() );
         }
@@ -222,97 +224,169 @@ Map::addMapCallback( MapCallback* cb )
         _mapCallbacks.push_back( cb );
 }
 
-void 
-Map::addMapLayer( MapLayer* layer )
+void
+Map::addImageLayer( ImageLayer* layer )
 {
     unsigned int index = -1;
     if ( layer )
     {
 	    //Set options for the map from the layer
-		layer->setReferenceURI( getReferenceURI() );
-		if ( _cacheConf.isSet() && _cacheConf->runOffCacheOnly().isSet() && _cacheConf->runOffCacheOnly().get())
+		layer->setReferenceURI( _mapOptions.referenceURI().value() );
+
+        //propagate the cache to the layer:
+        if ( _mapOptions.cache().isSet() && _mapOptions.cache()->cacheOnly().isSetTo( true ) )
 		{
-			layer->cacheOnly() = true;
+			layer->setCacheOnly( true );
 		}
-		//layer->setUseMercatorFastPath( getUseMercatorLocator() );
 
 		//Set the Cache for the MapLayer to our cache.
 		layer->setCache( this->getCache() );
 
+        int newRevision;
+
+        // Add the layer to our stack.
         {
-            Threading::ScopedWriteLock lock( getMapDataMutex() );
-            MapLayerList& list = 
-                layer->getType() == MapLayer::TYPE_IMAGE? _imageMapLayers : _heightFieldMapLayers;
-            list.push_back( layer );
-            index = list.size()-1;
-            _dataModelRevision++;
+            Threading::ScopedWriteLock lock( _mapDataMutex );
+
+            _imageLayers.push_back( layer );
+            index = _imageLayers.size() - 1;
+            newRevision = ++_dataModelRevision;
         }
 
         // a separate block b/c we don't need the mutex   
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onMapLayerAdded( layer, index );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::ADD_IMAGE_LAYER, newRevision, layer, index) );
+            //i->get()->onImageLayerAdded( layer, index, newRevision );
+        }	
+    }	
+}
+
+void
+Map::addElevationLayer( ElevationLayer* layer )
+{
+    unsigned int index = -1;
+    if ( layer )
+    {
+	    //Set options for the map from the layer
+		layer->setReferenceURI( _mapOptions.referenceURI().value() );
+
+        //propagate the cache to the layer:
+        if ( _mapOptions.cache().isSet() && _mapOptions.cache()->cacheOnly().isSetTo( true ) )
+		{
+			layer->setCacheOnly( true );
+		}
+
+		//Set the Cache for the MapLayer to our cache.
+		layer->setCache( this->getCache() );
+
+        int newRevision;
+
+        // Add the layer to our stack.
+        {
+            Threading::ScopedWriteLock lock( _mapDataMutex );
+
+            _elevationLayers.push_back( layer );
+            index = _elevationLayers.size() - 1;
+            newRevision = ++_dataModelRevision;
+        }
+
+        // a separate block b/c we don't need the mutex   
+        for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
+        {
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::ADD_ELEVATION_LAYER, newRevision, layer, index) );
         }	
     }	
 }
 
 void 
-Map::removeMapLayer( MapLayer* layer )
+Map::removeImageLayer( ImageLayer* layer )
 {
     unsigned int index = -1;
 
-    osg::ref_ptr<MapLayer> layerToRemove = layer;
+    osg::ref_ptr<ImageLayer> layerToRemove = layer;
+    Revision newRevision;
 
     if ( layerToRemove.get() )
     {
-        Threading::ScopedWriteLock lock( getMapDataMutex() );
-
-        MapLayerList& list = 
-            layerToRemove->getType() == MapLayer::TYPE_IMAGE? _imageMapLayers :
-            _heightFieldMapLayers;
-
+        Threading::ScopedWriteLock lock( _mapDataMutex );
         index = 0;
-        for( MapLayerList::iterator i = list.begin(); i != list.end(); i++, index++ )
+        for( ImageLayerVector::iterator i = _imageLayers.begin(); i != _imageLayers.end(); i++, index++ )
         {
             if ( i->get() == layerToRemove.get() )
             {
-                list.erase( i );
-                _dataModelRevision++;
+                _imageLayers.erase( i );
+                newRevision = ++_dataModelRevision;
                 break;
             }
         }
     }
 
     // a separate block b/c we don't need the mutex
-    if ( layerToRemove.get() )
+    if ( newRevision >= 0 ) // layerToRemove.get() )
     {
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onMapLayerRemoved( layerToRemove.get(), index );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::REMOVE_IMAGE_LAYER, newRevision, layerToRemove.get(), index) );
+            //i->get()->onImageLayerRemoved( layerToRemove.get(), index, newRevision );
+        }
+    }
+}
+
+void 
+Map::removeElevationLayer( ElevationLayer* layer )
+{
+    unsigned int index = -1;
+
+    osg::ref_ptr<ElevationLayer> layerToRemove = layer;
+    Revision newRevision;
+
+    if ( layerToRemove.get() )
+    {
+        Threading::ScopedWriteLock lock( _mapDataMutex );
+        index = 0;
+        for( ElevationLayerVector::iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); i++, index++ )
+        {
+            if ( i->get() == layerToRemove.get() )
+            {
+                _elevationLayers.erase( i );
+                newRevision = ++_dataModelRevision;
+                break;
+            }
+        }
+    }
+
+    // a separate block b/c we don't need the mutex
+    if ( newRevision >= 0 ) //layerToRemove.get() )
+    {
+        for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
+        {
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::REMOVE_ELEVATION_LAYER, newRevision, layerToRemove.get(), index) );
         }
     }
 }
 
 void
-Map::moveMapLayer( MapLayer* layer, unsigned int newIndex )
+Map::moveImageLayer( ImageLayer* layer, unsigned int newIndex )
 {
     unsigned int oldIndex = 0;
     unsigned int actualIndex = 0;
+    Revision newRevision;
 
     if ( layer )
     {
-        Threading::ScopedWriteLock lock( getMapDataMutex() );
-
-        MapLayerList& list = 
-            layer->getType() == MapLayer::TYPE_IMAGE? _imageMapLayers :
-            _heightFieldMapLayers;
+        Threading::ScopedWriteLock lock( _mapDataMutex );
 
         // preserve the layer with a ref:
-        osg::ref_ptr<MapLayer> layerToMove = layer;
+        osg::ref_ptr<ImageLayer> layerToMove = layer;
 
         // find it:
-        MapLayerList::iterator i_oldIndex = list.end();
-        for( MapLayerList::iterator i = list.begin(); i != list.end(); i++, actualIndex++ )
+        ImageLayerVector::iterator i_oldIndex = _imageLayers.end();
+        for( ImageLayerVector::iterator i = _imageLayers.begin(); i != _imageLayers.end(); i++, actualIndex++ )
         {
             if ( i->get() == layer )
             {
@@ -322,15 +396,14 @@ Map::moveMapLayer( MapLayer* layer, unsigned int newIndex )
             }
         }
 
-        if ( i_oldIndex == list.end() )
+        if ( i_oldIndex == _imageLayers.end() )
             return; // layer not found in list
 
-        // erase the old one:
-        list.erase( i_oldIndex );
+        // erase the old one and insert the new one.
+        _imageLayers.erase( i_oldIndex );
+        _imageLayers.insert( _imageLayers.begin() + newIndex, layerToMove.get() );
 
-        list.insert( list.begin() + newIndex, layerToMove.get() );
-
-        _dataModelRevision++;
+        newRevision = ++_dataModelRevision;
     }
 
     // a separate block b/c we don't need the mutex
@@ -338,29 +411,78 @@ Map::moveMapLayer( MapLayer* layer, unsigned int newIndex )
     {
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onMapLayerMoved( layer, oldIndex, newIndex );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::MOVE_IMAGE_LAYER, newRevision, layer, oldIndex, newIndex) );
         }
     }
 }
 
+void
+Map::moveElevationLayer( ElevationLayer* layer, unsigned int newIndex )
+{
+    unsigned int oldIndex = 0;
+    unsigned int actualIndex = 0;
+    Revision newRevision;
+
+    if ( layer )
+    {
+        Threading::ScopedWriteLock lock( _mapDataMutex );
+
+        // preserve the layer with a ref:
+        osg::ref_ptr<ElevationLayer> layerToMove = layer;
+
+        // find it:
+        ElevationLayerVector::iterator i_oldIndex = _elevationLayers.end();
+        for( ElevationLayerVector::iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); i++, actualIndex++ )
+        {
+            if ( i->get() == layer )
+            {
+                i_oldIndex = i;
+                oldIndex = actualIndex;
+                break;
+            }
+        }
+
+        if ( i_oldIndex == _elevationLayers.end() )
+            return; // layer not found in list
+
+        // erase the old one and insert the new one.
+        _elevationLayers.erase( i_oldIndex );
+        _elevationLayers.insert( _elevationLayers.begin() + newIndex, layerToMove.get() );
+
+        newRevision = ++_dataModelRevision;
+    }
+
+    // a separate block b/c we don't need the mutex
+    if ( layer )
+    {
+        for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
+        {
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::MOVE_ELEVATION_LAYER, newRevision, layer, oldIndex, newIndex) );
+        }
+    }
+}
 
 void
 Map::addModelLayer( ModelLayer* layer )
 {
     if ( layer )
     {
+        Revision newRevision;
         {
-            Threading::ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( _mapDataMutex );
             _modelLayers.push_back( layer );
-            _dataModelRevision++;
+            newRevision = ++_dataModelRevision;
         }
 
-        layer->initialize( getReferenceURI(), this );        
+        layer->initialize( _mapOptions.referenceURI().get(), this ); //getReferenceURI(), this );        
 
         // a seprate block b/c we don't need the mutex
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onModelLayerAdded( layer );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::ADD_MODEL_LAYER, newRevision, layer) );
         }
     }
 }
@@ -370,14 +492,15 @@ Map::removeModelLayer( ModelLayer* layer )
 {
     if ( layer )
     {
+        Revision newRevision;
         {
-            Threading::ScopedWriteLock lock( getMapDataMutex() );
-            for( ModelLayerList::iterator i = _modelLayers.begin(); i != _modelLayers.end(); ++i )
+            Threading::ScopedWriteLock lock( _mapDataMutex );
+            for( ModelLayerVector::iterator i = _modelLayers.begin(); i != _modelLayers.end(); ++i )
             {
                 if ( i->get() == layer )
                 {
                     _modelLayers.erase( i );
-                    _dataModelRevision++;
+                    newRevision = ++_dataModelRevision;
                     break;
                 }
             }
@@ -385,7 +508,8 @@ Map::removeModelLayer( ModelLayer* layer )
 
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); ++i )
         {
-            i->get()->onModelLayerRemoved( layer );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::REMOVE_MODEL_LAYER, newRevision, layer) );
         }
     }
 }
@@ -395,17 +519,20 @@ Map::setTerrainMaskLayer( MaskLayer* layer )
 {
     if ( layer )
     {
+        Revision newRevision;
         {
-            Threading::ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( _mapDataMutex );
             _terrainMaskLayer = layer;
+            newRevision = ++_dataModelRevision;
         }
 
-        layer->initialize( getReferenceURI(), this );
+        layer->initialize( _mapOptions.referenceURI().value(), this ); //getReferenceURI(), this );
 
         // a separate block b/c we don't need the mutex   
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onMaskLayerAdded( layer );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::ADD_MASK_LAYER, newRevision, layer) );
         }	
     }
     else
@@ -419,16 +546,20 @@ Map::removeTerrainMaskLayer()
 {
     if ( _terrainMaskLayer.valid() )
     {
+        Revision newRevision;
+
         osg::ref_ptr<MaskLayer> layer = _terrainMaskLayer.get();
         {
-            Threading::ScopedWriteLock lock( getMapDataMutex() );
+            Threading::ScopedWriteLock lock( _mapDataMutex );
             _terrainMaskLayer = 0L;
+            newRevision = ++_dataModelRevision;
         }
         
         // a separate block b/c we don't need the mutex   
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
-            i->get()->onMaskLayerRemoved( layer );
+            i->get()->onMapModelChanged( MapModelChange(
+                MapModelChange::REMOVE_MASK_LAYER, newRevision, layer.get()) );
         }	
     }
 }
@@ -443,17 +574,6 @@ void Map::setContourTransferFunction(osg::TransferFunction1D* transferFunction)
   _contourTransferFunction = transferFunction;
 }
 
-//static const Profile*
-//getSuitableMapProfileFor( const Profile* candidate )
-//{
-//    if ( candidate->getProfileType() == Profile::TYPE_GEODETIC )
-//        return osgEarth::Registry::instance()->getGlobalGeodeticProfile();
-//    else if ( candidate->getProfileType() == Profile::TYPE_MERCATOR )
-//        return osgEarth::Registry::instance()->getGlobalMercatorProfile();
-//    else
-//        return candidate;
-//}
-
 void
 Map::calculateProfile()
 {
@@ -461,12 +581,12 @@ Map::calculateProfile()
         return;
 
     osg::ref_ptr<const Profile> userProfile;
-    if ( _profileConf.isSet() )
+    if ( _mapOptions.profile().isSet() )
     {
-        userProfile = Profile::create( _profileConf.get() );
+        userProfile = Profile::create( _mapOptions.profile().value() );
     }
 
-    if ( getCoordinateSystemType() == CSTYPE_GEOCENTRIC )
+    if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC )
     {
         if ( userProfile.valid() )
         {
@@ -490,7 +610,7 @@ Map::calculateProfile()
         }
     }
 
-    else if ( getCoordinateSystemType() == CSTYPE_GEOCENTRIC_CUBE )
+    else if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC_CUBE )
     {
         //If the map type is a Geocentric Cube, set the profile to the cube profile.
         _profile = osgEarth::Registry::instance()->getCubeProfile();
@@ -507,22 +627,23 @@ Map::calculateProfile()
     // At this point, if we don't have a profile we need to search tile sources until we find one.
     if ( !_profile.valid() )
     {
-        Threading::ScopedReadLock lock( getMapDataMutex() );
+        Threading::ScopedReadLock lock( _mapDataMutex );
 
-        for( MapLayerList::iterator i = _imageMapLayers.begin(); i != _imageMapLayers.end() && !_profile.valid(); i++ )
+        for( ImageLayerVector::iterator i = _imageLayers.begin(); i != _imageLayers.end() && !_profile.valid(); i++ )
         {
-            MapLayer* layer = i->get();
+            ImageLayer* layer = i->get();
             if ( layer->getTileSource() )
             {
                 _profile = layer->getTileSource()->getProfile();
             }
         }
 
-        for( MapLayerList::iterator i = _heightFieldMapLayers.begin(); i != _heightFieldMapLayers.end() && !_profile.valid(); i++ )
+        for( ElevationLayerVector::iterator i = _elevationLayers.begin(); i != _elevationLayers.end() && !_profile.valid(); i++ )
         {
-            if ( i->get()->getTileSource() )
+            ElevationLayer* layer = i->get();
+            if ( layer->getTileSource() )
             {
-                _profile = i->get()->getTileSource()->getProfile();
+                _profile = layer->getTileSource()->getProfile();
             }
         }
     }
@@ -545,43 +666,41 @@ Map::calculateProfile()
 }
 
 
-osg::HeightField*
-Map::createHeightField( const TileKey* key,
-                        bool fallback,
-                        ElevationInterpolation interpolation,
-                        SamplePolicy samplePolicy,
-                        ProgressCallback* progress)
+static osg::HeightField*
+s_createHeightField(const TileKey& key,
+                    const ElevationLayerVector& elevLayers,
+                    const Profile* mapProfile,
+                    bool fallback,
+                    ElevationInterpolation interpolation,
+                    ElevationSamplePolicy samplePolicy,
+                    ProgressCallback* progress) 
 {
-	//OE_INFO << "[osgEarth::Map::createHeightField]" << std::endl;\
-       //Note:  Assumes that the map data mutex is locked before calling.  Avoids reentrantcy issue on Linux.
-//     OpenThreads::ScopedReadLock lock( _mapDataMutex );
-
 	osg::HeightField *result = NULL;
-    int lowestLOD = key->getLevelOfDetail();
+    int lowestLOD = key.getLevelOfDetail();
     bool hfInitialized = false;
 
-    typedef std::map< MapLayer*, bool> LayerValidMap;
+    typedef std::map< TerrainLayer*, bool > LayerValidMap;
     LayerValidMap layerValidMap;
 
 	//Get a HeightField for each of the enabled layers
-	GeoHeightFieldList heightFields;
+	GeoHeightFieldVector heightFields;
 
     unsigned int numValidHeightFields = 0;
 
     
     //First pass:  Try to get the exact LOD requested for each enabled heightfield
-    for( MapLayerList::const_iterator i = getHeightFieldMapLayers().begin(); i != getHeightFieldMapLayers().end(); i++ )
+    for( ElevationLayerVector::const_iterator i = elevLayers.begin(); i != elevLayers.end(); i++ )
     {
-        MapLayer* layer = i->get();
-        if (layer->enabled() == true)
+        ElevationLayer* layer = i->get();
+        if (layer->getProfile() && layer->getEnabled() )
         {
             osg::ref_ptr< osg::HeightField > hf = layer->createHeightField( key, progress );
             layerValidMap[ layer ] = hf.valid();
             if (hf.valid())
             {
                 numValidHeightFields++;
-                heightFields.push_back( new GeoHeightField(
-                    hf.get(), key->getGeoExtent(), layer->getProfile()->getVerticalSRS() ) );
+                GeoHeightField ghf( hf.get(), key.getExtent(), layer->getProfile()->getVerticalSRS() );
+                heightFields.push_back( ghf );
             }
         }
     }
@@ -594,30 +713,30 @@ Map::createHeightField( const TileKey* key,
 
     //Second pass:  We were either asked to fallback or we might have some heightfields at the requested LOD and some that are NULL
     //              Fall back on parent tiles to fill in the missing data if possible.
-    for( MapLayerList::const_iterator i = getHeightFieldMapLayers().begin(); i != getHeightFieldMapLayers().end(); i++ )
+    for( ElevationLayerVector::const_iterator i = elevLayers.begin(); i != elevLayers.end(); i++ )
     {
-        MapLayer* layer = i->get();
+        ElevationLayer* layer = i->get();
 
-        if (layer->enabled() == true)
+        if (layer->getProfile() && layer->getEnabled() )
         {
             if (!layerValidMap[ layer ])
             {
-                osg::ref_ptr< const TileKey > hf_key = key;
+                TileKey hf_key = key;
                 osg::ref_ptr< osg::HeightField > hf;
                 while (hf_key.valid())
                 {
-                    hf = layer->createHeightField( hf_key.get(), progress );
+                    hf = layer->createHeightField( hf_key, progress );
                     if (hf.valid()) break;
-                    hf_key = hf_key->createParentKey();
+                    hf_key = hf_key.createParentKey();
                 }
 
                 if (hf.valid())
                 {
-                    if ( hf_key->getLevelOfDetail() < lowestLOD )
-                        lowestLOD = hf_key->getLevelOfDetail();
+                    if ( hf_key.getLevelOfDetail() < lowestLOD )
+                        lowestLOD = hf_key.getLevelOfDetail();
 
-                    heightFields.push_back( new GeoHeightField(
-                        hf.get(), hf_key->getGeoExtent(), layer->getProfile()->getVerticalSRS() ) );
+                    heightFields.push_back( GeoHeightField(
+                        hf.get(), hf_key.getExtent(), layer->getProfile()->getVerticalSRS() ) );
                 }
             }
         }
@@ -630,15 +749,15 @@ Map::createHeightField( const TileKey* key,
 	}
 	else if (heightFields.size() == 1)
 	{
-        if ( lowestLOD == key->getLevelOfDetail() )
+        if ( lowestLOD == key.getLevelOfDetail() )
         {
 		    //If we only have on heightfield, just return it.
-		    result = heightFields[0]->takeHeightField();
+		    result = heightFields[0].takeHeightField();
         }
         else
         {
-            osg::ref_ptr<GeoHeightField> geoHF = heightFields[0]->createSubSample( key->getGeoExtent(), interpolation);
-            result = geoHF->takeHeightField();
+            GeoHeightField geoHF = heightFields[0].createSubSample( key.getExtent(), interpolation);
+            result = geoHF.takeHeightField();
             hfInitialized = true;
         }
 	}
@@ -648,21 +767,23 @@ Map::createHeightField( const TileKey* key,
 		unsigned int width = 0;
 		unsigned int height = 0;
 
-		for (GeoHeightFieldList::const_iterator i = heightFields.begin(); i < heightFields.end(); ++i)
+		for (GeoHeightFieldVector::const_iterator i = heightFields.begin(); i < heightFields.end(); ++i)
 		{
-			if (i->get()->getHeightField()->getNumColumns() > width) width = i->get()->getHeightField()->getNumColumns();
-			if (i->get()->getHeightField()->getNumRows() > height) height = i->get()->getHeightField()->getNumRows();
+			if (i->getHeightField()->getNumColumns() > width) 
+                width = i->getHeightField()->getNumColumns();
+			if (i->getHeightField()->getNumRows() > height) 
+                height = i->getHeightField()->getNumRows();
 		}
 		result = new osg::HeightField();
 		result->allocate( width, height );
 
 		//Go ahead and set up the heightfield so we don't have to worry about it later
         double minx, miny, maxx, maxy;
-        key->getGeoExtent().getBounds(minx, miny, maxx, maxy);
+        key.getExtent().getBounds(minx, miny, maxx, maxy);
         double dx = (maxx - minx)/(double)(result->getNumColumns()-1);
         double dy = (maxy - miny)/(double)(result->getNumRows()-1);
 
-        const VerticalSpatialReference* vsrs = getProfile()->getVerticalSRS();
+        const VerticalSpatialReference* vsrs = mapProfile->getVerticalSRS();
         
 		//Create the new heightfield by sampling all of them.
         for (unsigned int c = 0; c < width; ++c)
@@ -674,12 +795,12 @@ Map::createHeightField( const TileKey* key,
 
                 //Collect elevations from all of the layers
                 std::vector<float> elevations;
-                for (GeoHeightFieldList::iterator itr = heightFields.begin(); itr != heightFields.end(); ++itr)
+                for (GeoHeightFieldVector::iterator itr = heightFields.begin(); itr != heightFields.end(); ++itr)
                 {
-                    GeoHeightField* geoHF = itr->get();
+                    const GeoHeightField& geoHF = *itr;
 
                     float elevation = 0.0f;
-                    if ( geoHF->getElevation(key->getGeoExtent().getSRS(), geoX, geoY, interpolation, vsrs, elevation) )
+                    if ( geoHF.getElevation(key.getExtent().getSRS(), geoX, geoY, interpolation, vsrs, elevation) )
                     {
                         if (elevation != NO_DATA_VALUE)
                         {
@@ -693,11 +814,11 @@ Map::createHeightField( const TileKey* key,
                 //The list of elevations only contains valid values
                 if (elevations.size() > 0)
                 {
-                    if (samplePolicy == FIRST_VALID)
+                    if (samplePolicy == SAMPLE_FIRST_VALID)
                     {
                         elevation = elevations[0];
                     }
-                    else if (samplePolicy == HIGHEST)
+                    else if (samplePolicy == SAMPLE_HIGHEST)
                     {
                         elevation = -FLT_MAX;
                         for (unsigned int i = 0; i < elevations.size(); ++i)
@@ -705,7 +826,7 @@ Map::createHeightField( const TileKey* key,
                             if (elevation < elevations[i]) elevation = elevations[i];
                         }
                     }
-                    else if (samplePolicy == LOWEST)
+                    else if (samplePolicy == SAMPLE_LOWEST)
                     {
                         elevation = FLT_MAX;
                         for (unsigned i = 0; i < elevations.size(); ++i)
@@ -713,7 +834,7 @@ Map::createHeightField( const TileKey* key,
                             if (elevation > elevations[i]) elevation = elevations[i];
                         }
                     }
-                    else if (samplePolicy == AVERAGE)
+                    else if (samplePolicy == SAMPLE_AVERAGE)
                     {
                         elevation = 0.0;
                         for (unsigned i = 0; i < elevations.size(); ++i)
@@ -741,7 +862,7 @@ Map::createHeightField( const TileKey* key,
 	{	
 		//Go ahead and set up the heightfield so we don't have to worry about it later
 		double minx, miny, maxx, maxy;
-		key->getGeoExtent().getBounds(minx, miny, maxx, maxy);
+		key.getExtent().getBounds(minx, miny, maxx, maxy);
 		result->setOrigin( osg::Vec3d( minx, miny, 0.0 ) );
 		double dx = (maxx - minx)/(double)(result->getNumColumns()-1);
 		double dy = (maxy - miny)/(double)(result->getNumRows()-1);
@@ -751,12 +872,146 @@ Map::createHeightField( const TileKey* key,
 	}
 
 	return result;
+}
 
-	/*
-    osg::ref_ptr< ElevationManager > em = new ElevationManager;
-    for( MapLayerList::const_iterator i = getHeightFieldMapLayers().begin(); i != getHeightFieldMapLayers().end(); i++ )
+
+osg::HeightField*
+Map::createHeightField( const TileKey& key,
+                        bool fallback,
+                        ElevationInterpolation interpolation,
+                        ElevationSamplePolicy samplePolicy,
+                        ProgressCallback* progress) const
+{
+    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    return s_createHeightField( key, _elevationLayers, getProfile(), fallback, interpolation, samplePolicy, progress );
+}
+
+void
+Map::sync( MapFrame& frame ) const
+{
+    if ( frame._mapDataModelRevision != _dataModelRevision || !frame._initialized )
     {
-        em->getElevationLayers().push_back( i->get() );
-    }
-    return em->createHeightField( key, 0, 0, fallback );*/
+        //OE_INFO << LC << "Syncing map frame \"" << frame._name << "\"" << std::endl;
+
+        // hold the read lock while copying the layer lists.
+        Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+
+        if ( frame._parts & IMAGE_LAYERS )
+        {
+            if ( !frame._initialized )
+                frame._imageLayers.reserve( _imageLayers.size() );
+            frame._imageLayers.clear();
+            if ( frame._copyValidDataOnly )
+            {
+                for( ImageLayerVector::const_iterator i = _imageLayers.begin(); i != _imageLayers.end(); ++i )
+                    if ( i->get()->getProfile() )
+                        frame._imageLayers.push_back( i->get() );
+            }
+            else
+                std::copy( _imageLayers.begin(), _imageLayers.end(), std::back_inserter(frame._imageLayers) );
+        }
+
+        if ( frame._parts & ELEVATION_LAYERS )
+        {
+            if ( !frame._initialized )
+                frame._elevationLayers.reserve( _elevationLayers.size() );
+            frame._elevationLayers.clear();
+            if ( frame._copyValidDataOnly )
+            {
+                for( ElevationLayerVector::const_iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); ++i )
+                    if ( i->get()->getProfile() )
+                        frame._elevationLayers.push_back( i->get() );
+            }
+            else
+                std::copy( _elevationLayers.begin(), _elevationLayers.end(), std::back_inserter(frame._elevationLayers) );
+        }
+
+        if ( frame._parts & MODEL_LAYERS )
+        {
+            if ( !frame._initialized )
+                frame._modelLayers.reserve( _modelLayers.size() );
+            frame._modelLayers.clear();
+            std::copy( _modelLayers.begin(), _modelLayers.end(), std::back_inserter(frame._modelLayers) );
+        }
+
+        // sync the revision numbers.
+        frame._initialized = true;
+        frame._mapDataModelRevision = _dataModelRevision;
+    }    
+}
+
+//------------------------------------------------------------------------
+
+MapFrame::MapFrame( Map* map, Map::ModelParts parts, const std::string& name ) :
+_map( map ),
+_parts( parts ),
+_name( name ),
+_copyValidDataOnly( false ),
+_mapInfo( map ),
+_initialized( false )
+{
+    sync();
+}
+
+MapFrame::MapFrame( Map* map, bool copyValidDataOnly, Map::ModelParts parts, const std::string& name ) :
+_map( map ),
+_parts( parts ),
+_copyValidDataOnly( copyValidDataOnly ),
+_name( name ),
+_mapInfo( map ),
+_initialized( false )
+{
+    sync();
+}
+
+MapFrame::MapFrame( const MapFrame& src, const std::string& name ) :
+_name( name ),
+_map( src._map.get() ),
+_parts( src._parts ),
+_copyValidDataOnly( src._copyValidDataOnly ),
+_mapInfo( src._mapInfo ), // src._map.get() ),
+_imageLayers( src._imageLayers ),
+_elevationLayers( src._elevationLayers ),
+_modelLayers( src._modelLayers ),
+_mapDataModelRevision( src._mapDataModelRevision ),
+_initialized( src._initialized )
+{
+    //no sync required here; we copied the arrays etc
+}
+
+void
+MapFrame::sync()
+{
+    _map->sync( *this );
+}
+
+osg::HeightField*
+MapFrame::createHeightField(const TileKey& key,
+                            bool fallback,
+                            ElevationInterpolation interpolation,
+                            ElevationSamplePolicy samplePolicy,
+                            ProgressCallback* progress) const
+{
+    return s_createHeightField( key, _elevationLayers, _mapInfo.getProfile(), fallback, interpolation, samplePolicy, progress );
+}
+
+int
+MapFrame::indexOf( ImageLayer* layer ) const
+{
+    ImageLayerVector::const_iterator i = std::find( _imageLayers.begin(), _imageLayers.end(), layer );
+    return i != _imageLayers.end() ? i - _imageLayers.begin() : -1;
+}
+
+int
+MapFrame::indexOf( ElevationLayer* layer ) const
+{
+    ElevationLayerVector::const_iterator i = std::find( _elevationLayers.begin(), _elevationLayers.end(), layer );
+    return i != _elevationLayers.end() ? i - _elevationLayers.begin() : -1;
+}
+
+int
+MapFrame::indexOf( ModelLayer* layer ) const
+{
+    ModelLayerVector::const_iterator i = std::find( _modelLayers.begin(), _modelLayers.end(), layer );
+    return i != _modelLayers.end() ? i - _modelLayers.begin() : -1;
 }

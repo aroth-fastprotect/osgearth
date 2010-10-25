@@ -9,6 +9,13 @@ IF(WIN32)
     ENDIF(CURL_IS_STATIC)
 ENDIF(WIN32)
 
-SET(TARGET_SRC ReaderWriterOsgEarth.cpp )
+SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/earth/EarthFileSerializer)
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/earth)
+
+SET(TARGET_SRC 
+		EarthFileSerializer1.cpp 
+		EarthFileSerializer2.cpp 
+		ReaderWriterOsgEarth.cpp 
+		)
 #### end var setup  ###
 SETUP_PLUGIN(earth)

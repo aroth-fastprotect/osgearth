@@ -24,6 +24,7 @@
 #include <osgEarth/StringUtils>
 #include <osg/Version>
 #include <memory.h>
+#include <limits.h>
 
 using namespace osgEarth;
 using namespace OpenThreads;
@@ -52,6 +53,8 @@ ImageLayerOptions::setDefaults()
     _opacity.init( 1.0f );
     _gamma.init( 1.0f );
     _transparentColor.init( osg::Vec4ub(0,0,0,0) );
+    _minRange.init( -FLT_MAX );
+    _maxRange.init( FLT_MAX );
 }
 
 void
@@ -67,6 +70,8 @@ ImageLayerOptions::fromConfig( const Config& conf )
     conf.getIfSet( "nodata_image", _noDataImageFilename );
     conf.getIfSet( "opacity", _opacity );
     conf.getIfSet( "gamma", _gamma );
+    conf.getIfSet( "min_range", _minRange );
+    conf.getIfSet( "max_range", _maxRange );
 
     if ( conf.hasValue( "transparent_color" ) )
         _transparentColor = stringToColor( conf.value( "transparent_color" ), osg::Vec4ub(0,0,0,0));
@@ -93,6 +98,8 @@ ImageLayerOptions::getConfig() const
     conf.updateIfSet( "nodata_image", _noDataImageFilename );
     conf.updateIfSet( "opacity", _opacity );
     conf.updateIfSet( "gamma", _gamma );
+    conf.updateIfSet( "min_range", _minRange );
+    conf.updateIfSet( "max_range", _maxRange );
 
 	if (_transparentColor.isSet())
         conf.update("transparent_color", colorToString( _transparentColor.value()));

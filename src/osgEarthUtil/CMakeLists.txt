@@ -16,13 +16,10 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ElevationFadeCallback
 	#${HEADER_PATH}/ElevationManager
 	${HEADER_PATH}/Export
-	${HEADER_PATH}/FadeLayerNode
 	${HEADER_PATH}/Graticule
-	${HEADER_PATH}/Labeling
 	${HEADER_PATH}/ObjectPlacer
 	${HEADER_PATH}/ObjectLocator
 	${HEADER_PATH}/OceanSurfaceNode
-	${HEADER_PATH}/Popups
 	${HEADER_PATH}/Viewpoint
 	${HEADER_PATH}/WMS
 )
@@ -34,13 +31,10 @@ SET(TARGET_SRC
 	EarthManipulator.cpp
 	ElevationFadeCallback.cpp
 	#ElevationManager.cpp
-	FadeLayerNode.cpp
 	Graticule.cpp
-    Labeling.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     OceanSurfaceNode.cpp
-    Popups.cpp
 	Viewpoint.cpp
     WMS.cpp
 )

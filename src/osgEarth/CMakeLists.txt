@@ -97,6 +97,7 @@ SET(TARGET_SRC
     ImageToHeightFieldConverter.cpp
     ImageUtils.cpp
     JsonUtils.cpp
+    Layer.cpp
     Locators.cpp
     Map.cpp
     MapNode.cpp

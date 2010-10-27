@@ -142,7 +142,7 @@ EarthFileSerializer2::serialize( MapNode* input ) const
     for( ModelLayerVector::const_iterator i = mapf.modelLayers().begin(); i != mapf.modelLayers().end(); ++i )
     {
         ModelLayer* layer = i->get();
-        Config layerConf = layer->getDriverConfig();
+        Config layerConf = layer->getConfig();
         layerConf.attr("name") = layer->getName();
         layerConf.attr("driver") = layer->getDriverConfig().value("driver");
         mapConf.add( "model", layerConf );

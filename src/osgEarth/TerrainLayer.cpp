@@ -48,7 +48,7 @@ _maxLevel( 99 )
 }
 
 TerrainLayerOptions::TerrainLayerOptions( const std::string& name, const TileSourceOptions& driverOptions ) :
-ConfigOptions()
+ConfigOptions(driverOptions)
 {
     setDefaults();
     fromConfig( _conf );

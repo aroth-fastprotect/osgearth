@@ -24,6 +24,7 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_shadercomp)
 
 	#ADD_SUBDIRECTORY(osgearth_symbology)
+	ADD_SUBDIRECTORY(osgearth_seamless)
 ENDIF(BUILD_OSGEARTH_EXAMPLES)
 
 

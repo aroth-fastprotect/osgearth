@@ -35,12 +35,19 @@ namespace osgEarth
         TerrainEngineNodeCallbackProxy(TerrainEngineNode* node) : _node(node) { }
         osg::observer_ptr<TerrainEngineNode> _node;
 
-        void onMapProfileEstablished( const Profile* profile )
+        void onMapInfoEstablished( const MapInfo& mapInfo )
         {
             osg::ref_ptr<TerrainEngineNode> safeNode = _node.get();
             if ( safeNode.valid() )
-                safeNode->onMapProfileEstablished( profile );
+                safeNode->onMapInfoEstablished( mapInfo );
         }
+
+        //void onMapProfileEstablished( const Profile* profile )
+        //{
+        //    osg::ref_ptr<TerrainEngineNode> safeNode = _node.get();
+        //    if ( safeNode.valid() )
+        //        safeNode->onMapProfileEstablished( profile );
+        //}
 
         void onMapModelChanged( const MapModelChange& change )
         {
@@ -120,6 +127,17 @@ _map( rhs._map.get() )
 }
 
 void
+TerrainEngineNode::setMapInfo( const MapInfo& mapInfo )
+{
+    // set up the CSN values   
+    mapInfo.getProfile()->getSRS()->populateCoordinateSystemNode( this );
+    
+    // OSG's CSN likes a NULL ellipsoid to represent projected mode.
+    if ( !mapInfo.isGeocentric() )
+        this->setEllipsoidModel( NULL );
+}
+
+void
 TerrainEngineNode::initialize( Map* map, const TerrainOptions& options )
 {
     _map = map;
@@ -128,7 +146,8 @@ TerrainEngineNode::initialize( Map* map, const TerrainOptions& options )
     {
         // manually trigger the map callbacks the first time:
         if ( _map->getProfile() )
-            onMapProfileEstablished( map->getProfile() );
+            onMapInfoEstablished( MapInfo(_map.get()) );
+            //onMapProfileEstablished( map->getProfile() );
 
         // create a layer controller. This object affects the uniforms that control layer appearance properties
         _imageLayerController = new ImageLayerController( map );
@@ -156,7 +175,7 @@ TerrainEngineNode::initialize( Map* map, const TerrainOptions& options )
 osg::BoundingSphere
 TerrainEngineNode::computeBound() const
 {
-    if ( _map.valid() && _map->isGeocentric() && getEllipsoidModel() )
+    if ( getEllipsoidModel() )
     {
         return osg::BoundingSphere( osg::Vec3(0,0,0), getEllipsoidModel()->getRadiusEquator()+25000 );
     }
@@ -180,15 +199,26 @@ TerrainEngineNode::setElevationSamplingRatio( float value )
     onElevationSamplingRatioChanged();
 }
 
+//void
+//TerrainEngineNode::onMapProfileEstablished( const Profile* profile )
+//{
+//    // set up the CSN values   
+//    if ( _map.valid() )
+//        _map->getProfile()->getSRS()->populateCoordinateSystemNode( this );
+//    
+//    // OSG's CSN likes a NULL ellipsoid to represent projected mode.
+//    if ( !_map->isGeocentric() )
+//        this->setEllipsoidModel( NULL );
+//}
+
 void
-TerrainEngineNode::onMapProfileEstablished( const Profile* profile )
+TerrainEngineNode::onMapInfoEstablished( const MapInfo& mapInfo )
 {
-    // set up the CSN values
-    if ( _map.valid() )
-        _map->getProfile()->getSRS()->populateCoordinateSystemNode( this );
+    // set up the CSN values   
+    mapInfo.getProfile()->getSRS()->populateCoordinateSystemNode( this );
     
     // OSG's CSN likes a NULL ellipsoid to represent projected mode.
-    if ( !_map->isGeocentric() )
+    if ( !mapInfo.isGeocentric() )
         this->setEllipsoidModel( NULL );
 }
 
@@ -235,7 +265,10 @@ TerrainEngineNode::updateImageUniforms()
     
     if ( mapf.imageLayers().size() > 0 )
     {
-        _imageLayerController->_layerEnabledUniform = new osg::Uniform( osg::Uniform::BOOL, "osgearth_imagelayer_enabled", mapf.imageLayers().size() );
+        // the "enabled" uniform is fixed size. this is handy to account for layers that are in flux...i.e., their source
+        // layer count has changed, but the shader has not yet caught up. In the future we might use this to disable
+        // "ghost" layers that used to exist at a given index, but no longer do.
+        _imageLayerController->_layerEnabledUniform = new osg::Uniform( osg::Uniform::BOOL, "osgearth_imagelayer_enabled", 128 ); //mapf.imageLayers().size() );
         _imageLayerController->_layerOpacityUniform = new osg::Uniform( osg::Uniform::FLOAT, "osgearth_imagelayer_opacity", mapf.imageLayers().size() );
         _imageLayerController->_layerRangeUniform = new osg::Uniform( osg::Uniform::FLOAT, "osgearth_imagelayer_range", 2 * mapf.imageLayers().size() );
 
@@ -249,6 +282,10 @@ TerrainEngineNode::updateImageUniforms()
             _imageLayerController->_layerRangeUniform->setElement( (2*index), layer->getImageLayerOptions().minVisibleRange().value() );
             _imageLayerController->_layerRangeUniform->setElement( (2*index)+1, layer->getImageLayerOptions().maxVisibleRange().value() );
         }
+
+        // set the remainder of the layers to disabled 
+        for( int j=mapf.imageLayers().size(); j<128; ++j )
+            _imageLayerController->_layerEnabledUniform->setElement( j, false );
 
         stateSet->addUniform( _imageLayerController->_layerOpacityUniform.get() );
         stateSet->addUniform( _imageLayerController->_layerEnabledUniform.get() );
@@ -316,7 +353,7 @@ TerrainEngineNodeFactory::create( Map* map, const TerrainOptions& options )
     {
         TerrainOptions terrainOptions( options );
         result->validateTerrainOptions( terrainOptions );
-        result->initialize( map, terrainOptions );
+        //result->initialize( map, terrainOptions );
     }
     else
     {

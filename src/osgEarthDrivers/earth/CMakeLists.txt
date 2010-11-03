@@ -13,9 +13,9 @@ SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/earth/EarthFileSerialize
 INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/earth)
 
 SET(TARGET_SRC 
-		EarthFileSerializer1.cpp 
-		EarthFileSerializer2.cpp 
-		ReaderWriterOsgEarth.cpp 
-		)
+    ReaderWriterOsgEarth.cpp
+    EarthFileSerializer1.cpp
+    EarthFileSerializer2.cpp)
+
 #### end var setup  ###
 SETUP_PLUGIN(earth)

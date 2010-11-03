@@ -21,17 +21,17 @@
 #include <osgEarth/ImageUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/ShaderComposition>
-#include <osg/Texture2DArray>
-#include <vector>
+#include <osgEarth/SparseTexture2DArray>
 
 using namespace osgEarth;
 
 #define LC "[TextureCompositorTexArray] "
 
+
 //------------------------------------------------------------------------
 
 static osg::Shader*
-s_createTextureFragShaderFunction( int numImageLayers )
+s_createTextureFragShaderFunction( const TextureLayout& layout )
 {
     std::stringstream buf;
 
@@ -52,22 +52,27 @@ s_createTextureFragShaderFunction( int numImageLayers )
         << "    float u, v, dmin, dmax, atten_min, atten_max; \n"
         << "    vec4 texel; \n";
 
-    for(int i=0; i<numImageLayers; ++i)
+    const RenderOrderVector& order = layout.getRenderOrder();
+
+    for( int i = 0; i < order.size(); ++i )
     {
-        int j = i*4;
-        int k = i*2;
+        int slot = order[i];
+        int q = 2 * i;
+        int r = 4 * slot;
+
         buf << "    if (osgearth_imagelayer_enabled["<< i << "]) { \n"
-            << "        u = region["<< j <<"] + (region["<< j+2 <<"] * gl_TexCoord[0].s); \n"
-            << "        v = region["<< j+1 <<"] + (region["<< j+3 <<"] * gl_TexCoord[0].t); \n"
-            << "        dmin = osgearth_range - osgearth_imagelayer_range["<< k << "]; \n"
-            << "        dmax = osgearth_range - osgearth_imagelayer_range["<< k+1 <<"]; \n"
+            << "        u = region["<< r <<"] + (region["<< r+2 <<"] * gl_TexCoord[0].s); \n"
+            << "        v = region["<< r+1 <<"] + (region["<< r+3 <<"] * gl_TexCoord[0].t); \n"
+            << "        dmin = osgearth_range - osgearth_imagelayer_range["<< q << "]; \n"
+            << "        dmax = osgearth_range - osgearth_imagelayer_range["<< q+1 <<"]; \n"
             << "        if (dmin >= 0 && dmax <= 0.0) { \n"
             << "            atten_max = -clamp( dmax, -osgearth_imagelayer_attenuation, 0 ) / osgearth_imagelayer_attenuation; \n"
             << "            atten_min =  clamp( dmin, 0, osgearth_imagelayer_attenuation ) / osgearth_imagelayer_attenuation; \n"
-            << "            texel = texture2DArray( tex0, vec3(u,v,"<< i <<") ); \n"
+            << "            texel = texture2DArray( tex0, vec3(u,v,"<< slot <<") ); \n"
             << "            color = mix(color, texel.rgb, texel.a * osgearth_imagelayer_opacity["<< i <<"] * atten_max * atten_min); \n"
             << "        } \n"
-            << "    } \n";
+            << "    } \n"
+            ;
     }
 
     buf << "    return vec4(color,1); \n"
@@ -80,8 +85,89 @@ s_createTextureFragShaderFunction( int numImageLayers )
 
 //------------------------------------------------------------------------
 
+namespace
+{
+    static osg::Texture2DArray*
+    s_getTexture( osg::StateSet* stateSet, const TextureLayout& layout )
+    {
+        osg::Texture2DArray* tex = static_cast<osg::Texture2DArray*>(
+            stateSet->getTextureAttribute( 0, osg::StateAttribute::TEXTURE ) );
+
+        // if the texture array doesn't exist, create it anew.
+        if ( !tex )
+        {
+            tex = new SparseTexture2DArray();
+            tex->setInternalFormat( GL_RGBA );
+            tex->setTextureWidth( 256 );
+            tex->setTextureHeight( 256 );
+            
+            // configure the mipmapping 
+            tex->setMaxAnisotropy(16.0f);
+            tex->setResizeNonPowerOfTwoHint(false);
+            tex->setFilter( osg::Texture::MAG_FILTER, osg::Texture::LINEAR );
+            tex->setFilter( osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR );
+
+            // configure the wrapping
+            tex->setWrap(osg::Texture::WRAP_S,osg::Texture::CLAMP_TO_EDGE);
+            tex->setWrap(osg::Texture::WRAP_T,osg::Texture::CLAMP_TO_EDGE);
+
+            stateSet->setTextureAttribute( 0, tex, osg::StateAttribute::ON );
+            stateSet->addUniform( new osg::Uniform("tex0", 0) );
+        }
+
+        // grow the texture array if necessary.
+        int requiredDepth = layout.getMaxUsedSlot() + 1;
+        if ( tex->getTextureDepth() < requiredDepth )
+            tex->setTextureDepth( requiredDepth );
+
+        const TextureSlotVector& slots = layout.getTextureSlots();
+
+        // null out any empty slots (to save memory, i guess)
+        for( int i=0; i<tex->getTextureDepth(); ++i )
+        {
+            if ( i < slots.size() && slots[i] < 0 )
+                tex->setImage( i, 0L );
+        }
+
+        return tex;
+    }
+
+    static osg::Uniform*
+    s_getRegionUniform( osg::StateSet* stateSet, const TextureLayout& layout )
+    {
+        osg::Uniform* region = stateSet->getUniform( "region" );
+
+        // if the region-uniform doesn't exist, create it now
+        if ( !region )
+        {
+            region = new osg::Uniform( osg::Uniform::FLOAT, "region", layout.getTextureSlots().size() * 4 );
+            stateSet->addUniform( region );
+        }
+
+        // if the region exists but is too small, re-allocate it (cannot grow it) and copy over the old values
+        else if ( region->getNumElements() < layout.getTextureSlots().size() * 4 )
+        {            
+            osg::Uniform* newRegion = new osg::Uniform( osg::Uniform::FLOAT, "region", layout.getTextureSlots().size() * 4 );
+            for( int i=0; i<region->getNumElements(); ++i )
+            {
+                float value;
+                region->getElement( i, value );
+                newRegion->setElement( i, value );
+            }
+
+            stateSet->removeUniform( region );
+            stateSet->addUniform( newRegion );
+            region = newRegion;
+        }
+
+        return region;
+    }
+};
+
+//------------------------------------------------------------------------
+
 GeoImage
-TextureCompositorTexArray::prepareLayerUpdate( const GeoImage& layerImage, const GeoExtent& tileExtent ) const
+TextureCompositorTexArray::prepareImage( const GeoImage& layerImage, const GeoExtent& tileExtent ) const
 {
     osg::ref_ptr<osg::Image> image = layerImage.getImage();
 
@@ -105,20 +191,24 @@ TextureCompositorTexArray::prepareLayerUpdate( const GeoImage& layerImage, const
 
 void
 TextureCompositorTexArray::applyLayerUpdate(osg::StateSet* stateSet,
-                                            int layerNum,
+                                            UID layerUID,
                                             const GeoImage& preparedImage,
-                                            const GeoExtent& tileExtent) const
+                                            const GeoExtent& tileExtent,
+                                            const TextureLayout& layout ) const
 {
-    // here we are going to assume everything's kosher - i.e. that the state set came
-    // from createStateSet() in this class, and that the prepared image came from prepareImage()
-    // in this same class.
+    int slot = layout.getSlot( layerUID );
+    if ( slot < 0 )
+        return; // means the layer no longer exists
 
-    //TODO: un-hard-code the texture unit, perhaps
-    osg::Texture2DArray* texture = static_cast<osg::Texture2DArray*>(
-        stateSet->getTextureAttribute( 0, osg::StateAttribute::TEXTURE ) );
+    // access the texture array, creating or growing it if necessary:
+    osg::Texture2DArray* texture = s_getTexture( stateSet, layout );
 
-    // assign the new image at the proper position in the texture array:
-    texture->setImage( layerNum, preparedImage.getImage() );
+    // assign the new image at the proper position in the texture array. We have to 
+    // dirty() the image because otherwise the texture2d array implementation will not
+    // recognize it as new data.
+    osg::Image* image = preparedImage.getImage();
+    image->dirty();
+    texture->setImage( slot, image );
     
     // update the region uniform to reflect the geo extent of the image:
     const GeoExtent& imageExtent = preparedImage.getExtent();
@@ -127,18 +217,20 @@ TextureCompositorTexArray::applyLayerUpdate(osg::StateSet* stateSet,
     float xscale  = tileExtent.width() / imageExtent.width();
     float yscale  = tileExtent.height() / imageExtent.height();
 
-    osg::Uniform* texInfoArray = stateSet->getUniform( "region" );
-    if ( texInfoArray )
+    // access the region uniform, creating or growing it if necessary:
+    osg::Uniform* region = s_getRegionUniform( stateSet, layout );
+    if ( region )
     {
-        int layerOffset = layerNum * 4;
-        texInfoArray->setElement( layerOffset,     xoffset );
-        texInfoArray->setElement( layerOffset + 1, yoffset );
-        texInfoArray->setElement( layerOffset + 2, xscale );
-        texInfoArray->setElement( layerOffset + 3, yscale );
-        texInfoArray->dirty();
+        int layerOffset = slot * 4;
+        region->setElement( layerOffset,     xoffset );
+        region->setElement( layerOffset + 1, yoffset );
+        region->setElement( layerOffset + 2, xscale );
+        region->setElement( layerOffset + 3, yscale );
+        region->dirty();
     }
 }
 
+#if 0
 osg::StateSet*
 TextureCompositorTexArray::createStateSet( const GeoImageVector& layerImages, const GeoExtent& tileExtent ) const
 {
@@ -216,10 +308,11 @@ TextureCompositorTexArray::createStateSet( const GeoImageVector& layerImages, co
 
     return stateSet;
 }
+#endif
 
 void
-TextureCompositorTexArray::updateGlobalStateSet( osg::StateSet* stateSet, int numImageLayers ) const
+TextureCompositorTexArray::updateMasterStateSet( osg::StateSet* stateSet, const TextureLayout& layout ) const
 {
     VirtualProgram* vp = static_cast<VirtualProgram*>( stateSet->getAttribute(osg::StateAttribute::PROGRAM) );
-    vp->setShader( "osgearth_frag_texture", s_createTextureFragShaderFunction(numImageLayers) );
+    vp->setShader( "osgearth_frag_texture", s_createTextureFragShaderFunction(layout) );
 }

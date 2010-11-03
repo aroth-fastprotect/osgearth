@@ -16,8 +16,9 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-
+#if 0
 #include "TerrainTileEdgeNormalizerUpdateCallback"
+#include "CustomTile"
 #include "CustomTerrain"
 #include <osg/Version>
 #include <osg/Timer>
@@ -184,6 +185,8 @@ TerrainTileEdgeNormalizerUpdateCallback::TerrainTileEdgeNormalizerUpdateCallback
                   osgTerrain::TileID ul_id;
                   osgTerrain::TileID ur_id;
 
+                  TileKey ll_key, lu_key, ul_key, ur_key;
+                  
                   if (direction == NORTH_EAST)
                   {
                       ll_id = tile->getTileID();
@@ -391,3 +394,5 @@ TerrainTileEdgeNormalizerUpdateCallback::TerrainTileEdgeNormalizerUpdateCallback
 
           return id2;
       }
+
+#endif

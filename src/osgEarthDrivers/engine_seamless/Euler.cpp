@@ -28,6 +28,8 @@
 #include <ogr_api.h>
 #include <ogr_spatialref.h>
 
+#include "AutoBuffer"
+
 #define LC "[seamless::EULER] "
 
 namespace seamless
@@ -148,7 +150,7 @@ Vec3d face2qrs(const Vec2d& face)
     // "latitude"
     Vec3d ynorm(0, cy, -sy);
     Vec3d result = xnorm ^ ynorm;
-    result.normalize();
+    // Assume that result is normalized "enough."
     return result;
 }
 
@@ -183,10 +185,29 @@ Vec3d face2dc(int faceNum, const Vec2d& faceCoord)
 bool faceCoordsToLatLon(double x, double y, int face,
                         double& out_lat_deg, double& out_lon_deg)
 {
-    Vec3d geo = face2dc(face, Vec2d(x, y));
-    const double lon = atan2(geo.y(),geo.x());
-    const double lat = atan2(geo.z(),
-                             sqrt(geo.x() * geo.x() + geo.y() * geo.y()));
+    double lat, lon;
+    const double l = x * osg::PI_4;
+    const double ty = tan(y * osg::PI_4);
+    if (face < 4)
+    {
+        lon = face * osg::PI_2 + l;
+        lon = fmod(lon + osg::PI, 2.0 * osg::PI) - osg::PI;
+        lat = atan(cos(l) * ty);
+    }
+    else
+    {
+        const double tx = tan(x * osg::PI_4);
+        lat = osg::PI_2 - atan(sqrt(tx * tx + ty * ty));
+        if (face == 5)
+        {
+            lon = atan2(tx, ty);
+            lat = -lat;
+        }
+        else
+        {
+            lon = atan2(tx, -ty);
+        }
+    }
     out_lon_deg = RadiansToDegrees(lon);
     out_lat_deg = RadiansToDegrees(lat);
     return true;
@@ -532,6 +553,49 @@ EulerSpatialReference::postTransform(double& x, double& y, void* context) const
 }
 
 bool
+EulerSpatialReference::transform(double x, double y,
+                                 const SpatialReference* to_srs,
+                                 double& out_x, double& out_y,
+                                 void* context) const
+{
+    if ( !_initialized )
+        const_cast<EulerSpatialReference*>(this)->init();
+    if (!to_srs->isEquivalentTo(getGeographicSRS()))
+        return SpatialReference::transform(x, y, to_srs, out_x, out_y, context);
+    if (EulerSpatialReference::preTransform(x, y, context))
+    {
+        out_x = x;
+        out_y = y;
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool EulerSpatialReference::transformPoints(const SpatialReference* to_srs, 
+                                            double* x, double *y,
+                                            unsigned int numPoints,
+                                            void* context,
+                                            bool ignore_errors) const
+{
+        if ( !_initialized )
+            const_cast<EulerSpatialReference*>(this)->init();
+        if (!to_srs->isEquivalentTo(getGeographicSRS()))
+            return SpatialReference::transformPoints(to_srs, x, y, numPoints,
+                                                     context, ignore_errors);
+        bool success = true;
+        for (unsigned int i = 0; i < numPoints; ++i)
+        {
+            bool result
+                = EulerSpatialReference::preTransform(x[i], y[i], context);
+            success = success && result;
+        }
+        return success;
+}
+
+bool
 EulerSpatialReference::transformExtent(const SpatialReference* to_srs,
                                      double& in_out_xmin,
                                      double& in_out_ymin,
@@ -627,6 +691,80 @@ EulerSpatialReference::transformExtent(const SpatialReference* to_srs,
     return ok;
 }
 
+// This has been written to minimize the number of transcendental
+// function calls -- as well as other expensive operations -- in the
+// inner loop.
+bool EulerSpatialReference::transformExtentPoints(
+    const SpatialReference* to_srs,
+    double in_xmin, double in_ymin,
+    double in_xmax, double in_ymax,
+    double* x, double *y,
+    unsigned int numx, unsigned int numy,
+    void* context, bool ignore_errors ) const
+{
+    if ( !_initialized )
+        const_cast<EulerSpatialReference*>(this)->init();
+    int face;
+
+    // Punt if the extent covers more than one face (doesn't happen
+    // normally).
+    if (!(to_srs->isEquivalentTo(getGeographicSRS())
+          && cubeToFace(in_xmin, in_ymin, in_xmax, in_ymax, face)))
+        return SpatialReference::transformExtentPoints(
+            to_srs, in_xmin, in_ymin, in_xmax, in_ymax, x, y,
+            numx, numy, context, ignore_errors);
+    const double dx = (in_xmax - in_xmin) / (numx - 1);
+    const double dy = (in_ymax - in_ymin) / (numy - 1);
+    unsigned pixel = 0;
+    // Cache values for and tan(y)
+    AutoBuffer<double, 256> tany(numy);
+    // induction variables for column and row counters
+    double fc = 0.0, fr = 0.0;
+    for (unsigned r = 0; r < numy; ++r, ++fr)
+        tany[r] = tan((in_ymin + fr * dy) * osg::PI_4);
+    if (face < 4)
+    {
+        double lonBase = face * osg::PI_2;
+        for (unsigned c = 0; c < numx; ++c, ++fc)
+        {
+            const double l = (in_xmin + fc * dx) * osg::PI_4;
+            double lon = lonBase + l;
+            lon = fmod(lon + osg::PI, 2.0 * osg::PI) - osg::PI;
+            const double rlon = RadiansToDegrees(lon);
+            const double cosl = cos(l);
+            for (unsigned r = 0; r < numy; ++r)
+            {
+                const double lat = atan(cosl * tany[r]);
+                x[pixel] = rlon;
+                y[pixel] = RadiansToDegrees(lat);
+                pixel++;
+            }
+        }
+    }
+    else
+    {
+        // The pole faces are the same, except for a change of sign in
+        // the latitude and longitude calculations.
+        const double sgn = face == 4 ? -1.0 : 1.0;
+        for (unsigned c = 0; c < numx; ++c, ++fc)
+        {
+            const double l = (in_xmin + fc * dx) * osg::PI_4;
+            const double tx = tan(l);
+            const double tx2 = tx * tx;
+            for (unsigned r = 0; r < numy; ++r)
+            {
+                const double ty = tany[r];
+                const double lon = atan2(tx, sgn * ty);
+                const double lat = (atan(sqrt(tx2 + ty * ty)) - osg::PI_2)
+                    * sgn;
+                x[pixel] = RadiansToDegrees(lon);
+                y[pixel] = RadiansToDegrees(lat);
+                pixel++;
+            }
+        }
+    }
+    return true;
+}
 
 namespace
 {
@@ -678,8 +816,9 @@ EulerProfile::EulerProfile()
 
 int EulerProfile::getFace(const TileKey& key)
 {
-    int faceX = key.getTileX() >> key.getLevelOfDetail();
-    int faceY = key.getTileY() >> key.getLevelOfDetail();
+    int shiftVal = key.getLevelOfDetail() - 2;
+    int faceX = key.getTileX() >> shiftVal;
+    int faceY = key.getTileY() >> shiftVal;
     if (faceY == 0)
         return 5;
     else if (faceY == 2)

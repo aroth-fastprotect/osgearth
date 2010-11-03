@@ -56,6 +56,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/Revisioning
     ${HEADER_PATH}/ShaderComposition
     ${HEADER_PATH}/ShaderUtils
+	${HEADER_PATH}/SparseTexture2DArray
 	${HEADER_PATH}/SpatialReference
 	${HEADER_PATH}/StringUtils
 	${HEADER_PATH}/TaskService
@@ -114,6 +115,7 @@ SET(TARGET_SRC
     Registry.cpp
     ShaderComposition.cpp
     ShaderUtils.cpp
+    SparseTexture2DArray.cpp
     SpatialReference.cpp
     TaskService.cpp
     TerrainLayer.cpp

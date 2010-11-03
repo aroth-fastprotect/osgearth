@@ -53,6 +53,7 @@ using namespace osgEarth::Drivers;
 
 /*****************************************************************************/
 
+//TODO: get rid of this, and move it to the CustomTerrain CULL traversal.
 struct PopulateTileDataCallback : public osg::NodeCallback
 {
     PopulateTileDataCallback( const MapFrame& mapf ) : _mapf(mapf) { }
@@ -372,10 +373,14 @@ OSGTileFactory::addPlaceholderImageLayers(CustomTile* tile,
     // Now if we have a valid ancestor tile, go through and make a temporary tile consisting only of
     // layers that exist in the new map layer image list as well.
     //int layer = 0;
-    for( unsigned int j=0; j<ancestorTile->getNumColorLayers(); j++ )
-    {
-        tile->setColorLayer( j,  ancestorTile->getColorLayer( j ) );
-    }
+    ColorLayersByUID colorLayers;
+    ancestorTile->getCustomColorLayers( colorLayers );
+    tile->setCustomColorLayers( colorLayers );
+
+    //for( unsigned int j=0; j<ancestorTile->getNumColorLayers(); j++ )
+    //{
+    //    tile->setCustomColorLayer( j,  ancestorTile->getCustomColorLayer( j ) );
+    //}
 }
 
 
@@ -390,7 +395,12 @@ OSGTileFactory::addPlaceholderHeightfieldLayer(CustomTile* tile,
 
     if ( ancestorTile && ancestorKey.valid() )
     {
-        osg::ref_ptr<osgTerrain::HeightFieldLayer> ancestorLayer = dynamic_cast<osgTerrain::HeightFieldLayer*>(ancestorTile->getElevationLayer());
+        osg::ref_ptr<osgTerrain::HeightFieldLayer> ancestorLayer;
+        {
+            Threading::ScopedReadLock sharedLock( ancestorTile->getTileLayersMutex() );
+            ancestorLayer = dynamic_cast<osgTerrain::HeightFieldLayer*>(ancestorTile->getElevationLayer());
+        }
+
         if ( ancestorLayer.valid() )
         {
             osg::ref_ptr<osg::HeightField> ancestorHF = ancestorLayer->getHeightField();
@@ -403,23 +413,33 @@ OSGTileFactory::addPlaceholderHeightfieldLayer(CustomTile* tile,
 
                 newHFLayer = new osgTerrain::HeightFieldLayer( newHF );
                 newHFLayer->setLocator( defaultLocator );
-                tile->setElevationLayer( newHFLayer );                
-                tile->setElevationLOD( ancestorTile->getElevationLOD() );
+
+                // lock to set the elevation layerdata:
+                {
+                    Threading::ScopedWriteLock exclusiveLock( tile->getTileLayersMutex() );
+                    tile->setElevationLayer( newHFLayer );                
+                    tile->setElevationLOD( ancestorTile->getElevationLOD() );
+                }
             }
         }
     }
 
-    if ( !newHFLayer )
+    // lock the tile to write the elevation data.
     {
-        newHFLayer = new osgTerrain::HeightFieldLayer();
-        newHFLayer->setHeightField( createEmptyHeightField( key, 8, 8 ) );
-        newHFLayer->setLocator( defaultLocator );
-        tile->setElevationLOD( -1 );
-    }
+        Threading::ScopedWriteLock exclusiveLock( tile->getTileLayersMutex() );
 
-    if ( newHFLayer )
-    {
-        tile->setElevationLayer( newHFLayer );
+        if ( !newHFLayer )
+        {
+            newHFLayer = new osgTerrain::HeightFieldLayer();
+            newHFLayer->setHeightField( createEmptyHeightField( key, 8, 8 ) );
+            newHFLayer->setLocator( defaultLocator );
+            tile->setElevationLOD( -1 );
+        }
+
+        if ( newHFLayer )
+        {
+            tile->setElevationLayer( newHFLayer );
+        }
     }
 }
 
@@ -509,16 +529,18 @@ OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
     tile->setLocator( locator.get() );
 
     // Attach an updatecallback to normalize the edges of TerrainTiles.
+#if 0
     if ( hasElevation && _terrainOptions.normalizeEdges().get() )
     {
         tile->setUpdateCallback(new TerrainTileEdgeNormalizerUpdateCallback());
         tile->setDataVariance(osg::Object::DYNAMIC);
     }
+#endif
 
     // Generate placeholder imagery and elevation layers. These "inherit" data from an
     // ancestor tile.
     {
-        Threading::ScopedReadLock parentLock( ancestorTile->getTileLayersMutex() );
+        //Threading::ScopedReadLock parentLock( ancestorTile->getTileLayersMutex() );
         addPlaceholderImageLayers( tile, ancestorTile.get(), mapf.imageLayers(), locator.get(), key );
         addPlaceholderHeightfieldLayer( tile, ancestorTile.get(), locator.get(), key, ancestorKey );
     }
@@ -619,6 +641,9 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
         {
             image = layer->createImage( key );
         }
+
+        // always push images, even it they are empty, so that the image_tiles vector is one-to-one
+        // with the imageLayers() vector.
         image_tiles.push_back(image);
     }
 
@@ -732,12 +757,14 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
     tile->setRequiresNormals( true );
     tile->setDataVariance(osg::Object::DYNAMIC);
 
+#if 0
     //Attach an updatecallback to normalize the edges of TerrainTiles.
     if (hasElevation && _terrainOptions.normalizeEdges().get() )
     {
         tile->setUpdateCallback(new TerrainTileEdgeNormalizerUpdateCallback());
         tile->setDataVariance(osg::Object::DYNAMIC);
     }
+#endif
 
     //Assign the terrain system to the TerrainTile.
     //It is very important the terrain system is set while the MapConfig's sourceMutex is locked.
@@ -747,8 +774,6 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
 
     double min_units_per_pixel = DBL_MAX;
 
-    int layer = 0;
-
 #if 0
     // create contour layer:
     if (map->getContourTransferFunction() != NULL)
@@ -757,7 +782,7 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
 
         contourLayer->setMagFilter(_terrainOptions.getContourMagFilter().value());
         contourLayer->setMinFilter(_terrainOptions.getContourMinFilter().value());
-        tile->setColorLayer(layer,contourLayer);
+        tile->setCustomColorLayer(layer,contourLayer); //TODO: need layerUID, not layer index here -GW
         ++layer;
     }
 #endif
@@ -779,12 +804,22 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
             if ( mapInfo.isGeocentric() )
                 img_locator->setCoordinateSystemType( osgTerrain::Locator::GEOCENTRIC );
 
-            TransparentLayer* img_layer = new TransparentLayer(geo_image.getImage(), mapf.imageLayers()[i].get());
+#if 0
+            CustomColorLayer* img_layer = new CustomColorLayer(geo_image.getImage(), mapf.imageLayers()[i].get());
             img_layer->setLevelOfDetail( key.getLevelOfDetail() );
             img_layer->setName( mapf.imageLayers()[i]->getName() );
             img_layer->setLocator( img_locator.get());
             img_layer->setMinFilter( mapf.imageLayers()[i]->getImageLayerOptions().minFilter().value());
             img_layer->setMagFilter( mapf.imageLayers()[i]->getImageLayerOptions().magFilter().value());
+
+            tile->setCustomColorLayer( img_layer->getUID(), img_layer );
+#endif
+
+            tile->setCustomColorLayer( CustomColorLayer(
+                mapf.imageLayerAt(i),
+                geo_image.getImage(),
+                img_locator.get(),
+                key.getLevelOfDetail() ) );
 
             double upp = geo_image.getUnitsPerPixel();
 
@@ -793,9 +828,6 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
                 upp *= 1.0f/111319.0f;
 
             min_units_per_pixel = osg::minimum(upp, min_units_per_pixel);
-
-            tile->setColorLayer( layer, img_layer );
-            layer++;
         }
     }
 
@@ -889,7 +921,7 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
 }
 
 
-osgTerrain::ImageLayer* 
+CustomColorLayerRef*
 OSGTileFactory::createImageLayer(const MapInfo& mapInfo,
                                  ImageLayer* layer,
                                  const TileKey& key,
@@ -922,14 +954,18 @@ OSGTileFactory::createImageLayer(const MapInfo& mapInfo,
         if ( mapInfo.isGeocentric() )
             imgLocator->setCoordinateSystemType( osgTerrain::Locator::GEOCENTRIC );
 
-        //osgTerrain::ImageLayer* imgLayer = new osgTerrain::ImageLayer( geoImage->getImage() );
-        TransparentLayer* imgLayer = new TransparentLayer(geoImage.getImage(), layer);
-        imgLayer->setLocator( imgLocator.get() );
-        imgLayer->setLevelOfDetail( key.getLevelOfDetail() );
-        imgLayer->setMinFilter( layer->getImageLayerOptions().minFilter().value() );
-        imgLayer->setMagFilter( layer->getImageLayerOptions().magFilter().value() );
-        return imgLayer;
+        CustomColorLayer result( layer, geoImage.getImage(), imgLocator.get(), key.getLevelOfDetail() );
+        return new CustomColorLayerRef( result );
+
+        ////osgTerrain::ImageLayer* imgLayer = new osgTerrain::ImageLayer( geoImage->getImage() );
+        //CustomColorLayer* imgLayer = new CustomColorLayer(geoImage.getImage(), layer);
+        //imgLayer->setLocator( imgLocator.get() );
+        //imgLayer->setLevelOfDetail( key.getLevelOfDetail() );
+        //imgLayer->setMinFilter( layer->getImageLayerOptions().minFilter().value() );
+        //imgLayer->setMagFilter( layer->getImageLayerOptions().magFilter().value() );
+        //return imgLayer;
     }
+
     return NULL;
 }
 

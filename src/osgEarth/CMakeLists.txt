@@ -64,11 +64,8 @@ SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/TerrainOptions
 	${HEADER_PATH}/TerrainEngineNode
     ${HEADER_PATH}/TextureCompositor
-    ${HEADER_PATH}/TextureCompositorAtlas
     ${HEADER_PATH}/TextureCompositorMulti
     ${HEADER_PATH}/TextureCompositorTexArray
-    ${HEADER_PATH}/TextureCompositorTex3D
-    ${HEADER_PATH}/TextureCompositorSoftware
     ${HEADER_PATH}/TileFactory
 	${HEADER_PATH}/TileKey
 	${HEADER_PATH}/TileSource
@@ -79,6 +76,11 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/VerticalSpatialReference
 	${HEADER_PATH}/XmlUtils
 )
+
+SET(TARGET_H
+    tinystr.h
+    tinyxml.h 
+	)
 
 SET(TARGET_SRC
     Caching.cpp
@@ -122,11 +124,8 @@ SET(TARGET_SRC
     TerrainOptions.cpp
     TerrainEngineNode.cpp
     TextureCompositor.cpp
-    TextureCompositorAtlas.cpp
     TextureCompositorMulti.cpp
     TextureCompositorTexArray.cpp
-    TextureCompositorTex3D.cpp
-    TextureCompositorSoftware.cpp
     TileFactory.cpp
     TileKey.cpp
     TileSource.cpp
@@ -141,9 +140,9 @@ SET(TARGET_SRC
     XmlUtils.cpp
 )
 
-INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${CURL_INCLUDE_DIR} ${EXPAT_INCLUDE_DIR} ${GDAL_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${GDAL_INCLUDE_DIR} ${CURL_INCLUDE_DIR} ${OSG_INCLUDE_DIR} )
 
-SET(TARGET_LIBRARIES_VARS CURL_LIBRARY GDAL_LIBRARY EXPAT_LIBRARY)
+SET(TARGET_LIBRARIES_VARS CURL_LIBRARY GDAL_LIBRARY)
 
 SET(TARGET_ADDED_LIBRARIES
 	osg

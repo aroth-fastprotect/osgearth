@@ -190,7 +190,9 @@ public:
                     double min_x, max_x, min_y, max_y;
                     ct.getRange(min_x, min_y, max_x, max_y);
 
-                    OE_DEBUG<<"VPB: range("<<min_x<<", "<<min_y<<", "<<max_x<<", "<<max_y<<std::endl;
+                    OE_DEBUG<<"VPB: range("<<min_x<<", "<<min_y<<", "<<max_x<<", "<<max_y<< ")" <<std::endl;
+					OE_DEBUG<<"VPB: range("<<osg::RadiansToDegrees(min_x)<<", "<<osg::RadiansToDegrees(min_y)<<", "
+						<<osg::RadiansToDegrees(max_x)<<", "<<osg::RadiansToDegrees(max_y)<< ")" <<std::endl;
 
                     srs = locator->getCoordinateSystem();
 

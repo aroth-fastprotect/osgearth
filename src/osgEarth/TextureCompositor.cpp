@@ -19,10 +19,7 @@
 
 #include <osgEarth/TextureCompositor>
 #include <osgEarth/TextureCompositorTexArray>
-#include <osgEarth/TextureCompositorTex3D>
-#include <osgEarth/TextureCompositorAtlas>
 #include <osgEarth/TextureCompositorMulti>
-#include <osgEarth/TextureCompositorSoftware>
 #include <osgEarth/Capabilities>
 #include <osgEarth/ImageUtils>
 #include <osgEarth/Registry>
@@ -38,8 +35,7 @@ using namespace OpenThreads;
 
 //---------------------------------------------------------------------------
 
-TextureLayout::TextureLayout() :
-_firstTextureSlot( 0 )
+TextureLayout::TextureLayout()
 {
     //nop
 }
@@ -76,14 +72,18 @@ TextureLayout::applyMapModelChange( const MapModelChange& change )
         bool found = false;
         for( TextureSlotVector::iterator i = _slots.begin(); i != _slots.end() && !found; ++i )
         {
-            if ( *i < 0 ) // negative UID means the slot is empty.
+            int slot = (int)(i - _slots.begin());
+
+            // negative UID means the slot is empty.
+            bool slotAvailable = (*i < 0) && (_reservedSlots.find(slot) == _reservedSlots.end());
+            if ( slotAvailable )
             {
                 *i = change.getImageLayer()->getUID();
                 
-                if ( change.getFirstIndex() >= _order.size() )
+                if ( change.getFirstIndex() >= (int)_order.size() )
                     _order.resize( change.getFirstIndex() + 1, -1 );
 
-                _order[change.getFirstIndex()] = (int)(i - _slots.begin());
+                _order[change.getFirstIndex()] = slot;
                 found = true;
                 break;
             }
@@ -137,6 +137,12 @@ TextureLayout::applyMapModelChange( const MapModelChange& change )
     //    OE_INFO << LC << "  Ordr " << i << ": slot=" << _order[i] << std::endl;
 }
 
+void
+TextureLayout::setReservedSlots( const std::set<int>& reservedSlots )
+{
+    _reservedSlots = reservedSlots;
+}
+
 //---------------------------------------------------------------------------
 
 TextureCompositor::TextureCompositor( const TerrainOptions::CompositingTechnique& tech ) :
@@ -150,17 +156,72 @@ _forceTech( false )
         TerrainOptions::CompositingTechnique oldTech = _tech;
         std::string t( ::getenv( "OSGEARTH_COMPOSITOR_TECH" ) );
         if      ( t == "TEXTURE_ARRAY" )    _tech = TerrainOptions::COMPOSITING_TEXTURE_ARRAY;
-        //else if ( t == "TEXTURE_3D" )       _tech = TECH_TEXTURE_3D;
-        //else if ( t == "TEXTURE_ATLAS" )    _tech = TerrainOptions::COMPOSITING_TEXTURE_ATLAS;
         else if ( t == "MULTITEXTURE_GPU" ) _tech = TerrainOptions::COMPOSITING_MULTITEXTURE_GPU;
-        //else if ( t == "MULTITEXTURE_FFP" ) _tech = TerrainOptions::COMPOSITING_MULTITEXTURE_FFP;
         else if ( t == "MULTIPASS" )        _tech = TerrainOptions::COMPOSITING_MULTIPASS;
-        //else if ( t == "SOFTWARE" )         _tech = TECH_SOFTWARE;
         if ( oldTech != _tech )
             _forceTech = true;
     }
 
     init();
+}
+
+bool
+TextureCompositor::reserveTextureImageUnit( int& out_unit )
+{
+    //todo: move this into the impls!!
+
+    out_unit = -1;
+
+    //TODO: this only supports GPU texturing....
+    int maxUnits = osgEarth::Registry::instance()->getCapabilities().getMaxGPUTextureUnits();
+
+    if ( _tech == TerrainOptions::COMPOSITING_MULTITEXTURE_GPU )
+    {
+        Threading::ScopedWriteLock exclusiveLock( _layoutMutex );
+
+        const TextureLayout::TextureSlotVector& slots = _layout.getTextureSlots();
+        for( int i=0; i<maxUnits; ++i )
+        {
+            if (( i < (int)slots.size() && slots[i] < 0 ) || i >= (int)slots.size() )
+            {
+                out_unit = i;
+                _reservedUnits.insert( i );
+                _layout.setReservedSlots( _reservedUnits ); // in multitexture, slots == units
+                return true;
+            }
+        }
+
+        // all taken, return false.
+        return false;
+    }
+    else // texture array or multipass... they area locked to unit 0
+    {
+        // search for an unused unit.
+        for( int i=1; i<maxUnits; ++i ) // start at 1 because unit 0 is always reserved
+        {
+            if ( _reservedUnits.find( i ) == _reservedUnits.end() )
+            {
+                out_unit = i;
+                _reservedUnits.insert( i );
+                return true;
+            }
+        }
+
+        // all taken, return false.
+        return false;
+    }
+}
+
+void
+TextureCompositor::releaseTextureImageUnit( int unit )
+{
+    _reservedUnits.erase( unit );
+
+    if ( _tech == TerrainOptions::COMPOSITING_MULTITEXTURE_GPU )
+    {
+        Threading::ScopedWriteLock exclusiveLock( _layoutMutex );
+        _layout.setReservedSlots( _reservedUnits );
+    }
 }
 
 void
@@ -170,13 +231,15 @@ TextureCompositor::applyMapModelChange( const MapModelChange& change )
     _layout.applyMapModelChange( change );
 }
 
-#if 0
-osg::StateSet*
-TextureCompositor::createStateSet( const GeoImageVector& stack, const GeoExtent& tileExtent ) const
+void
+TextureCompositor::applyResourcePolicy( const ResourcePolicy& policy )
 {
-    return _impl ? _impl->createStateSet( stack, tileExtent ) : 0L;
+    if ( _impl.valid() )
+    {
+        Threading::ScopedWriteLock exclusiveLock( _layoutMutex );
+        _impl->applyResourcePolicy( policy, _layout );
+    }
 }
-#endif
 
 bool
 TextureCompositor::supportsLayerUpdate() const
@@ -264,6 +327,30 @@ TextureCompositor::getRenderOrder( UID layerUID ) const
     return _layout.getOrder( layerUID );
 }
 
+osg::Shader*
+TextureCompositor::createSamplerFunction(UID                layerUID, 
+                                         const std::string& functionName,
+                                         osg::Shader::Type  type ) const
+{
+    osg::Shader* result = 0L;
+    if ( _impl.valid() )
+    {
+        Threading::ScopedReadLock sharedLock( const_cast<TextureCompositor*>(this)->_layoutMutex );
+        result = _impl->createSamplerFunction( layerUID, functionName, type, _layout );
+    }
+
+    if ( !result )
+    {
+        std::string fname = !functionName.empty() ? functionName : "defaultSamplerFunction";
+        std::stringstream buf;
+        buf << "void " << functionName << "() { \n return vec4(0,0,0,0); \n } \n";
+        std::string str = buf.str();
+        result = new osg::Shader( type, str );
+    }
+
+    return result;
+}
+
 void
 TextureCompositor::init()
 {        
@@ -276,6 +363,8 @@ TextureCompositor::init()
 
     const Capabilities& caps = Registry::instance()->getCapabilities();
 
+#if OSG_VERSION_GREATER_OR_EQUAL( 2, 9, 8 )
+
     if (_tech == TerrainOptions::COMPOSITING_TEXTURE_ARRAY || 
         (isAuto && caps.supportsGLSL(1.30f) && caps.supportsTextureArrays()) )
     {
@@ -284,26 +373,11 @@ TextureCompositor::init()
         OE_INFO << LC << "Compositing technique = TEXTURE ARRAY" << std::endl;
     }
 
-#if 0
-    // check "forceTech" because it doesn't work yet:
-    else if ( _forceTech && ( _tech == TerrainOptions::COMPOSITING_TEXTURE_3D || (isAuto && caps.supportsTexture3D()) ) )
-    {
-        _tech = TerrainOptions::COMPOSITING_TEXTURE_3D;
-        _impl = new TextureCompositorTex3D();
-        OE_INFO << LC << "Compositing technique = TEXTURE 3D" << std::endl;
-    }
+    else
 
-    // check "forceTech" because the tile boundaries show
-    else if ( _forceTech && ( _tech == TerrainOptions::COMPOSITING_TEXTURE_ATLAS || (isAuto && caps.supportsGLSL()) ) )
-    {
-        _tech = TerrainOptions::COMPOSITING_TEXTURE_ATLAS;
-        _impl = new TextureCompositorAtlas();
-        OE_INFO << LC << "Compositing technique = TEXTURE ATLAS" << std::endl;
-    }
-#endif
+#endif // OSG_VERSION_GREATER_OR_EQUAL( 2, 9, 8 )
 
-    else if (
-        _tech == TerrainOptions::COMPOSITING_MULTITEXTURE_GPU ||
+    if (_tech == TerrainOptions::COMPOSITING_MULTITEXTURE_GPU ||
         (isAuto && caps.supportsGLSL(1.20f) && caps.supportsMultiTexture()) ) 
     {
         _tech = TerrainOptions::COMPOSITING_MULTITEXTURE_GPU;

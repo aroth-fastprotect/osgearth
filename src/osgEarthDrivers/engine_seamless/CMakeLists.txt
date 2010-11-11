@@ -32,8 +32,3 @@ INCLUDE_DIRECTORIES(${INCDIR} ${GDAL_INCLUDE_DIR})
 
 # to install public driver includes:
 SETUP_PLUGIN(osgearth_engine_seamless)
-
-SET(LIB_NAME engine_seamless)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

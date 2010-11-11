@@ -37,6 +37,8 @@
 #include <osgEarthDrivers/feature_ogr/OGRFeatureOptions>
 #include <osgEarthDrivers/agglite/AGGLiteOptions>
 
+#include <osgDB/WriteFile>
+
 using namespace osgEarth::Drivers;
 using namespace osgEarth::Symbology;
 using namespace osgEarth::Features;
@@ -107,6 +109,10 @@ struct LockAzimuthHandler : public osgGA::GUIEventHandler
     {
         if (ea.getEventType() == ea.KEYDOWN && ea.getKey() == _key)
         {
+			osg::Camera * cam = aa.asView()->getCamera();
+
+			osgDB::writeNodeFile(*cam, "C:/tmp/osgcam.osgx");
+
             bool lockAzimuth
                 = _manip->getSettings()->getLockAzimuthWhilePanning();
             _manip->getSettings()->setLockAzimuthWhilePanning(!lockAzimuth);
@@ -144,31 +150,39 @@ int main(int argc, char** argv)
         return -1;
     }
 
-    osg::Group* root = new osg::Group();
+	osg::ref_ptr<osg::Group> root = new osg::Group();
     root->addChild( earthNode );
 
     osgEarthUtil::Graticule* graticule = 0L;
 
-    osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( earthNode );
+	osg::ref_ptr<osgEarth::MapNode> mapNode = osgEarth::MapNode::findMapNode( earthNode );
     if ( mapNode )
     {
-        if ( mapNode )
-            manip->setNode( mapNode->getTerrainEngine() );
-
-        if ( mapNode->getMap()->isGeocentric() )
-        {
-            manip->setHomeViewpoint( 
-                osgEarthUtil::Viewpoint( osg::Vec3d( -90, 0, 0 ), 0.0, -90.0, 5e7 ) );
-
-            // add a handler that will automatically calculate good clipping planes
-            viewer.addEventHandler( new osgEarthUtil::AutoClipPlaneHandler() );
-        }
+		osg::ref_ptr<osg::CoordinateSystemNode> csn = new osg::CoordinateSystemNode;
+		csn->set(*mapNode->getTerrainEngine());
+		csn->addChild(mapNode->getTerrainEngine());
+//        if ( mapNode )
+//            manip->setNode( csn );
+		root->addChild( csn );
 
         // create a graticle, and start it in the OFF position
         graticule = new osgEarthUtil::Graticule( mapNode->getMap() );
         graticule->setNodeMask(0);
         root->addChild( graticule );
     }
+	else
+		root->addChild( earthNode );
+
+	manip->setNode( root );
+	if ( mapNode->getMap()->isGeocentric() )
+	{
+		manip->setHomeViewpoint( 
+			osgEarthUtil::Viewpoint( osg::Vec3d( -90, 0, 0 ), 0.0, -90.0, 5e7 ) );
+
+		// add a handler that will automatically calculate good clipping planes
+		viewer.addEventHandler( new osgEarthUtil::AutoClipPlaneHandler() );
+	}
+
 
     viewer.setSceneData( root );
     viewer.setCameraManipulator( manip );

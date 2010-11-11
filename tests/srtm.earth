@@ -18,7 +18,7 @@ The heightfield is draped with the NASA Blue Marble imagery.
   <options>
       <terrain>
           <vertical_scale>2</vertical_scale>
-          <loading_policy mode="sequential"/>
+          <loading_policy mode="sequential" loading_threads="8" compile_threads="8"/>
       </terrain>
   </options>
   

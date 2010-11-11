@@ -16,8 +16,11 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-
 #include <osgEarth/TextureCompositorTexArray>
+
+// only in newer OSG versions.
+#if OSG_VERSION_GREATER_OR_EQUAL( 2, 9, 8 )
+
 #include <osgEarth/ImageUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/ShaderComposition>
@@ -30,57 +33,60 @@ using namespace osgEarth;
 
 //------------------------------------------------------------------------
 
-static osg::Shader*
-s_createTextureFragShaderFunction( const TextureLayout& layout )
+namespace
 {
-    std::stringstream buf;
-
-    buf << "#version 130 \n"
-        << "#extension GL_EXT_gpu_shader4 : enable \n"
-
-        << "uniform sampler2DArray tex0; \n"
-        << "uniform float[] region; \n"
-        << "uniform float[] osgearth_imagelayer_opacity; \n"
-        << "uniform bool[]  osgearth_imagelayer_enabled; \n"
-        << "uniform float[] osgearth_imagelayer_range; \n"
-        << "uniform float   osgearth_imagelayer_attenuation; \n"
-        << "varying float osgearth_range; \n"
-
-        << "vec4 osgearth_frag_texture(void) \n"
-        << "{ \n"
-        << "    vec3 color = vec3(1,1,1); \n"
-        << "    float u, v, dmin, dmax, atten_min, atten_max; \n"
-        << "    vec4 texel; \n";
-
-    const RenderOrderVector& order = layout.getRenderOrder();
-
-    for( int i = 0; i < order.size(); ++i )
+    static osg::Shader*
+    s_createTextureFragShaderFunction( const TextureLayout& layout )
     {
-        int slot = order[i];
-        int q = 2 * i;
-        int r = 4 * slot;
+        std::stringstream buf;
 
-        buf << "    if (osgearth_imagelayer_enabled["<< i << "]) { \n"
-            << "        u = region["<< r <<"] + (region["<< r+2 <<"] * gl_TexCoord[0].s); \n"
-            << "        v = region["<< r+1 <<"] + (region["<< r+3 <<"] * gl_TexCoord[0].t); \n"
-            << "        dmin = osgearth_range - osgearth_imagelayer_range["<< q << "]; \n"
-            << "        dmax = osgearth_range - osgearth_imagelayer_range["<< q+1 <<"]; \n"
-            << "        if (dmin >= 0 && dmax <= 0.0) { \n"
-            << "            atten_max = -clamp( dmax, -osgearth_imagelayer_attenuation, 0 ) / osgearth_imagelayer_attenuation; \n"
-            << "            atten_min =  clamp( dmin, 0, osgearth_imagelayer_attenuation ) / osgearth_imagelayer_attenuation; \n"
-            << "            texel = texture2DArray( tex0, vec3(u,v,"<< slot <<") ); \n"
-            << "            color = mix(color, texel.rgb, texel.a * osgearth_imagelayer_opacity["<< i <<"] * atten_max * atten_min); \n"
-            << "        } \n"
-            << "    } \n"
-            ;
+        buf << "#version 130 \n"
+            << "#extension GL_EXT_gpu_shader4 : enable \n"
+
+            << "uniform sampler2DArray tex0; \n"
+            << "uniform float[] region; \n"
+            << "uniform float[] osgearth_imagelayer_opacity; \n"
+            << "uniform bool[]  osgearth_imagelayer_enabled; \n"
+            << "uniform float[] osgearth_imagelayer_range; \n"
+            << "uniform float   osgearth_imagelayer_attenuation; \n"
+            << "varying float osgearth_range; \n"
+
+            << "vec4 osgearth_frag_texture(void) \n"
+            << "{ \n"
+            << "    vec3 color = vec3(1,1,1); \n"
+            << "    float u, v, dmin, dmax, atten_min, atten_max; \n"
+            << "    vec4 texel; \n";
+
+        const TextureLayout::RenderOrderVector& order = layout.getRenderOrder();
+
+        for( unsigned int i = 0; i < order.size(); ++i )
+        {
+            int slot = order[i];
+            int q = 2 * i;
+            int r = 4 * slot;
+
+            buf << "    if (osgearth_imagelayer_enabled["<< i << "]) { \n"
+                << "        u = region["<< r <<"] + (region["<< r+2 <<"] * gl_TexCoord[0].s); \n"
+                << "        v = region["<< r+1 <<"] + (region["<< r+3 <<"] * gl_TexCoord[0].t); \n"
+                << "        dmin = osgearth_range - osgearth_imagelayer_range["<< q << "]; \n"
+                << "        dmax = osgearth_range - osgearth_imagelayer_range["<< q+1 <<"]; \n"
+                << "        if (dmin >= 0 && dmax <= 0.0) { \n"
+                << "            atten_max = -clamp( dmax, -osgearth_imagelayer_attenuation, 0 ) / osgearth_imagelayer_attenuation; \n"
+                << "            atten_min =  clamp( dmin, 0, osgearth_imagelayer_attenuation ) / osgearth_imagelayer_attenuation; \n"
+                << "            texel = texture2DArray( tex0, vec3(u,v,"<< slot <<") ); \n"
+                << "            color = mix(color, texel.rgb, texel.a * osgearth_imagelayer_opacity["<< i <<"] * atten_max * atten_min); \n"
+                << "        } \n"
+                << "    } \n"
+                ;
+        }
+
+        buf << "    return vec4(color,1); \n"
+            << "} \n";
+
+        std::string str = buf.str();
+        //OE_INFO << std::endl << str;
+        return new osg::Shader( osg::Shader::FRAGMENT, str );
     }
-
-    buf << "    return vec4(color,1); \n"
-        << "} \n";
-
-    std::string str = buf.str();
-    //OE_INFO << std::endl << str;
-    return new osg::Shader( osg::Shader::FRAGMENT, str );
 }
 
 //------------------------------------------------------------------------
@@ -120,12 +126,12 @@ namespace
         if ( tex->getTextureDepth() < requiredDepth )
             tex->setTextureDepth( requiredDepth );
 
-        const TextureSlotVector& slots = layout.getTextureSlots();
+        const TextureLayout::TextureSlotVector& slots = layout.getTextureSlots();
 
         // null out any empty slots (to save memory, i guess)
-        for( int i=0; i<tex->getTextureDepth(); ++i )
+        for( int i=0; i < tex->getTextureDepth(); ++i )
         {
-            if ( i < slots.size() && slots[i] < 0 )
+            if ( i < (int)slots.size() && slots[i] < 0 )
                 tex->setImage( i, 0L );
         }
 
@@ -148,7 +154,7 @@ namespace
         else if ( region->getNumElements() < layout.getTextureSlots().size() * 4 )
         {            
             osg::Uniform* newRegion = new osg::Uniform( osg::Uniform::FLOAT, "region", layout.getTextureSlots().size() * 4 );
-            for( int i=0; i<region->getNumElements(); ++i )
+            for( unsigned int i=0; i<region->getNumElements(); ++i )
             {
                 float value;
                 region->getElement( i, value );
@@ -230,89 +236,51 @@ TextureCompositorTexArray::applyLayerUpdate(osg::StateSet* stateSet,
     }
 }
 
-#if 0
-osg::StateSet*
-TextureCompositorTexArray::createStateSet( const GeoImageVector& layerImages, const GeoExtent& tileExtent ) const
-{
-    osg::StateSet* stateSet = new osg::StateSet();
-    if ( layerImages.size() < 1 )
-        return stateSet;
-
-    osg::Texture2DArray* texture = new osg::Texture2DArray();
-
-    int texWidth = 0, texHeight = 0;
-
-    // find each image layer and create a region entry for it
-    texture->setTextureDepth( layerImages.size() );
-    texture->setInternalFormat( GL_RGBA );
-
-    // this uniform will properly position the image within the tile (kind of like
-    // texture coordinate generation parameters).
-    osg::Uniform* texInfoArray = new osg::Uniform( osg::Uniform::FLOAT, "region", layerImages.size() * 4 );
-
-    int layerNum = 0, u = 0;
-    for( GeoImageVector::const_iterator i = layerImages.begin(); i != layerImages.end(); ++i, ++layerNum )
-    {
-        const GeoImage& geoImage = *i;
-        GeoImage preparedImage = prepareLayerUpdate( geoImage, tileExtent );
-        osg::Image* image = preparedImage.getImage();
-
-        // add the layer image to the composite.
-        texture->setImage( layerNum, image );
-
-        // track the maximum texture size
-        // TODO: currently pointless since we are resizing all layers to 256 anyway...
-        if ( image->s() > texWidth )
-            texWidth = image->s();
-
-        if ( image->t() > texHeight )
-            texHeight = image->t();
-            
-        // record the proper texture offset/scale for this layer. this accounts for subregions that
-        // are used when referencing lower LODs.
-        const GeoExtent& layerExtent = preparedImage.getExtent();
-
-        float xoffset = (tileExtent.xMin() - layerExtent.xMin()) / layerExtent.width();
-        float yoffset = (tileExtent.yMin() - layerExtent.yMin()) / layerExtent.height();
-        float xscale  = tileExtent.width() / layerExtent.width();
-        float yscale  = tileExtent.height() / layerExtent.height();
-
-        texInfoArray->setElement( u++, xoffset );
-        texInfoArray->setElement( u++, yoffset );
-        texInfoArray->setElement( u++, xscale );
-        texInfoArray->setElement( u++, yscale );
-    }
-
-    texture->setTextureSize( texWidth, texHeight, layerImages.size() );
-
-    // configure the mipmapping 
-    texture->setMaxAnisotropy(16.0f);
-    texture->setResizeNonPowerOfTwoHint(false);
-    texture->setFilter( osg::Texture::MAG_FILTER, osg::Texture::LINEAR );
-    bool powerOfTwo = texWidth > 0 && (texWidth & (texWidth - 1)) && texHeight > 0 && (texHeight & (texHeight - 1));
-    if ( powerOfTwo )
-        texture->setFilter( osg::Texture::MIN_FILTER, osg::Texture::LINEAR_MIPMAP_LINEAR );
-    else
-        texture->setFilter( osg::Texture::MIN_FILTER, osg::Texture::LINEAR );
-
-    // configure the wrapping
-    texture->setWrap(osg::Texture::WRAP_S,osg::Texture::CLAMP_TO_EDGE);
-    texture->setWrap(osg::Texture::WRAP_T,osg::Texture::CLAMP_TO_EDGE);
-    //texture->setWrap(osg::Texture::WRAP_R,osg::Texture::REPEAT);
-
-    // (note: do NOT call setTextureAttributeAndModes -- opengl error since TEXTURE_2D_ARRAY is not a valid mode)
-    //TODO: un-hard-code the texture unit, perhaps
-    stateSet->setTextureAttribute( 0, texture, osg::StateAttribute::ON ); 
-    stateSet->addUniform( texInfoArray );
-    stateSet->addUniform( new osg::Uniform("tex0", 0) );
-
-    return stateSet;
-}
-#endif
-
 void
 TextureCompositorTexArray::updateMasterStateSet( osg::StateSet* stateSet, const TextureLayout& layout ) const
 {
     VirtualProgram* vp = static_cast<VirtualProgram*>( stateSet->getAttribute(osg::StateAttribute::PROGRAM) );
     vp->setShader( "osgearth_frag_texture", s_createTextureFragShaderFunction(layout) );
 }
+
+osg::Shader*
+TextureCompositorTexArray::createSamplerFunction(UID layerUID,
+                                                 const std::string& functionName,
+                                                 osg::Shader::Type type,
+                                                 const TextureLayout& layout ) const
+{
+    osg::Shader* result = 0L;
+
+    int slot = layout.getSlot( layerUID );
+    if ( slot >= 0 )
+    {
+        int r = 4 * slot;
+
+        std::string texCoord = 
+            type == osg::Shader::VERTEX ? "gl_MultiTexCoord0" : 
+            "gl_TexCoord[0]";
+
+        std::stringstream buf;
+
+        buf << "#version 130 \n"
+            << "#extension GL_EXT_gpu_shader4 : enable \n"
+
+            << "uniform sampler2DArray tex0; \n"
+            << "uniform float[] region; \n"
+
+            << "vec4 " << functionName << "() \n"
+            << "{ \n"
+            << "    float u = region["<< r <<"] + (region["<< r+2 <<"] * "<< texCoord <<".s); \n"
+            << "    float v = region["<< r+1 <<"] + (region["<< r+3 <<"] * "<< texCoord <<".t); \n"
+            << "    return texture2DArray( tex0, vec3(u,v,"<< slot <<") ); \n"
+            << "} \n";
+
+        std::string str = buf.str();
+        result = new osg::Shader( type, str );
+    }
+    return result;
+}
+
+//------------------------------------------------------------------------
+
+#endif // OSG_VERSION_GREATER_OR_EQUAL( 2, 9, 8 )

@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-#include <EarthFileSerializer>
+#include "EarthFileSerializer"
 #include <osgEarth/Map>
 #include <osgEarth/MapNode>
 #include <osgEarth/Registry>

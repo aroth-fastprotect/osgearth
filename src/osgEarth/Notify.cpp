@@ -17,6 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Notify>
+#include <OpenThreads/Thread>
+#include <OpenThreads/Mutex>
 
 using namespace osgEarth;
 
@@ -44,6 +46,10 @@ using namespace osgEarth;
 
 using namespace std;
 
+#ifdef _WIN32
+extern "C" unsigned long __stdcall GetCurrentThreadId();
+#endif
+
 namespace osgEarth {
 
 class NullStreamBuffer : public std::streambuf
@@ -68,14 +74,19 @@ struct NullStream : public std::ostream
     }
 };
 
+
 /** Stream buffer calling notify handler when buffer is synchronized (usually on std::endl).
  * Stream stores last notification severity to pass it to handler call.
  */
 struct NotifyStreamBuffer : public std::stringbuf
 {
-    NotifyStreamBuffer() : _severity(osg::NOTICE)
+	NotifyStreamBuffer() : _severity(osg::NOTICE), _mutex(OpenThreads::Mutex::MUTEX_RECURSIVE), _ownerThreadId(0)
     {
     }
+	~NotifyStreamBuffer()
+	{
+		sync();
+	}
 
     void setNotifyHandler(osg::NotifyHandler *handler) { _handler = handler; }
     osg::NotifyHandler *getNotifyHandler() const { return _handler.get(); }
@@ -86,17 +97,43 @@ struct NotifyStreamBuffer : public std::stringbuf
 
 private:
 
-    int sync()
+    virtual int sync()
     {
         sputc(0); // string termination
         if (_handler.valid())
             _handler->notify(_severity, pbase());
         pubseekpos(0, std::ios_base::out); // or str(std::string())
+
+		unlock();
         return 0;
     }
+	virtual streamsize xsputn (const char_type* p, streamsize n)
+	{
+		lock();
+		return std::stringbuf::xsputn(p, n);
+	}
 
+	void lock()
+	{
+		unsigned currentThread = ::GetCurrentThreadId();
+		if(_ownerThreadId != currentThread)
+		{
+			_mutex.lock();
+			_ownerThreadId = currentThread;
+		}
+	}
+
+	void unlock()
+	{
+		_mutex.unlock();
+		_ownerThreadId = 0;
+	}
+
+private:
     osg::ref_ptr<osg::NotifyHandler> _handler;
     osg::NotifySeverity _severity;
+	OpenThreads::Mutex _mutex;
+	unsigned _ownerThreadId;
 };
 
 struct NotifyStream : public std::ostream
@@ -234,26 +271,4 @@ std::ostream& osgEarth::notify(const osg::NotifySeverity severity)
 	}
 	return *g_NullStream;
 }
-/*
-std::ostream&
-osgEarth::notify(const osg::NotifySeverity severity)
-{
-    // set up global notify null stream for inline notify
-    static NullStream s_NotifyNulStream;
 
-    static bool initialized = false;
-    if (!initialized) 
-    {
-        std::cerr<<""; // dummy op to force construction of cerr, before a reference is passed back to calling code.
-        std::cout<<""; // dummy op to force construction of cout, before a reference is passed back to calling code.
-        initialized = osgEarth::initNotifyLevel();
-    }
-
-    if (severity<=osgearth_g_NotifyLevel)
-    {
-        if (severity<=osg::WARN) return std::cerr;
-        else return std::cout;
-    }
-    return s_NotifyNulStream;
-}
-*/

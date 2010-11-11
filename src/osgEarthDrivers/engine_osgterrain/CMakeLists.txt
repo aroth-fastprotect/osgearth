@@ -18,8 +18,6 @@ SET(TARGET_PUBLIC_H
     )
 INCLUDE_DIRECTORIES(${INCDIR})
 
-MESSAGE(STATUS "common=${INCDIR}/Common")
-
 SET(TARGET_SRC
     CustomTerrain.cpp
     CustomTile.cpp

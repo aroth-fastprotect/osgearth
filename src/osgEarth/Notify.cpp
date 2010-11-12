@@ -48,7 +48,17 @@ using namespace std;
 
 #ifdef _WIN32
 extern "C" unsigned long __stdcall GetCurrentThreadId();
+#else
+#include <sys/syscall.h> 
 #endif
+static unsigned getCurrentThreadId()
+{
+#ifdef _WIN32
+	return (unsigned)::GetCurrentThreadId();
+#else
+	return (unsigned)::syscall(SYS_gettid);
+#endif
+}
 
 namespace osgEarth {
 
@@ -115,7 +125,7 @@ private:
 
 	void lock()
 	{
-		unsigned currentThread = ::GetCurrentThreadId();
+		unsigned currentThread = ::getCurrentThreadId();
 		if(_ownerThreadId != currentThread)
 		{
 			_mutex.lock();

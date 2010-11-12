@@ -189,13 +189,13 @@ TextureCompositorMultiTexture::updateMasterStateSet(osg::StateSet* stateSet,
         VirtualProgram* vp = static_cast<VirtualProgram*>( stateSet->getAttribute(osg::StateAttribute::PROGRAM) );
         if ( maxLayers > 0 )
         {
-            vp->setShader( "osgearth_frag_texture", s_createTextureFragShaderFunction(layout, maxLayers) );
-            vp->setShader( "osgearth_vert_texture", s_createTextureVertexShader(maxLayers) );
+            vp->setShader( "osgearth_frag_applyTexturing", s_createTextureFragShaderFunction(layout, maxLayers) );
+            vp->setShader( "osgearth_vert_setupTexturing", s_createTextureVertexShader(maxLayers) );
         }
         else
         {
-            vp->removeShader( "osgearth_frag_texture", osg::Shader::FRAGMENT );
-            vp->removeShader( "osgearth_vert_texture", osg::Shader::VERTEX );
+            vp->removeShader( "osgearth_frag_applyTexturing", osg::Shader::FRAGMENT );
+            vp->removeShader( "osgearth_vert_setupTexturing", osg::Shader::VERTEX );
         }
     }
 

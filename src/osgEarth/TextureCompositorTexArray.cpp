@@ -240,7 +240,7 @@ void
 TextureCompositorTexArray::updateMasterStateSet( osg::StateSet* stateSet, const TextureLayout& layout ) const
 {
     VirtualProgram* vp = static_cast<VirtualProgram*>( stateSet->getAttribute(osg::StateAttribute::PROGRAM) );
-    vp->setShader( "osgearth_frag_texture", s_createTextureFragShaderFunction(layout) );
+    vp->setShader( "osgearth_frag_applyTexturing", s_createTextureFragShaderFunction(layout) );
 }
 
 osg::Shader*

@@ -24,7 +24,7 @@
  * to simply incorporate it here instead of introducing another dependency.
  */
 
-#include <osgEarth/JsonUtils>
+#include "JsonUtils"
 #include <osg/Notify>
 
 #include <string.h>

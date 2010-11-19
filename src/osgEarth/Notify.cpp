@@ -91,33 +91,33 @@ struct NullStream : public std::ostream
 struct NotifyStreamBuffer : public std::stringbuf
 {
 	NotifyStreamBuffer() : _severity(osg::NOTICE), _mutex(OpenThreads::Mutex::MUTEX_RECURSIVE), _ownerThreadId(0)
-    {
-    }
+	{
+	}
 	~NotifyStreamBuffer()
 	{
 		sync();
 	}
 
-    void setNotifyHandler(osg::NotifyHandler *handler) { _handler = handler; }
-    osg::NotifyHandler *getNotifyHandler() const { return _handler.get(); }
+	void setNotifyHandler(osg::NotifyHandler *handler) { _handler = handler; }
+	osg::NotifyHandler *getNotifyHandler() const { return _handler.get(); }
 
-    /** Sets severity for next call of notify handler */
-    void setCurrentSeverity(osg::NotifySeverity severity) { _severity = severity; }
-    osg::NotifySeverity getCurrentSeverity() const { return _severity; }
+	/** Sets severity for next call of notify handler */
+	void setCurrentSeverity(osg::NotifySeverity severity) { _severity = severity; }
+	osg::NotifySeverity getCurrentSeverity() const { return _severity; }
 
 private:
 
-    virtual int sync()
-    {
-        sputc(0); // string termination
-        if (_handler.valid())
-            _handler->notify(_severity, pbase());
-        pubseekpos(0, std::ios_base::out); // or str(std::string())
+	virtual int sync()
+	{
+		sputc(0); // string termination
+		if (_handler.valid())
+			_handler->notify(_severity, pbase());
+		pubseekpos(0, std::ios_base::out); // or str(std::string())
 
 		unlock();
-        return 0;
-    }
-	virtual streamsize xsputn (const char_type* p, streamsize n)
+		return 0;
+	}
+	virtual std::streamsize xsputn (const char_type* p, std::streamsize n)
 	{
 		lock();
 		return std::stringbuf::xsputn(p, n);
@@ -140,8 +140,8 @@ private:
 	}
 
 private:
-    osg::ref_ptr<osg::NotifyHandler> _handler;
-    osg::NotifySeverity _severity;
+	osg::ref_ptr<osg::NotifyHandler> _handler;
+	osg::NotifySeverity _severity;
 	OpenThreads::Mutex _mutex;
 	unsigned _ownerThreadId;
 };

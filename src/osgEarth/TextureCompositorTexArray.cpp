@@ -47,22 +47,22 @@ namespace
         if ( blending )
         {
             buf << "#extension GL_ARB_shader_texture_lod : enable \n"
-                << "uniform float[] osgearth_slot_stamp; \n"
+                << "uniform float[] osgearth_SlotStamp; \n"
                 << "uniform float   osg_FrameTime; \n";
         }
 
         buf << "uniform sampler2DArray tex0; \n"
             << "uniform float[] region; \n"
-            << "uniform float[] osgearth_imagelayer_opacity; \n"
-            << "uniform bool[]  osgearth_imagelayer_enabled; \n"
-            << "uniform float[] osgearth_imagelayer_range; \n"
-            << "uniform float   osgearth_imagelayer_attenuation; \n"
-            << "varying float osgearth_range; \n"
+            << "uniform float[] osgearth_ImageLayerOpacity; \n"
+            << "uniform bool[]  osgearth_ImageLayerEnabled; \n"
+            << "uniform float[] osgearth_ImageLayerRange; \n"
+            << "uniform float   osgearth_ImageLayerAttenuation; \n"
+            << "varying float osgearth_CameraRange; \n"
 
             << "void osgearth_frag_applyTexturing( inout vec4 color ) \n"
             << "{ \n"
             << "    vec3 color3 = color.rgb; \n"
-            << "    float u, v, dmin, dmax, atten_min, atten_max; \n"
+            << "    float u, v, dmin, dmax, atten_min, atten_max, age; \n"
             << "    vec4 texel; \n";
 
         const TextureLayout::RenderOrderVector& order = layout.getRenderOrder();
@@ -73,20 +73,20 @@ namespace
             int q = 2 * i;
             int r = 4 * slot;
 
-            buf << "    if (osgearth_imagelayer_enabled["<< i << "]) { \n"
+            buf << "    if (osgearth_ImageLayerEnabled["<< i << "]) { \n"
                 << "        u = region["<< r <<"] + (region["<< r+2 <<"] * gl_TexCoord[0].s); \n"
                 << "        v = region["<< r+1 <<"] + (region["<< r+3 <<"] * gl_TexCoord[0].t); \n"
-                << "        dmin = osgearth_range - osgearth_imagelayer_range["<< q << "]; \n"
-                << "        dmax = osgearth_range - osgearth_imagelayer_range["<< q+1 <<"]; \n"
+                << "        dmin = osgearth_CameraRange - osgearth_ImageLayerRange["<< q << "]; \n"
+                << "        dmax = osgearth_CameraRange - osgearth_ImageLayerRange["<< q+1 <<"]; \n"
                 << "        if (dmin >= 0 && dmax <= 0.0) { \n"
-                << "            atten_max = -clamp( dmax, -osgearth_imagelayer_attenuation, 0 ) / osgearth_imagelayer_attenuation; \n"
-                << "            atten_min =  clamp( dmin, 0, osgearth_imagelayer_attenuation ) / osgearth_imagelayer_attenuation; \n";
+                << "            atten_max = -clamp( dmax, -osgearth_ImageLayerAttenuation, 0 ) / osgearth_ImageLayerAttenuation; \n"
+                << "            atten_min =  clamp( dmin, 0, osgearth_ImageLayerAttenuation ) / osgearth_ImageLayerAttenuation; \n";
                        
             if ( blending )
             {
                 float invBlendTime = 1.0f/blendTime;
 
-                buf << "            age = "<< invBlendTime << " * min( "<< blendTime << ", osg_FrameTime - osgearth_slot_stamp[" << slot << "] ); \n"
+                buf << "            age = "<< invBlendTime << " * min( "<< blendTime << ", osg_FrameTime - osgearth_SlotStamp[" << slot << "] ); \n"
                     << "            if ( age < 1.0 ) \n"
                     << "                texel = texture2DArrayLod( tex0, vec3(u,v,"<< slot <<"), 1.0-age); \n"
                     << "            else \n"
@@ -97,7 +97,7 @@ namespace
                 buf << "            texel = texture2DArray( tex0, vec3(u,v,"<< slot <<") ); \n";
             }
   
-            buf << "            color3 = mix(color3, texel.rgb, texel.a * osgearth_imagelayer_opacity["<< i <<"] * atten_max * atten_min); \n"
+            buf << "            color3 = mix(color3, texel.rgb, texel.a * osgearth_ImageLayerOpacity["<< i <<"] * atten_max * atten_min); \n"
                 << "        } \n"
                 << "    } \n"
                 ;
@@ -107,7 +107,6 @@ namespace
             << "} \n";
 
         std::string str = buf.str();
-        OE_INFO << std::endl << str;
         return new osg::Shader( osg::Shader::FRAGMENT, str );
     }
 }
@@ -213,8 +212,8 @@ TextureCompositorTexArray::prepareImage( const GeoImage& layerImage, const GeoEx
     osg::ref_ptr<osg::Image> image = layerImage.getImage();
 
     // Because all tex2darray layers must be identical in format, let's use RGBA.
-    if ( image->getPixelFormat() != GL_RGBA )
-        image = ImageUtils::convertToRGBA( image.get() );
+    if ( image->getPixelFormat() != GL_RGBA8 )
+        image = ImageUtils::convertToRGBA8( image.get() );
 
     // TODO: revisit. For now let's just settle on 256 (again, all layers must be the same size)
     if ( image->s() != 256 || image->t() != 256 )
@@ -225,7 +224,7 @@ TextureCompositorTexArray::prepareImage( const GeoImage& layerImage, const GeoEx
     }
 
     //Make sure that the internal texture format is always set to GL_RGBA
-    image->setInternalTextureFormat( GL_RGBA );
+    image->setInternalTextureFormat( GL_RGBA8 );
     
     // Failure to do this with a Texture2DArray will result in texture corruption if we are 
     // updating layers (like in sequential mode).
@@ -277,10 +276,10 @@ TextureCompositorTexArray::applyLayerUpdate(osg::StateSet* stateSet,
     if ( _lodBlending )
     {
         // update the timestamp on the image layer to support blending.
-        osg::Uniform* stamp = stateSet->getUniform( "osgearth_slot_stamp" );
+        osg::Uniform* stamp = stateSet->getUniform( "osgearth_SlotStamp" );
         if ( !stamp || stamp->getNumElements() < layout.getMaxUsedSlot() + 1 )
         {
-            stamp = new osg::Uniform( osg::Uniform::FLOAT, "osgearth_slot_stamp", layout.getMaxUsedSlot()+1 );   
+            stamp = new osg::Uniform( osg::Uniform::FLOAT, "osgearth_SlotStamp", layout.getMaxUsedSlot()+1 );   
             stateSet->addUniform( stamp );
         }
 

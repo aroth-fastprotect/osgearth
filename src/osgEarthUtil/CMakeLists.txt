@@ -13,7 +13,6 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/Controls
 	${HEADER_PATH}/ClampCallback
 	${HEADER_PATH}/EarthManipulator
-	${HEADER_PATH}/ElevationFadeCallback
 	#${HEADER_PATH}/ElevationManager
 	${HEADER_PATH}/Export
 	${HEADER_PATH}/Graticule
@@ -29,7 +28,6 @@ SET(TARGET_SRC
 	ClampCallback.cpp
     Controls.cpp
 	EarthManipulator.cpp
-	ElevationFadeCallback.cpp
 	#ElevationManager.cpp
 	Graticule.cpp
 	ObjectPlacer.cpp

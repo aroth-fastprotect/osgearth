@@ -70,6 +70,8 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/TileKey
 	${HEADER_PATH}/TileSource
 	${HEADER_PATH}/ThreadingUtils
+	#${HEADER_PATH}/tinystr.h # only to simplify merging
+	#${HEADER_PATH}/tinyxml.h # only to simplify merging 
 	${HEADER_PATH}/TMS
 	${HEADER_PATH}/Units
 	${HEADER_PATH}/Version

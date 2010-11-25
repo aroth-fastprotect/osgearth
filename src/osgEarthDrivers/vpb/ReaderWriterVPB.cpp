@@ -20,6 +20,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/TileSource>
 #include <osgEarth/HTTPClient>
+#include <osgEarth/FileUtils>
 
 #include <osg/Notify>
 #include <osg/io_utils>
@@ -145,6 +146,10 @@ public:
         _maxNumTilesInCache( 128 ),
         _profile( osgEarth::Registry::instance()->getGlobalGeodeticProfile() )
     {
+	}
+	
+	void initialize( const std::string& referenceURI)
+	{
         unsigned int numTilesWideAtLod0, numTilesHighAtLod0;
         _profile->getNumTiles(0, numTilesWideAtLod0, numTilesHighAtLod0);
 
@@ -153,6 +158,12 @@ public:
 
         if ( !_url.empty() )
         {
+			//If the path doesn't contain a server address, get the full path to the file.
+			if (!osgDB::containsServerAddress(_url))
+			{
+				_url = osgEarth::getFullPath(referenceURI, _url);
+			}
+			
             osg::ref_ptr<osgDB::ReaderWriter::Options> localOptions = new osgDB::ReaderWriter::Options;
             localOptions->setPluginData("osgearth_vpb Plugin",(void*)(1));
             //_rootNode = osgDB::readNodeFile( _url, localOptions.get() );
@@ -483,13 +494,16 @@ public:
     VPBSource( VPBDatabase* vpbDatabase, const VPBOptions& in_options ) : //const VPBOptions* in_options) :  
         TileSource(in_options),
         _vpbDatabase(vpbDatabase),
-        _options( in_options )
+        _options( in_options ),
+        _referenceUri()
     {
         //nop
     }
 
     void initialize( const std::string& referenceURI, const Profile* overrideProfile)
     {
+		_referenceUri = referenceURI;
+		_vpbDatabase->initialize(referenceURI);
 		if ( overrideProfile)
 		{
 			setProfile( overrideProfile );
@@ -584,6 +598,7 @@ public:
 private:
     osg::ref_ptr<VPBDatabase> _vpbDatabase;
     const VPBOptions _options;
+	std::string	_referenceUri;
     //unsigned int                                        layerNum;
 };
 
@@ -610,7 +625,7 @@ class VPBSourceFactory : public TileSourceDriver
 
             std::string url = vpbOptions.url().value();
             if ( !url.empty() )
-            {                
+            {
                 OpenThreads::ScopedLock<OpenThreads::Mutex> lock(vpbDatabaseMapMutex);
                 osg::observer_ptr<VPBDatabase>& db_ptr = vpbDatabaseMap[url]; //get or create
                 

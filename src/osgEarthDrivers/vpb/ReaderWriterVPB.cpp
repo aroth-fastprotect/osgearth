@@ -521,6 +521,7 @@ public:
 				osgTerrain::ImageLayer* imageLayer = dynamic_cast<osgTerrain::ImageLayer*>(layer);
 				if (imageLayer)
 				{
+					OE_DEBUG<<"VPB: createImage(" << key.str() << " layerNum=" << layerNum << ") successful." <<std::endl;
 					ret = new osg::Image( *imageLayer->getImage() );
 				}
 				else
@@ -537,12 +538,15 @@ public:
 						}
 					}
 					if(imageLayer)
+					{
+						OE_DEBUG<<"VPB: createImage(" << key.str() << " layerSet=" << layerSetName.value() << ") successful." <<std::endl;
 						ret = new osg::Image( *imageLayer->getImage() );
+					}
 				}
 			}
 			if(!ret)
 			{
-				OE_DEBUG<<"VPB: createImage(" << key.str() << " layerSet=" << layerSetName.value() << " layerNum=" << layerNum << ") failed." <<std::endl;
+				OE_DEBUG<<"VPB: createImage(" << key.str() << " layerSet=" << layerSetName.value() << " layerNum=" << layerNum << "/" << numColorLayers << ") failed." <<std::endl;
 			}
 		}
 		else

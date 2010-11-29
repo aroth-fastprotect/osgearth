@@ -34,17 +34,24 @@ using namespace osgEarth;
 
 struct MyGraphicsContext
 {
-    MyGraphicsContext()
+    MyGraphicsContext(bool quadBufferStereo)
     {
         osg::ref_ptr<osg::GraphicsContext::Traits> traits = new osg::GraphicsContext::Traits;
+/*
         traits->x = 0;
         traits->y = 0;
         traits->width = 1;
         traits->height = 1;
+*/
+        traits->x = -64;
+        traits->y = -64;
+        traits->width = 64;
+        traits->height = 64;
         traits->windowDecoration = false;
         traits->doubleBuffer = false;
         traits->sharedContext = 0;
         traits->pbuffer = false;
+		traits->quadBufferStereo = quadBufferStereo;
 
         // Intel graphics adapters dont' support pbuffers, and some of their drivers crash when
         // you try to create them. So by default we will only use the unmapped/pbuffer method
@@ -84,7 +91,8 @@ struct MyGraphicsContext
     }
 
     bool valid() const { return _gc.valid() && _gc->isRealized(); }
-
+	osg::GraphicsContext * gc() { return _gc.get(); }
+private:
     osg::ref_ptr<osg::GraphicsContext> _gc;
 };
 
@@ -104,14 +112,23 @@ _supportsTextureArrays  ( false ),
 _supportsMultiTexture   ( false ),
 _supportsStencilWrap    ( true ),
 _supportsTwoSidedStencil( false ),
-_supportsTexture2DLod   ( false )
+_supportsTexture2DLod   ( false ),
+_supportsQuadBufferStereo( false )
 {
-    // create a graphics context so we can query OpenGL support:
-    MyGraphicsContext mgc;
+    // first create a opengl context with quad buffer stereo enabled
+	MyGraphicsContext * mgc = new MyGraphicsContext(true);
+	_supportsQuadBufferStereo = mgc->valid();
+	if(!_supportsQuadBufferStereo)
+	{
+		// delete the old context
+		delete mgc;
+		// second try to create a new graphics context without quad buffer stereo
+		mgc = new MyGraphicsContext(false);
+	}
 
-    if ( mgc.valid() )
+    if ( mgc->valid() )
     {
-        osg::GraphicsContext* gc = mgc._gc.get();
+        osg::GraphicsContext* gc = mgc->gc();
         unsigned int id = gc->getState()->getContextID();
         const osg::GL2Extensions* GL2 = osg::GL2Extensions::Get( id, true );
 
@@ -174,8 +191,12 @@ _supportsTexture2DLod   ( false )
         _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
         OE_INFO << LC << "  2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
 
+		OE_INFO << LC << "  Supports quad buffer stereo = " << SAYBOOL(_supportsQuadBufferStereo) << std::endl;
+
         //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
         //OE_INFO << LC << "  texture2DLod = " << SAYBOOL(_supportsTexture2DLod) << std::endl;
     }
+    
+    // delete the final object of the graphics context
+	delete mgc;
 }
-

@@ -142,7 +142,7 @@ _options( options )
     this->setThreadSafeRefUnref( true );
 
     _memCache = new MemCache();
-
+	//_memCache->setMaxNumTilesInCache(3);
     if (_options.blacklistFilename().isSet())
     {
         _blacklistFilename = _options.blacklistFilename().value();
@@ -179,7 +179,7 @@ TileSource::getPixelsPerTile() const
     return _options.tileSize().value();
 }
 
-osg::Image*
+osg::ref_ptr<osg::Image>
 TileSource::getImage( const TileKey& key,
                       ProgressCallback* progress )
 {
@@ -198,10 +198,11 @@ TileSource::getImage( const TileKey& key,
 			_memCache->setImage( key, CacheSpec(), image.get() );
 		}
 	}
-	return image.release();
+	return image;
+	//return image.release();
 }
 
-osg::HeightField*
+osg::ref_ptr<osg::HeightField>
 TileSource::getHeightField( const TileKey& key,
                             ProgressCallback* progress )
 {
@@ -219,7 +220,8 @@ TileSource::getHeightField( const TileKey& key,
 			_memCache->setHeightField( key, CacheSpec(), hf.get() );
 		}
 	}
-	return hf.release();
+	return hf;
+	//return hf.release();
 }
 
 osg::HeightField*

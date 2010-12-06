@@ -925,7 +925,6 @@ s_createHeightField(const TileKey& key,
         {
             GeoHeightField geoHF = heightFields[0].createSubSample( key.getExtent(), interpolation);
             result = geoHF.takeHeightField();
-            result->ref();  // mali: set ref counter to 1
             hfInitialized = true;
         }
 	}

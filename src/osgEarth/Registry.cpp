@@ -59,6 +59,8 @@ _uidGen( 0 )
 
 Registry::~Registry()
 {
+	OGRCleanupAll();
+	GDALDestroyDriverManager();
 }
 
 Registry* Registry::instance(bool erase)

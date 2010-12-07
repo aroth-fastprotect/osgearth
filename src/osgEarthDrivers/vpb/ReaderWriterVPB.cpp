@@ -513,7 +513,7 @@ public:
 			setProfile(_vpbDatabase->_profile.get());
 		}
     }
-    
+
 	osg::Image* createImage( const TileKey& key,
 		ProgressCallback* progress)
 	{
@@ -599,7 +599,6 @@ private:
     osg::ref_ptr<VPBDatabase> _vpbDatabase;
     const VPBOptions _options;
 	std::string	_referenceUri;
-    //unsigned int                                        layerNum;
 };
 
 

@@ -37,16 +37,10 @@ struct MyGraphicsContext
     MyGraphicsContext(bool quadBufferStereo)
     {
         osg::ref_ptr<osg::GraphicsContext::Traits> traits = new osg::GraphicsContext::Traits;
-/*
         traits->x = 0;
         traits->y = 0;
         traits->width = 1;
         traits->height = 1;
-*/
-        traits->x = -64;
-        traits->y = -64;
-        traits->width = 64;
-        traits->height = 64;
         traits->windowDecoration = false;
         traits->doubleBuffer = false;
         traits->sharedContext = 0;

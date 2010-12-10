@@ -141,8 +141,11 @@ _options( options )
 {
     this->setThreadSafeRefUnref( true );
 
+#if 0
+	// disable cache for now, til it causes more trouble than it's worth
     _memCache = new MemCache();
-	//_memCache->setMaxNumTilesInCache(3);
+	_memCache->setMaxNumTilesInCache(1);
+#endif
     if (_options.blacklistFilename().isSet())
     {
         _blacklistFilename = _options.blacklistFilename().value();
@@ -179,7 +182,7 @@ TileSource::getPixelsPerTile() const
     return _options.tileSize().value();
 }
 
-osg::ref_ptr<osg::Image>
+osg::Image*
 TileSource::getImage( const TileKey& key,
                       ProgressCallback* progress )
 {
@@ -198,11 +201,10 @@ TileSource::getImage( const TileKey& key,
 			_memCache->setImage( key, CacheSpec(), image.get() );
 		}
 	}
-	return image;
-	//return image.release();
+	return image.release();
 }
 
-osg::ref_ptr<osg::HeightField>
+osg::HeightField*
 TileSource::getHeightField( const TileKey& key,
                             ProgressCallback* progress )
 {
@@ -220,8 +222,7 @@ TileSource::getHeightField( const TileKey& key,
 			_memCache->setHeightField( key, CacheSpec(), hf.get() );
 		}
 	}
-	return hf;
-	//return hf.release();
+	return hf.release();
 }
 
 osg::HeightField*

@@ -23,6 +23,7 @@
 #include <osg/GLExtensions>
 #include <osg/GL2Extensions>
 #include <osg/Texture>
+#include <osgViewer/Version>
 
 using namespace osgEarth;
 
@@ -55,9 +56,11 @@ struct MyGraphicsContext
             traits->pbuffer = true;
             OE_INFO << LC << "Activating pbuffer test for graphics capabilities" << std::endl;
             _gc = osg::GraphicsContext::createGraphicsContext(traits.get());
+            if ( !_gc.valid() )
+                OE_WARN << LC << "Failed to create pbuffer" << std::endl;
         }
 
-        if (!_gc)
+        if (!_gc.valid())
         {
             // fall back on a mapped window
             traits->pbuffer = false;
@@ -80,7 +83,7 @@ struct MyGraphicsContext
         }
         else
         {
-            OE_INFO << LC << "Failed to create graphic window too." << std::endl;
+            OE_WARN << LC << "Failed to create graphic window too." << std::endl;
         }
     }
 
@@ -109,6 +112,9 @@ _supportsTwoSidedStencil( false ),
 _supportsTexture2DLod   ( false ),
 _supportsQuadBufferStereo( false )
 {
+    // little hack to force the osgViewer library to link so we can create a graphics context
+    osgViewerGetVersion();
+
     // first create a opengl context with quad buffer stereo enabled
 	MyGraphicsContext * mgc = new MyGraphicsContext(true);
 	_supportsQuadBufferStereo = mgc->valid();

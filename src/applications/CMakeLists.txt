@@ -13,7 +13,6 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	SET(TARGET_DEFAULT_PREFIX "application_")
 	SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
 
-	ADD_SUBDIRECTORY(osgearth_viewer)
 	ADD_SUBDIRECTORY(osgearth_manip)
 	ADD_SUBDIRECTORY(osgearth_seed)
 	ADD_SUBDIRECTORY(osgearth_clouds)
@@ -33,3 +32,4 @@ SET(TARGET_DEFAULT_PREFIX "")
 SET(TARGET_DEFAULT_LABEL_PREFIX "Applications")
 # always build osgearth_version
 ADD_SUBDIRECTORY(osgearth_version)
+ADD_SUBDIRECTORY(osgearth_viewer)

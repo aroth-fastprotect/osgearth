@@ -19,6 +19,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ObjectPlacer
 	${HEADER_PATH}/ObjectLocator
 	${HEADER_PATH}/OceanSurfaceNode
+	${HEADER_PATH}/SkyNode
 	${HEADER_PATH}/Viewpoint
 	${HEADER_PATH}/WMS
 )
@@ -33,6 +34,7 @@ SET(TARGET_SRC
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     OceanSurfaceNode.cpp
+    SkyNode.cpp
 	Viewpoint.cpp
     WMS.cpp
 )

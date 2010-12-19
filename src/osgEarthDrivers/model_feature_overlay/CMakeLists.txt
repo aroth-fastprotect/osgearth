@@ -1,5 +1,0 @@
-SET(TARGET_SRC FeatureOverlayModelSource.cpp)
-SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/model_feature_overlay/FeatureOverlayModelOptions)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/model_feature_overlay)
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures)
-SETUP_PLUGIN(osgearth_model_feature_overlay)

@@ -79,19 +79,19 @@ TextureLayout::applyMapModelChange( const MapModelChange& change )
             if ( slotAvailable )
             {
                 *i = change.getImageLayer()->getUID();
-                
+
                 if ( change.getFirstIndex() >= (int)_order.size() )
-								{
+                {
                     _order.resize( change.getFirstIndex() + 1, -1 );
-										_order[change.getFirstIndex()] = slot;
-								}
-								else
-								{
-										if (_order[change.getFirstIndex()] == -1)
-												_order[change.getFirstIndex()] = slot;
-										else
-												_order.insert(_order.begin() + change.getFirstIndex(), slot);
-								}
+                    _order[change.getFirstIndex()] = slot;
+                }
+                else
+                {
+                    if (_order[change.getFirstIndex()] == -1)
+                        _order[change.getFirstIndex()] = slot;
+                    else
+                        _order.insert(_order.begin() + change.getFirstIndex(), slot);
+                }
 
                 found = true;
                 break;
@@ -100,6 +100,10 @@ TextureLayout::applyMapModelChange( const MapModelChange& change )
 
         if ( !found )
         {
+            // put the UID in the next available slot (that's not reserved).
+            while( _reservedSlots.find(_slots.size()) != _reservedSlots.end() )
+                _slots.push_back( -1 );
+
             _slots.push_back( change.getImageLayer()->getUID() );
             _order.push_back( _slots.size() - 1 );
         }

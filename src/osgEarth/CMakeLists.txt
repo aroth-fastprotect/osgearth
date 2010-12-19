@@ -50,6 +50,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ModelLayer
 	${HEADER_PATH}/ModelSource
 	${HEADER_PATH}/Notify
+	${HEADER_PATH}/OverlayDecorator
 	${HEADER_PATH}/Profile
 	${HEADER_PATH}/Progress
 	${HEADER_PATH}/Registry
@@ -114,6 +115,7 @@ SET(TARGET_SRC
 	ModelLayer.cpp
 	ModelSource.cpp
 	Notify.cpp
+	OverlayDecorator.cpp
     Profile.cpp
 	Progress.cpp
     Registry.cpp

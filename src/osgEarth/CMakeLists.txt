@@ -158,6 +158,7 @@ SET(TARGET_ADDED_LIBRARIES
 	osgViewer
 	osgText
 	osgGA
+	osgShadow
 	OpenThreads
     )
 

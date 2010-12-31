@@ -28,6 +28,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ScaleFilter
 	${HEADER_PATH}/BuildTextOperator
 	${HEADER_PATH}/TransformFilter
+	${HEADER_PATH}/VirtualFeatureSource
 )
 
 SET(TARGET_SRC
@@ -46,6 +47,7 @@ SET(TARGET_SRC
 	ScaleFilter.cpp
 	BuildTextOperator.cpp
     TransformFilter.cpp
+    VirtualFeatureSource.cpp
 )
 
 IF(GEOS_FOUND)

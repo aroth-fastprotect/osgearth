@@ -89,7 +89,7 @@ ModelLayer::ModelLayer( const std::string& name, const ModelSourceOptions& optio
 _options( ModelLayerOptions( name, options ) ),
 _enabled( true )
 {
-//    mergeConfig( options.getConfig() );
+    //NOP
 }
 
 ModelLayer::ModelLayer( const ModelLayerOptions& options, ModelSource* source ) :
@@ -118,48 +118,44 @@ ModelLayer::initialize( const std::string& referenceURI, const Map* map )
 osg::Node*
 ModelLayer::getOrCreateNode( ProgressCallback* progress )
 {
-    if (!_node.valid() && _modelSource.valid())
+    if ( !_nodeContainer.valid() )
+        _nodeContainer = new osg::Group();
+
+    if ( _modelSource.valid() )
     {
-        _node = _modelSource->createNode( progress );
-
-        if ( _options.enabled().isSet() )
-            setEnabled( *_options.enabled() );
-
-        if ( _options.lightingEnabled().isSet() )
-            setLightingEnabled( *_options.lightingEnabled() );
-
-        if ( _modelSource->getOptions().depthTestEnabled() == false )            
+        // if the model source has changed, regenerate the node.
+        if ( _node.valid() && !_modelSource->inSyncWith(_modelSourceRev) )
         {
-            if ( _node )
+            _nodeContainer->removeChild( _node.get() );
+            _node = 0L;
+        }
+
+        if ( !_node.valid() )
+        {
+            _node = _modelSource->createNode( progress );
+
+            if ( _options.enabled().isSet() )
+                setEnabled( *_options.enabled() );
+
+            if ( _options.lightingEnabled().isSet() )
+                setLightingEnabled( *_options.lightingEnabled() );
+
+            if ( _modelSource->getOptions().depthTestEnabled() == false )            
             {
-                osg::StateSet* ss = _node->getOrCreateStateSet();
-                ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS ) );
-                ss->setRenderBinDetails( 99999, "RenderBin" ); //TODO: configure this bin ...
+                if ( _node )
+                {
+                    osg::StateSet* ss = _node->getOrCreateStateSet();
+                    ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS ) );
+                    ss->setRenderBinDetails( 99999, "RenderBin" ); //TODO: configure this bin ...
+                }
             }
+
+            _modelSource->sync( _modelSourceRev );
         }
     }
+
     return _node.get();
 }
-
-//Config
-//ModelLayer::getConfig() const
-//{
-//    Config conf = _driverOptions.getConfig();
-//
-//    conf.key() = "model";
-//    conf.attr("name") = _name;
-//    conf.updateIfSet( "enabled", _enabled );
-//    conf.updateIfSet( "lighting", _lighting );
-//
-//    return conf;
-//}
-//
-//void
-//ModelLayer::mergeConfig(const osgEarth::Config &conf)
-//{
-//    conf.getIfSet( "enabled", _enabled );
-//    conf.getIfSet( "lighting", _lighting );
-//}
 
 bool
 ModelLayer::getEnabled() const

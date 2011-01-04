@@ -26,6 +26,7 @@ SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/GeometryRasterizer
     ${HEADER_PATH}/MarkerSymbolizer
     ${HEADER_PATH}/MarkerSymbol
+	${HEADER_PATH}/MeshSubdivider
     ${HEADER_PATH}/ModelSymbolizer
 	${HEADER_PATH}/Query
     ${HEADER_PATH}/Registry
@@ -50,6 +51,7 @@ SET(TARGET_SRC
     GeometryRasterizer.cpp
     MarkerSymbolizer.cpp
     MarkerSymbol.cpp
+    MeshSubdivider.cpp
     ModelSymbolizer.cpp
     Query.cpp
     Registry.cpp

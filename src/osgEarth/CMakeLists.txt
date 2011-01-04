@@ -23,6 +23,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/CacheSeed
 	${HEADER_PATH}/Capabilities
 	${HEADER_PATH}/Common
+	${HEADER_PATH}/CompositeTileSource
 	${HEADER_PATH}/Config
 	${HEADER_PATH}/Cube
 	${HEADER_PATH}/ElevationLayer
@@ -89,6 +90,7 @@ SET(TARGET_SRC
     Caching.cpp
     CacheSeed.cpp
 	Capabilities.cpp
+    CompositeTileSource.cpp
     Config.cpp
     Cube.cpp
     EGM.cpp

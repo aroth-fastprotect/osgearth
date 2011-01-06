@@ -19,6 +19,7 @@
 #include <osgEarth/Notify>
 #include <OpenThreads/Thread>
 #include <OpenThreads/Mutex>
+#include <OpenThreads/Atomic>
 
 using namespace osgEarth;
 
@@ -129,21 +130,21 @@ private:
 		if(_ownerThreadId != currentThread)
 		{
 			_mutex.lock();
-			_ownerThreadId = currentThread;
+			_ownerThreadId.exchange(currentThread);
 		}
 	}
 
 	void unlock()
 	{
+		_ownerThreadId.exchange(0);
 		_mutex.unlock();
-		_ownerThreadId = 0;
 	}
 
 private:
 	osg::ref_ptr<osg::NotifyHandler> _handler;
 	osg::NotifySeverity _severity;
 	OpenThreads::Mutex _mutex;
-	unsigned _ownerThreadId;
+	OpenThreads::Atomic _ownerThreadId;
 };
 
 struct NotifyStream : public std::ostream

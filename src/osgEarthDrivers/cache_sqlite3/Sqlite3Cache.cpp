@@ -90,10 +90,11 @@ sqlite3* openDatabase( const std::string& path, bool serialized )
 struct AsyncCache : public Cache
 {
 public:
+    AsyncCache(const CacheOptions& options =CacheOptions()): Cache(options) { }
     virtual void setImageSync(
         const TileKey& key,
         const CacheSpec& spec,
-        osg::Image* image ) =0;
+        const osg::Image* image ) =0;
 };
 
 
@@ -300,7 +301,7 @@ struct ImageRecord
     TileKey _key;
     int _created;
     int _accessed;
-    osg::ref_ptr<osg::Image> _image;
+    osg::ref_ptr<const osg::Image> _image;
 };
 
 #ifdef INSERT_POOL
@@ -938,8 +939,8 @@ struct AsyncPurge : public TaskRequest {
 };
 
 struct AsyncInsert : public TaskRequest {
-    AsyncInsert( const TileKey& key, const CacheSpec& spec, osg::Image* image, AsyncCache* cache )
-        : _key(key), _cacheSpec(spec), _image(image), _cache(cache) { }
+    AsyncInsert( const TileKey& key, const CacheSpec& spec, const osg::Image* image, AsyncCache* cache )
+        : _cacheSpec(spec), _key(key), _image(image), _cache(cache) { }
 
     void operator()( ProgressCallback* progress ) {
         osg::ref_ptr<AsyncCache> cache = _cache.get();
@@ -949,7 +950,7 @@ struct AsyncInsert : public TaskRequest {
 
     CacheSpec _cacheSpec;
     TileKey _key;
-    osg::ref_ptr<osg::Image> _image;
+    osg::ref_ptr<const osg::Image> _image;
     osg::observer_ptr<AsyncCache> _cache;
 };
 
@@ -997,7 +998,7 @@ class Sqlite3Cache : public AsyncCache
 {
 public:
     Sqlite3Cache( const CacheOptions& options ) 
-        : AsyncCache(), _db(0L), _options(options)
+      : AsyncCache(options), _options(options),  _db(0L)
     {
         setName( "sqlite3" );
 
@@ -1059,7 +1060,7 @@ public: // Cache interface
         // this looks ineffecient, but usually when isCached() is called, getImage() will be
         // called soon thereafter. And this call will load it into the L2 cache so the subsequent
         // getImage call will not hit the DB again.
-        osg::ref_ptr<osg::Image> temp;
+        osg::ref_ptr<const osg::Image> temp;
         return const_cast<Sqlite3Cache*>(this)->getImage( key, spec, temp );
     }
 
@@ -1138,7 +1139,7 @@ public: // Cache interface
     /**
      * Gets the cached image for the given TileKey
      */
-    bool getImage( const TileKey& key, const CacheSpec& spec, osg::ref_ptr<osg::Image>& out_image )
+    bool getImage( const TileKey& key, const CacheSpec& spec, osg::ref_ptr<const osg::Image>& out_image )
     {
         if ( !_db ) return false;
 
@@ -1240,7 +1241,7 @@ public: // Cache interface
     /**
      * Sets the cached image for the given TileKey
      */
-    void setImage( const TileKey& key, const CacheSpec& spec, osg::Image* image )
+    void setImage( const TileKey& key, const CacheSpec& spec, const osg::Image* image )
     {        
         if ( !_db ) return;
 
@@ -1290,7 +1291,7 @@ public: // Cache interface
      */
     bool purge( const std::string& layerName, int olderThanUTC, bool async )
     {
-        if ( !_db ) false;
+        if ( !_db ) return false;
 
         // purge the L2 cache first:
         if ( async == true && _options.asyncWrites() == true )
@@ -1321,7 +1322,7 @@ public: // Cache interface
             sqlite3_int64 limit = _options.maxSize().value() * 1024 * 1024;
             std::map<std::string, std::pair<sqlite3_int64,int> > layers;
             sqlite3_int64 totalSize = 0;
-            for (int i = 0; i < _layersList.size(); ++i) {
+            for (unsigned int i = 0; i < _layersList.size(); ++i) {
                 ThreadTable tt = getTable( _layersList[i] );
                 if ( tt._table ) {
                     sqlite3_int64 size = tt._table->getTableSize(tt._db);
@@ -1333,7 +1334,7 @@ public: // Cache interface
             OE_INFO << LC << "SQlite cache size " << totalSize/(1024*1024) << " MB" << std::endl;
             if (totalSize > 1.2 * limit) {
                 sqlite3_int64 diff = totalSize - limit;
-                for (int i = 0; i < _layersList.size(); ++i) {
+                for (unsigned int i = 0; i < _layersList.size(); ++i) {
                     float ratio = layers[_layersList[i] ].first * 1.0 / (float)(totalSize);
                     int sizeToRemove = (int)floor(ratio * diff);
                     if (sizeToRemove > 0) {
@@ -1384,7 +1385,7 @@ public: // Cache interface
      */
     bool updateAccessTimeSync( const std::string& layerName, const TileKey& key, int newTimestamp )
     {
-        if ( !_db ) false;
+        if ( !_db ) return false;
 
         ThreadTable tt = getTable(layerName);
         if ( tt._table )
@@ -1399,7 +1400,7 @@ public: // Cache interface
      */
     bool updateAccessTimeSyncPool( const std::string& layerName, const std::string& keys, int newTimestamp )
     {
-        if ( !_db ) false;
+        if ( !_db ) return false;
 
         ThreadTable tt = getTable(layerName);
         if ( tt._table )
@@ -1452,7 +1453,7 @@ private:
         //OE_INFO << LC << "Pending writes: " << std::dec << _writeService->getNumRequests() << std::endl;
     }
 
-    void setImageSync( const TileKey& key, const CacheSpec& spec, osg::Image* image )
+    void setImageSync( const TileKey& key, const CacheSpec& spec, const osg::Image* image )
     {
         if (_options.maxSize().value() > 0 && _nbRequest > MAX_REQUEST_TO_RUN_PURGE) {
             int t = (int)::time(0L);

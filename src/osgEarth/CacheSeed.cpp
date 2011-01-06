@@ -52,7 +52,7 @@ void CacheSeed::seed( Map* map )
 
     bool hasCaches = false;
     int src_min_level = INT_MAX;
-    int src_max_level = 0;
+    unsigned int src_max_level = 0;
 
     MapFrame mapf( map, Map::TERRAIN_LAYERS, "CacheSeed::seed" );
 
@@ -131,7 +131,7 @@ void CacheSeed::seed( Map* map )
         return;
     }
 
-    if ( src_max_level > 0 && src_max_level < _maxLevel )
+    if ( src_max_level > 0 && (unsigned)src_max_level < _maxLevel )
     {
         _maxLevel = src_max_level;
     }

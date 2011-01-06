@@ -194,7 +194,6 @@ createVolume(osgEarth::Symbology::Geometry* geom,
     }
 
 
-    bool made_geom = true;
     const SpatialReference* srs = context.profile()->getSRS();
 
     // total up all the points so we can pre-allocate the vertex arrays.
@@ -263,7 +262,7 @@ createVolume(osgEarth::Symbology::Geometry* geom,
             (*top_verts)[top_vert_ptr++] = extrude_vec;
             (*bottom_verts)[bottom_vert_ptr++] = *m;
              
-            part_len += wall_vert_ptr > wall_part_ptr?
+            part_len += wall_vert_ptr > (int)wall_part_ptr?
                 (extrude_vec - (*verts)[wall_vert_ptr-2]).length() :
                 0.0;
 
@@ -279,7 +278,7 @@ createVolume(osgEarth::Symbology::Geometry* geom,
         // close the wall if it's a ring/poly:
         if ( part->getType() == osgEarth::Symbology::Geometry::TYPE_RING || part->getType() == osgEarth::Symbology::Geometry::TYPE_POLYGON )
         {
-            part_len += wall_vert_ptr > wall_part_ptr?
+            part_len += wall_vert_ptr > (int)wall_part_ptr?
                 ((*verts)[wall_part_ptr] - (*verts)[wall_vert_ptr-2]).length() :
                 0.0;
 
@@ -493,9 +492,13 @@ public:
                 if ( !styleNodeAlreadyCreated )
                 {
                     if ( _options.mask() == true )
+					{
                         OE_INFO << LC << "Creating MASK LAYER for feature group" << std::endl;
+					}
                     else
+					{
                         OE_INFO << LC << "Creating new style group for '" << style->getName() << "'" << std::endl;
+					}
 
                     styleNode = new osgEarth::Symbology::StencilVolumeNode( _options.mask().value(), _options.inverted().value() );
                     if ( _options.mask() == false )
@@ -539,8 +542,8 @@ class FeatureStencilModelSource : public FeatureModelSource
 public:
     FeatureStencilModelSource( const ModelSourceOptions& options, int renderBinStart ) :
         FeatureModelSource( options ),
-        _options( options ),
-        _renderBinStart( renderBinStart )
+        _renderBinStart( renderBinStart ),
+        _options( options )
     {
         // make sure we have stencil bits. Note, this only works before
         // a viewer gets created. You may need to allocate stencil bits

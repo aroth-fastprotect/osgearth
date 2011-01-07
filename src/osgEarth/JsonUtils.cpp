@@ -583,7 +583,7 @@ Value::Value( Int value )
 
 Value::Value( UInt value )
    : type_( uintValue )
-   , comments_( 0 )
+   , comments_ ( 0 )
 # ifdef JSON_VALUE_USE_INTERNAL_MAP
    , itemIsUsed_( 0 )
 #endif

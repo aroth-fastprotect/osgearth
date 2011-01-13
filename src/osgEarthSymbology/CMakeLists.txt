@@ -24,6 +24,7 @@ SET(TARGET_PUBLIC_H
     ${HEADER_PATH}/GeometrySymbol
     ${HEADER_PATH}/GEOS
     ${HEADER_PATH}/GeometryRasterizer
+	${HEADER_PATH}/LineFunctor
     ${HEADER_PATH}/MarkerSymbolizer
     ${HEADER_PATH}/MarkerSymbol
 	${HEADER_PATH}/MeshSubdivider

@@ -20,6 +20,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ObjectLocator
 	${HEADER_PATH}/OceanSurfaceNode
 	${HEADER_PATH}/SkyNode
+	${HEADER_PATH}/StarData
 	${HEADER_PATH}/Viewpoint
 	${HEADER_PATH}/WMS
 )

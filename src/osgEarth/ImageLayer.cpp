@@ -188,12 +188,13 @@ ImageLayerTileProcessor::process( osg::ref_ptr<osg::Image>& image ) const
             return;
         }
     }
-
+// mali: disable default decompression, this needs 8 times the memory and lots of CPU, configurator needs then 2.5GB and will crash on my Laptop
+#if 0
     if ( ImageUtils::isCompressed(image.get()) && ImageUtils::canConvert(image.get(), GL_RGBA, GL_UNSIGNED_BYTE) )
     {
         image = ImageUtils::convertToRGBA8( image.get() );
     }
-
+#endif
     // Apply a transparent color mask if one is specified
     if ( _options.transparentColor().isSet() )
     {

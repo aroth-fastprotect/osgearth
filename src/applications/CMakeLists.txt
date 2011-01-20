@@ -22,6 +22,7 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_features)
 	ADD_SUBDIRECTORY(osgearth_controls)
 	ADD_SUBDIRECTORY(osgearth_shadercomp)
+	ADD_SUBDIRECTORY(osgearth_tilesource)
 
 	#ADD_SUBDIRECTORY(osgearth_symbology)
 	ADD_SUBDIRECTORY(osgearth_seamless)

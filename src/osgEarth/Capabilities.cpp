@@ -110,6 +110,7 @@ _supportsMultiTexture   ( false ),
 _supportsStencilWrap    ( true ),
 _supportsTwoSidedStencil( false ),
 _supportsTexture2DLod   ( false ),
+_supportsMipmappedTextureUpdates( false ),
 _supportsQuadBufferStereo( false )
 {
     // little hack to force the osgViewer library to link so we can create a graphics context
@@ -120,7 +121,7 @@ _supportsQuadBufferStereo( false )
     if ( ::getenv( "OSGEARTH_DISABLE_ATI_WORKAROUNDS" ) != 0L )
         enableATIworkarounds = false;
 
-    // first create a opengl context with quad buffer stereo enabled
+	// first create a opengl context with quad buffer stereo enabled
 	MyGraphicsContext * mgc = new MyGraphicsContext(true);
 	_supportsQuadBufferStereo = mgc->valid();
 	if(!_supportsQuadBufferStereo)
@@ -144,6 +145,9 @@ _supportsQuadBufferStereo( false )
 
         _renderer = std::string( reinterpret_cast<const char*>(glGetString(GL_RENDERER)) );
         OE_INFO << LC << "  Renderer = " << _renderer << std::endl;
+
+        _version = std::string( reinterpret_cast<const char*>(glGetString(GL_VERSION)) );
+        OE_INFO << LC << "  Version = " << _version << std::endl;
 
         glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
         OE_INFO << LC << "  Max FFP texture units = " << _maxFFPTextureUnits << std::endl;
@@ -209,9 +213,9 @@ _supportsQuadBufferStereo( false )
 
         bool isATI = _vendor.length() >= 4 && ::strncmp(_vendor.c_str(), "ATI ", 4) == 0;
 
-        _supportsMipmappedTextureUpdates = isATI && enableATIworkarounds ? false : true;        //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
+        _supportsMipmappedTextureUpdates = isATI && enableATIworkarounds ? false : true;
     }
-    
+
     // delete the final object of the graphics context
 	delete mgc;
 }

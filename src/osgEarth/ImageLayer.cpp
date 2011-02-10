@@ -55,6 +55,7 @@ ImageLayerOptions::setDefaults()
     _transparentColor.init( osg::Vec4ub(0,0,0,0) );
     _minRange.init( -FLT_MAX );
     _maxRange.init( FLT_MAX );
+    _compressTextures.init( false );
 }
 
 void
@@ -72,6 +73,7 @@ ImageLayerOptions::fromConfig( const Config& conf )
     conf.getIfSet( "gamma", _gamma );
     conf.getIfSet( "min_range", _minRange );
     conf.getIfSet( "max_range", _maxRange );
+    conf.getIfSet( "compress_textures", _compressTextures);
 
     if ( conf.hasValue( "transparent_color" ) )
         _transparentColor = stringToColor( conf.value( "transparent_color" ), osg::Vec4ub(0,0,0,0));
@@ -100,6 +102,7 @@ ImageLayerOptions::getConfig() const
     conf.updateIfSet( "gamma", _gamma );
     conf.updateIfSet( "min_range", _minRange );
     conf.updateIfSet( "max_range", _maxRange );
+    conf.updateIfSet( "compress_textures", _compressTextures);
 
 	if (_transparentColor.isSet())
         conf.update("transparent_color", colorToString( _transparentColor.value()));
@@ -192,11 +195,7 @@ ImageLayerTileProcessor::process( osg::ref_ptr<osg::Image>& image ) const
             return;
         }
     }
-// mali: disable default decompression, this needs 8 times the memory and 
-//       lots of CPU, configurator needs then 2.5GB and will crash on my Laptop
-// ARO: this should be fixed in osgEarth by check if the _layerInTargetProfile
-//      is given, so leave it for now and recheck.
-#if 1
+
     // If this is a compressed image, uncompress it IF the image is not already in the
     // target profile...becuase if it's not in the target profile, we will have to do
     // some mosaicing...and we can't mosaic a compressed image.
@@ -206,7 +205,6 @@ ImageLayerTileProcessor::process( osg::ref_ptr<osg::Image>& image ) const
     {
         image = ImageUtils::convertToRGBA8( image.get() );
     }
-#endif
 
     // Apply a transparent color mask if one is specified
     if ( _options.transparentColor().isSet() )
@@ -341,7 +339,7 @@ ImageLayer::initPreCacheOp()
         getProfile() &&
         _targetProfileHint->isEquivalentTo( getProfile() );
 
-    ImageLayerPreCacheOperation* op = new ImageLayerPreCacheOperation();
+    ImageLayerPreCacheOperation* op = new ImageLayerPreCacheOperation();    
     op->_processor.init( _options, layerInTargetProfile );
 
     _preCacheOp = op;
@@ -405,6 +403,11 @@ ImageLayer::createImage( const TileKey& key, ProgressCallback* progress)
 			OE_DEBUG << LC << "Layer \"" << getName()<< "\" got tile " << key.str() << " from map cache " << std::endl;
 
             result = GeoImage( ImageUtils::cloneImage(cachedImage.get()), key.getExtent() );
+            ImageUtils::normalizeImage( result.getImage() );
+            if (*_options.compressTextures())
+            {
+                result.compress();
+            }
             return result;
 		}
 	}
@@ -416,7 +419,9 @@ ImageLayer::createImage( const TileKey& key, ProgressCallback* progress)
         osg::ref_ptr<const osg::Image> image;
         osg::Image* im = createImageWrapper( key, cacheInLayerProfile, progress );
         if ( im )
+        {
             result = GeoImage( im, key.getExtent() );
+        }
     }
 
     // Otherwise, we need to process the tiles.
@@ -595,13 +600,22 @@ ImageLayer::createImage( const TileKey& key, ProgressCallback* progress)
         }
     }
 
+    // Normalize the image if necessary
+    if ( result.valid() )
+    {
+        ImageUtils::normalizeImage( result.getImage() );
+    }
+
 	//If we got a result, the cache is valid and we are caching in the map profile, write to the map cache.
     if (result.valid() && _cache.valid() && _options.cacheEnabled() == true && cacheInMapProfile)
 	{
 		OE_DEBUG << LC << "Layer \"" << getName() << "\" writing tile " << key.str() << " to cache " << std::endl;
 		_cache->setImage( key, _cacheSpec, result.getImage());
 	}
-
+    if (*_options.compressTextures())
+    {
+        result.compress();
+    }
     return result;
 }
 

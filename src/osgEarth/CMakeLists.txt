@@ -26,6 +26,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/CompositeTileSource
 	${HEADER_PATH}/Config
 	${HEADER_PATH}/Cube
+	#${HEADER_PATH}/dxt.h # only to simplify merging
 	${HEADER_PATH}/ElevationLayer
 	${HEADER_PATH}/Export
 	${HEADER_PATH}/EGM
@@ -41,6 +42,7 @@ SET(TARGET_PUBLIC_H
 	${HEADER_PATH}/ImageUtils
 	${HEADER_PATH}/JsonUtils
 	${HEADER_PATH}/Layer
+	#${HEADER_PATH}/libdxt.h # only to simplify merging 
 	${HEADER_PATH}/Locators
 	${HEADER_PATH}/Map
 	${HEADER_PATH}/MapNode
@@ -76,6 +78,7 @@ SET(TARGET_PUBLIC_H
 	#${HEADER_PATH}/tinyxml.h # only to simplify merging 
 	${HEADER_PATH}/TMS
 	${HEADER_PATH}/Units
+	#${HEADER_PATH}/util.h # only to simplify merging 
 	${HEADER_PATH}/Version
 	${HEADER_PATH}/VerticalSpatialReference
 	${HEADER_PATH}/XmlUtils
@@ -84,6 +87,9 @@ SET(TARGET_PUBLIC_H
 SET(TARGET_H
     tinystr.h
     tinyxml.h 
+	dxt.h
+	util.h
+	libdxt.h
 	)
 
 SET(TARGET_SRC
@@ -93,6 +99,7 @@ SET(TARGET_SRC
     CompositeTileSource.cpp
     Config.cpp
     Cube.cpp
+	dxt.cpp
     EGM.cpp
     ElevationLayer.cpp
     FileUtils.cpp
@@ -104,8 +111,10 @@ SET(TARGET_SRC
     ImageMosaic.cpp
     ImageToHeightFieldConverter.cpp
     ImageUtils.cpp
+	intrinsic.cpp
     JsonUtils.cpp
     Layer.cpp
+	libdxt.cpp
     Locators.cpp
     Map.cpp
     MapNode.cpp
@@ -141,6 +150,7 @@ SET(TARGET_SRC
     tinyxmlparser.cpp
     TMS.cpp
     Units.cpp
+	util.cpp
     Version.cpp
     VerticalSpatialReference.cpp
     XmlUtils.cpp

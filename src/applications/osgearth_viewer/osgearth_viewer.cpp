@@ -20,6 +20,7 @@
 #include <osg/Notify>
 #include <osgGA/StateSetManipulator>
 #include <osgGA/GUIEventHandler>
+#include <osgGA/TrackballManipulator>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
 #include <osgEarth/MapNode>
@@ -29,6 +30,7 @@
 #include <osgEarthUtil/SkyNode>
 
 using namespace osgEarth::Util;
+#define USE_EXTRA_CAMERA
 
 int
 usage( const std::string& msg )
@@ -54,6 +56,35 @@ struct AnimateSunCallback : public osg::NodeCallback
     }
 };
 
+struct ToggleStereoHandler : public osgGA::GUIEventHandler 
+{
+	bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
+	{
+		if ( ea.getEventType() == ea.KEYDOWN )
+		{
+			if(ea.getKey() == 'b')
+			{
+				bool stereo = osg::DisplaySettings::instance()->getStereo();
+				osg::DisplaySettings::instance()->setStereo(stereo ? false : true);
+			}
+		}
+		return false;
+	}
+};
+
+
+// Callback that checks other cameras
+int s_skyDomePreRenderCameraNum = -3;
+
+#ifdef _WIN32
+#define FAST_EXTERNAL_DIR "/work/trac/external"
+#define FAST_TEST_DIR "/work/trac/test"
+#else
+#define FAST_EXTERNAL_DIR "/local/work/fastprotect/external"
+#define FAST_TEST_DIR "/local/work/fastprotect/test"
+#endif
+#define FAST_OSG_DATA_DIR FAST_EXTERNAL_DIR "/OpenSceneGraph/data/"
+
 int
 main(int argc, char** argv)
 {
@@ -73,7 +104,10 @@ main(int argc, char** argv)
     osgViewer::Viewer viewer(arguments);
 
     osg::Group* root = new osg::Group();
+
     root->addChild( earthNode );
+	osg::Node * cow = osgDB::readNodeFile(FAST_OSG_DATA_DIR "cow.osg");
+	root->addChild( cow );
 
     // create a graticule and clip plane handler.
     Graticule* graticule = 0L;
@@ -103,7 +137,29 @@ main(int argc, char** argv)
                 sky->setDateTime( 2011, 1, 6, 17.0 );
                 //sky->setSunPosition( osg::Vec3(0,-1,0) );
                 sky->attach( &viewer );
+#ifdef USE_EXTRA_CAMERA
+				osg::Camera* mainCamera = viewer.getCamera();
+				// Set the camera to not clear the color buffer.
+				if (mainCamera->getClearMask() & GL_COLOR_BUFFER_BIT)
+					mainCamera->setClearMask(mainCamera->getClearMask() & ~GL_COLOR_BUFFER_BIT);
+
+				osg::Camera* camera = new osg::Camera;
+				// set to -100 by default
+				camera->setRenderOrder(osg::Camera::PRE_RENDER, s_skyDomePreRenderCameraNum);
+				// Hopefully this will be the first pre-render camera, so it should
+				// clear the color and depth buffers (this skydome is not guaranteed
+				// to fill the whole view at all times).
+				camera->setClearMask(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+				// The dome hangs under m_skyTransform.
+				camera->addChild(sky);
+
+				// Make sure the main viewer camera only clears the depth buffer
+				// otherwise it will clear our skydome...
+				//root->setCullCallback(new CheckCamerasCallback);
+				root->addChild( camera );
+#else
                 root->addChild( sky );
+#endif
                 if (animateSky)
                 {
                     sky->setUpdateCallback( new AnimateSunCallback());
@@ -119,15 +175,18 @@ main(int argc, char** argv)
     viewer.setSceneData( root );
 
     EarthManipulator* manip = new EarthManipulator();
+	//osgGA::TrackballManipulator* manip = new osgGA::TrackballManipulator();
+	//manip->setNode(cow);
     viewer.setCameraManipulator( manip );
 
-    // add some stock OSG handlers:
+	// add some stock OSG handlers:
     viewer.addEventHandler(new osgViewer::StatsHandler());
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
     viewer.addEventHandler(new osgViewer::ThreadingHandler());
     viewer.addEventHandler(new osgViewer::LODScaleHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
     viewer.addEventHandler(new osgViewer::HelpHandler(arguments.getApplicationUsage()));
+	viewer.addEventHandler(new ToggleStereoHandler());
 
     return viewer.run();
 }

@@ -190,6 +190,12 @@ ModelLayer::setLightingEnabled( bool value )
 }
 
 bool
+ModelLayer::isLightingEnabled() const
+{
+    return _lighting.get();
+}
+
+bool
 ModelLayer::getOverlay() const
 {
     return _overlay.get();

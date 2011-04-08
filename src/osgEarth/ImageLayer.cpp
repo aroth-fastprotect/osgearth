@@ -254,7 +254,7 @@ ImageLayer::init()
 
     // intialize the runtime actuals from the initialization options:
     _actualOpacity = _options.opacity().value();
-    //_actualGamma   = _options.gamma().value();
+    _actualGamma   = _options.gamma().value();
 
     //TODO: probably should graduate this to the superclass.
     _actualEnabled = _options.enabled().value();

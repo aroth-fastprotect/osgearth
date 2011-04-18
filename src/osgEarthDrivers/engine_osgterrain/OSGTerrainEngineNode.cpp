@@ -455,7 +455,7 @@ OSGTerrainEngineNode::removeImageLayer( ImageLayer* layerRemoved, unsigned int i
         CustomTile* tile = itr->get();
 
         // critical section
-        tile->removeCustomColorLayer( index );
+        tile->removeCustomColorLayer( layerRemoved->getUID() );
 
         //if ( _terrainOptions.loadingPolicy()->mode() == LoadingPolicy::MODE_STANDARD )
         //    tile->applyImmediateTileUpdate( TileUpdate::REMOVE_IMAGE_LAYER, layerRemoved->getUID() );

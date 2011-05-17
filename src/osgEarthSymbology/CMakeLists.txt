@@ -10,35 +10,34 @@ ENDIF(GEOS_FOUND)
 
 SET(LIB_NAME osgEarthSymbology)
 
-SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
 #   header files go here
-	${HEADER_PATH}/AGG.h
-    ${HEADER_PATH}/Common
-    ${HEADER_PATH}/Content
-    ${HEADER_PATH}/CssUtils
-    ${HEADER_PATH}/ExtrudedSymbol
-    ${HEADER_PATH}/Geometry
-    ${HEADER_PATH}/GeometryExtrudeSymbolizer
-    ${HEADER_PATH}/GeometrySymbolizer
-    ${HEADER_PATH}/GeometrySymbol
-    ${HEADER_PATH}/GEOS
-    ${HEADER_PATH}/GeometryRasterizer
-	${HEADER_PATH}/LineFunctor
-    ${HEADER_PATH}/MarkerSymbolizer
-    ${HEADER_PATH}/MarkerSymbol
-	${HEADER_PATH}/MeshSubdivider
-    ${HEADER_PATH}/ModelSymbolizer
-	${HEADER_PATH}/Query
-    ${HEADER_PATH}/Registry
-	${HEADER_PATH}/StencilVolumeNode
-    ${HEADER_PATH}/Style
-    ${HEADER_PATH}/SLD
-    ${HEADER_PATH}/StyleSheet
-    ${HEADER_PATH}/Symbol
-    ${HEADER_PATH}/SymbolicNode
-    ${HEADER_PATH}/Symbolizer
-	${HEADER_PATH}/Text
+	AGG.h
+    Common
+    Content
+    CssUtils
+    ExtrudedSymbol
+    Geometry
+    GeometryExtrudeSymbolizer
+    GeometrySymbolizer
+    GeometrySymbol
+    GEOS
+    GeometryRasterizer
+	LineFunctor
+    MarkerSymbolizer
+    MarkerSymbol
+	MeshSubdivider
+    ModelSymbolizer
+	Query
+    Registry
+	StencilVolumeNode
+    Style
+    SLD
+    StyleSheet
+    Symbol
+    SymbolicNode
+    Symbolizer
+	Text
 )
 
 SET(TARGET_SRC

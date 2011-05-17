@@ -13,22 +13,21 @@ SET(TARGET_SRC
         SeamlessPlugin.cpp
 )
 
-SET(INCDIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/engine_seamless)
 SET(TARGET_PUBLIC_H 
-        ${INCDIR}/QSC
-        ${INCDIR}/Euler
-        ${INCDIR}/Patch
-        ${INCDIR}/PatchInfo
-        ${INCDIR}/PatchGroup
-        ${INCDIR}/PatchSet
-        ${INCDIR}/Projected
-        ${INCDIR}/Geographic
-        ${INCDIR}/GeoPatch
-        ${INCDIR}/SeamlessEngineNode
-        ${INCDIR}/SeamlessOptions
+        QSC
+        Euler
+        Patch
+        PatchInfo
+        PatchGroup
+        PatchSet
+        Projected
+        Geographic
+        GeoPatch
+        SeamlessEngineNode
+        SeamlessOptions
 )
 
-INCLUDE_DIRECTORIES(${INCDIR} ${GDAL_INCLUDE_DIR})
+INCLUDE_DIRECTORIES(${GDAL_INCLUDE_DIR})
 
 # to install public driver includes:
 SETUP_PLUGIN(osgearth_engine_seamless)

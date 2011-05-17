@@ -3,9 +3,8 @@ SET(TARGET_SRC
 )
 
 SET(TARGET_PUBLIC_H
-    ../../../../include/osgEarthDrivers/model_feature_stencil/FeatureStencilModelOptions
+    FeatureStencilModelOptions
 )
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/model_feature_stencil)
 
 SET(TARGET_COMMON_LIBRARIES
     ${TARGET_COMMON_LIBRARIES}

@@ -1,0 +1,94 @@
+/* -*-c++-*- */
+/* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
+ * Copyright 2008-2010 Pelican Mapping
+ * http://osgearth.org
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+#ifndef OSGEARTH_DRIVER_OGR_FEATURE_SOURCE_OPTIONS
+#define OSGEARTH_DRIVER_OGR_FEATURE_SOURCE_OPTIONS 1
+
+#include <osgEarth/Common>
+#include <osgEarthFeatures/FeatureSource>
+
+namespace osgEarth { namespace Drivers
+{
+    using namespace osgEarth;
+    using namespace osgEarth::Features;
+
+    class OGRFeatureOptions : public FeatureSourceOptions // NO EXPORT; header only
+    {
+    public:
+        optional<std::string>& url() { return _url; }
+        const optional<std::string>& url() const { return _url; }
+
+        optional<std::string>& ogrDriver() { return _ogrDriver; }
+        const optional<std::string>& ogrDriver() const { return _ogrDriver; }
+
+        optional<bool>& buildSpatialIndex() { return _buildSpatialIndex; }
+        const optional<bool>& buildSpatialIndex() const { return _buildSpatialIndex; }
+
+        optional<Config>& geometryConfig() { return _geometryConf; }
+        const optional<Config>& geometryConfig() const { return _geometryConf; }
+
+        optional<Config>& geometryProfileOptions() { return _geometryProfileConf; }
+        const optional<Config>& geometryProfileOptions() const { return _geometryProfileConf; }
+
+        osg::ref_ptr<Symbology::Geometry>& geometry() { return _geometry; }
+        const osg::ref_ptr<Symbology::Geometry>& geometry() const { return _geometry; }
+
+    public:
+        OGRFeatureOptions( const ConfigOptions& opt =ConfigOptions() ) : FeatureSourceOptions( opt ) {
+            setDriver( "ogr" );
+            fromConfig( _conf );
+        }
+
+    public:
+        Config getConfig() const {
+            Config conf = FeatureSourceOptions::getConfig();
+            conf.updateIfSet( "url", _url );
+            conf.updateIfSet( "ogr_driver", _ogrDriver );
+            conf.updateIfSet( "build_spatial_index", _buildSpatialIndex );
+            conf.updateIfSet( "geometry", _geometryConf );    
+            conf.updateIfSet( "geometry_profile", _geometryProfileConf );
+            return conf;
+        }
+
+    protected:
+        void mergeConfig( const Config& conf ) {
+            FeatureSourceOptions::mergeConfig( conf );
+            fromConfig( conf );
+        }
+
+    private:
+        void fromConfig( const Config& conf ) {
+            conf.getIfSet( "url", _url );
+            conf.getIfSet( "ogr_driver", _ogrDriver );
+            conf.getIfSet( "build_spatial_index", _buildSpatialIndex );
+            conf.getIfSet( "geometry", _geometryConf );
+            conf.getIfSet( "geometry_profile", _geometryProfileConf );
+        }
+
+        optional<std::string> _url;
+        optional<std::string> _ogrDriver;
+        optional<bool> _buildSpatialIndex;
+        optional<Config> _geometryConf;
+        optional<Config> _geometryProfileConf;
+        osg::ref_ptr<Symbology::Geometry> _geometry;
+    };
+
+} } // namespace osgEarth::Drivers
+
+#endif // OSGEARTH_DRIVER_OGR_FEATURE_SOURCE_OPTIONS
+

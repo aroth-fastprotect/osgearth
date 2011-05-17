@@ -1,0 +1,92 @@
+/* -*-c++-*- */
+/* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
+ * Copyright 2008-2010 Pelican Mapping
+ * http://osgearth.org
+ *
+ * osgEarth is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU Lesser General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ */
+#ifndef OSGEARTHUTIL_AUTOCLIPPLANEHANDLER_H
+#define OSGEARTHUTIL_AUTOCLIPPLANEHANDLER_H
+
+#include <osgEarthUtil/Common>
+#include <osgEarth/MapNode>
+#include <osgGA/GUIEventHandler>
+#include <osgGA/EventVisitor>
+
+namespace osgEarth { namespace Util
+{
+    using namespace osgEarth;
+
+    /**
+     * An event handler that automatically calculates optimal near and
+     * far clip planes for a geocentric map node. Just add this to your
+     * main Viewer and go.
+     *
+     * This only works properly for geocentric (round earth) maps.
+     */
+    class OSGEARTHUTIL_EXPORT AutoClipPlaneHandler : public osgGA::GUIEventHandler
+    {
+    public:
+        /**
+         * Constructs a new clip plane handler.
+         */
+        AutoClipPlaneHandler( const Map* map =0L );
+        
+        /**
+         * Whether to automatically set the far clip to the horizon. default=true.
+         */
+        void setAutoFarPlaneClipping(bool enabled) { _autoFarPlaneClipping = enabled; }
+        bool getAutoFarPlaneClipping() const { return _autoFarPlaneClipping; }
+
+        
+    public: // EventHandler
+
+        virtual bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa );
+
+        void frame( osgGA::GUIActionAdapter& aa );
+
+    private:
+
+        osg::observer_ptr<osgEarth::MapNode> _mapNode;
+        bool _geocentric;
+        int _frame;
+        double _nfrAtRadius, _nfrAtDoubleRadius, _rp;
+        bool _autoFarPlaneClipping;
+    };
+
+
+    class OSGEARTHUTIL_EXPORT AutoClipPlaneCallback : public osg::NodeCallback
+    {
+    public:
+        AutoClipPlaneCallback( const Map* map =0L )
+        {
+            _handler = new AutoClipPlaneHandler( map );
+        }
+
+        virtual void operator()( osg::Node* node, osg::NodeVisitor* nv )
+        {
+            osgGA::EventVisitor* ev = dynamic_cast<osgGA::EventVisitor*>( nv );
+            if ( ev ) {
+                _handler->frame( *ev->getActionAdapter() );
+            }
+            traverse( node, nv );
+        }
+
+        osg::ref_ptr<AutoClipPlaneHandler> _handler;
+    };
+
+} } // namespace osgEarth::Util
+
+#endif // OSGEARTHUTIL_AUTOCLIPPLANEHANDLER_H
+

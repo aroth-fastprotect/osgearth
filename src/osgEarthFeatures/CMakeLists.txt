@@ -10,25 +10,24 @@ ENDIF(GEOS_FOUND)
 
 SET(LIB_NAME osgEarthFeatures)
 
-SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
-	${HEADER_PATH}/Annotation  
-	${HEADER_PATH}/BufferFilter
-	${HEADER_PATH}/BuildGeometryFilter  
-	${HEADER_PATH}/Common
-	${HEADER_PATH}/ConvertTypeFilter
-	${HEADER_PATH}/Feature
-	${HEADER_PATH}/FeatureGridder
-	${HEADER_PATH}/FeatureModelSource
-	${HEADER_PATH}/FeatureSource
-	${HEADER_PATH}/FeatureSymbolizer
-	${HEADER_PATH}/FeatureTileSource
-	${HEADER_PATH}/Filter
-	${HEADER_PATH}/ResampleFilter
-	${HEADER_PATH}/ScaleFilter
-	${HEADER_PATH}/BuildTextOperator
-	${HEADER_PATH}/TransformFilter
-	${HEADER_PATH}/VirtualFeatureSource
+	Annotation  
+	BufferFilter
+	BuildGeometryFilter  
+	Common
+	ConvertTypeFilter
+	Feature
+	FeatureGridder
+	FeatureModelSource
+	FeatureSource
+	FeatureSymbolizer
+	FeatureTileSource
+	Filter
+	ResampleFilter
+	ScaleFilter
+	BuildTextOperator
+	TransformFilter
+	VirtualFeatureSource
 )
 
 SET(TARGET_SRC

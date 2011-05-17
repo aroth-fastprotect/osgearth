@@ -7,7 +7,7 @@ SET(TARGET_COMMON_LIBRARIES
 )
 
 SET(TARGET_PUBLIC_H
-    ../../../../include/osgEarthDrivers/cache_sqlite3/Sqlite3CacheOptions
+    Sqlite3CacheOptions
 )
 SET(TARGET_SRC 
     Sqlite3Cache.cpp

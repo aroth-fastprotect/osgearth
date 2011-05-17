@@ -1,5 +1,5 @@
 SET(TARGET_SRC SimpleModelSource.cpp)
-SET(TARGET_PUBLIC_H ../../../../include/osgEarthDrivers/model_simple/SimpleModelOptions)
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/model_simple)
+SET(TARGET_PUBLIC_H SimpleModelOptions)
+
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarthSymbology)
 SETUP_PLUGIN(osgearth_model_simple)

@@ -6,24 +6,23 @@ ENDIF(DYNAMIC_OSGEARTH)
 
 SET(LIB_NAME osgEarthUtil)
 
-SET(HEADER_PATH ${OpenSceneGraph_SOURCE_DIR}/include/${LIB_NAME})
 SET(TARGET_PUBLIC_H
-	${HEADER_PATH}/AutoClipPlaneHandler
-	${HEADER_PATH}/Common
-	${HEADER_PATH}/Controls
-	${HEADER_PATH}/ClampCallback
-	${HEADER_PATH}/EarthManipulator
-	${HEADER_PATH}/ElevationManager
-	${HEADER_PATH}/Export
-	${HEADER_PATH}/Graticule
-	${HEADER_PATH}/ObjectPlacer
-	${HEADER_PATH}/ObjectLocator
-	${HEADER_PATH}/OceanSurfaceNode
-	${HEADER_PATH}/SkyNode
-	${HEADER_PATH}/SpatialData
-	${HEADER_PATH}/StarData
-	${HEADER_PATH}/Viewpoint
-	${HEADER_PATH}/WMS
+	AutoClipPlaneHandler
+	Common
+	Controls
+	ClampCallback
+	EarthManipulator
+	ElevationManager
+	Export
+	Graticule
+	ObjectPlacer
+	ObjectLocator
+	OceanSurfaceNode
+	SkyNode
+	SpatialData
+	StarData
+	Viewpoint
+	WMS
 )
 
 SET(TARGET_SRC

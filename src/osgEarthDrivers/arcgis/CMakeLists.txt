@@ -11,9 +11,7 @@ SET(TARGET_H
 )
 
 SET(TARGET_PUBLIC_H 
-	../../../../include/osgEarthDrivers/arcgis/ArcGISOptions
+	ArcGISOptions
 )
-
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR}/../../../../include/osgEarthDrivers/arcgis)
 
 SETUP_PLUGIN(osgearth_arcgis)

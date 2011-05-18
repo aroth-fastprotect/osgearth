@@ -13,56 +13,51 @@ SET(LIB_NAME osgEarthSymbology)
 SET(TARGET_PUBLIC_H
 #   header files go here
 	AGG.h
+    AltitudeSymbol
     Common
-    Content
+    Color
     CssUtils
-    ExtrudedSymbol
+    Expression
+    ExtrusionSymbol
     Geometry
-    GeometryExtrudeSymbolizer
-    GeometrySymbolizer
-    GeometrySymbol
     GEOS
     GeometryRasterizer
 	LineFunctor
-    MarkerSymbolizer
+    LineSymbol
+    MeshConsolidator
+    MeshSubdivider
     MarkerSymbol
-	MeshSubdivider
-    ModelSymbolizer
+    PointSymbol
+    PolygonSymbol
 	Query
-    Registry
 	StencilVolumeNode
     Style
     SLD
-    StyleSheet
     Symbol
-    SymbolicNode
-    Symbolizer
-	Text
+    TextSymbol
 )
 
 SET(TARGET_SRC
+    AltitudeSymbol.cpp
+    Color.cpp
     CssUtils.cpp
-    ExtrudedSymbol.cpp
+    Expression.cpp
+    ExtrusionSymbol.cpp
     Geometry.cpp
-    GeometryExtrudeSymbolizer.cpp
-    GeometrySymbolizer.cpp
-    GeometrySymbol.cpp
     GEOS.cpp
     GeometryRasterizer.cpp
-    MarkerSymbolizer.cpp
-    MarkerSymbol.cpp
+    LineSymbol.cpp
+    MeshConsolidator.cpp
     MeshSubdivider.cpp
-    ModelSymbolizer.cpp
+    MarkerSymbol.cpp
+    PointSymbol.cpp
+    PolygonSymbol.cpp
     Query.cpp
-    Registry.cpp
     StencilVolumeNode.cpp
     Style.cpp
     SLD.cpp
-    StyleSheet.cpp
     Symbol.cpp
-    SymbolicNode.cpp
-    Symbolizer.cpp
-	Text.cpp
+    TextSymbol.cpp
 )
 
 

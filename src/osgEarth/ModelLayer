@@ -127,12 +127,12 @@ namespace osgEarth
         /** 
          * Gets the name of this model layer
          */
-        const std::string& getName() const { return _options.name().value(); }
+        const std::string& getName() const { return *_runtimeOptions.name(); }
 
         /**
          * Gets the initialization options for this layer.
          */
-        const ModelLayerOptions& getModelLayerOptions() const { return _options; }
+        const ModelLayerOptions& getModelLayerOptions() const { return _initOptions; }
 
         /**
          * Gets the reference URI (for resolving relative paths)
@@ -178,18 +178,22 @@ namespace osgEarth
     private:
         std::string _referenceURI;
         osg::ref_ptr<ModelSource> _modelSource;
-        const ModelLayerOptions _options;
+
+        const ModelLayerOptions _initOptions;
+        ModelLayerOptions       _runtimeOptions;
 
         osg::ref_ptr< osg::Node > _node;
 
-        optional<bool> _enabled;
-        optional<bool> _lighting;
-        optional<bool>  _overlay;
+        //optional<bool> _enabled;
+        //optional<bool> _lighting;
+        //optional<bool> _overlay;
 
         Revision _modelSourceRev;
 
         ModelLayerCallbackList _callbacks;
         virtual void fireCallback( ModelLayerCallbackMethodPtr method );
+
+        void copyOptions();
 
     };
 

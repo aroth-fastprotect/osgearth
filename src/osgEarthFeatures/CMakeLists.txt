@@ -11,40 +11,66 @@ ENDIF(GEOS_FOUND)
 SET(LIB_NAME osgEarthFeatures)
 
 SET(TARGET_PUBLIC_H
-	Annotation  
-	BufferFilter
-	BuildGeometryFilter  
-	Common
-	ConvertTypeFilter
-	Feature
-	FeatureGridder
-	FeatureModelSource
-	FeatureSource
-	FeatureSymbolizer
-	FeatureTileSource
-	Filter
-	ResampleFilter
-	ScaleFilter
-	BuildTextOperator
-	TransformFilter
-	VirtualFeatureSource
+    Annotation  
+    BufferFilter
+    BuildGeometryFilter  
+    BuildTextFilter
+    BuildTextOperator
+    Common
+    ClampFilter
+    ConvertTypeFilter
+    CropFilter
+    ExtrudeGeometryFilter
+    Feature
+    FeatureCursor
+    FeatureDisplayLayout
+    FeatureGeometryIndex
+    FeatureGridder
+    FeatureModelGraph
+    FeatureModelSource    
+    FeatureSource
+    FeatureTileSource
+    Filter
+    FilterContext
+    LabelSource
+    OptimizerHints
+    ResampleFilter
+    ScaleFilter
+    Session
+    ScatterFilter
+    SubstituteModelFilter
+    TransformFilter
+    VirtualFeatureSource
 )
 
 SET(TARGET_SRC
     Annotation.cpp
     BufferFilter.cpp
-    BuildGeometryFilter.cpp
+    BuildGeometryFilter.cpp 
+    BuildTextFilter.cpp
+    BuildTextOperator.cpp
+    ClampFilter.cpp
     ConvertTypeFilter.cpp
+    CropFilter.cpp
+    ExtrudeGeometryFilter.cpp
     Feature.cpp
+    FeatureCursor.cpp
+    FeatureDisplayLayout.cpp
+    FeatureGeometryIndex.cpp
     FeatureGridder.cpp
+    FeatureModelGraph.cpp
     FeatureModelSource.cpp
     FeatureSource.cpp
-    FeatureSymbolizer.cpp
     FeatureTileSource.cpp
     Filter.cpp
+    FilterContext.cpp
+    LabelSource.cpp
+    OptimizerHints.cpp
     ResampleFilter.cpp
-	ScaleFilter.cpp
-	BuildTextOperator.cpp
+    ScaleFilter.cpp
+    Session.cpp
+    ScatterFilter.cpp
+    SubstituteModelFilter.cpp
     TransformFilter.cpp
     VirtualFeatureSource.cpp
 )

@@ -35,6 +35,8 @@
 #include <OpenThreads/ReadWriteMutex>
 
 #include <string>
+#include <list>
+#include <map>
 
 namespace osgEarth
 {
@@ -52,8 +54,18 @@ namespace osgEarth
         }
 
         /** Whether to run exclusively off the cache (and not fetch files from tile sources) */
-        optional<bool> cacheOnly() { return _cacheOnly; }
-        const optional<bool> cacheOnly() const { return _cacheOnly; }
+        optional<bool>& cacheOnly() { return _cacheOnly; }
+        const optional<bool>& cacheOnly() const { return _cacheOnly; }
+
+        void setReferenceURI(const std::string& referenceURI)
+        {
+            _referenceURI = referenceURI;
+        }
+
+        const std::string& getReferenceURI() const
+        {
+            return _referenceURI;
+        }
 
     public:
         virtual Config getConfig() const {
@@ -71,6 +83,7 @@ namespace osgEarth
         }
 
         optional<bool> _cacheOnly;
+        std::string _referenceURI;
     };
 
     //----------------------------------------------------------------------
@@ -475,7 +488,7 @@ namespace osgEarth
   class OSGEARTH_EXPORT CacheFactory
   {
   public:
-      static Cache* create( const CacheOptions& options );
+      static Cache* create( const CacheOptions& options);
   };
 }
 

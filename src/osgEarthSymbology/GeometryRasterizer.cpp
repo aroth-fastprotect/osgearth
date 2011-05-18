@@ -17,7 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthSymbology/GeometryRasterizer>
-#include <osgEarthSymbology/GeometrySymbol>
+#include <osgEarthSymbology/PointSymbol>
+#include <osgEarthSymbology/LineSymbol>
+#include <osgEarthSymbology/PolygonSymbol>
 #include <osgEarthSymbology/AGG.h>
 
 using namespace osgEarth::Symbology;
@@ -46,7 +48,7 @@ struct AggState : public osg::Referenced
 
 // --------------------------------------------------------------------------
 
-GeometryRasterizer::GeometryRasterizer( int width, int height, Style* style ) :
+GeometryRasterizer::GeometryRasterizer( int width, int height, const Style& style ) :
 _style( style )
 {
     _image = new osg::Image();
@@ -82,13 +84,13 @@ GeometryRasterizer::draw( const Geometry* geom, const osg::Vec4f& c )
 
     if ( geom->getType() == Geometry::TYPE_POLYGON )
     {
-        const PolygonSymbol* ps = _style.valid() ? _style->getSymbol<const PolygonSymbol>() : 0L;
+        const PolygonSymbol* ps = _style.getSymbol<const PolygonSymbol>();
         if ( ps )
             color = ps->fill()->color();
     }
     else
     {
-        const LineSymbol* ls = _style.valid() ? _style->getSymbol<const LineSymbol>() : 0L;
+        const LineSymbol* ls = _style.getSymbol<const LineSymbol>();
         float distance = ls ? ls->stroke()->width().value() * 0.5f : 1.0f;
         osg::ref_ptr<Geometry> bufferedGeom;
         if ( !geom->buffer( distance, bufferedGeom ) )
@@ -102,7 +104,7 @@ GeometryRasterizer::draw( const Geometry* geom, const osg::Vec4f& c )
     }
 
     float a = 127+(color.a()*255)/2; // scale alpha up
-    agg::rgba8 fgColor = agg::rgba8( color.r()*255, color.g()*255, color.b()*255, a );
+    agg::rgba8 fgColor = agg::rgba8( (unsigned int)(color.r()*255), (unsigned int)(color.g()*255), (unsigned int)(color.b()*255), (unsigned int)a );
 
     ConstGeometryIterator gi( geomToRender.get() );
     while( gi.hasMore() )

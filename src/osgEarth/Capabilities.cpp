@@ -146,7 +146,6 @@ _supportsQuadBufferStereo( false )
 		mgc = new MyGraphicsContext(false);
 	}
 
-
     if ( mgc->valid() )
     {
         osg::GraphicsContext* gc = mgc->gc();

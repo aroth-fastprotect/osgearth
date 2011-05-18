@@ -66,8 +66,9 @@ FeatureTileSourceOptions::mergeConfig( const Config& conf )
 void
 FeatureTileSourceOptions::fromConfig( const Config& conf )
 {
-    if ( conf.hasChild("features") )
-        _featureOptions->merge( ConfigOptions(conf.child("features")) );
+    conf.getObjIfSet( "features", _featureOptions );
+    //if ( conf.hasChild("features") )
+    //    _featureOptions->merge( ConfigOptions(conf.child("features")) );
 
     conf.getObjIfSet( "styles", _styles );
     
@@ -118,6 +119,8 @@ FeatureTileSource::initialize( const std::string& referenceURI, const Profile* o
     if ( _features.valid() )
     {
         _features->initialize( referenceURI );
+
+#if 0 // removed this as it was screwing up the rasterizer (agglite plugin).. not sure there's any reason to do this anyway
         if (_features->getFeatureProfile())
         {
             setProfile( Profile::create(_features->getFeatureProfile()->getSRS(),
@@ -125,6 +128,7 @@ FeatureTileSource::initialize( const std::string& referenceURI, const Profile* o
                                     _features->getFeatureProfile()->getExtent().xMax(), _features->getFeatureProfile()->getExtent().yMax()));
 
         }
+#endif
     }
     else
     {
@@ -154,7 +158,7 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
         return 0L;
 
     // style data
-    const StyleCatalog* styles = _options.styles();
+    const StyleSheet* styles = _options.styles();
 
     // implementation-specific data
     osg::ref_ptr<osg::Referenced> buildData = createBuildData();
@@ -178,7 +182,7 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
                 FeatureList list;
                 list.push_back( feature );
                 renderFeaturesForStyle( 
-                    feature->style().get(), list, buildData.get(),
+                    *feature->style(), list, buildData.get(),
                     key.getExtent(), image.get() );
             }
         }
@@ -190,20 +194,21 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
             for( StyleSelectorList::const_iterator i = styles->selectors().begin(); i != styles->selectors().end(); ++i )
             {
                 const StyleSelector& sel = *i;
-                Style* style;
+                Style style;
                 styles->getStyle( sel.getSelectedStyleName(), style );
                 queryAndRenderFeaturesForStyle( style, sel.query().value(), buildData.get(), key.getExtent(), image.get() );
             }
         }
         else
         {
-            const Style* style = styles->getDefaultStyle();
+            Style style;
+            styles->getDefaultStyle( style );
             queryAndRenderFeaturesForStyle( style, Query(), buildData.get(), key.getExtent(), image.get() );
         }
     }
     else
     {
-        queryAndRenderFeaturesForStyle( new Style, Query(), buildData.get(), key.getExtent(), image.get() );
+        queryAndRenderFeaturesForStyle( Style(), Query(), buildData.get(), key.getExtent(), image.get() );
     }
 
     // final tile processing after all styles are done
@@ -214,11 +219,11 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
 
 
 bool
-FeatureTileSource::queryAndRenderFeaturesForStyle(const Style* style,
-                                                  const Query& query,
+FeatureTileSource::queryAndRenderFeaturesForStyle(const Style&     style,
+                                                  const Query&     query,
                                                   osg::Referenced* data,
                                                   const GeoExtent& imageExtent,
-                                                  osg::Image* out_image)
+                                                  osg::Image*      out_image)
 {   
     // first we need the overall extent of the layer:
     const GeoExtent& featuresExtent = getFeatureSource()->getFeatureProfile()->getExtent();
@@ -226,7 +231,7 @@ FeatureTileSource::queryAndRenderFeaturesForStyle(const Style* style,
     // convert them both to WGS84, intersect the extents, and convert back.
     GeoExtent featuresExtentWGS84 = featuresExtent.transform( featuresExtent.getSRS()->getGeographicSRS() );
     GeoExtent imageExtentWGS84 = imageExtent.transform( featuresExtent.getSRS()->getGeographicSRS() );
-    GeoExtent queryExtentWGS84 = featuresExtentWGS84.intersectionSameSRS( imageExtentWGS84 );
+    GeoExtent queryExtentWGS84 = featuresExtentWGS84.intersectionSameSRS( imageExtentWGS84.bounds() );
     if ( queryExtentWGS84.isValid() )
     {
         GeoExtent queryExtent = queryExtentWGS84.transform( featuresExtent.getSRS() );

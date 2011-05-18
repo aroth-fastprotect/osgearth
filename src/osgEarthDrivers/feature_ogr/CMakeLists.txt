@@ -4,9 +4,9 @@ SET(TARGET_SRC
 )
 
 SET(TARGET_PUBLIC_H 
-	OGRFeatureOptions
 	FeatureCursorOGR
 	GeometryUtils
+    OGRFeatureOptions
 )
 
 INCLUDE_DIRECTORIES( ${GDAL_INCLUDE_DIR} )

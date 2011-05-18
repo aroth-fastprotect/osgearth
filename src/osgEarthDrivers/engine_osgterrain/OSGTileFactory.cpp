@@ -17,9 +17,9 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 #include "OSGTileFactory"
-#include "CustomTerrain"
+#include "Terrain"
+#include "StreamingTerrain"
 #include "FileLocationCallback"
-#include "TerrainTileEdgeNormalizerUpdateCallback"
 #include "TransparentLayer"
 
 #include <osgEarth/Map>
@@ -37,8 +37,6 @@
 #include <osgFX/MultiTextureControl>
 #include <osgDB/ReadFile>
 #include <osgDB/WriteFile>
-#include <osgTerrain/Terrain>
-#include <osgTerrain/TerrainTile>
 #include <osgTerrain/Locator>
 #include <osgTerrain/GeometryTechnique>
 #include <OpenThreads/ReentrantMutex>
@@ -56,9 +54,9 @@ using namespace osgEarth::Drivers;
 namespace
 {
     //TODO: get rid of this, and move it to the CustomTerrain CULL traversal....?????
-    struct PopulateTileDataCallback : public osg::NodeCallback
+    struct PopulateStreamingTileDataCallback : public osg::NodeCallback
     {
-        PopulateTileDataCallback( const MapFrame& mapf ) : _mapf(mapf) { }
+        PopulateStreamingTileDataCallback( const MapFrame& mapf ) : _mapf(mapf) { }
 
         void operator()( osg::Node* node, osg::NodeVisitor* nv )
         {
@@ -66,11 +64,8 @@ namespace
             {
                 if ( node->asGroup()->getNumChildren() > 0 )
                 {
-                    CustomTile* tile = static_cast<CustomTile*>( node->asGroup()->getChild(0) );
-                    if ( tile && tile->getUseLayerRequests() )
-                    {
-                        tile->servicePendingImageRequests( _mapf, nv->getFrameStamp()->getFrameNumber() );
-                    }
+                    StreamingTile* tile = static_cast<StreamingTile*>( node->asGroup()->getChild(0) );
+                    tile->servicePendingImageRequests( _mapf, nv->getFrameStamp()->getFrameNumber() );
                 }
             }
             traverse( node, nv );
@@ -91,12 +86,6 @@ _cull_thread_mapf( cull_thread_mapf ),
 _terrainOptions( props )
 {
     LoadingPolicy::Mode mode = _terrainOptions.loadingPolicy()->mode().value();
-
-    OE_INFO << LC << "Loading policy mode = " <<
-        ( mode == LoadingPolicy::MODE_PREEMPTIVE ? "PREEMPTIVE" :
-        mode == LoadingPolicy::MODE_SEQUENTIAL ? "SEQUENTIAL" :
-        "STANDARD" )
-        << std::endl;
 }
 
 const OSGTerrainOptions& 
@@ -131,7 +120,7 @@ OSGTileFactory::getTransformFromExtents(double minX, double minY, double maxX, d
 }
 
 osg::Node*
-OSGTileFactory::createSubTiles( const MapFrame& mapf, CustomTerrain* terrain, const TileKey& key, bool populateLayers )
+OSGTileFactory::createSubTiles( const MapFrame& mapf, Terrain* terrain, const TileKey& key, bool populateLayers )
 {
     TileKey k0 = key.createChildKey(0);
     TileKey k1 = key.createChildKey(1);
@@ -258,91 +247,6 @@ OSGTileFactory::hasMoreLevels( Map* map, const TileKey& key )
     return more_levels;
 }
 
-bool
-OSGTileFactory::areChildrenCached( const Map* map, const TileKey& parentKey ) const
-{      
-    MapFrame mapf( map );
-
-    //Split the key into it's 4 children and check to see if all 4 are cached.
-    for( unsigned int i=0; i<4; ++i )
-    {
-        if ( !isCached( mapf, parentKey.createChildKey(i) ) )
-            return false;
-    }
-
-    return true;
-}
-
-bool
-OSGTileFactory::isCached( const MapFrame& mapf, const osgEarth::TileKey& key ) const
-{
-    const Profile* mapProfile = mapf.getProfile();
-
-    //Check the imagery layers
-    for( ImageLayerVector::const_iterator i = mapf.imageLayers().begin(); i != mapf.imageLayers().end(); i++ )
-    {
-        ImageLayer* layer = i->get();
-        osg::ref_ptr< Cache > cache = layer->getCache();
-
-        if ( !cache.valid() || !layer->getProfile() ) 
-            return false;
-
-        std::vector< TileKey > keys;
-
-        if ( mapProfile->isEquivalentTo( layer->getProfile() ) )
-        {
-            keys.push_back( key );
-        }
-        else
-        {
-            layer->getProfile()->getIntersectingTiles( key, keys );
-        }
-
-        for (unsigned int j = 0; j < keys.size(); ++j)
-        {
-            if ( layer->isKeyValid( keys[j] ) )
-            {
-                if ( !cache->isCached( keys[j], layer->getCacheSpec() ) )
-                {
-                    return false;
-                }
-            }
-        }
-    }
-
-    for( ElevationLayerVector::const_iterator i =mapf.elevationLayers().begin(); i != mapf.elevationLayers().end(); ++i )
-    {
-        ElevationLayer* layer = i->get();
-        osg::ref_ptr< Cache > cache = layer->getCache();
-
-        if ( !cache.valid() || !layer->getProfile() )
-            return false;
-
-        std::vector<TileKey> keys;
-
-        if ( mapProfile->isEquivalentTo( layer->getProfile() ) )
-        {
-            keys.push_back( key );
-        }
-        else
-        {
-            layer->getProfile()->getIntersectingTiles( key, keys );
-        }
-
-        for (unsigned int j = 0; j < keys.size(); ++j)
-        {
-            if ( layer->isKeyValid( keys[j] ) )
-            {
-                if ( !cache->isCached( keys[j], layer->getCacheSpec() ) )
-                {
-                    return false;
-                }
-            }
-        }
-    }
-    return true;
-}
-
 osg::HeightField*
 OSGTileFactory::createEmptyHeightField( const TileKey& key, int numCols, int numRows )
 {
@@ -353,11 +257,7 @@ OSGTileFactory::createEmptyHeightField( const TileKey& key, int numCols, int num
 }
 
 void
-OSGTileFactory::addPlaceholderImageLayers(CustomTile* tile,
-                                          CustomTile* ancestorTile,
-                                          const ImageLayerVector& imageLayers,
-                                          GeoLocator* defaultLocator,
-                                          const TileKey& key)
+OSGTileFactory::addPlaceholderImageLayers(Tile* tile, Tile* ancestorTile )
 {
     if ( !ancestorTile )
     {
@@ -375,9 +275,9 @@ OSGTileFactory::addPlaceholderImageLayers(CustomTile* tile,
 
 
 void
-OSGTileFactory::addPlaceholderHeightfieldLayer(CustomTile* tile,
-                                               CustomTile* ancestorTile,
-                                               GeoLocator* defaultLocator,
+OSGTileFactory::addPlaceholderHeightfieldLayer(StreamingTile* tile,
+                                               StreamingTile* ancestorTile,
+                                               GeoLocator*    defaultLocator,
                                                const TileKey& key,
                                                const TileKey& ancestorKey)
 {
@@ -436,9 +336,9 @@ OSGTileFactory::addPlaceholderHeightfieldLayer(CustomTile* tile,
 
 osgTerrain::HeightFieldLayer*
 OSGTileFactory::createPlaceholderHeightfieldLayer(osg::HeightField* ancestorHF,
-                                                  const TileKey& ancestorKey,
-                                                  const TileKey& key,
-                                                  GeoLocator* keyLocator )
+                                                  const TileKey&    ancestorKey,
+                                                  const TileKey&    key,
+                                                  GeoLocator*       keyLocator )
 {
     osgTerrain::HeightFieldLayer* hfLayer = NULL;
 
@@ -456,38 +356,45 @@ OSGTileFactory::createPlaceholderHeightfieldLayer(osg::HeightField* ancestorHF,
 }
 
 osg::Node*
-OSGTileFactory::createTile(const MapFrame& mapf, CustomTerrain* terrain, 
-                           const TileKey& key, bool populateLayers, 
-                           bool wrapInPagedLOD, bool fallback,
-                           bool& validData )
+OSGTileFactory::createTile(const MapFrame&  mapf, 
+                           Terrain*         terrain, 
+                           const TileKey&   key, 
+                           bool             populateLayers, 
+                           bool             wrapInPagedLOD, 
+                           bool             fallback,
+                           bool&            out_validData )
 {
     if ( populateLayers )
     {        
-        return createPopulatedTile( mapf, terrain, key, wrapInPagedLOD, fallback, validData);
+        return createPopulatedTile( mapf, terrain, key, wrapInPagedLOD, fallback, out_validData);
     }
     else
     {
         //Placeholders always contain valid data
-        validData = true;
-        return createPlaceholderTile( mapf, terrain, key );
+        out_validData = true;
+
+        return createPlaceholderTile(
+            mapf, 
+            static_cast<StreamingTerrain*>(terrain),
+            key );
     }
 }
 
 
 
 osg::Node*
-OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
-                                      CustomTerrain* terrain,
-                                      const TileKey& key )
+OSGTileFactory::createPlaceholderTile(const MapFrame&   mapf,
+                                      StreamingTerrain* terrain,
+                                      const TileKey&    key )
 {
     // Start out by finding the nearest registered ancestor tile, since the placeholder is
     // going to be based on inherited data. Note- the ancestor may not be the immediate
     // parent, b/c the parent may or may not be in the scene graph.
     TileKey ancestorKey = key.createParentKey();
-    osg::ref_ptr<CustomTile> ancestorTile;
+    osg::ref_ptr<StreamingTile> ancestorTile;
     while( !ancestorTile.valid() && ancestorKey.valid() )
     {
-        terrain->getCustomTile( ancestorKey.getTileId(), ancestorTile );
+        terrain->getTile( ancestorKey.getTileId(), ancestorTile );
         if ( !ancestorTile.valid() )
             ancestorKey = ancestorKey.createParentKey();
     }
@@ -511,12 +418,11 @@ OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
     osg::ref_ptr<GeoLocator> locator = GeoLocator::createForKey( key, mapInfo );
 
     // The empty tile:
-    CustomTile* tile = new CustomTile( key, locator.get(), terrain->getQuickReleaseGLObjects() );
-    tile->setTerrainTechnique( osg::clone(terrain->getTerrainTechniquePrototype(), osg::CopyOp::DEEP_COPY_ALL) );
+    StreamingTile* tile = new StreamingTile( key, locator.get(), terrain->getQuickReleaseGLObjects() );
+    tile->setTerrainTechnique( terrain->cloneTechnique() );
     tile->setVerticalScale( _terrainOptions.verticalScale().value() );
-    tile->setRequiresNormals( true );
     tile->setDataVariance( osg::Object::DYNAMIC );
-    tile->setLocator( locator.get() );
+    //tile->setLocator( locator.get() );
 
     // Attach an updatecallback to normalize the edges of TerrainTiles.
 #if 0
@@ -531,7 +437,7 @@ OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
     // ancestor tile.
     {
         //Threading::ScopedReadLock parentLock( ancestorTile->getTileLayersMutex() );
-        addPlaceholderImageLayers( tile, ancestorTile.get(), mapf.imageLayers(), locator.get(), key );
+        addPlaceholderImageLayers     ( tile, ancestorTile.get() );
         addPlaceholderHeightfieldLayer( tile, ancestorTile.get(), locator.get(), key, ancestorKey );
     }
 
@@ -558,17 +464,15 @@ OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
     if ( _terrainOptions.loadingPolicy()->mode().get() != LoadingPolicy::MODE_STANDARD )
     {
         markTileLoaded = true;
-        tile->setUseLayerRequests( true );
         tile->setHasElevationHint( hasElevation );
     }
 
     // install a tile switcher:
-    tile->setTerrainRevision( terrain->getRevision() );
-    tile->setTerrain( terrain );
-    terrain->registerTile( tile );
+    tile->attachToTerrain( terrain );
+    //tile->setTerrain( terrain );
+    //terrain->registerTile( tile );
 
     osg::Node* result = 0L;
-
 
     // create a PLOD so we can keep subdividing:
     osg::PagedLOD* plod = new osg::PagedLOD();
@@ -585,7 +489,7 @@ OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
         plod->setRange( 0, 0, FLT_MAX );
     }
 
-#if USE_FILELOCATIONCALLBACK
+#if 0 //USE_FILELOCATIONCALLBACK
     osgDB::Options* options = new osgDB::Options;
     options->setFileLocationCallback( new FileLocationCallback);
     plod->setDatabaseOptions( options );
@@ -594,7 +498,7 @@ OSGTileFactory::createPlaceholderTile(const MapFrame& mapf,
     result = plod;
 
     // Install a callback that will load the actual tile data via the pager.
-    result->addCullCallback( new PopulateTileDataCallback( _cull_thread_mapf ) );
+    result->addCullCallback( new PopulateStreamingTileDataCallback( _cull_thread_mapf ) );
 
     // Install a cluster culler (FIXME for cube mode)
     //bool isCube = map->getMapOptions().coordSysType() == MapOptions::CSTYPE_GEOCENTRIC_CUBE;
@@ -618,10 +522,14 @@ namespace
     };
 }
 
+
 osg::Node*
-OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain, 
-                                    const TileKey& key, bool wrapInPagedLOD, 
-                                    bool fallback, bool& validData )
+OSGTileFactory::createPopulatedTile(const MapFrame&  mapf, 
+                                    Terrain*         terrain, 
+                                    const TileKey&   key, 
+                                    bool             wrapInPagedLOD, 
+                                    bool             fallback, 
+                                    bool&            validData )
 {
     const MapInfo& mapInfo = mapf.getMapInfo();
     bool isPlateCarre = !mapInfo.isGeocentric() && mapInfo.isGeographicSRS();
@@ -657,7 +565,7 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
     osg::ref_ptr<osg::HeightField> hf;
     if ( mapf.elevationLayers().size() > 0 )
     {
-        mapf.getHeightField( key, false, hf, _terrainOptions.elevationInterpolation().value());     
+        mapf.getHeightField( key, false, hf, 0L, _terrainOptions.elevationInterpolation().value());     
     }
 
     //If we are on the first LOD and we couldn't get a heightfield tile, just create an empty one.  Otherwise you can run into the situation
@@ -725,7 +633,7 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
         else
         {
             //Try to get a heightfield again, but this time fallback on parent tiles
-            if ( mapf.getHeightField( key, true, hf, _terrainOptions.elevationInterpolation().value() ) )
+            if ( mapf.getHeightField( key, true, hf, 0L, _terrainOptions.elevationInterpolation().value() ) )
             {
                 hasElevation = true;
             }
@@ -749,12 +657,16 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
     hf_layer->setLocator( locator.get() );
     hf_layer->setHeightField( hf.get() );
 
-    CustomTile* tile = new CustomTile( key, locator.get(), terrain->getQuickReleaseGLObjects() );
-    tile->setTerrainTechnique( osg::clone(terrain->getTerrainTechniquePrototype(), osg::CopyOp::DEEP_COPY_ALL) );
+    bool isStreaming = 
+        _terrainOptions.loadingPolicy()->mode() == LoadingPolicy::MODE_SEQUENTIAL ||
+        _terrainOptions.loadingPolicy()->mode() == LoadingPolicy::MODE_PREEMPTIVE;
+
+    Tile* tile = terrain->createTile( key, locator.get() );
+    tile->setTerrainTechnique( terrain->cloneTechnique() );
     tile->setVerticalScale( _terrainOptions.verticalScale().value() );
-    tile->setLocator( locator.get() );
+    //tile->setLocator( locator.get() );
     tile->setElevationLayer( hf_layer );
-    tile->setRequiresNormals( true );
+    //tile->setRequiresNormals( true );
     tile->setDataVariance(osg::Object::DYNAMIC);
 
 #if 0
@@ -804,30 +716,12 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
             if ( mapInfo.isGeocentric() )
                 img_locator->setCoordinateSystemType( osgTerrain::Locator::GEOCENTRIC );
 
-            // if blending is on, AND if actual new data was loaded (instead of just reusing a parent tile),
-            // create a custom blended image.
-            if ( _terrainOptions.lodBlending() == true && key == image_tiles[i]._imageTileKey )
-            {
-                osg::ref_ptr<osg::Image> blendedImage;
-                if ( ! createLodBlendedImage( image_tiles[i]._layerUID, key, geo_image.getImage(), terrain, blendedImage ) )
-                {
-                    blendedImage = geo_image.getImage();
-                }
-
-                tile->setCustomColorLayer( CustomColorLayer(
-                    mapf.getImageLayerAt(i),
-                    blendedImage.get(),
-                    img_locator.get(),
-                    key.getLevelOfDetail() ) );
-            }
-            else
-            {
-                tile->setCustomColorLayer( CustomColorLayer(
-                    mapf.getImageLayerAt(i),
-                    geo_image.getImage(),
-                    img_locator.get(),
-                    key.getLevelOfDetail() ) );
-            }
+            tile->setCustomColorLayer( CustomColorLayer(
+                mapf.getImageLayerAt(i),
+                geo_image.getImage(),
+                img_locator.get(),
+                key.getLevelOfDetail(),
+                key) );
 
             double upp = geo_image.getUnitsPerPixel();
 
@@ -872,20 +766,14 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
     //
     // If there's already a placeholder tile registered, this will be ignored. If there isn't,
     // this will register the new tile.
-    tile->setTerrain( terrain );
-    terrain->registerTile( tile );
+    tile->attachToTerrain( terrain );
+    //tile->setTerrain( terrain );
+    //terrain->registerTile( tile );
 
-    // Set the tile's revision to the current terrain revision
-    tile->setTerrainRevision( static_cast<CustomTerrain*>(terrain)->getRevision() );
-
-    if ( _terrainOptions.loadingPolicy()->mode() != LoadingPolicy::MODE_STANDARD && key.getLevelOfDetail())
+    if ( isStreaming && key.getLevelOfDetail() > 0 )
     {
-        tile->setUseLayerRequests( true );
-        tile->setHasElevationHint( hasElevation );
+        static_cast<StreamingTile*>(tile)->setHasElevationHint( hasElevation );
     }
-
-    tile->setTerrainRevision( terrain->getRevision() );
-    tile->setDataVariance( osg::Object::DYNAMIC );
 
     osg::Node* result = 0L;
 
@@ -917,8 +805,8 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
 #endif
         result = plod;
 
-        if ( tile->getUseLayerRequests() )
-            result->addCullCallback( new PopulateTileDataCallback( _cull_thread_mapf ) );
+        if ( isStreaming )
+            result->addCullCallback( new PopulateStreamingTileDataCallback( _cull_thread_mapf ) );
     }
     else
     {
@@ -928,55 +816,15 @@ OSGTileFactory::createPopulatedTile(const MapFrame& mapf, CustomTerrain* terrain
     return result;
 }
 
-bool
-OSGTileFactory::createLodBlendedImage(UID layerUID, const TileKey& key,
-                                      const osg::Image* tileImage,
-                                      CustomTerrain* terrain,
-                                      osg::ref_ptr<osg::Image>& output)
-{
-    TileKey parentKey = key.createParentKey();
-    if ( parentKey.valid() )
-    {
-        osg::ref_ptr<CustomTile> parentTile;
-        terrain->getCustomTile( parentKey.getTileId(), parentTile );
-        if ( parentTile.valid() )
-        {
-            CustomColorLayer parentLayer;
-            if ( parentTile->getCustomColorLayer( layerUID, parentLayer ) )
-            {
-                if ( parentLayer.getImage() && parentLayer.getLocator() )
-                {
-                    GeoImage parentGI(
-                        const_cast<osg::Image*>( parentLayer.getImage() ),
-                        static_cast<const GeoLocator*>(parentLayer.getLocator())->getDataExtent() );
-
-                    GeoImage cropped = parentGI.crop( key.getExtent() );
-
-                    osg::ref_ptr<osg::Image> parentImage;                            
-                    ImageUtils::resizeImage( 
-                        cropped.getImage(),
-                        tileImage->s(),
-                        tileImage->t(),
-                        parentImage );
-
-                    output = ImageUtils::createMipmapBlendedImage(
-                        tileImage,
-                        parentImage.get() );
-
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
 CustomColorLayerRef*
-OSGTileFactory::createImageLayer(const MapInfo& mapInfo,
-                                 ImageLayer* layer,
-                                 const TileKey& key,
+OSGTileFactory::createImageLayer(const MapInfo&    mapInfo,
+                                 ImageLayer*       layer,
+                                 const TileKey&    key,
                                  ProgressCallback* progress)
 {
+    if ( !layer )
+        return 0L;
+
     GeoImage geoImage;
 
     //If the key is valid, try to get the image from the MapLayer
@@ -998,33 +846,12 @@ OSGTileFactory::createImageLayer(const MapInfo& mapInfo,
         if ( mapInfo.isGeocentric() )
             imgLocator->setCoordinateSystemType( osgTerrain::Locator::GEOCENTRIC );
 
-#if 0
-        // since this method is only called in SEQ/PRE mode, we don't need to bother 
-        // supporting LOD blending here.
-
-        if ( keyValid && _terrainOptions.lodBlending() == true )
-        {
-            osg::ref_ptr<osg::Image> blendedImage;
-            createLodBlendedImage( layer->getUID(), key, geoImage.getImage(), terrain, blendedImage );
-
-            return new CustomColorLayerRef( CustomColorLayer(
-                layer,
-                blendedImage.get(),
-                imgLocator.get(),
-                key.getLevelOfDetail() ) );
-        }
-        else
-#endif
-        {
-            return new CustomColorLayerRef( CustomColorLayer(
-                layer,
-                geoImage.getImage(),
-                imgLocator.get(),
-                key.getLevelOfDetail() ) );
-        }
-
-        //CustomColorLayer result( layer, geoImage.getImage(), imgLocator.get(), key.getLevelOfDetail() );
-        //return new CustomColorLayerRef( result );
+        return new CustomColorLayerRef( CustomColorLayer(
+            layer,
+            geoImage.getImage(),
+            imgLocator.get(),
+            key.getLevelOfDetail(),
+            key) );
     }
 
     return NULL;
@@ -1038,7 +865,7 @@ OSGTileFactory::createHeightFieldLayer( const MapFrame& mapf, const TileKey& key
 
     // try to create a heightfield at native res:
     osg::ref_ptr<osg::HeightField> hf;
-    if ( !mapf.getHeightField( key, !exactOnly, hf, _terrainOptions.elevationInterpolation().value() ) )
+    if ( !mapf.getHeightField( key, !exactOnly, hf, 0L, _terrainOptions.elevationInterpolation().value() ) )
     {
         if ( exactOnly )
             return NULL;
@@ -1061,14 +888,14 @@ OSGTileFactory::createHeightFieldLayer( const MapFrame& mapf, const TileKey& key
 }
 
 osg::ClusterCullingCallback*
-OSGTileFactory::createClusterCullingCallback(osgTerrain::TerrainTile* tile, osg::EllipsoidModel* et)
+OSGTileFactory::createClusterCullingCallback(Tile* tile, osg::EllipsoidModel* et)
 {
     //This code is a very slightly modified version of the DestinationTile::createClusterCullingCallback in VirtualPlanetBuilder.
     osg::HeightField* grid = ((osgTerrain::HeightFieldLayer*)tile->getElevationLayer())->getHeightField();
     if (!grid) return 0;
 
     float verticalScale = 1.0f;
-    CustomTile* customTile = dynamic_cast<CustomTile*>(tile);
+    Tile* customTile = dynamic_cast<Tile*>(tile);
     if (customTile)
     {
         verticalScale = customTile->getVerticalScale();

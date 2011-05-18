@@ -22,7 +22,6 @@
 #include <osgEarthFeatures/TransformFilter>
 #include <osgEarthFeatures/BufferFilter>
 #include <osgEarthSymbology/Style>
-#include <osgEarthSymbology/GeometrySymbol>
 //TODO: replace this with ImageRasterizer
 #include <osgEarthSymbology/AGG.h>
 #include <osgEarth/Registry>
@@ -84,11 +83,11 @@ public:
 
     //override
     bool renderFeaturesForStyle(
-        const Symbology::Style* style,
+        const Style&       style,
         const FeatureList& inFeatures,
-        osg::Referenced* buildData,
-        const GeoExtent& imageExtent,
-        osg::Image* image )
+        osg::Referenced*   buildData,
+        const GeoExtent&   imageExtent,
+        osg::Image*        image )
     {
         // local copy of the features that we can process
         FeatureList features = inFeatures;
@@ -99,8 +98,8 @@ public:
         FilterContext context;
         context.profile() = getFeatureSource()->getFeatureProfile();
 
-        const LineSymbol* masterLine = style->getSymbol<LineSymbol>();
-        const PolygonSymbol* masterPoly = style->getSymbol<PolygonSymbol>();
+        const LineSymbol* masterLine = style.getSymbol<LineSymbol>();
+        const PolygonSymbol* masterPoly = style.getSymbol<PolygonSymbol>();
 
         //bool embeddedStyles = getFeatureSource()->hasEmbeddedStyles();
 
@@ -133,9 +132,10 @@ public:
             {
                 // check for an embedded style:
                 const LineSymbol* line = feature->style().isSet() ? 
-                    feature->style()->get()->getSymbol<LineSymbol>() : masterLine;
+                    feature->style()->getSymbol<LineSymbol>() : masterLine;
+
                 const PolygonSymbol* poly =
-                    feature->style().isSet() ? feature->style()->get()->getSymbol<PolygonSymbol>() : masterPoly;
+                    feature->style().isSet() ? feature->style()->getSymbol<PolygonSymbol>() : masterPoly;
 
                 // if we have polygons but only a LineSymbol, draw the poly as a line.
                 if ( geom->getComponentType() == Geometry::TYPE_POLYGON )
@@ -259,8 +259,8 @@ public:
 
             // set up a default color:
             osg::Vec4 c = color;
-            unsigned int a = 127+(c.a()*255)/2; // scale alpha up
-            agg::rgba8 fgColor( c.r()*255, c.g()*255, c.b()*255, a );
+            unsigned int a = (unsigned int)(127+(c.a()*255)/2); // scale alpha up
+            agg::rgba8 fgColor( (unsigned int)(c.r()*255), (unsigned int)(c.g()*255), (unsigned int)(c.b()*255), a );
 
             GeometryIterator gi( croppedGeometry.get() );
             while( gi.hasMore() )
@@ -269,10 +269,10 @@ public:
                 Geometry* g = gi.next();
             
                 const LineSymbol* line = feature->style().isSet() ? 
-                    feature->style()->get()->getSymbol<LineSymbol>() : masterLine;
+                    feature->style()->getSymbol<LineSymbol>() : masterLine;
 
                 const PolygonSymbol* poly =
-                    feature->style().isSet() ? feature->style()->get()->getSymbol<PolygonSymbol>() : masterPoly;
+                    feature->style().isSet() ? feature->style()->getSymbol<PolygonSymbol>() : masterPoly;
 
                 if (g->getType() == Geometry::TYPE_RING || g->getType() == Geometry::TYPE_LINESTRING)
                 {
@@ -291,7 +291,7 @@ public:
                 }
 
                 a = 127+(c.a()*255)/2; // scale alpha up
-                fgColor = agg::rgba8( c.r()*255, c.g()*255, c.b()*255, a );
+                fgColor = agg::rgba8( (unsigned int)(c.r()*255), (unsigned int)(c.g()*255), (unsigned int)(c.b()*255), a );
 
                 ras.filling_rule( agg::fill_even_odd );
                 for( Geometry::iterator p = g->begin(); p != g->end(); p++ )

@@ -16,6 +16,7 @@
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
+#if 0
 #include "CustomTerrain"
 #include "CustomTile"
 #include "TransparentLayer"
@@ -105,6 +106,11 @@ CustomTerrain::releaseGLObjectsForTiles(osg::State* state)
 {
     OpenThreads::ScopedLock<Mutex> lock( _tilesToReleaseMutex );
 
+    //if ( _tilesToRelease.size() > 0 )
+    //{
+    //    OE_INFO << "Releasing " << _tilesToRelease.size() << " tiles" << std::endl;
+    //}
+
     while( _tilesToRelease.size() > 0 )
     {
         _tilesToRelease.front()->releaseGLObjects( state );
@@ -119,27 +125,33 @@ CustomTerrain::CustomTerrain(const MapFrame& update_mapf,
 _revision(0),
 _tileFactory( tileFactory ),
 _numLoadingThreads( 0 ),
-_onDemandDelay( 2 ),
 _registeredWithReleaseGLCallback( false ),
 _update_mapf( update_mapf ),
 _cull_mapf( cull_mapf ),
+_onDemandDelay( 2 ),
 _quickReleaseGLObjects( quickReleaseGLObjects ),
-_quickReleaseCallbackInstalled( false )
+_quickReleaseCallbackInstalled( false ),
+_alwaysUpdate( false )
 {
     this->setThreadSafeRefUnref( true );
 
     _loadingPolicy = _tileFactory->getTerrainOptions().loadingPolicy().get();
 
-    if ( _loadingPolicy.mode() != LoadingPolicy::MODE_STANDARD )
+    if ( _loadingPolicy.mode() != LoadingPolicy::MODE_SERIAL && _loadingPolicy.mode() != LoadingPolicy::MODE_PARALLEL )
     {
         setNumChildrenRequiringUpdateTraversal( 1 );
+        _alwaysUpdate = true;
         _numLoadingThreads = computeLoadingThreads(_loadingPolicy);
         OE_INFO << LC << "Using a total of " << _numLoadingThreads << " loading threads " << std::endl;
     }
     else
     {        
         // undo the setting in osgTerrain::Terrain
-        setNumChildrenRequiringUpdateTraversal( 0 );
+        //setNumChildrenRequiringUpdateTraversal( 0 );
+
+        // the EVENT_VISITOR will reset this to 0 once the "delay" is expired.
+        _alwaysUpdate = false;
+        setNumChildrenRequiringUpdateTraversal( 1 );
     }
 
     // register for events in order to support ON_DEMAND frame scheme
@@ -344,6 +356,7 @@ CustomTerrain::registerTile( CustomTile* newTile )
 {
     Threading::ScopedWriteLock exclusiveTileTableLock( _tilesMutex );
     _tiles[ newTile->getTileID() ] = newTile;
+    //OE_INFO << LC << "Registered tiles = " << _tiles.size() << std::endl;
 }
 
 unsigned int
@@ -361,6 +374,8 @@ CustomTerrain::getNumTasksRemaining() const
 void
 CustomTerrain::traverse( osg::NodeVisitor &nv )
 {
+    // UPDATE runs whenever a Tile runs its update traversal on the first pass.
+    // i.e., only runs then a new Tile is born.
     if ( nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR )
     {
         // if the terrain engine requested "quick release", install the quick release
@@ -390,10 +405,14 @@ CustomTerrain::traverse( osg::NodeVisitor &nv )
                 if ( tile->getNumParents() == 0 && tile->getHasBeenTraversed() )
                 {
                     _tilesToShutDown.push_back( tile );
+                    
+                    // i is incremented prior to calling erase, but i's previous value goes to erase,
+                    // maintaining validity
                     _tiles.erase( i++ );
                 }
                 else
                     ++i;
+
             }
         }
 
@@ -421,37 +440,42 @@ CustomTerrain::traverse( osg::NodeVisitor &nv )
             }
         }
 
-        // update the frame stamp on the task services. This is necessary to support 
-        // automatic request cancelation for image requests.
+//        OE_NOTICE << "Tiles = " << _tiles.size() << std::endl;
+
+        if ( _loadingPolicy.mode() == LoadingPolicy::MODE_SEQUENTIAL || _loadingPolicy.mode() == LoadingPolicy::MODE_PREEMPTIVE )
         {
-            ScopedLock<Mutex> lock( _taskServiceMutex );
-            for (TaskServiceMap::iterator i = _taskServices.begin(); i != _taskServices.end(); ++i)
+            // update the frame stamp on the task services. This is necessary to support 
+            // automatic request cancelation for image requests.
             {
-                i->second->setStamp( stamp );
-            }
-        }
-
-        // next, go through the live tiles and process update-traversal requests. This
-        // requires a read-lock on the master tiles table.
-        TileList updatedTiles;
-        {
-            Threading::ScopedReadLock tileTableReadLock( _tilesMutex );
-
-            for( TileTable::const_iterator i = _tiles.begin(); i != _tiles.end(); ++i )
-            {
-                CustomTile* tile = i->second.get();
-
-                // update the neighbor list for each tile.
-                refreshFamily( _update_mapf.getMapInfo(), tile->getKey(), tile->getFamily(), true );
-
-                if ( tile->getUseLayerRequests() ) // i.e., sequential or preemptive mode
+                ScopedLock<Mutex> lock( _taskServiceMutex );
+                for (TaskServiceMap::iterator i = _taskServices.begin(); i != _taskServices.end(); ++i)
                 {
-                    tile->servicePendingElevationRequests( _update_mapf, stamp, true );                   
-                    tile->serviceCompletedRequests( _update_mapf, true );
-                    //if ( tileModified && _terrainCallbacks.size() > 0 )
-                    //{
-                    //    updatedTiles.push_back( tile );
-                    //}
+                    i->second->setStamp( stamp );
+                }
+            }
+
+            // next, go through the live tiles and process update-traversal requests. This
+            // requires a read-lock on the master tiles table.
+            TileList updatedTiles;
+            {
+                Threading::ScopedReadLock tileTableReadLock( _tilesMutex );
+
+                for( TileTable::const_iterator i = _tiles.begin(); i != _tiles.end(); ++i )
+                {
+                    CustomTile* tile = i->second.get();
+
+                    // update the neighbor list for each tile.
+                    refreshFamily( _update_mapf.getMapInfo(), tile->getKey(), tile->getFamily(), true );
+
+                    if ( tile->getUseLayerRequests() ) // i.e., sequential or preemptive mode
+                    {
+                        tile->servicePendingElevationRequests( _update_mapf, stamp, true );                   
+                        tile->serviceCompletedRequests( _update_mapf, true );
+                        //if ( tileModified && _terrainCallbacks.size() > 0 )
+                        //{
+                        //    updatedTiles.push_back( tile );
+                        //}
+                    }
                 }
             }
         }
@@ -500,14 +524,16 @@ CustomTerrain::traverse( osg::NodeVisitor &nv )
 
         if ( _tilesToShutDown.size() > 0 )
         {
-            _onDemandDelay = 2;
+            setDelay( 2 );
         }
 
-        if ( _onDemandDelay <= 0 )
+        else if ( _onDemandDelay <= 0 )
         {
             int numTasks = getNumTasksRemaining();
             if ( numTasks > 0 )
-                _onDemandDelay = 2;
+            {
+                setDelay( 2 );
+            }
         }
 
         //OE_INFO << "Tasks = " << numTasks << std::endl;
@@ -516,11 +542,31 @@ CustomTerrain::traverse( osg::NodeVisitor &nv )
         {
             osgGA::EventVisitor* ev = dynamic_cast<osgGA::EventVisitor*>( &nv );
             ev->getActionAdapter()->requestRedraw();
-            _onDemandDelay--;
+            decDelay();
         }
     }
 
     osgTerrain::Terrain::traverse( nv );
+}
+
+void
+CustomTerrain::setDelay( unsigned frames )
+{
+    if ( _onDemandDelay == 0 && !_alwaysUpdate )
+    {
+        ADJUST_UPDATE_TRAV_COUNT( this, 1 );
+    }
+    _onDemandDelay = frames;
+}
+
+void
+CustomTerrain::decDelay()
+{
+    _onDemandDelay--;
+    if ( _onDemandDelay == 0 && !_alwaysUpdate )
+    {
+        ADJUST_UPDATE_TRAV_COUNT(this, -1);
+    }
 }
 
 TaskService*
@@ -631,3 +677,4 @@ CustomTerrain::updateTaskServiceThreads( const MapFrame& mapf )
         getImageryTaskService( itr->get()->getUID() )->setNumThreads( imageThreads );
     }
 }
+#endif

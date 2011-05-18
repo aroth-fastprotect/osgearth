@@ -15,6 +15,7 @@ SET(TARGET_PUBLIC_H
 	ElevationManager
 	Export
 	Graticule
+	ImageOverlay	
 	ObjectPlacer
 	ObjectLocator
 	OceanSurfaceNode
@@ -22,6 +23,7 @@ SET(TARGET_PUBLIC_H
 	SpatialData
 	StarData
 	Viewpoint
+	WFS
 	WMS
 )
 
@@ -32,14 +34,28 @@ SET(TARGET_SRC
 	EarthManipulator.cpp
 	ElevationManager.cpp
 	Graticule.cpp
+	ImageOverlay.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     OceanSurfaceNode.cpp
     SpatialData.cpp
     SkyNode.cpp
 	Viewpoint.cpp
+	WFS.cpp
     WMS.cpp
 )
+
+IF(NOT (${OPENSCENEGRAPH_VERSION} VERSION_LESS "2.9.6"))
+SET(TARGET_PUBLIC_H ${TARGET_PUBLIC_H}
+    Draggers
+	ImageOverlayEditor
+	)
+	
+SET(TARGET_SRC ${TARGET_SRC} 
+    Draggers.cpp
+    ImageOverlayEditor.cpp
+    )
+ENDIF()
 
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})
 
@@ -57,6 +73,7 @@ SET(TARGET_ADDED_LIBRARIES
     osgWidget
 	osgText
 	osgGA
+	osgManipulator
     OpenThreads
     )
 

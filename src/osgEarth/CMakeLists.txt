@@ -26,6 +26,7 @@ SET(TARGET_PUBLIC_H
 	Config
 	Cube
 	ElevationLayer
+    ElevationQuery
 	Export
 	EGM
 	FileUtils
@@ -47,8 +48,10 @@ SET(TARGET_PUBLIC_H
 	MapOptions
 	MaskLayer
 	MaskNode
+    MaskSource
 	ModelLayer
 	ModelSource
+    NodeUtils
 	Notify
 	OverlayDecorator
 	Profile
@@ -75,6 +78,7 @@ SET(TARGET_PUBLIC_H
 	#tinyxml.h # only to simplify merging 
 	TMS
 	Units
+    Utils
 	Version
 	VerticalSpatialReference
 	XmlUtils
@@ -94,6 +98,7 @@ SET(TARGET_SRC
     Cube.cpp
     EGM.cpp
     ElevationLayer.cpp
+    ElevationQuery.cpp
     FileUtils.cpp
     GeoData.cpp
     GeoMath.cpp
@@ -112,9 +117,11 @@ SET(TARGET_SRC
     MapOptions.cpp
     MaskLayer.cpp
     MaskNode.cpp
+    MaskSource.cpp
 	MimeTypes.cpp
 	ModelLayer.cpp
 	ModelSource.cpp
+	NodeUtils.cpp
 	Notify.cpp
 	OverlayDecorator.cpp
     Profile.cpp
@@ -140,6 +147,7 @@ SET(TARGET_SRC
     tinyxmlparser.cpp
     TMS.cpp
     Units.cpp
+    Utils.cpp
     Version.cpp
     VerticalSpatialReference.cpp
     XmlUtils.cpp

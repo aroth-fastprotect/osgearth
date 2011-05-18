@@ -46,12 +46,14 @@ namespace
         void onModelLayerMoved( ModelLayer* layer, unsigned int oldIndex, unsigned int newIndex ) {
             _node->onModelLayerMoved( layer, oldIndex, newIndex);
         }
+#if 0
         void onMaskLayerAdded( MaskLayer* layer ) {
             _node->onMaskLayerAdded( layer );
         }
         void onMaskLayerRemoved( MaskLayer* layer ) {
             _node->onMaskLayerRemoved( layer );
         }
+#endif
 
         osg::observer_ptr<MapNode> _node;
     };
@@ -229,7 +231,8 @@ MapNode::init()
 
     // a decorator for overlay models:
     _overlayDecorator = new OverlayDecorator();
-    //_overlayDecorator->setOverlayGraph( _overlayModels.get() );
+    if ( _mapNodeOptions.overlayVertexWarping().isSet() )
+        _overlayDecorator->setVertexWarping( *_mapNodeOptions.overlayVertexWarping() );
     addTerrainDecorator( _overlayDecorator.get() );
 
     // install any pre-existing model layers:
@@ -241,14 +244,17 @@ MapNode::init()
         onModelLayerAdded( k->get(), modelLayerIndex );
     }
 
+#if 0
     // install any pre-existing mask layer:
     if ( _map->getTerrainMaskLayer() )
     {
         onMaskLayerAdded( _map->getTerrainMaskLayer() );
     }
+#endif
 
+    _mapCallback = new MapNodeMapCallbackProxy(this);
     // install a layer callback for processing further map actions:
-    _map->addMapCallback( new MapNodeMapCallbackProxy(this) );
+    _map->addMapCallback( _mapCallback.get()  );
 
     osg::StateSet* ss = getOrCreateStateSet();
 	//ss->setAttributeAndModes( new osg::CullFace() ); //, osg::StateAttribute::ON);
@@ -274,7 +280,15 @@ MapNode::init()
 
 MapNode::~MapNode()
 {
-    removeChildren( 0, getNumChildren() );
+    _map->removeMapCallback( _mapCallback.get() );
+
+    ModelLayerVector modelLayers;
+    _map->getModelLayers( modelLayers );
+    //Remove our model callback from any of the model layers in the map
+    for (osgEarth::ModelLayerVector::iterator itr = modelLayers.begin(); itr != modelLayers.end(); ++itr)
+    {
+        itr->get()->removeCallback(_modelLayerCallback.get() );
+    }
 }
 
 osg::BoundingSphere
@@ -358,7 +372,7 @@ MapNode::onModelLayerAdded( ModelLayer* layer, unsigned int index )
             }
             else
             {
-                if ( layer->getModelLayerOptions().overlay() == true )
+                if ( layer->getOverlay() )
                 {
                     _overlayModels->addChild( node ); // todo: index?
                     updateOverlayGraph();
@@ -457,6 +471,7 @@ struct MaskNodeFinder : public osg::NodeVisitor {
     std::list< osg::Group* > _groups;
 };
 
+#if 0
 void
 MapNode::onMaskLayerAdded( MaskLayer* layer )
 {
@@ -493,6 +508,7 @@ MapNode::onMaskLayerRemoved( MaskLayer* layer )
         dirtyBound();
     }
 }
+#endif
 
 void
 MapNode::addTerrainDecorator(osg::Group* decorator)
@@ -583,7 +599,7 @@ MapNode::traverse( osg::NodeVisitor& nv )
 void
 MapNode::onModelLayerOverlayChanged( ModelLayer* layer )
 {
-    OE_INFO << "Overlay changed to "  << layer->getOverlay() << std::endl;
+    OE_NOTICE << "Overlay changed to "  << layer->getOverlay() << std::endl;
     osg::ref_ptr< osg::Group > origParent = layer->getOverlay() ? _models.get() : _overlayModels.get();
     osg::ref_ptr< osg::Group > newParent  = layer->getOverlay() ? _overlayModels.get() : _models.get();
 

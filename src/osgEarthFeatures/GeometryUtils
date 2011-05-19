@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2011 Pelican Mapping
+* Copyright 2008-2010 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -16,20 +16,21 @@
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
+#ifndef OSGEARTHFEATURES_FEATURE_GEOMETRYUTILS
+#define OSGEARTHFEATURES_FEATURE_GEOMETRYUTILS 1
 
-#ifndef OSGEARTH_ENGINE_OSGTERRAIN_LOD_FACTOR_CALLBACK_H
-#define OSGEARTH_ENGINE_OSGTERRAIN_LOD_FACTOR_CALLBACK_H 1
+#include <osgEarthFeatures/Common>
+#include <osgEarthSymbology/Geometry>
 
-#include <osg/NodeCallback>
 
-namespace osgEarth
-{
-    namespace Drivers
-    {
-        struct LODFactorCallback : public osg::NodeCallback
-        {
-            void operator()(osg::Node* node, osg::NodeVisitor* nv);
-        };
-    }
-}
+namespace osgEarth { namespace Features {
+
+    extern OSGEARTHFEATURES_EXPORT std::string geometryToWkt( osgEarth::Symbology::Geometry * geometry );
+    extern OSGEARTHFEATURES_EXPORT std::string geometryToJson( osgEarth::Symbology::Geometry * geometry );
+    extern OSGEARTHFEATURES_EXPORT std::string geometryToKml( osgEarth::Symbology::Geometry * geometry );
+    extern OSGEARTHFEATURES_EXPORT std::string geometryToGml( osgEarth::Symbology::Geometry * geometry );
+
+}}
+
 #endif
+

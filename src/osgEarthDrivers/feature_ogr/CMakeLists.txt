@@ -5,7 +5,6 @@ SET(TARGET_SRC
 
 SET(TARGET_PUBLIC_H 
 	FeatureCursorOGR
-	GeometryUtils
     OGRFeatureOptions
 )
 

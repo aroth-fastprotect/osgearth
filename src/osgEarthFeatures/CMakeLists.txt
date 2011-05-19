@@ -32,7 +32,9 @@ SET(TARGET_PUBLIC_H
     FeatureTileSource
     Filter
     FilterContext
+	GeometryUtils
     LabelSource
+	OgrUtils
     OptimizerHints
     ResampleFilter
     ScaleFilter
@@ -64,6 +66,7 @@ SET(TARGET_SRC
     FeatureTileSource.cpp
     Filter.cpp
     FilterContext.cpp
+	GeometryUtils.cpp
     LabelSource.cpp
     OptimizerHints.cpp
     ResampleFilter.cpp

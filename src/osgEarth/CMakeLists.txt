@@ -131,6 +131,7 @@ SET(TARGET_SRC
     ShaderUtils.cpp
     SparseTexture2DArray.cpp
     SpatialReference.cpp
+    StringUtils.cpp
     TaskService.cpp
     TerrainLayer.cpp
     TerrainOptions.cpp

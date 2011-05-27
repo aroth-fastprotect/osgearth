@@ -229,7 +229,7 @@ namespace osgEarth
     toLower( const std::string& input )
     {
         std::string output = input;
-        std::transform( output.begin(), output.end(), output.begin(), std::tolower );
+        std::transform( output.begin(), output.end(), output.begin(), ::tolower );
         return output;
     }
 

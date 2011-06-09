@@ -12,4 +12,8 @@ SET(TARGET_COMMON_LIBRARIES
     osgEarthSymbology
 )
 
+IF(MSVC)
+	SET(TARGET_LDFLAGS "/MANIFESTFILE:\"\$(IntDir)\\\$(TargetFileName).manifest\"")
+ENDIF()
+
 SETUP_PLUGIN(osgearth_model_feature_stencil)

@@ -14,9 +14,17 @@ OSG geometry out of it.
     <model name="states" driver="feature_geom">
 
         <!-- Configure the OGR feature driver to read the shapefile -->
+		
         <features name="states" driver="ogr">
             <url>../data/usa.shp</url>
         </features>
+		
+		<!--
+        <features name="world" driver="ogr">
+			<ogr_driver>PostgreSQL/PostGIS</ogr_driver>
+            <url>dbname='postgis' host='localhost' port='5432' user='postgres' password='pass'</url>
+        </features>
+		-->
         
         <!-- Render the geometry at a height offset to prevent Z fighting -->
         <height_offset>1000</height_offset>
@@ -29,6 +37,9 @@ OSG geometry out of it.
             <style type="text/css">
                 states {
                    stroke: #ffff00;
+                }                    
+                world {
+                   stroke: #ff0000;
                 }                    
             </style>
         </styles>

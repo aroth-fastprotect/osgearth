@@ -94,6 +94,8 @@ namespace osgEarth
     public:
         StringTokenizer( const std::string& delims =" \t\r\n", const std::string& quotes ="'\"" );
 
+        StringTokenizer( const std::string& input, StringVector& output );
+
         void tokenize( const std::string& input, StringVector& output ) const;
 
         bool& keepEmpties() { return _allowEmpties; }
@@ -229,7 +231,7 @@ namespace osgEarth
     toLower( const std::string& input )
     {
         std::string output = input;
-        std::transform( output.begin(), output.end(), output.begin(), ::tolower );
+        std::transform( output.begin(), output.end(), output.begin(), std::tolower );
         return output;
     }
 

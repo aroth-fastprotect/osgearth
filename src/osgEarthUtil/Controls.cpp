@@ -718,19 +718,20 @@ HSliderControl::fireValueChanged()
 }
 
 void
-HSliderControl::setValue( float value )
+HSliderControl::setValue( float value, bool notify )
 {
     value = osg::clampBetween( value, _min, _max );
     if ( value != _value )
     {
         _value = value;
-        fireValueChanged();
+        if ( notify )
+            fireValueChanged();
         dirty();
     }
 }
 
 void
-HSliderControl::setMin( float min )
+HSliderControl::setMin( float min, bool notify )
 {
     if ( min != _min )
     {
@@ -741,14 +742,15 @@ HSliderControl::setMin( float min )
         if ( _value < _min || _value > _max ) 
         {
             _value = _min;
-            fireValueChanged();
+            if ( notify )
+                fireValueChanged();
         }
         dirty();
     }
 }
 
 void
-HSliderControl::setMax( float max )
+HSliderControl::setMax( float max, bool notify )
 {
     if ( max != _max )
     {
@@ -759,7 +761,8 @@ HSliderControl::setMax( float max )
         if ( _value < _min || _value > _max )
         {
             _value = _max;
-            fireValueChanged();
+            if ( notify )
+                fireValueChanged();
         }
         dirty();
     }
@@ -772,7 +775,7 @@ HSliderControl::draw( const ControlContext& cx, DrawableList& out )
 
     if ( visible() == true )
     {
-        osg::Geometry* g = new osg::Geometry();
+        osg::ref_ptr<osg::Geometry> g = new osg::Geometry();
 
         float rx = osg::round( _renderPos.x() );
         float ry = osg::round( _renderPos.y() );
@@ -805,7 +808,7 @@ HSliderControl::draw( const ControlContext& cx, DrawableList& out )
             g->setColorArray( c );
             g->setColorBinding( osg::Geometry::BIND_OVERALL );
 
-            out.push_back( g );
+            out.push_back( g.get() );
         }
     }
 }
@@ -1122,6 +1125,15 @@ Container::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa
     return handled ? handled : Control::handle( ea, aa, cx );
 }
 
+void
+Container::addControls( const ControlVector& controls )
+{
+    for( ControlVector::const_iterator i = controls.begin(); i != controls.end(); ++i )
+    {
+        addControl( i->get() );
+    }
+}
+
 // ---------------------------------------------------------------------------
 
 VBox::VBox()
@@ -1429,7 +1441,21 @@ void
 Grid::addControl( Control* control, int index )
 {
     // creates a new row and puts the control in its first column
-    setControl( _rows.size(), 0, control );
+    setControl( 0, _rows.size(), control );
+}
+
+void
+Grid::addControls( const ControlVector& controls )
+{
+    unsigned row = _rows.size();
+    unsigned col = 0;
+    for( ControlVector::const_iterator i = controls.begin(); i != controls.end(); ++i, ++col )
+    {
+        if ( i->valid() )
+        {
+            setControl( col, row, i->get() );
+        }
+    }
 }
 
 void
@@ -1459,6 +1485,7 @@ Grid::calcSize( const ControlContext& cx, osg::Vec2f& out_size )
         {
             for( int r=0; r<numRows; ++r )
             { 
+                //for( int c=0; c<_rows[r].size(); ++c )
                 for( int c=0; c<numCols; ++c )
                 {
                     Control* child = cell(c,r).get();
@@ -1504,7 +1531,7 @@ Grid::calcFill(const ControlContext& cx)
 
     for( int r=0; r<numRows; ++r )
     {
-        for( int c=0; c<numCols; ++c )
+        for( int c=0; c<numCols; ++c ) //<_rows[r].size(); ++c )
         {
             Control* child = cell(c,r).get();
             if ( child )
@@ -1532,7 +1559,7 @@ Grid::calcPos( const ControlContext& cx, const osg::Vec2f& cursor, const osg::Ve
 
     for( int r=0; r<numRows; ++r )
     {
-        for( int c=0; c<numCols; ++c )
+        for( int c=0; c<numCols; ++c ) //_rows[r].size(); ++c )
         {
             Control* child = cell(c,r).get();
             if ( child )
@@ -1673,44 +1700,29 @@ ControlNode::traverse( osg::NodeVisitor& nv )
 
         // if it's uninitialized, find the corresponding control canvas and 
         // cache a reference to its control node bin:
-        if ( !data._visibleNodes.valid() )
+        if ( !data._canvas.valid() )
         {
-            ControlCanvas* canvas = ControlCanvas::get( cv->getCurrentCamera()->getView(), true );
-            if ( canvas )
+            data._canvas = ControlCanvas::get( cv->getCurrentCamera()->getView(), true );
+            if ( data._canvas.valid() )
             {
-                ControlNodeBin* bin = canvas->getControlNodeBin();
+                ControlNodeBin* bin = static_cast<ControlCanvas*>(data._canvas.get())->getControlNodeBin();
                 bin->addNode( this );
-                data._visibleNodes = bin->getVisibleNodesVector();       
             }
         }
 
-        if ( data._visibleNodes.valid() )
+        if ( data._canvas.valid() )
         {
-            // normal-cull it:
-            // TODO: only do this in geocentric mode.....
-            osg::Matrixd local2world = osg::computeLocalToWorld( nv.getNodePath() );            
-            double dp = cv->getEyePoint() * local2world.getTrans();
+            // calculate its screen position:
+            data._screenPos = s_zero * (*cv->getMVPW());
 
-            if ( dp < 0.0 )
+            if ( data._obscured == true )
             {
-                data._obscured = true;
-            }
-
-            else
-            {
-                // calculate its screen position:
-                osg::Vec3f sp = s_zero * (*cv->getMVPW());
-                data._screenPos.set( sp.x(), sp.y() );
-
-                if ( data._obscured == true )
-                {
-                    data._obscured = false;
-                    data._visibleTime = cv->getFrameStamp()->getReferenceTime();
-                }
-
-                data._visibleNodes->push_back( this );
+                data._obscured = false;
+                data._visibleTime = cv->getFrameStamp()->getReferenceTime();
             }
         }
+
+        data._visitFrame = cv->getFrameStamp()->getFrameNumber();
     }
 
     // ControlNode has no children, so no point in calling traverse.
@@ -1719,7 +1731,7 @@ ControlNode::traverse( osg::NodeVisitor& nv )
 ControlNode::PerViewData::PerViewData() :
 _obscured   ( true ),
 _visibleTime( 0.0 ),
-_screenPos  ( 0.0, 0.0 )
+_screenPos  ( 0.0, 0.0, 0.0 )
 {
     //nop
 }
@@ -1752,10 +1764,10 @@ namespace
 
 // ---------------------------------------------------------------------------
 
-ControlNodeBin::ControlNodeBin()
+ControlNodeBin::ControlNodeBin() :
+_sortByDistance( true )
 {
     _group = new Group();
-    _visibleNodes = new RefNodeVector();
 
     osg::Program* program = new osg::Program();
     program->addShader( new osg::Shader( osg::Shader::VERTEX, s_controlVertexShader ) );
@@ -1783,7 +1795,34 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
     // reallocate it each time
     _taken.clear();
 
-    for( ControlNodeCollection::iterator i = _controlNodes.begin(); i != _controlNodes.end(); ) 
+    ControlNodeCollection* drawList = 0L;
+    ControlNodeCollection byDepth;
+
+    if ( _sortByDistance )
+    {
+        for( ControlNodeCollection::iterator i = _controlNodes.begin(); i != _controlNodes.end(); i++) 
+        {
+            ControlNode* node = i->second.get();
+            if ( node->getNumParents() == 0 )
+            {
+              _renderNodes.erase( node );
+              _controlNodes.erase( i );
+            }
+            else
+            {
+                ControlNode::PerViewData& nodeData = node->getData( context._view );
+                byDepth.insert( ControlNodePair(nodeData._screenPos.z(), node) );
+            }
+        }
+
+        drawList = &byDepth;
+    }
+    else
+    {
+        drawList = &_controlNodes;
+    }
+
+    for( ControlNodeCollection::iterator i = drawList->begin(); i != drawList->end(); ) 
     {
         ControlNode* node = i->second.get();
         osg::MatrixTransform* xform = _renderNodes[node];
@@ -1803,9 +1842,16 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
               control->dirty();
           }
 
-          if ( nodeData._obscured == false )
+          bool visible;
+
+          if ( context._frameStamp->getFrameNumber() - nodeData._visitFrame > 2 )
           {
-              const osg::Vec2f& nPos = nodeData._screenPos; //node->getScreenPos( _view ); //_screenPos;
+              visible = false;
+          }
+
+          else if ( nodeData._obscured == false )
+          {
+              const osg::Vec3f& nPos = nodeData._screenPos;
               const osg::Vec2f& size = control->renderSize();
 
               float x = nPos.x()-size.x()*0.5;
@@ -1853,7 +1899,7 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
                           j->get()->setDataVariance( osg::Object::DYNAMIC );
 
                           osg::StateSet* stateSet = j->get()->getOrCreateStateSet();
-                          stateSet->setRenderBinDetails( bin, "RenderBin" );
+                          stateSet->setRenderBinDetails( bin++, "RenderBin" );
                           geode->addDrawable( j->get() );
                       }
                   }
@@ -1871,10 +1917,12 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
                   if ( oldValue != nodeData._visibleTime )
                       nodeData._uniform->set( nodeData._visibleTime );                
               }
+
+              visible = !nodeData._obscured;
           }
           
-          // adjust the visibility based on whether the node is visible
-          xform->setNodeMask( nodeData._obscured ? 0 : ~0 );
+          // adjust the visibility
+          xform->setNodeMask( visible ? ~0 : 0 ); // ? 0 : ~0 );
 
           ++i;
         }
@@ -1884,13 +1932,16 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
           _controlNodes.erase( i++ );
         }
     }
-
-    _visibleNodes->clear();
 }
 
 void
 ControlNodeBin::addNode( ControlNode* controlNode )
 {
+    // if we see a node with a non-zero priority, assume we're sorting
+    // by priority.
+    if ( controlNode->getPriority() != 0.0f )
+        _sortByDistance = false;
+
     // record the node in priority order.
     ControlNodeCollection::iterator ptr = _controlNodes.insert(
         ControlNodePair( -controlNode->getPriority(), controlNode ) );
@@ -1948,12 +1999,6 @@ ControlCanvas::get( osg::View* view, bool installInSceneData )
 
 // ---------------------------------------------------------------------------
 
-struct UpdateHook : public osg::NodeCallback {
-    void operator()(osg::Node* node, osg::NodeVisitor* nv ) {
-        static_cast<ControlCanvas*>(node)->update();
-    }
-};
-
 ControlCanvas::ControlCanvas( osgViewer::View* view ) :
 _contextDirty(true)
 {
@@ -1970,9 +2015,14 @@ _contextDirty(true)
     ADJUST_UPDATE_TRAV_COUNT( this, 1 );
 
     osg::StateSet* ss = getOrCreateStateSet();
-    ss->setMode( GL_LIGHTING, 0 );
-    ss->setMode( GL_BLEND, 1 );
+    ss->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE );
+    ss->setMode( GL_BLEND, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE );
     ss->setAttributeAndModes( new osg::Depth( osg::Depth::LEQUAL, 0, 1, false ) );
+    //ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS, 0, 1, false ) );
+
+    // this is necessary b/c osgText puts things in this bin too and we can't override that
+    ss->setRenderingHint( osg::StateSet::TRANSPARENT_BIN );
+    ss->setBinNumber(999999);
 
     _controlNodeBin = new ControlNodeBin();
     this->addChild( _controlNodeBin->getControlGroup() );
@@ -1982,8 +2032,6 @@ _contextDirty(true)
         OpenThreads::ScopedLock<OpenThreads::Mutex> lock( _viewCanvasMapMutex );
         _viewCanvasMap[view] = this;
     }
-
-    //this->setUpdateCallback( new UpdateHook );
 }
 
 ControlCanvas::~ControlCanvas()
@@ -2074,9 +2122,11 @@ ControlCanvas::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter
 }
 
 void
-ControlCanvas::update()
+ControlCanvas::update( const osg::FrameStamp* frameStamp )
 {
-    int bin = 999999;
+    _context._frameStamp = frameStamp;
+
+    int bin = 0;
     for( ControlList::iterator i = _controls.begin(); i != _controls.end(); ++i )
     {
         Control* control = i->get();
@@ -2097,7 +2147,7 @@ ControlCanvas::update()
             for( DrawableList::iterator j = drawables.begin(); j != drawables.end(); ++j )
             {
                 j->get()->setDataVariance( osg::Object::DYNAMIC );
-                j->get()->getOrCreateStateSet()->setRenderBinDetails( bin++, "RenderBin" );
+                j->get()->getOrCreateStateSet()->setBinNumber( bin++ );
                 geode->addDrawable( j->get() );
             }
         }
@@ -2116,7 +2166,7 @@ ControlCanvas::traverse( osg::NodeVisitor& nv )
 {
     if ( nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR )
     {
-        update();
+        update( nv.getFrameStamp() );
     }
 
     osg::Camera::traverse( nv );

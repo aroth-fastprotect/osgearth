@@ -26,6 +26,7 @@
 #include <osgEarthUtil/Controls>
 #include <osgEarthDrivers/feature_ogr/OGRFeatureOptions>
 #include <osgEarthFeatures/FeatureSource>
+#include <osgEarth/Utils>
 
 #define LC "[osgearth_labels] "
 
@@ -148,13 +149,12 @@ createLabels( Map* map )
             continue;
 
         // we will display the country name:
-        std::string text = feature->getAttr( g_labelAttr );
+        std::string text = feature->getString( g_labelAttr );
         if ( text.empty() )
             continue;
 
         // and use the population to prioritize labels:
-        std::string populationStr = feature->getAttr( g_priorityAttr );
-        float population = osgEarth::as<float>( populationStr, 0.0f );
+        float population = feature->getDouble(g_priorityAttr, 0.0);
 
         // remove duplicate labels:
         if ( g_removeDupes )
@@ -172,17 +172,14 @@ createLabels( Map* map )
             continue;
 
         osg::Vec3d worldPoint;
-        if ( !map->mapPointToGeocentricPoint( mapPoint, worldPoint ) )
+        if ( !map->mapPointToWorldPoint( mapPoint, worldPoint ) )
             continue;
 
         // create the label and place it:
         osg::MatrixTransform* xform = new osg::MatrixTransform( osg::Matrix::translate(worldPoint) );
+        xform->setCullCallback( new CullNodeByNormal(worldPoint) );
         xform->addChild( new ControlNode(new LabelControl(text)) );
         labels->addChild( xform );
-
-        //LabelControl* label = new LabelControl( text );
-        //osg::MatrixTransform* xform = priorityBin->addControl( label, population );
-        //xform->setMatrix( osg::Matrix::translate(worldPoint) );
 
         ++count;
 

@@ -50,11 +50,13 @@ FeatureModelSourceOptions::fromConfig( const Config& conf )
     conf.getObjIfSet( "features", _featureOptions );
     //if ( conf.hasChild("features") )
     //    _featureOptions->merge( conf.child("features") );
+    _featureSource = conf.getNonSerializable<FeatureSource>("feature_source");
 
     conf.getObjIfSet( "styles", _styles );
     conf.getObjIfSet( "layout", _levels );
     conf.getObjIfSet( "paging", _levels ); // backwards compat.. to be deprecated
     conf.getObjIfSet( "gridding", _gridding ); // to be deprecated
+    conf.getObjIfSet( "feature_name", _featureNameExpr );
     conf.getIfSet( "lighting", _lit );
     conf.getIfSet( "max_granularity", _maxGranularity_deg );
     conf.getIfSet( "merge_geometry", _mergeGeometry );
@@ -74,14 +76,21 @@ FeatureModelSourceOptions::getConfig() const
 {
     Config conf = ModelSourceOptions::getConfig();
 
-    conf.updateObjIfSet( "features", _featureOptions );
+    conf.updateObjIfSet( "features", _featureOptions );    
+    if (_featureSource.valid())
+    {
+        conf.addNonSerializable("feature_source", _featureSource);
+    }
+    //conf.updateObjIfSet( "feature_source", _featureSource);
     conf.updateObjIfSet( "gridding", _gridding ); // to be deprecated
     conf.updateObjIfSet( "styles", _styles );
     conf.updateObjIfSet( "layout", _levels );
+
     conf.updateIfSet( "lighting", _lit );
     conf.updateIfSet( "max_granularity", _maxGranularity_deg );
     conf.updateIfSet( "merge_geometry", _mergeGeometry );
     conf.updateIfSet( "cluster_culling", _clusterCulling );
+
 
     if ( _geomTypeOverride.isSet() ) {
         if ( _geomTypeOverride == Geometry::TYPE_LINESTRING )
@@ -155,6 +164,12 @@ FeatureModelSource::createNode( ProgressCallback* progress )
     if ( !_factory.valid() )
         return 0L;
 
+    if ( !_features.valid() || !_features->getFeatureProfile() )
+    {
+        OE_WARN << LC << "Invalid feature source" << std::endl;
+        return 0L;
+    }
+
     FeatureModelGraph* graph = new FeatureModelGraph( 
         _features.get(), 
         _options, 
@@ -163,4 +178,21 @@ FeatureModelSource::createNode( ProgressCallback* progress )
         new Session( _map ) );
 
     return graph;
+}
+
+//------------------------------------------------------------------------
+GeomFeatureNodeFactory::GeomFeatureNodeFactory( const GeometryCompilerOptions& options )
+            : _options( options ) 
+{ 
+}
+
+bool GeomFeatureNodeFactory::createOrUpdateNode(       
+    FeatureCursor*            features,
+    const Style&              style,
+    const FilterContext&      context,
+    osg::ref_ptr<osg::Node>&  node )
+{
+    GeometryCompiler compiler( _options );
+    node = compiler.compile( features, style, context );
+    return node.valid();
 }

@@ -277,58 +277,62 @@ SinglePassTerrainTechnique::applyTileUpdates()
         if ( _pendingGeometryUpdate )
         {
             osg::Geode* frontGeode = getFrontGeode();
-            
-            if ( _texCompositor->requiresUnitTextureSpace() )
+
+            if (frontGeode)
             {
-                // in "unit-texture-space" mode, we can take the shortcut of just updating
-                // the geometry VBOs. The texture coordinates never change.
-                for( unsigned int i=0; i<_backGeode->getNumDrawables(); ++i )
+
+                if ( _texCompositor->requiresUnitTextureSpace() )
                 {
-                    osg::Geometry* backGeom = static_cast<osg::Geometry*>( _backGeode->getDrawable(i) );
-                    osg::Vec3Array* backVerts = static_cast<osg::Vec3Array*>( backGeom->getVertexArray() );
-
-                    osg::Geometry* frontGeom = static_cast<osg::Geometry*>( frontGeode->getDrawable(i) );
-                    osg::Vec3Array* frontVerts = static_cast<osg::Vec3Array*>( frontGeom->getVertexArray() );
-
-                    if ( backVerts->size() == frontVerts->size() )
+                    // in "unit-texture-space" mode, we can take the shortcut of just updating
+                    // the geometry VBOs. The texture coordinates never change.
+                    for( unsigned int i=0; i<_backGeode->getNumDrawables(); ++i )
                     {
-                        // simple VBO update:
-                        std::copy( backVerts->begin(), backVerts->end(), frontVerts->begin() );
-                        frontVerts->dirty();
+                        osg::Geometry* backGeom = static_cast<osg::Geometry*>( _backGeode->getDrawable(i) );
+                        osg::Vec3Array* backVerts = static_cast<osg::Vec3Array*>( backGeom->getVertexArray() );
 
-                        osg::Vec3Array* backNormals = static_cast<osg::Vec3Array*>( backGeom->getNormalArray() );
-                        if ( backNormals )
-                        {
-                            osg::Vec3Array* frontNormals = static_cast<osg::Vec3Array*>( frontGeom->getNormalArray() );
-                            std::copy( backNormals->begin(), backNormals->end(), frontNormals->begin() );
-                            frontNormals->dirty();
-                        }
+                        osg::Geometry* frontGeom = static_cast<osg::Geometry*>( frontGeode->getDrawable(i) );
+                        osg::Vec3Array* frontVerts = static_cast<osg::Vec3Array*>( frontGeom->getVertexArray() );
 
-                        osg::Vec2Array* backTexCoords = static_cast<osg::Vec2Array*>( backGeom->getTexCoordArray(0) );
-                        if ( backTexCoords )
+                        if ( backVerts->size() == frontVerts->size() )
                         {
-                            osg::Vec2Array* frontTexCoords = static_cast<osg::Vec2Array*>( frontGeom->getTexCoordArray(0) );
-                            std::copy( backTexCoords->begin(), backTexCoords->end(), frontTexCoords->begin() );
-                            frontTexCoords->dirty();
+                            // simple VBO update:
+                            std::copy( backVerts->begin(), backVerts->end(), frontVerts->begin() );
+                            frontVerts->dirty();
+
+                            osg::Vec3Array* backNormals = static_cast<osg::Vec3Array*>( backGeom->getNormalArray() );
+                            if ( backNormals )
+                            {
+                                osg::Vec3Array* frontNormals = static_cast<osg::Vec3Array*>( frontGeom->getNormalArray() );
+                                std::copy( backNormals->begin(), backNormals->end(), frontNormals->begin() );
+                                frontNormals->dirty();
+                            }
+
+                            osg::Vec2Array* backTexCoords = static_cast<osg::Vec2Array*>( backGeom->getTexCoordArray(0) );
+                            if ( backTexCoords )
+                            {
+                                osg::Vec2Array* frontTexCoords = static_cast<osg::Vec2Array*>( frontGeom->getTexCoordArray(0) );
+                                std::copy( backTexCoords->begin(), backTexCoords->end(), frontTexCoords->begin() );
+                                frontTexCoords->dirty();
+                            }
                         }
-                    }
-                    else
-                    {
-                        frontGeom->setVertexArray( backVerts );
-                        frontGeom->setTexCoordArray( 0, backGeom->getTexCoordArray( 0 ) ); // TODO: un-hard-code
-                        if ( backGeom->getNormalArray() )
-                            frontGeom->setNormalArray( backGeom->getNormalArray() );
+                        else
+                        {
+                            frontGeom->setVertexArray( backVerts );
+                            frontGeom->setTexCoordArray( 0, backGeom->getTexCoordArray( 0 ) ); // TODO: un-hard-code
+                            if ( backGeom->getNormalArray() )
+                                frontGeom->setNormalArray( backGeom->getNormalArray() );
+                        }
                     }
                 }
-            }
-            else
-            {
-                // copy the drawables from the back buffer to the front buffer. By doing this,
-                // we don't touch the front geode's stateset (which contains the textures) and
-                // therefore they don't get re-applied.
-                for( unsigned int i=0; i<_backGeode->getNumDrawables(); ++i )
+                else
                 {
-                    frontGeode->setDrawable( i, _backGeode->getDrawable( i ) );
+                    // copy the drawables from the back buffer to the front buffer. By doing this,
+                    // we don't touch the front geode's stateset (which contains the textures) and
+                    // therefore they don't get re-applied.
+                    for( unsigned int i=0; i<_backGeode->getNumDrawables(); ++i )
+                    {
+                        frontGeode->setDrawable( i, _backGeode->getDrawable( i ) );
+                    }
                 }
             }
 
@@ -349,15 +353,20 @@ SinglePassTerrainTechnique::applyTileUpdates()
         {
             const ImageLayerUpdate& update = _pendingImageLayerUpdates.front();
 
-            _texCompositor->applyLayerUpdate(
-                getFrontGeode()->getStateSet(),
-                update._layerUID,
-                update._image,
-                _tileKey,
-                update._isRealData ? parentStateSet : 0L );
+            osg::ref_ptr< osg::Geode > frontGeode = getFrontGeode();
+            if (frontGeode.valid())
+            {
+                _texCompositor->applyLayerUpdate(
+                    frontGeode->getStateSet(),
+                    update._layerUID,
+                    update._image,
+                    _tileKey,
+                    update._isRealData ? parentStateSet : 0L );
+            }
 
             _pendingImageLayerUpdates.pop();
             applied = true;
+
         }
     }
 
@@ -529,7 +538,8 @@ namespace
         osg::ref_ptr<const GeoLocator> _locator;
         osg::ref_ptr<osg::Vec2Array> _texCoords;
         osg::ref_ptr<osg::Vec2Array> _skirtTexCoords;
-        osg::ref_ptr<osg::Vec2Array> _maskSkirtTexCoords;
+        osg::ref_ptr<osg::Vec2Array> _stitchTexCoords;
+        osg::ref_ptr<osg::Vec2Array> _stitchSkirtTexCoords;
         bool _ownsTexCoords;
         RenderLayer() : _ownsTexCoords(false) { }
     };
@@ -627,6 +637,22 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
       }
     }
 
+    osg::Geometry* stitching_skirts = 0L;
+    osg::Vec3Array* ss_verts = 0L;
+    if (masks.size() > 0)
+    {
+      stitching_skirts = new osg::Geometry();
+      stitching_skirts->setThreadSafeRefUnref(true);
+      stitching_skirts->setDataVariance( osg::Object::DYNAMIC );
+      stitching_skirts->setUseDisplayList(false);
+      stitching_skirts->setUseVertexBufferObjects(true);
+      //stitching_skirts->getOrCreateStateSet()->setAttribute(new osg::Point( 5.0f ), osg::StateAttribute::ON);
+      geode->addDrawable( stitching_skirts);
+
+      ss_verts = new osg::Vec3Array();
+      stitching_skirts->setVertexArray(ss_verts);
+    }
+
 
     unsigned int numRows = 20;
     unsigned int numColumns = 20;
@@ -667,8 +693,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
     // skirt texture coordinates, if applicable:
     osg::Vec2Array* unifiedSkirtTexCoords = 0L;
 
-    // mask skirt texture coordinates, if applicable:
-    osg::Vec2Array* unifiedMaskSkirtTexCoords = 0L;
+    // stitching skirt texture coordinates, if applicable:
+    osg::Vec2Array* unifiedStitchSkirtTexCoords = 0L;
 
     // allocate and assign texture coordinates
     osg::Vec2Array* unifiedSurfaceTexCoords = 0L;
@@ -687,6 +713,13 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             unifiedSkirtTexCoords = new osg::Vec2Array();
             unifiedSkirtTexCoords->reserve( numVerticesInSkirt );        
             skirt->setTexCoordArray( 0, unifiedSkirtTexCoords );
+        }
+
+        if (masks.size() > 0)
+        {
+            unifiedStitchSkirtTexCoords = new osg::Vec2Array();
+            //unifiedStitchSkirtTexCoords->reserve( ? );        
+            stitching_skirts->setTexCoordArray( 0, unifiedStitchSkirtTexCoords );
         }
     }
 
@@ -719,7 +752,10 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                 r._skirtTexCoords->reserve( numVerticesInSkirt );
 
                 if ( masks.size() > 0 )
-                    r._maskSkirtTexCoords = new osg::Vec2Array();
+                {
+                    r._stitchTexCoords = new osg::Vec2Array();
+                    r._stitchSkirtTexCoords = new osg::Vec2Array();
+                }
 
                 r._locator = locator;
                 if ( locator->getCoordinateSystemType() == osgTerrain::Locator::GEOCENTRIC )
@@ -733,7 +769,10 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                 _texCompositor->assignTexCoordArray( skirt, colorLayer.getUID(), r._skirtTexCoords.get() );
 
                 for (MaskRecordVector::iterator mr = masks.begin(); mr != masks.end(); ++mr)
-                    _texCompositor->assignTexCoordArray( (*mr)._geom, colorLayer.getUID(), r._maskSkirtTexCoords.get() );
+                    _texCompositor->assignTexCoordArray( (*mr)._geom, colorLayer.getUID(), r._stitchTexCoords.get() );
+
+                if (stitching_skirts)
+                    _texCompositor->assignTexCoordArray( stitching_skirts, colorLayer.getUID(), r._stitchSkirtTexCoords.get() );
 
                 //surface->setTexCoordArray( renderLayers.size(), r._texCoords );
                 renderLayers.push_back( r );
@@ -978,13 +1017,15 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
 
         osg::Vec3Array* outVerts = new osg::Vec3Array();
 
-        osg::Geometry* mask_skirt = (*mr)._geom;
-        mask_skirt->setVertexArray(outVerts);
+        osg::Geometry* stitch_geom = (*mr)._geom;
+        stitch_geom->setVertexArray(outVerts);
 
         bool multiParent = false;
         if (outPoly.valid())
           multiParent = outPoly->getType() == osgEarth::Symbology::Geometry::TYPE_MULTI;
         
+        std::vector<int> skirtIndices;
+
         osgEarth::Symbology::GeometryIterator i( outPoly, false );
         while( i.hasMore() )
         {
@@ -996,7 +1037,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
           {
             osg::Vec3Array* partVerts = part->toVec3Array();
             outVerts->insert(outVerts->end(), partVerts->begin(), partVerts->end());
-            mask_skirt->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POLYGON, outVerts->size() - partVerts->size(), partVerts->size()));
+            stitch_geom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POLYGON, outVerts->size() - partVerts->size(), partVerts->size()));
+            skirtIndices.push_back(outVerts->size());
 
             if (!multiParent)
             {
@@ -1009,14 +1051,15 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                 {
                   (*hit)->rewind(osgEarth::Symbology::Ring::ORIENTATION_CCW);
                   outVerts->insert(outVerts->end(), (*hit)->begin(), (*hit)->end());
-                  mask_skirt->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POLYGON, outVerts->size() - (*hit)->size(), (*hit)->size()));
+                  stitch_geom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::POLYGON, outVerts->size() - (*hit)->size(), (*hit)->size()));
+                  skirtIndices.push_back(outVerts->size());
                 }
               }
             }
           }
         }
 
-        if (mask_skirt->getNumPrimitiveSets() > 0)
+        if (stitch_geom->getNumPrimitiveSets() > 0)
         {
 #if 1
           // Tessellate mask skirt
@@ -1024,18 +1067,18 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
           tscx->setTessellationType(osgUtil::Tessellator::TESS_TYPE_GEOMETRY);
           tscx->setBoundaryOnly(false);
           tscx->setWindingType(osgUtil::Tessellator::TESS_WINDING_ODD);
-          tscx->retessellatePolygons(*mask_skirt);
+          tscx->retessellatePolygons(*stitch_geom);
 
           // Assign normals to the stitching polygon: -gw
-          osg::Vec3Array* msVerts = dynamic_cast<osg::Vec3Array*>(mask_skirt->getVertexArray());
-          osg::Vec3Array* msNormals = new osg::Vec3Array(msVerts->size());
-          mask_skirt->setNormalArray( msNormals );
-          mask_skirt->setNormalBinding( osg::Geometry::BIND_PER_VERTEX );
+          osg::Vec3Array* sgVerts = dynamic_cast<osg::Vec3Array*>(stitch_geom->getVertexArray());
+          osg::Vec3Array* sgNormals = new osg::Vec3Array(sgVerts->size());
+          stitch_geom->setNormalArray( sgNormals );
+          stitch_geom->setNormalBinding( osg::Geometry::BIND_PER_VERTEX );
           
           // calculate the normal and convert to model space.
-          for( unsigned v=0; v<msVerts->size(); ++v )
+          for( unsigned v=0; v<sgVerts->size(); ++v )
           {
-              const osg::Vec3& vert = (*msVerts)[v];
+              const osg::Vec3& vert = (*sgVerts)[v];
               osg::Vec3d local_one(vert);
               osg::Vec3d model;
               _masterLocator->convertLocalToModel( local_one, model );
@@ -1044,21 +1087,22 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
               _masterLocator->convertLocalToModel( local_one, model_one );
               model_one = model_one - model;
               model_one.normalize();
-              (*msNormals)[v] = model_one;
+              (*sgNormals)[v] = model_one;
           }
 
           //Initialize tex coords
+          osg::Vec2Array* unifiedStitchTexCoords = 0L;
           if (_texCompositor->requiresUnitTextureSpace())
           {
-            unifiedMaskSkirtTexCoords = new osg::Vec2Array();
-            unifiedMaskSkirtTexCoords->reserve(outVerts->size());
-            mask_skirt->setTexCoordArray(0, unifiedMaskSkirtTexCoords);
+            unifiedStitchTexCoords = new osg::Vec2Array();
+            unifiedStitchTexCoords->reserve(outVerts->size());
+            stitch_geom->setTexCoordArray(0, unifiedStitchTexCoords);
           }
           else if ( renderLayers.size() > 0 )
           {
             for (unsigned int i = 0; i < renderLayers.size(); ++i)
             {
-              renderLayers[i]._maskSkirtTexCoords->reserve(outVerts->size());
+              renderLayers[i]._stitchTexCoords->reserve(outVerts->size());
             }
           }
 
@@ -1187,7 +1231,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
 
             if (_texCompositor->requiresUnitTextureSpace())
             {
-              unifiedMaskSkirtTexCoords->push_back(osg::Vec2(ndc.x(), ndc.y()));
+              unifiedStitchTexCoords->push_back(osg::Vec2(ndc.x(), ndc.y()));
             }
             else if (renderLayers.size() > 0)
             {
@@ -1197,11 +1241,11 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                 {
                   osg::Vec3d color_ndc;
                   osgTerrain::Locator::convertLocalCoordBetween(*masterTextureLocator.get(), ndc, *renderLayers[i]._locator.get(), color_ndc);
-                  renderLayers[i]._maskSkirtTexCoords->push_back(osg::Vec2(color_ndc.x(), color_ndc.y()));
+                  renderLayers[i]._stitchTexCoords->push_back(osg::Vec2(color_ndc.x(), color_ndc.y()));
                 }
                 else
                 {
-                  renderLayers[i]._maskSkirtTexCoords->push_back(osg::Vec2(ndc.x(), ndc.y()));
+                  renderLayers[i]._stitchTexCoords->push_back(osg::Vec2(ndc.x(), ndc.y()));
                 }
               }
             }
@@ -1216,6 +1260,83 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             (*it).set(model.x(), model.y(), model.z());
           }
 #endif
+      
+          //Create stitching skirts
+          if (createSkirt && skirtIndices.size() > 0)
+          {
+            ss_verts->reserve(ss_verts->size() + outVerts->size() * 4 + skirtIndices.size() * 2);
+
+            //Add a primative set for each continuous skirt strip
+            for (int p=0; p < skirtIndices.size(); p++)
+            {
+              int cursor = ss_verts->size();
+
+              int outStart = p == 0 ? 0 : skirtIndices[p-1];
+              for (int i=outStart; i < skirtIndices[p]; i++)
+              {
+                ss_verts->push_back((*outVerts)[i]);
+                ss_verts->push_back((*outVerts)[i] - (*sgNormals)[i] * skirtHeight);
+
+                if ( _texCompositor->requiresUnitTextureSpace() )
+                {
+                    unifiedStitchSkirtTexCoords->push_back( (*unifiedStitchTexCoords)[i] );
+                    unifiedStitchSkirtTexCoords->push_back( (*unifiedStitchTexCoords)[i] );
+                }
+                else if ( renderLayers.size() > 0 )
+                {
+                    for (unsigned int r = 0; r < renderLayers.size(); ++r)
+                    {
+                        const osg::Vec2& tc = (*renderLayers[r]._stitchTexCoords.get())[i];
+                        renderLayers[r]._stitchSkirtTexCoords->push_back( tc );
+                        renderLayers[r]._stitchSkirtTexCoords->push_back( tc );
+                    }
+                }
+              }
+
+              //Add the first vert again to complete the loop
+              ss_verts->push_back((*outVerts)[outStart]);
+              ss_verts->push_back((*outVerts)[outStart] - (*sgNormals)[outStart] * skirtHeight);
+
+              if ( _texCompositor->requiresUnitTextureSpace() )
+              {
+                  unifiedStitchSkirtTexCoords->push_back( (*unifiedStitchTexCoords)[outStart] );
+                  unifiedStitchSkirtTexCoords->push_back( (*unifiedStitchTexCoords)[outStart] );
+              }
+              else if ( renderLayers.size() > 0 )
+              {
+                  for (unsigned int r = 0; r < renderLayers.size(); ++r)
+                  {
+                      const osg::Vec2& tc = (*renderLayers[r]._stitchTexCoords.get())[outStart];
+                      renderLayers[r]._stitchSkirtTexCoords->push_back( tc );
+                      renderLayers[r]._stitchSkirtTexCoords->push_back( tc );
+                  }
+              }
+
+              //Now go back the opposite direction to create a skirt facing the other direction
+              for (int i=skirtIndices[p] - 1; i >= outStart; i--)
+              {
+                ss_verts->push_back((*outVerts)[i]);
+                ss_verts->push_back((*outVerts)[i] - (*sgNormals)[i] * skirtHeight);
+
+                if ( _texCompositor->requiresUnitTextureSpace() )
+                {
+                    unifiedStitchSkirtTexCoords->push_back( (*unifiedStitchTexCoords)[i] );
+                    unifiedStitchSkirtTexCoords->push_back( (*unifiedStitchTexCoords)[i] );
+                }
+                else if ( renderLayers.size() > 0 )
+                {
+                    for (unsigned int r = 0; r < renderLayers.size(); ++r)
+                    {
+                        const osg::Vec2& tc = (*renderLayers[r]._stitchTexCoords.get())[i];
+                        renderLayers[r]._stitchSkirtTexCoords->push_back( tc );
+                        renderLayers[r]._stitchSkirtTexCoords->push_back( tc );
+                    }
+                }
+              }
+
+              stitching_skirts->addPrimitiveSet(new osg::DrawArrays( GL_TRIANGLE_STRIP, cursor, ss_verts->size() - cursor));
+            }
+          }
         }
       }
     }

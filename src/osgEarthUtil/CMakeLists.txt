@@ -16,6 +16,7 @@ SET(TARGET_PUBLIC_H
 	Export
 	Graticule
 	ImageOverlay	
+	MeasureTool
 	ObjectPlacer
 	ObjectLocator
 	OceanSurfaceNode
@@ -35,6 +36,7 @@ SET(TARGET_SRC
 	ElevationManager.cpp
 	Graticule.cpp
 	ImageOverlay.cpp
+	MeasureTool.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     OceanSurfaceNode.cpp

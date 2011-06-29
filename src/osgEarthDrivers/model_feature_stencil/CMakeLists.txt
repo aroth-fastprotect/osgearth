@@ -13,7 +13,7 @@ SET(TARGET_COMMON_LIBRARIES
 )
 
 IF(MSVC)
-	SET(TARGET_LDFLAGS "/MANIFESTFILE:\"\$(IntDir)\\\$(TargetFileName).manifest\"")
+	SET(TARGET_LDFLAGS "/MANIFESTFILE:\"${CMAKE_CURRENT_BINARY_DIR}\\\$(TargetFileName).manifest\"")
 ENDIF()
 
 SETUP_PLUGIN(osgearth_model_feature_stencil)

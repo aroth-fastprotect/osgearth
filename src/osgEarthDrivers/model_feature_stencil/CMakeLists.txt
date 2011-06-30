@@ -12,8 +12,7 @@ SET(TARGET_COMMON_LIBRARIES
     osgEarthSymbology
 )
 
-IF(MSVC)
-	SET(TARGET_LDFLAGS "/MANIFESTFILE:\"${CMAKE_CURRENT_BINARY_DIR}\\\$(TargetFileName).manifest\"")
-ENDIF()
+FILE(TO_NATIVE_PATH "${CMAKE_CURRENT_BINARY_DIR}/\$(TargetFileName).manifest" _manifestfile)
+SET(TARGET_LDFLAGS "/MANIFEST /MANIFESTFILE:\"${_manifestfile}\"")
 
 SETUP_PLUGIN(osgearth_model_feature_stencil)

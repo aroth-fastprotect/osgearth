@@ -31,6 +31,7 @@
 #include <osgDB/FileUtils>
 #include <list>
 #include <ogr_api.h>
+#include <cpl_error.h>
 
 #define LC "[OGR FeatureSource] "
 
@@ -96,7 +97,13 @@ public:
     {
         if ( _options.url().isSet() )
         {
-            _absUrl = osgEarth::getFullPath( referenceURI, _options.url().value() );
+			std::string driverName = _options.ogrDriver().value();
+			if ( driverName.empty() )
+				driverName = "ESRI Shapefile";
+			if(driverName == "ESRI Shapefile")
+				_absUrl = osgEarth::getFullPath( referenceURI, _options.url().value() );
+			else
+				_absUrl = _options.url().value();
         }
     }
 
@@ -229,7 +236,7 @@ public:
 	        }
             else
             {
-                OE_INFO << LC << "failed to open dataset at " << _absUrl << std::endl;
+                OE_INFO << LC << "failed to open dataset at " << _absUrl << " error " << CPLGetLastErrorMsg() << std::endl;
             }
         }
         else

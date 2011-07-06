@@ -1841,7 +1841,7 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
               control->dirty();
           }
 
-          bool visible;
+          bool visible = true;
 
           if ( context._frameStamp->getFrameNumber() - nodeData._visitFrame > 2 )
           {
@@ -1919,10 +1919,6 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
 
               visible = !nodeData._obscured;
           }
-		  else
-		  {
-			  visible = false;
-		  }
           
           // adjust the visibility
           xform->setNodeMask( visible ? ~0 : 0 ); // ? 0 : ~0 );

@@ -18,6 +18,7 @@
  */
 #include <osgEarthFeatures/SubstituteModelFilter>
 #include <osgEarthFeatures/MarkerFactory>
+#include <osgEarthFeatures/FeatureNode>
 #include <osgEarthSymbology/MeshConsolidator>
 #include <osgEarth/HTTPClient>
 #include <osg/Drawable>
@@ -67,7 +68,8 @@ SubstituteModelFilter::pushFeature(Feature*                     input,
         for( unsigned i=0; i<geom->size(); ++i )
         {
             const osg::Vec3d& point = (*geom)[i];
-            osg::MatrixTransform* xform = new osg::MatrixTransform();
+
+            FeatureNode* xform = new FeatureNode(NULL, input->getFID());
             xform->setMatrix( _modelMatrix * osg::Matrixd::translate( point ) );
             xform->setDataVariance( osg::Object::STATIC );
             xform->addChild( data._model.get() );
@@ -101,9 +103,10 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 {
     struct ClusterVisitor : public osg::NodeVisitor
     {
-        ClusterVisitor( const FeatureList& features, const osg::Matrixd& modelMatrix, FilterContext& cx )
+        ClusterVisitor( const FeatureList& features, const osg::Matrixd& modelMatrix, FeatureMultiNode * featureNode, FilterContext& cx )
             : _features( features ),
               _modelMatrix( modelMatrix ),
+				_featureNode(featureNode),
               _cx( cx ),
               osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN )
         {
@@ -141,8 +144,8 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 
                             // clone the source drawable once for each input feature.
                             osg::ref_ptr<osg::Geometry> newDrawable = osg::clone( 
-                                originalDrawable, 
-                                osg::CopyOp::DEEP_COPY_ARRAYS | osg::CopyOp::DEEP_COPY_PRIMITIVES );
+                                originalDrawable, osg::CopyOp::DEEP_COPY_ALL |
+                                osg::CopyOp::DEEP_COPY_ARRAYS | osg::CopyOp::DEEP_COPY_STATESETS | osg::CopyOp::DEEP_COPY_PRIMITIVES );
 
                             osg::Vec3Array* verts = dynamic_cast<osg::Vec3Array*>( newDrawable->getVertexArray() );
                             if ( verts )
@@ -154,6 +157,7 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
                                 
                                 // add the new cloned, translated drawable back to the geode.
                                 geode.addDrawable( newDrawable.get() );
+								_featureNode->addDrawable(newDrawable.get(), feature->getFID());
                             }
                         }
 
@@ -182,18 +186,22 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
     private:
         const FeatureList&   _features;
         FilterContext        _cx;
+		FeatureMultiNode *   _featureNode;
         osg::Matrixd         _modelMatrix;
     };
 
 
     // make a copy of the model:
 	osg::Node* clone = dynamic_cast<osg::Node*>( data._model->clone( osg::CopyOp::DEEP_COPY_ALL ) );
+	FeatureMultiNode * featureNode = new FeatureMultiNode();
 
     // ..and apply the clustering to the copy.
-	ClusterVisitor cv( features, _modelMatrix, cx );
+	ClusterVisitor cv( features, _modelMatrix, featureNode, cx );
 	clone->accept( cv );
 
-    attachPoint->addChild( clone );
+	featureNode->addChild(clone);
+
+    attachPoint->addChild( featureNode );
     return true;
 }
 

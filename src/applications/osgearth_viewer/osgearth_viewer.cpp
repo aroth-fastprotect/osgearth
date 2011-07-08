@@ -31,10 +31,12 @@
 #include <osgEarthUtil/SkyNode>
 #include <osgEarthUtil/Viewpoint>
 #include <osgEarthSymbology/Color>
+#include <osgEarthFeatures/FeatureNode>
 
 using namespace osgEarth::Util;
 using namespace osgEarth::Util::Controls;
 using namespace osgEarth::Symbology;
+using namespace osgEarth::Features;
 
 int
 usage( const std::string& msg )
@@ -184,7 +186,7 @@ struct ViewpointHandler : public osgGA::GUIEventHandler
 };
 
 
-bool hitTest(osgViewer::View * view, unsigned traversalMask, float x, float y, osg::Vec3d & posWorld, osg::Vec3d & posLocal, osg::NodePath & nodePath, osg::ref_ptr<osg::Drawable> & drawable)
+bool hitTest(osgViewer::View * view, unsigned traversalMask, float x, float y, osg::Vec3d & posWorld, osg::Vec3d & posLocal, osg::NodePath & nodePath, osg::ref_ptr<osg::Drawable> & drawable, unsigned & primIndex)
 {
 	osg::Vec3d vecLocal;
 	osg::Vec3d vecWorld;
@@ -210,6 +212,7 @@ bool hitTest(osgViewer::View * view, unsigned traversalMask, float x, float y, o
 		posLocal = hitr.getLocalIntersectPoint();
 		nodePath = hitr.nodePath;
 		drawable = hitr.drawable;
+		primIndex = hitr.primitiveIndex;
 	}
 	else
 	{
@@ -217,6 +220,7 @@ bool hitTest(osgViewer::View * view, unsigned traversalMask, float x, float y, o
 		posWorld = osg::Vec3d();
 		posLocal = osg::Vec3d();
 		drawable = NULL;
+		primIndex = (unsigned)-1;
 	}
 	return ret;
 }
@@ -293,9 +297,29 @@ struct FeatureInfoHandler : public osgGA::GUIEventHandler
 			osg::Vec3d local;
 			osg::NodePath path;
 			osg::ref_ptr<osg::Drawable> drawable;
-			if(hitTest((osgViewer::View*)aa.asView(), (unsigned)-1, ea.getX(), ea.getY(), world, local, path, drawable))
+			unsigned primIndex = 0;
+			if(hitTest((osgViewer::View*)aa.asView(), (unsigned)-1, ea.getX(), ea.getY(), world, local, path, drawable, primIndex))
 			{
 				std::cout << "hit on " << path << std::endl;
+				FeatureNode * featureNode = NULL;
+				for(osg::NodePath::reverse_iterator it = path.rbegin(); !featureNode && it != path.rend(); it++)
+					featureNode = dynamic_cast<FeatureNode *>(*it);
+
+				if(featureNode)
+				{
+					osgEarth::Features::FeatureID fid;
+					FeatureMultiNode * featureMultiNode = dynamic_cast<FeatureMultiNode *>(featureNode);
+					if(featureMultiNode)
+						fid = featureMultiNode->getFID(drawable);
+					else
+						fid = featureNode->getFID();
+					std::string name; // = feature->getString("name");
+					std::cerr << "hit feature " << fid << ":" << name << std::endl;
+				}
+				else
+				{
+					std::cerr << "hit no feature" << std::endl;
+				}
 			}
 /*
 			osgEarth::ModelLayerVector layers;

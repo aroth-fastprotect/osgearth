@@ -22,6 +22,7 @@ SET(TARGET_PUBLIC_H
     CropFilter
     ExtrudeGeometryFilter
     Feature
+    FeatureNode
     FeatureCursor
     FeatureDisplayLayout
     FeatureGeometryIndex
@@ -59,6 +60,7 @@ SET(TARGET_SRC
     CropFilter.cpp
     ExtrudeGeometryFilter.cpp
     Feature.cpp
+    FeatureNode.cpp
     FeatureCursor.cpp
     FeatureDisplayLayout.cpp
     FeatureGeometryIndex.cpp

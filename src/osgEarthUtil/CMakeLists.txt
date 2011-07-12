@@ -14,7 +14,6 @@ SET(TARGET_PUBLIC_H
 	EarthManipulator
 	ElevationManager
 	Export
-	FeatureEditing
 	Graticule
 	ImageOverlay	
 	MeasureTool
@@ -35,7 +34,6 @@ SET(TARGET_SRC
     Controls.cpp
 	EarthManipulator.cpp
 	ElevationManager.cpp
-	FeatureEditing.cpp
 	Graticule.cpp
 	ImageOverlay.cpp
 	MeasureTool.cpp
@@ -52,11 +50,13 @@ SET(TARGET_SRC
 IF(NOT (${OPENSCENEGRAPH_VERSION} VERSION_LESS "2.9.6"))
 SET(TARGET_PUBLIC_H ${TARGET_PUBLIC_H}
     Draggers
+	FeatureEditing
 	ImageOverlayEditor
 	)
 	
 SET(TARGET_SRC ${TARGET_SRC} 
     Draggers.cpp
+	FeatureEditing.cpp
     ImageOverlayEditor.cpp
     )
 ENDIF()

@@ -39,6 +39,10 @@ namespace osgEarth { namespace Features
 
 		FeatureSource * getSource() const { return _featureSource; }
 		FeatureID getFID() const { return _fid; }
+
+        virtual const char* className() const { return "FeatureNode"; }
+        virtual const char* libraryName() const { return "osgEarthFeatures"; }
+
 	private:
 		FeatureSource * _featureSource;
 		FeatureID _fid;
@@ -49,8 +53,14 @@ namespace osgEarth { namespace Features
 	public:
 		FeatureMultiNode(FeatureSource * featureSource=NULL);
 	public:
-		void		addDrawable(osg::Drawable * drawable, FeatureID fid);
+		void addDrawable(osg::Drawable * drawable, FeatureID fid);
+		void removeDrawable(osg::Drawable * drawable);
+		void clearDrawables();
+		unsigned getNumDrawables() const;
 		FeatureID getFID(osg::Drawable * drawable) const;
+
+        virtual const char* className() const { return "FeatureMultiNode"; }
+        virtual const char* libraryName() const { return "osgEarthFeatures"; }
 	private:
 		typedef std::map< osg::ref_ptr<osg::Drawable>, FeatureID > DrawableFeatureIDMap;
 		DrawableFeatureIDMap _features;

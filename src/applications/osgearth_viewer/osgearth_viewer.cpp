@@ -32,6 +32,7 @@
 #include <osgEarthUtil/Viewpoint>
 #include <osgEarthSymbology/Color>
 #include <osgEarthFeatures/FeatureNode>
+#include <osgEarthFeatures/FeatureSource>
 
 using namespace osgEarth::Util;
 using namespace osgEarth::Util::Controls;
@@ -307,13 +308,20 @@ struct FeatureInfoHandler : public osgGA::GUIEventHandler
 
 				if(featureNode)
 				{
+					FeatureSource * featureSource = featureNode->getSource();
 					osgEarth::Features::FeatureID fid;
 					FeatureMultiNode * featureMultiNode = dynamic_cast<FeatureMultiNode *>(featureNode);
 					if(featureMultiNode)
 						fid = featureMultiNode->getFID(drawable);
 					else
 						fid = featureNode->getFID();
-					std::string name; // = feature->getString("name");
+					std::string name;
+					if(featureSource)
+					{
+						Feature * feature = featureSource->getFeature(fid);
+						if(feature)
+							name = feature->getString("name");
+					}
 					std::cerr << "hit feature " << fid << ":" << name << std::endl;
 				}
 				else

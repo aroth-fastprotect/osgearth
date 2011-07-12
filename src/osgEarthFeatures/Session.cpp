@@ -18,6 +18,7 @@
  */
 
 #include <osgEarthFeatures/Session>
+#include <osgEarthFeatures/FeatureSource>
 #include <osgEarth/FileUtils>
 #include <osgEarth/HTTPClient>
 #include <osgEarth/StringUtils>
@@ -94,6 +95,10 @@ _mapInfo(map)
 	_referenceURI = map->getMapOptions().referenceURI().value();
 }
 
+Session::~Session()
+{
+}
+
 void
 Session::setReferenceURI( const std::string& referenceURI )
 {
@@ -124,4 +129,16 @@ Session::removeResource( const std::string& uri )
 {
     Threading::ScopedWriteLock lock( _resourceMutex );
     _resourceMap.erase( uri );
+}
+
+FeatureSource *
+Session::getFeatureSource() const 
+{ 
+	return _featureSource.get(); 
+}
+
+void 
+Session::setFeatureSource(FeatureSource * source)
+{ 
+	_featureSource = source;
 }

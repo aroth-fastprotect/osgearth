@@ -38,6 +38,30 @@ void FeatureMultiNode::addDrawable(osg::Drawable * drawable, FeatureID fid)
 	_features.insert(DrawableFeatureIDMap::value_type(drawable, fid));
 }
 
+void FeatureMultiNode::removeDrawable(osg::Drawable * drawable)
+{
+	DrawableFeatureIDMap::iterator it = _features.find(drawable);
+	if(it != _features.end())
+	{
+		OE_WARN << "FeatureMultiNode removeDrawable " << drawable << std::endl;
+		_features.erase(it);
+	}
+	else
+	{
+		OE_WARN << "FeatureMultiNode removeDrawable " << drawable  << " not found" << std::endl;
+	}
+}
+
+void FeatureMultiNode::clearDrawables()
+{
+	_features.clear();
+}
+
+unsigned FeatureMultiNode::getNumDrawables() const
+{
+	return _features.size();
+}
+
 FeatureID FeatureMultiNode::getFID(osg::Drawable * drawable) const
 {
 	DrawableFeatureIDMap::const_iterator it = _features.find(drawable);

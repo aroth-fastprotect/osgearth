@@ -118,8 +118,13 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
             // save the geode's drawables..
             osg::Geode::DrawableList old_drawables = geode.getDrawableList();
 
+			OE_WARN << "ClusterVisitor geode " << &geode << " featureNode=" << _featureNode << " drawables=" << old_drawables.size() << std::endl;
+
             // ..and clear out the drawables list.
             geode.removeDrawables( 0, geode.getNumDrawables() );
+			// ... and remove all drawables from the feature node
+			for( osg::Geode::DrawableList::iterator i = old_drawables.begin(); i != old_drawables.end(); i++ )
+				_featureNode->removeDrawable(i->get());
 
             // foreach each drawable that was originally in the geode...
             for( osg::Geode::DrawableList::iterator i = old_drawables.begin(); i != old_drawables.end(); i++ )
@@ -144,8 +149,8 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 
                             // clone the source drawable once for each input feature.
                             osg::ref_ptr<osg::Geometry> newDrawable = osg::clone( 
-                                originalDrawable, osg::CopyOp::DEEP_COPY_ALL |
-                                osg::CopyOp::DEEP_COPY_ARRAYS | osg::CopyOp::DEEP_COPY_STATESETS | osg::CopyOp::DEEP_COPY_PRIMITIVES );
+                                originalDrawable, 
+                                osg::CopyOp::DEEP_COPY_ARRAYS | osg::CopyOp::DEEP_COPY_PRIMITIVES );
 
                             osg::Vec3Array* verts = dynamic_cast<osg::Vec3Array*>( newDrawable->getVertexArray() );
                             if ( verts )
@@ -167,7 +172,11 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 
             geode.dirtyBound();
 
-            MeshConsolidator::run( geode );
+			OE_WARN << "ClusterVisitor done geode " << &geode << " featureNode=" << _featureNode 
+				<< " featureNode drawables=" << _featureNode->getNumDrawables()
+				<< " geode drawables=" << geode.getNumDrawables() << std::endl;
+
+            //MeshConsolidator::run( geode );
             //// merge the geometry...
             //osgUtil::Optimizer opt;
             //opt.optimize( &geode, osgUtil::Optimizer::MERGE_GEOMETRY );
@@ -193,7 +202,11 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 
     // make a copy of the model:
 	osg::Node* clone = dynamic_cast<osg::Node*>( data._model->clone( osg::CopyOp::DEEP_COPY_ALL ) );
-	FeatureMultiNode * featureNode = new FeatureMultiNode();
+	Session* session = cx.getSession();
+	FeatureSource * source = (session!=NULL)?session->getFeatureSource():NULL;
+	FeatureMultiNode * featureNode = new FeatureMultiNode(source);
+
+	OE_WARN << "ClusterVisitor clone " << clone << " featureNode=" << featureNode << std::endl;
 
     // ..and apply the clustering to the copy.
 	ClusterVisitor cv( features, _modelMatrix, featureNode, cx );

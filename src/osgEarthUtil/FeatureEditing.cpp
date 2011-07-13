@@ -26,12 +26,12 @@ using namespace osgEarth::Features;
 
 /****************************************************************/
 AddPointHandler::AddPointHandler(Feature* feature, FeatureListSource* source, const osgEarth::SpatialReference* mapSRS):
-_feature(feature),
-_source( source ),
-_mapSRS( mapSRS ),
+_mouseButton( osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON ),
 _mouseDown( false ),
 _firstMove( false ),
-_mouseButton( osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON )
+_source( source ),
+_feature(feature),
+_mapSRS( mapSRS )
 {
 }
 
@@ -116,9 +116,9 @@ class MoveFeatureDraggerCallback : public osgManipulator::DraggerCallback
 {
 public:
     MoveFeatureDraggerCallback(Feature* feature, FeatureSource* source, const Map* map, int point):
+      _map(map),
       _feature(feature),
       _source(source),
-      _map(map),
       _point(point)
       {}
 

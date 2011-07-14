@@ -55,11 +55,18 @@ _mapNode( mapNode )
     StyleSheet styleSheet;
     styleSheet.addStyle( style );
 
+
+    _factory = new GeomFeatureNodeFactory();
+    _factory->_options.resampleMode() = ResampleFilter::RESAMPLE_GREATCIRCLE;
+    //2 degrees in meters
+    _factory->_options.resampleMaxLength() = 111319.0 * 2.0;
+
+
     //Initialize the FeatureModelGraph which will actually display our features
     _featureGraph = new FeatureModelGraph( 
         _features.get(), 
         FeatureModelSourceOptions(), 
-        new GeomFeatureNodeFactory(),
+        _factory.get(),
         styleSheet,
         new Session( _mapNode->getMap() ) );    
 
@@ -99,6 +106,15 @@ MeasureToolHandler::setMode( Mode mode )
 {
     if (_mode != mode) {
         _mode = mode;
+        if (mode == MODE_GREATCIRCLE)
+        {
+            _factory->_options.resampleMode() = ResampleFilter::RESAMPLE_GREATCIRCLE;
+        }
+        else if (mode == MODE_RHUMB)
+        {
+               _factory->_options.resampleMode() = ResampleFilter::RESAMPLE_RHUMB;
+        }
+        _featureGraph->dirty();
     }
 }
 
@@ -189,7 +205,7 @@ bool MeasureToolHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIAct
 bool MeasureToolHandler::getLocationAt(osgViewer::View* view, double x, double y, double &lon, double &lat)
 {
     osgUtil::LineSegmentIntersector::Intersections results;            
-    if ( view->computeIntersections( x, y, results ) )
+    if ( view->computeIntersections( x, y, results, _intersectionMask ) )
     {
         // find the first hit under the mouse:
         osgUtil::LineSegmentIntersector::Intersection first = *(results.begin());

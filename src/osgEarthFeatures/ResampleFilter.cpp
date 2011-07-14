@@ -18,6 +18,7 @@
  */
 #include <osgEarthFeatures/ResampleFilter>
 #include <osgEarth/GeoMath>
+#include <osg/io_utils>
 #include <list>
 #include <deque>
 #include <cstdlib>
@@ -60,7 +61,7 @@ ResampleFilter::push( Feature* input, FilterContext& context )
 
     GeometryIterator i( input->getGeometry() );
     while( i.hasMore() )
-    {
+    {        
         Geometry* part = i.next();
 
         if ( part->size() < 2 ) continue;
@@ -82,6 +83,8 @@ ResampleFilter::push( Feature* input, FilterContext& context )
             osg::Vec3d& p1 = *v1;
             bool lastSeg = v1 == last;
             osg::Vec3d seg = p1 - p0;
+
+            //OE_NOTICE << "p0=" << p0 << " to " << "p1=" << p1 << std::endl;
 
             osg::Vec3d p0Rad, p1Rad;
 
@@ -162,10 +165,12 @@ ResampleFilter::push( Feature* input, FilterContext& context )
         part->reserve( plist.size() );
         part->insert( part->begin(), plist.begin(), plist.end() );
 
-        //if ( partSize0 != part->size() )
-        //{
-        //    OE_NOTICE << "Resampled part from " << partSize0 << " to " << part->size() << " points" << std::endl;
-        //}
+        /*
+        if ( origSize != part->size() )
+        {
+            OE_NOTICE << "Resampled part from " << origSize << " to " << part->size() << " points" << std::endl;
+        }
+        */
     }
     return success;
 }

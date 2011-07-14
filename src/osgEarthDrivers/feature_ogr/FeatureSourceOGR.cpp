@@ -97,13 +97,11 @@ public:
     {
         if ( _options.url().isSet() )
         {
-			std::string driverName = _options.ogrDriver().value();
-			if ( driverName.empty() )
-				driverName = "ESRI Shapefile";
-			if(driverName == "ESRI Shapefile")
-				_absUrl = osgEarth::getFullPath( referenceURI, _options.url().value() );
-			else
-				_absUrl = _options.url().value();
+            _source = osgEarth::getFullPath( referenceURI, _options.url().value() );
+        }
+        else if ( _options.connection().isSet() )
+        {
+            _source = _options.connection().value();
         }
     }
 
@@ -133,7 +131,7 @@ public:
             }
             result = new FeatureProfile( ex );
         }
-        else if ( !_absUrl.empty() )
+        else if ( !_source.empty() )
         {
             // otherwise, assume we're loading from the URL:
             OGR_SCOPED_LOCK;
@@ -147,7 +145,7 @@ public:
             // attempt to open the dataset:
             int openMode = _options.openWrite().isSet() && _options.openWrite().value() ? 1 : 0;
 
-	        _dsHandle = OGROpenShared( _absUrl.c_str(), openMode, &_ogrDriverHandle );
+	        _dsHandle = OGROpenShared( _source.c_str(), openMode, &_ogrDriverHandle );
 	        if ( _dsHandle )
 	        {
                 if (openMode == 1) _writable = true;
@@ -236,7 +234,7 @@ public:
 	        }
             else
             {
-                OE_INFO << LC << "failed to open dataset at " << _absUrl << " error " << CPLGetLastErrorMsg() << std::endl;
+                OE_INFO << LC << "failed to open dataset at " << _source << " error " << CPLGetLastErrorMsg() << std::endl;
             }
         }
         else
@@ -267,7 +265,7 @@ public:
             // Each cursor requires its own DS handle so that multi-threaded access will work.
             // The cursor impl will dispose of the new DS handle.
 
-	        OGRDataSourceH dsHandle = OGROpenShared( _absUrl.c_str(), 0, &_ogrDriverHandle );
+	        OGRDataSourceH dsHandle = OGROpenShared( _source.c_str(), 0, &_ogrDriverHandle );
 	        if ( dsHandle )
 	        {
                 OGRLayerH layerHandle = OGR_DS_GetLayer( dsHandle, 0 );
@@ -455,7 +453,7 @@ protected:
 
 
 private:
-    std::string _absUrl;
+    std::string _source;
     OGRDataSourceH _dsHandle;
     OGRLayerH _layerHandle;
     OGRSFDriverH _ogrDriverHandle;

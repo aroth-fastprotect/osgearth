@@ -941,7 +941,7 @@ namespace
             return false;
         }
 
-        if ( out_isFallback )
+        if ( out_isFallback && numValidHeightFields == 0)
             *out_isFallback = true;
 
         //Second pass:  We were either asked to fallback or we might have some heightfields at the requested

@@ -31,7 +31,7 @@
 #  include <osgGA/CameraManipulator>
     namespace osgGA {
         typedef CameraManipulator MatrixManipulator;
-    };
+    }
 #  include <osg/ObserverNodePath>
 #  define USE_OBSERVER_NODE_PATH 1
 #else

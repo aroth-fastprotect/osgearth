@@ -104,11 +104,11 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
     struct ClusterVisitor : public osg::NodeVisitor
     {
         ClusterVisitor( const FeatureList& features, const osg::Matrixd& modelMatrix, FeatureMultiNode * featureNode, FilterContext& cx )
-            : _features( features ),
+            : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
+              _features( features ),
               _modelMatrix( modelMatrix ),
-				_featureNode(featureNode),
               _cx( cx ),
-              osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN )
+              _featureNode(featureNode)
         {
             //nop
         }

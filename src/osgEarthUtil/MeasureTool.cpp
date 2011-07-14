@@ -38,7 +38,8 @@ _mouseDown(false),
 _mouseButton( osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON),
 _group(group),
 _isPath( false ),
-_mapNode( mapNode )
+_mapNode( mapNode ),
+_intersectionMask(0xffffffff)
 {
     //Initialize the feature source, which is just a single feature that we will use to draw the measuring line
     _features = new FeatureListSource();

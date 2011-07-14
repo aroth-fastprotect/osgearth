@@ -226,6 +226,45 @@ bool hitTest(osgViewer::View * view, unsigned traversalMask, float x, float y, o
 	return ret;
 }
 
+bool hitTestPolytope(osgViewer::View * view, unsigned traversalMask, float x, float y, osg::Vec3d & posWorld, osg::Vec3d & posLocal, osg::NodePath & nodePath, osg::ref_ptr<osg::Drawable> & drawable, unsigned & primIndex)
+{
+	osg::Vec3d vecLocal;
+	osg::Vec3d vecWorld;
+	bool ret;
+
+	osg::Camera * camera = view->getCamera();
+
+	osg::ref_ptr< osgUtil::PolytopeIntersector > picker = new osgUtil::PolytopeIntersector(osgUtil::Intersector::WINDOW, x, y, x, y);
+
+	osgUtil::IntersectionVisitor iv(picker.get());
+
+	// get the traversal mask from the given camera if no mask has been specified
+	if(traversalMask == (unsigned)-1)
+		traversalMask = camera->getCullMask();
+	iv.setTraversalMask(traversalMask);
+	camera->accept(iv);
+
+	ret = picker->containsIntersections();
+	if (ret)
+	{
+		const osgUtil::PolytopeIntersector::Intersection& hitr = picker->getFirstIntersection();
+		posWorld = hitr.localIntersectionPoint * (const osg::Matrix&)hitr.matrix;
+		posLocal = hitr.localIntersectionPoint;
+		nodePath = hitr.nodePath;
+		drawable = hitr.drawable;
+		primIndex = hitr.primitiveIndex;
+	}
+	else
+	{
+		nodePath.clear();
+		posWorld = osg::Vec3d();
+		posLocal = osg::Vec3d();
+		drawable = NULL;
+		primIndex = (unsigned)-1;
+	}
+	return ret;
+}
+
 std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const osg::Node * node)
 {
 /*
@@ -292,61 +331,48 @@ struct FeatureInfoHandler : public osgGA::GUIEventHandler
 
 	bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
 	{
-		if ( ea.getEventType() == ea.KEYDOWN && ea.getKey() == 'i')
+		osg::Vec3d world;
+		osg::Vec3d local;
+		osg::NodePath path;
+		osg::ref_ptr<osg::Drawable> drawable;
+		unsigned primIndex = 0;
+		bool hit = false;
+		if ( ea.getEventType() == ea.KEYDOWN)
 		{
-			osg::Vec3d world;
-			osg::Vec3d local;
-			osg::NodePath path;
-			osg::ref_ptr<osg::Drawable> drawable;
-			unsigned primIndex = 0;
-			if(hitTest((osgViewer::View*)aa.asView(), (unsigned)-1, ea.getX(), ea.getY(), world, local, path, drawable, primIndex))
-			{
-				std::cout << "hit on " << path << std::endl;
-				FeatureNode * featureNode = NULL;
-				for(osg::NodePath::reverse_iterator it = path.rbegin(); !featureNode && it != path.rend(); it++)
-					featureNode = dynamic_cast<FeatureNode *>(*it);
+			if(ea.getKey() == 'i')
+				hit = hitTest((osgViewer::View*)aa.asView(), (unsigned)-1, ea.getX(), ea.getY(), world, local, path, drawable, primIndex);
+			else if(ea.getKey() == 'u')
+				hit = hitTestPolytope((osgViewer::View*)aa.asView(), (unsigned)-1, ea.getX(), ea.getY(), world, local, path, drawable, primIndex);
+		}
+		if(hit)
+		{
+			std::cout << "hit on " << path << std::endl;
+			FeatureNode * featureNode = NULL;
+			for(osg::NodePath::reverse_iterator it = path.rbegin(); !featureNode && it != path.rend(); it++)
+				featureNode = dynamic_cast<FeatureNode *>(*it);
 
-				if(featureNode)
-				{
-					FeatureSource * featureSource = featureNode->getSource();
-					osgEarth::Features::FeatureID fid;
-					FeatureMultiNode * featureMultiNode = dynamic_cast<FeatureMultiNode *>(featureNode);
-					if(featureMultiNode)
-						fid = featureMultiNode->getFID(drawable);
-					else
-						fid = featureNode->getFID();
-					std::string name;
-					if(featureSource)
-					{
-						Feature * feature = featureSource->getFeature(fid);
-						if(feature)
-							name = feature->getString("name");
-					}
-					std::cerr << "hit feature " << fid << ":" << name << std::endl;
-				}
+			if(featureNode)
+			{
+				FeatureSource * featureSource = featureNode->getSource();
+				osgEarth::Features::FeatureID fid;
+				FeatureMultiNode * featureMultiNode = dynamic_cast<FeatureMultiNode *>(featureNode);
+				if(featureMultiNode)
+					fid = featureMultiNode->getFID(drawable);
 				else
+					fid = featureNode->getFID();
+				std::string name;
+				if(featureSource)
 				{
-					std::cerr << "hit no feature" << std::endl;
+					Feature * feature = featureSource->getFeature(fid);
+					if(feature)
+						name = feature->getString("name");
 				}
+				std::cerr << "hit feature " << fid << ":" << name << std::endl;
 			}
-/*
-			osgEarth::ModelLayerVector layers;
-			_map->getModelLayers(layers);
-			for(osgEarth::ModelLayerVector::iterator it = layers.begin(); it != layers.end(); it++)
+			else
 			{
-				osg::ref_ptr<osgEarth::ModelLayer> layer = *it;
-				osgEarth::ModelSource* modelSource = layer->getModelSource();
-				osgEarth::Features::FeatureModelSource * featureModelSource = modelSource?dynamic_cast<osgEarth::Features::FeatureModelSource *>(modelSource):NULL;
-
-				if(featureModelSource)
-				{
-					osgEarth::Features::FeatureSource* featureSource = featureModelSource->getFeatureSource();
-					if(featureSource)
-					{
-					}
-				}
+				std::cerr << "hit no feature" << std::endl;
 			}
-*/
 		}
 		return false;
 	}

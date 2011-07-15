@@ -17,12 +17,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthFeatures/BuildGeometryFilter>
+#include <osgEarth/MeshConsolidator>
 #include <osgEarthSymbology/TextSymbol>
 #include <osgEarthSymbology/PointSymbol>
 #include <osgEarthSymbology/LineSymbol>
 #include <osgEarthSymbology/PolygonSymbol>
 #include <osgEarthSymbology/MeshSubdivider>
-#include <osgEarthSymbology/MeshConsolidator>
+#include <osgEarth/MeshConsolidator>
 #include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/LineWidth>
@@ -279,7 +280,7 @@ BuildGeometryFilter::pushRegularFeature( Feature* input, const FilterContext& co
             // the tessellator results in a collection of trifans, strips, etc. This step will
             // consolidate those into one (or more if necessary) GL_TRIANGLES primitive.
             //NOTE: this now happens elsewhere 
-            //MeshConsolidator::run( *osgGeom );
+            MeshConsolidator::run( *osgGeom );
 
             // mark this geometry as DYNAMIC because otherwise the OSG optimizer will destroy it.
             //osgGeom->setDataVariance( osg::Object::DYNAMIC );
@@ -312,8 +313,6 @@ BuildGeometryFilter::pushRegularFeature( Feature* input, const FilterContext& co
 
         // add the part to the geode.
 		_featureNode->addDrawable(osgGeom, input->getFID());
-		const osg::BoundingSphere& bs = osgGeom->getBound();
-
 
         _geode->addDrawable( osgGeom );
     }

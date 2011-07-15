@@ -24,7 +24,6 @@ SET(TARGET_PUBLIC_H
     GeometryRasterizer
 	LineFunctor
     LineSymbol
-    MeshConsolidator
     MeshSubdivider
     MarkerSymbol
     PointSymbol
@@ -47,7 +46,6 @@ SET(TARGET_SRC
     GEOS.cpp
     GeometryRasterizer.cpp
     LineSymbol.cpp
-    MeshConsolidator.cpp
     MeshSubdivider.cpp
     MarkerSymbol.cpp
     PointSymbol.cpp

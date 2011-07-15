@@ -267,43 +267,12 @@ bool hitTestPolytope(osgViewer::View * view, unsigned traversalMask, float x, fl
 
 std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const osg::Node * node)
 {
-/*
-	const osg::Group * group= dynamic_cast<const osg::Group*>(node);
-	const osgEarth::MapNode * mapNode = dynamic_cast<const osgEarth::MapNode*>(node);
-	const osg::Camera * camera = dynamic_cast<const osg::Camera*>(node);
-	const osg::Geode * geode = dynamic_cast<const osg::Geode*>(node);
-	const osg::Transform * transform = dynamic_cast<const osg::Transform*>(node);
-	const osg::MatrixTransform * mattrans = dynamic_cast<const osg::MatrixTransform*>(node);
-	const osg::PositionAttitudeTransform * pat = dynamic_cast<const osg::PositionAttitudeTransform*>(node);
-	const osg::CoordinateSystemNode * csn = dynamic_cast<const osg::CoordinateSystemNode*>(node);
-
-	if(pat != NULL)
-		os << pat;
-	else if(mattrans != NULL)
-		os << mattrans;
-	else if(camera != NULL)
-		os << *camera;
-	else if(transform != NULL)
-		os << transform;
-	else if(csn != NULL)
-		os << *csn;
-	else if(mapNode != NULL)
-		os << mapNode;
-	else if(group != NULL)
-		os << *group;
-	else if(geode != NULL)
-		os << *geode;
-	else
-	{
-*/
 		const osg::StateSet * stateSet = (node!=NULL)?node->getStateSet():NULL;
 		os << "{this=" << (void*)node 
 			<< ";name=" << (node?node->getName():"<null>")
 			<< ";classname=" << (node?node->className():"<null>")
 			<< ";libname=" << (node?node->libraryName():"<null>")
 			<< ";mask=" << std::hex << (node?node->getNodeMask():0) << std::dec
-//			<< ";bs=" << (node?node->getBound():osg::BoundingSphere())
-			<< ";stateSet=" << stateSet
 			<< "}";
 //	}
 	return os;
@@ -357,7 +326,7 @@ struct FeatureInfoHandler : public osgGA::GUIEventHandler
 				osgEarth::Features::FeatureID fid;
 				FeatureMultiNode * featureMultiNode = dynamic_cast<FeatureMultiNode *>(featureNode);
 				if(featureMultiNode)
-					fid = featureMultiNode->getFID(drawable);
+					fid = featureMultiNode->getFID(drawable, primIndex);
 				else
 					fid = featureNode->getFID();
 				std::string name;

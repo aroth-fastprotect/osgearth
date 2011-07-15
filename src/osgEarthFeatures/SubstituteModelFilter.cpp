@@ -19,7 +19,8 @@
 #include <osgEarthFeatures/SubstituteModelFilter>
 #include <osgEarthFeatures/MarkerFactory>
 #include <osgEarthFeatures/FeatureNode>
-#include <osgEarthSymbology/MeshConsolidator>
+#include <osgEarthFeatures/GeometryUtils>
+#include <osgEarth/MeshConsolidator>
 #include <osgEarth/HTTPClient>
 #include <osg/Drawable>
 #include <osg/Geode>
@@ -172,11 +173,7 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 
             geode.dirtyBound();
 
-			OE_WARN << "ClusterVisitor done geode " << &geode << " featureNode=" << _featureNode 
-				<< " featureNode drawables=" << _featureNode->getNumDrawables()
-				<< " geode drawables=" << geode.getNumDrawables() << std::endl;
-
-            //MeshConsolidator::run( geode );
+            FeatureMeshConsolidator::run( geode, _featureNode );
             //// merge the geometry...
             //osgUtil::Optimizer opt;
             //opt.optimize( &geode, osgUtil::Optimizer::MERGE_GEOMETRY );
@@ -205,8 +202,6 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
 	Session* session = cx.getSession();
 	FeatureSource * source = (session!=NULL)?session->getFeatureSource():NULL;
 	FeatureMultiNode * featureNode = new FeatureMultiNode(source);
-
-	OE_WARN << "ClusterVisitor clone " << clone << " featureNode=" << featureNode << std::endl;
 
     // ..and apply the clustering to the copy.
 	ClusterVisitor cv( features, _modelMatrix, featureNode, cx );

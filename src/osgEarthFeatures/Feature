@@ -28,6 +28,12 @@
 #include <map>
 #include <list>
 
+namespace osgEarth { 
+	namespace Symbology {
+		class Geometry;
+	}
+}
+
 namespace osgEarth { namespace Features
 {
     using namespace osgEarth;

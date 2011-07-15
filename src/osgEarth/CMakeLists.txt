@@ -49,6 +49,7 @@ SET(TARGET_PUBLIC_H
 	MaskLayer
 	MaskNode
     MaskSource
+    MeshConsolidator
 	ModelLayer
 	ModelSource
     NodeUtils
@@ -118,6 +119,7 @@ SET(TARGET_SRC
     MaskLayer.cpp
     MaskNode.cpp
     MaskSource.cpp
+    MeshConsolidator.cpp
 	MimeTypes.cpp
 	ModelLayer.cpp
 	ModelSource.cpp

@@ -382,8 +382,6 @@ BuildGeometryFilter::push( FeatureList& input, const FilterContext& context )
                     new osg::Point( *pointSymbol->size() ), osg::StateAttribute::ON );
         }
 
-		const osg::BoundingSphere& bs = _geode->getBound();
-
 		_featureNode->addChild(_geode.release());
 
         _result = _featureNode;

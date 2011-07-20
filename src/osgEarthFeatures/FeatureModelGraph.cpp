@@ -298,7 +298,7 @@ FeatureModelGraph::buildSubTiles(unsigned            nextLevelIndex,
         for( unsigned v = tileY; v < tileY+numTiles; ++v )
         {
             GeoExtent subtileFeatureExtent = s_getTileExtent( nextLOD, u, v, _usableFeatureExtent );
-            osg::BoundingSphered subtile_bs = getBoundInWorldCoords( subtileFeatureExtent, mapf );
+            osg::BoundingSphered subtile_bs = getBoundInWorldCoords( subtileFeatureExtent, NULL/*mapf*/ );
 
             std::stringstream buf;
             buf << _uid << "." << nextLevelIndex << "_" << u << "_" << v << ".osgearth_pseudo_fmg";

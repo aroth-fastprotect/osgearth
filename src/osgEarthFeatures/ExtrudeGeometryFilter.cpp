@@ -434,7 +434,7 @@ ExtrudeGeometryFilter::pushFeature( Feature* input, const FilterContext& context
                 // reorganize the drawable into a single triangle set.
                 // TODO: probably deprecate this once we start texturing rooftops
                 // NOTE: MC is now called elsewhere.
-                MeshConsolidator::run( *rooflines.get() );
+                //MeshConsolidator::run( *rooflines.get() );
 
                 // mark this geometry as DYNAMIC because otherwise the OSG optimizer will destroy it.
                 // TODO: why??

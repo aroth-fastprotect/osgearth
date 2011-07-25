@@ -20,8 +20,6 @@
 #include <osgEarth/ElevationQuery>
 #include <osgEarth/GeoData>
 
-#include <osg/io_utils>
-
 #define LC "[ClampFilter] "
 
 using namespace osgEarth;
@@ -68,7 +66,6 @@ ClampFilter::push( FeatureList& features, FilterContext& cx )
 
             if ( isGeocentric )
             {
-				osg::Vec3 v1 = geom->asVector()[0];
                 // convert to map coords:
                 cx.toWorld( geom );
                 mapSRS->transformFromECEF( geom->asVector() );
@@ -91,10 +88,6 @@ ClampFilter::push( FeatureList& features, FilterContext& cx )
                 // convert back to geocentric:
                 mapSRS->transformToECEF( geom->asVector() );
                 cx.toLocal( geom );
-
-				osg::Vec3 v2 = geom->asVector()[0];
-				OE_WARN << LC << "ClampFilter " << v1 << " to " << v2 << std::endl;
-
             }
 
             else

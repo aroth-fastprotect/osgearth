@@ -57,6 +57,8 @@ usage( const std::string& msg )
 static EarthManipulator* s_manip         = 0L;
 static Control*          s_controlPanel  =0L;
 static SkyNode*          s_sky           =0L;
+static osg::Camera*      s_skyCamera     =0L;
+int s_skyDomePreRenderCameraNum = -100;
 
 struct SkySliderHandler : public ControlEventHandler
 {
@@ -243,6 +245,39 @@ struct ViewpointHandler : public osgGA::GUIEventHandler
     }
 
     std::vector<Viewpoint> _viewpoints;
+};
+
+class CheckCamerasCallback : public osg::NodeCallback
+{
+public:
+	virtual void operator()(osg::Node* node, osg::NodeVisitor* nv)
+	{
+		osgUtil::CullVisitor *cv =
+			dynamic_cast< osgUtil::CullVisitor *>( nv );
+		if (cv)
+		{
+			// Do not use cv->getCurrentCamera() because it did not
+			// exist in 2.2 which we still support
+			osg::Camera* camera =
+				cv->getCurrentRenderBin()->getStage()->getCamera();
+			// If the camera is either a pre-render camera with num >
+			// our pre-render order, or not a pre-render camera
+			if (camera->getRenderOrder() != osg::Camera::PRE_RENDER ||
+				camera->getRenderOrderNum() >
+				s_skyDomePreRenderCameraNum)
+			{
+				// I should also check if the camera is set to render to
+				// the framebuffer and is not an RTT camera, just to be
+				// sure I'm only affecting the cameras I want to affect.
+
+				// Set the camera to not clear the color buffer.
+				if (camera->getClearMask() & GL_COLOR_BUFFER_BIT)
+					camera->setClearMask(camera->getClearMask() & ~GL_COLOR_BUFFER_BIT);
+			}
+		}
+
+		traverse(node,nv);
+	}
 };
 
 
@@ -461,7 +496,34 @@ main(int argc, char** argv)
                 s_sky = new SkyNode( mapNode->getMap() );
                 s_sky->setDateTime( 2011, 3, 6, hours );
                 s_sky->attach( &viewer );
-                root->addChild( s_sky );
+
+				// Render the skydome through another camera so that the cloud plane
+				// won't influence the main camera's near/far plane computations.
+				// I'd prefer to find some other way to have the sky dome not
+				// influence the main camera near/far values, because this has
+				// repercussions on the viewer setup (see how CheckCamerasCallback
+				// affects all other cameras). But it works well.
+
+				s_skyCamera = new osg::Camera;
+
+				s_skyCamera->setComputeNearFarMode(osg::Camera::DO_NOT_COMPUTE_NEAR_FAR);
+				s_skyCamera->setCullingMode(osg::Camera::NO_CULLING);
+				// set to -100 by default
+				s_skyCamera->setRenderOrder(osg::Camera::PRE_RENDER, s_skyDomePreRenderCameraNum);
+				// Hopefully this will be the first pre-render camera, so it should
+				// clear the color and depth buffers (this skydome is not guaranteed
+				// to fill the whole view at all times).
+				s_skyCamera->setClearMask(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+				bool doubleBuffer = true;
+				s_skyCamera->setDrawBuffer(doubleBuffer ? GL_BACK : GL_FRONT);
+
+				// The dome hangs under m_skyTransform.
+				s_skyCamera->addChild(s_sky);
+				s_skyCamera->setView(&viewer);
+
+				root->setCullCallback(new CheckCamerasCallback);
+
+                root->addChild( s_skyCamera );
                 if ( animateSky )
                 {
                     s_sky->setUpdateCallback( new AnimateSunCallback());

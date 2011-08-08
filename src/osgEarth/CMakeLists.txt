@@ -25,6 +25,7 @@ SET(TARGET_PUBLIC_H
 	CompositeTileSource
 	Config
 	Cube
+    DrapeableNode
 	ElevationLayer
     ElevationQuery
 	Export
@@ -42,6 +43,7 @@ SET(TARGET_PUBLIC_H
 	JsonUtils
 	Layer
 	Locators
+    LocalTangentPlane
 	Map
 	MapNode
 	MapNodeOptions
@@ -97,6 +99,7 @@ SET(TARGET_SRC
     CompositeTileSource.cpp
     Config.cpp
     Cube.cpp
+    DrapeableNode.cpp
     EGM.cpp
     ElevationLayer.cpp
     ElevationQuery.cpp
@@ -112,6 +115,7 @@ SET(TARGET_SRC
     JsonUtils.cpp
     Layer.cpp
     Locators.cpp
+    LocalTangentPlane.cpp
     Map.cpp
     MapNode.cpp
     MapNodeOptions.cpp

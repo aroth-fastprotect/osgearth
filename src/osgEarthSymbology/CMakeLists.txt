@@ -20,6 +20,7 @@ SET(TARGET_PUBLIC_H
     Expression
     ExtrusionSymbol
     Geometry
+    GeometryFactory
     GEOS
     GeometryRasterizer
 	LineFunctor
@@ -43,6 +44,7 @@ SET(TARGET_SRC
     Expression.cpp
     ExtrusionSymbol.cpp
     Geometry.cpp
+    GeometryFactory.cpp
     GEOS.cpp
     GeometryRasterizer.cpp
     LineSymbol.cpp

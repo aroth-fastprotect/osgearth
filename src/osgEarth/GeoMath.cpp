@@ -35,6 +35,24 @@ GeoMath::distance(double lat1Rad, double lon1Rad, double lat2Rad, double lon2Rad
 }
 
 double
+GeoMath::distance(const std::vector< osg::Vec3d > &points, double radius)
+{
+    double length = 0;
+
+    if (points.size() > 1)
+    {
+        for (unsigned int i = 0; i < points.size()-1; ++i)
+        {
+            const osg::Vec3d& current = points[i];
+            const osg::Vec3d& next    = points[i+1];
+            length += GeoMath::distance(osg::DegreesToRadians(current.y()), osg::DegreesToRadians(current.x()),
+                osg::DegreesToRadians(next.y()), osg::DegreesToRadians(next.x()), radius);
+        }
+    }
+    return length;
+}
+
+double
 GeoMath::bearing(double lat1Rad, double lon1Rad,
                  double lat2Rad, double lon2Rad)
 {
@@ -89,10 +107,27 @@ GeoMath::rhumbDistance(double lat1Rad, double lon1Rad,
 
     double dPhi = log(tan(lat2Rad/2.0+osg::PI/4.0)/tan(lat1Rad/2.0+osg::PI/4.0));
     double q = (!osg::isNaN(dLat/dPhi)) ? dLat/dPhi : cos(lat1Rad);  // E-W line gives dPhi=0
-    // if dLon over 180° take shorter rhumb across 180° meridian:
+    // if dLon over 180ï¿½ take shorter rhumb across 180ï¿½ meridian:
     if (dLon > osg::PI) dLon = 2.0*osg::PI - dLon;
     double dist = sqrt(dLat*dLat + q*q*dLon*dLon) * radius; 
     return dist;
+}
+
+double
+GeoMath::rhumbDistance(const std::vector< osg::Vec3d > &points, double radius)
+{
+    double length = 0;
+    if (points.size() > 1)
+    {
+        for (unsigned int i = 0; i < points.size()-1; ++i)
+        {
+            const osg::Vec3d& current = points[i];
+            const osg::Vec3d& next    = points[i+1];
+            length += GeoMath::rhumbDistance(osg::DegreesToRadians(current.y()), osg::DegreesToRadians(current.x()),
+                                             osg::DegreesToRadians(next.y()), osg::DegreesToRadians(next.x()), radius);                                             
+        }
+    }
+    return length;
 }
 
 double

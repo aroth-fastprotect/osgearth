@@ -11,7 +11,6 @@ ENDIF(GEOS_FOUND)
 SET(LIB_NAME osgEarthFeatures)
 
 SET(TARGET_PUBLIC_H
-    Annotation  
     BufferFilter
     BuildGeometryFilter  
     BuildTextFilter
@@ -30,7 +29,9 @@ SET(TARGET_PUBLIC_H
 	FeatureListSource
     FeatureModelGraph
     FeatureModelSource    
+    FeatureNode
     FeatureSource
+	FeatureSourceNode
     FeatureTileSource
     Filter
     FilterContext
@@ -50,7 +51,6 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
-    Annotation.cpp
     BufferFilter.cpp
     BuildGeometryFilter.cpp 
     BuildTextFilter.cpp
@@ -68,7 +68,9 @@ SET(TARGET_SRC
 	FeatureListSource.cpp
     FeatureModelGraph.cpp
     FeatureModelSource.cpp
+    FeatureNode.cpp
     FeatureSource.cpp
+	FeatureSourceNode.cpp
     FeatureTileSource.cpp
     Filter.cpp
     FilterContext.cpp

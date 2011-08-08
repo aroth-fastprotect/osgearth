@@ -7,6 +7,7 @@ ENDIF(DYNAMIC_OSGEARTH)
 SET(LIB_NAME osgEarthUtil)
 
 SET(TARGET_PUBLIC_H
+	Annotation  
 	AutoClipPlaneHandler
 	Common
 	Controls
@@ -14,6 +15,7 @@ SET(TARGET_PUBLIC_H
 	EarthManipulator
 	ElevationManager
 	Export
+    Formatters
 	Graticule
 	ImageOverlay	
 	MeasureTool
@@ -29,11 +31,13 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
+	Annotation.cpp
 	AutoClipPlaneHandler.cpp
 	ClampCallback.cpp
     Controls.cpp
 	EarthManipulator.cpp
 	ElevationManager.cpp
+    Formatters.cpp
 	Graticule.cpp
 	ImageOverlay.cpp
 	MeasureTool.cpp

@@ -913,7 +913,9 @@ namespace
         unsigned int numValidHeightFields = 0;
 
         if ( out_isFallback )
+        {
             *out_isFallback = false;
+        }
         
         //First pass:  Try to get the exact LOD requested for each enabled heightfield
         for( ElevationLayerVector::const_iterator i = elevLayers.begin(); i != elevLayers.end(); i++ )
@@ -922,12 +924,8 @@ namespace
             if (layer->getProfile() && layer->getEnabled() )
             {
                 osg::HeightField* hf = layer->createHeightField( key, progress );
-                //osg::ref_ptr< osg::HeightField > hf;
-                //layer->getHeightField( key, hf, progress );
-                layerValidMap[ layer ] = (hf != 0L); //hf.valid();
-                if ( hf )
-                //if (hf.valid())
-                {
+                layerValidMap[ layer ] = (hf != 0L);
+                if ( hf )                {
                     numValidHeightFields++;
                     GeoHeightField ghf( hf, key.getExtent(), layer->getProfile()->getVerticalSRS() );
                     heightFields.push_back( ghf );
@@ -941,9 +939,13 @@ namespace
             return false;
         }
 
+#ifdef AMA_HEIGHTFIELD_ONLY_FIX
+		// ARO: These lines have been removed from osgEarth/trunk
+		//      so it should be safe to remove them too. If something does not work
+		//      e.g. heightfields for calc, you might add these lines again.
         if ( out_isFallback && numValidHeightFields == 0)
             *out_isFallback = true;
-
+#endif // AMA_HEIGHTFIELD_ONLY_FIX
         //Second pass:  We were either asked to fallback or we might have some heightfields at the requested
         //              LOD and some that are NULL. Fall back on parent tiles to fill in the missing data if possible.
         for( ElevationLayerVector::const_iterator i = elevLayers.begin(); i != elevLayers.end(); i++ )
@@ -972,6 +974,10 @@ namespace
 
                         heightFields.push_back( GeoHeightField(
                             hf.get(), hf_key.getExtent(), layer->getProfile()->getVerticalSRS() ) );
+
+                        if ( out_isFallback )
+                            *out_isFallback = true;
+
                     }
                 }
             }
@@ -1231,9 +1237,9 @@ MapInfo::toMapPoint( const osg::Vec3d& input, const SpatialReference* inputSRS, 
     }
 
     return inputSRS->transform(
-        input.x(), input.y(),
+        input.x(), input.y(), input.z(),
         mapSRS,
-        output.x(), output.y() );
+        output.x(), output.y(), output.z() );
 }
 
 bool
@@ -1272,6 +1278,7 @@ MapInfo::worldPointToMapPoint( const osg::Vec3d& input, osg::Vec3d& output ) con
 }
 
 //------------------------------------------------------------------------
+
 MapFrame::MapFrame( const Map* map, Map::ModelParts parts, const std::string& name ) :
 _initialized( false ),
 _map( map ),

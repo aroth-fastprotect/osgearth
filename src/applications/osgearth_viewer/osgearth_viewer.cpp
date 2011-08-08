@@ -30,8 +30,9 @@
 #include <osgEarthUtil/Graticule>
 #include <osgEarthUtil/SkyNode>
 #include <osgEarthUtil/Viewpoint>
+#include <osgEarthUtil/Formatters>
 #include <osgEarthSymbology/Color>
-#include <osgEarthFeatures/FeatureNode>
+#include <osgEarthFeatures/FeatureSourceNode>
 #include <osgEarthFeatures/FeatureSource>
 
 using namespace osgEarth::Util;
@@ -47,9 +48,11 @@ usage( const std::string& msg )
     OE_NOTICE << "USAGE: osgearth_viewer [--graticule] [--autoclip] file.earth" << std::endl;
     OE_NOTICE << "   --graticule     : displays a lat/long grid in geocentric mode" << std::endl;
     OE_NOTICE << "   --sky           : activates the atmospheric model" << std::endl;
-    OE_NOTICE << "   --animateSky    : animates the sun across the sky" << std::endl;
     OE_NOTICE << "   --autoclip      : activates the auto clip-plane handler" << std::endl;
     OE_NOTICE << "   --jump          : automatically jumps to first viewpoint" << std::endl;
+    OE_NOTICE << "   --dms           : format coordinates as degrees/minutes/seconds" << std::endl;
+    OE_NOTICE << "   --mgrs          : format coordinates as MGRS" << std::endl;
+    
         
     return -1;
 }
@@ -57,6 +60,8 @@ usage( const std::string& msg )
 static EarthManipulator* s_manip         = 0L;
 static Control*          s_controlPanel  =0L;
 static SkyNode*          s_sky           =0L;
+static bool              s_dms           =false;
+static bool              s_mgrs          =false;
 static osg::Camera*      s_skyCamera     =0L;
 int s_skyDomePreRenderCameraNum = -100;
 
@@ -73,7 +78,7 @@ struct ClickViewpointHandler : public ControlEventHandler
     ClickViewpointHandler( const Viewpoint& vp ) : _vp(vp) { }
     Viewpoint _vp;
 
-    virtual void onClick( class Control* control, int buttonMask )
+    virtual void onClick( class Control* control )
     {
         s_manip->setViewpoint( _vp, 4.5 );
     }
@@ -101,8 +106,27 @@ struct MouseCoordsHandler : public osgGA::GUIEventHandler
 
                 // transform it to map coordinates:
                 _map->worldPointToMapPoint(point, lla);
+
                 std::stringstream ss;
-                ss << std::fixed << std::setprecision(2) << "lat " << lla.y() << "� lon " << lla.x() << "� elev " << lla.z() << "m";
+
+                if ( s_mgrs )
+                {
+                    MGRSFormatter f( MGRSFormatter::PRECISION_1M );
+                    ss << "MGRS: " << f.format(lla.y(), lla.x()) << "   ";
+                }
+                 // lat/long
+                {
+                    LatLongFormatter::AngularFormat fFormat = s_dms?
+                        LatLongFormatter::FORMAT_DEGREES_MINUTES_SECONDS :
+                        LatLongFormatter::FORMAT_DECIMAL_DEGREES;
+                    
+                    LatLongFormatter f( fFormat );
+
+                    ss 
+                        << "Lat: " << f.format(Angular(lla.y(),Units::DEGREES)) << "  "
+                        << "Lon: " << f.format(Angular(lla.x(),Units::DEGREES));
+                }
+
                 _label->setText( ss.str() );
             }
             else
@@ -117,10 +141,6 @@ struct MouseCoordsHandler : public osgGA::GUIEventHandler
     osg::ref_ptr< LabelControl > _label;
     const Map*                   _map;
 };
-
-
-
-
 
 
 
@@ -202,18 +222,6 @@ void addMouseCoords(osgViewer::Viewer* viewer, const osgEarth::Map* map)
 
     viewer->addEventHandler( new MouseCoordsHandler(mouseCoords, map ) );
 }
-
-
-struct AnimateSunCallback : public osg::NodeCallback
-{
-    void operator()( osg::Node* node, osg::NodeVisitor* nv )
-    {
-        SkyNode* skyNode = static_cast<SkyNode*>(node);
-        double hours = fmod( osg::Timer::instance()->time_s()/4.0, 24.0 );
-        skyNode->setDateTime( 2011, 6, 6, hours );
-        OE_INFO << "TIME: " << hours << std::endl;
-    }
-};
 
 struct ViewpointHandler : public osgGA::GUIEventHandler
 {
@@ -361,7 +369,6 @@ bool hitTestPolytope(osgViewer::View * view, unsigned traversalMask, float x, fl
 
 std::basic_ostream<char>& operator<<(std::basic_ostream<char>& os, const osg::Node * node)
 {
-		const osg::StateSet * stateSet = (node!=NULL)?node->getStateSet():NULL;
 		os << "{this=" << (void*)node 
 			<< ";name=" << (node?node->getName():"<null>")
 			<< ";classname=" << (node?node->className():"<null>")
@@ -410,15 +417,15 @@ struct FeatureInfoHandler : public osgGA::GUIEventHandler
 		if(hit)
 		{
 			std::cout << "hit on " << path << std::endl;
-			FeatureNode * featureNode = NULL;
+			FeatureSourceNode * featureNode = NULL;
 			for(osg::NodePath::reverse_iterator it = path.rbegin(); !featureNode && it != path.rend(); it++)
-				featureNode = dynamic_cast<FeatureNode *>(*it);
+				featureNode = dynamic_cast<FeatureSourceNode *>(*it);
 
 			if(featureNode)
 			{
 				FeatureSource * featureSource = featureNode->getSource();
 				osgEarth::Features::FeatureID fid;
-				FeatureMultiNode * featureMultiNode = dynamic_cast<FeatureMultiNode *>(featureNode);
+				FeatureSourceMultiNode * featureMultiNode = dynamic_cast<FeatureSourceMultiNode *>(featureNode);
 				if(featureMultiNode)
 					fid = featureMultiNode->getFID(drawable, primIndex);
 				else
@@ -448,20 +455,20 @@ main(int argc, char** argv)
 {
     osg::ArgumentParser arguments(&argc,argv);
     osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
+    osgViewer::Viewer viewer(arguments);
 
     bool useGraticule = arguments.read( "--graticule" );
     bool useAutoClip  = arguments.read( "--autoclip" );
-    bool animateSky   = arguments.read( "--animateSky");
-    bool useSky       = arguments.read( "--sky" ) || animateSky;
+    bool useSky       = arguments.read( "--sky" );
     bool jump         = arguments.read( "--jump" );
+    s_dms             = arguments.read( "--dms" );
+    s_mgrs            = arguments.read( "--mgrs" );
 
     // load the .earth file from the command line.
     osg::Node* earthNode = osgDB::readNodeFiles( arguments );
     if (!earthNode)
         return usage( "Unable to load earth model." );
 
-    osgViewer::Viewer viewer(arguments);
-    
     s_manip = new EarthManipulator();
     viewer.setCameraManipulator( s_manip );
 
@@ -524,10 +531,6 @@ main(int argc, char** argv)
 				root->setCullCallback(new CheckCamerasCallback);
 
                 root->addChild( s_skyCamera );
-                if ( animateSky )
-                {
-                    s_sky->setUpdateCallback( new AnimateSunCallback());
-                }
             }
 
             if ( externals.hasChild("autoclip") )

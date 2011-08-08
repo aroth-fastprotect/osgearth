@@ -19,7 +19,7 @@
 
 #include <osgEarthFeatures/OgrUtils>
 #include <osgEarthFeatures/GeometryUtils>
-#include <osgEarthFeatures/FeatureNode>
+#include <osgEarthFeatures/FeatureSourceNode>
 
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
@@ -95,9 +95,8 @@ std::string osgEarth::Features::geometryToGml( Geometry* geometry )
     return result;
 }
 
-
 void
-FeatureMeshConsolidator::run( osg::Geode& geode, FeatureMultiNode * featureNode )
+FeatureSourceMeshConsolidator::run( osg::Geode& geode, FeatureSourceMultiNode * featureNode )
 {
 	unsigned numVerts = 0;
 	unsigned numColors = 0;

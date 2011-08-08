@@ -190,7 +190,7 @@ void expandHeights(Geographic* gpatchset, const TileKey& key,
             Vec2d cubeCoord(patchExtent.xMin() + i * xInc,
                             patchExtent.yMin() + j * yInc);
             double lon, lat;
-            srs->transform(cubeCoord.x(), cubeCoord.y(), geoSrs, lon, lat);
+            srs->transform2D(cubeCoord.x(), cubeCoord.y(), geoSrs, lon, lat);
             float elevation;
 
             bool found = hf.getElevation(srs, cubeCoord.x(), cubeCoord.y(),

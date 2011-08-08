@@ -17,7 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthFeatures/BuildTextOperator>
-#include <osgEarthFeatures/Annotation>
 #include <osgEarth/Utils>
 #include <osgDB/ReadFile>
 #include <osgDB/ReaderWriter>
@@ -98,25 +97,11 @@ osg::Node* BuildTextOperator::operator()(const FeatureList&   features,
         if (!feature->getGeometry()) continue;
 
         std::string text;
-        //If the feature is a TextAnnotation, just get the value from it
-        TextAnnotation* annotation = dynamic_cast<TextAnnotation*>(feature);
-        if (annotation)
-        {
-            text = annotation->text();
-        }
-        else if (symbol->content().isSet())
+        if (symbol->content().isSet())
         {
              //Get the text from the specified content and referenced attributes
              text = feature->eval( contentExpr );
-             //std::string content = symbol->content().value();
-             //text = parseAttributes(feature, content, symbol->contentAttributeDelimiter().value());
         }
-        //else if (symbol->attribute().isSet())
-        //{
-        //    //Get the text from the specified attribute
-        //    std::string attr = symbol->attribute().value();
-        //    text = feature->getAttr(attr);
-        //}
 
         if (text.empty()) continue;
 

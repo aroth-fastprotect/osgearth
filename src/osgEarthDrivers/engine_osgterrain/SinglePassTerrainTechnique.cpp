@@ -584,14 +584,30 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
     skirt->setUseVertexBufferObjects(true);
     geode->addDrawable( skirt );
 
+	osg::ref_ptr<GeoLocator> geoLocator = _masterLocator;
+	// Avoid coordinates conversion when GEOCENTRIC, so get a GEOGRAPHIC version of Locator 
+	if (_masterLocator->getCoordinateSystemType() == osgTerrain::Locator::GEOCENTRIC) {
+		geoLocator = _masterLocator->getGeographicFromGeocentric();
+	}
 
-    //Find mask bounds in local coords and create a record for any mask relevant to this tile.
-    osg::ref_ptr<GeoLocator> geoLocator = _masterLocator->getGeographicFromGeocentric();
+	float scaleHeight = 
+		_verticalScaleOverride != 1.0? _verticalScaleOverride :
+		_tile->getTerrain() ? _tile->getTerrain()->getVerticalScale() :
+		1.0f;
 
     MaskRecordVector masks;
     for (MaskLayerVector::const_iterator it = tilef._masks.begin(); it != tilef._masks.end(); ++it)
     {
-      osg::Vec3dArray* boundary = (*it)->getOrCreateBoundary();
+	  // When displaying Plate Carre, Heights have to be converted from meters to degrees.
+	  // This is also true for mask feature
+	  // TODO: adjust this calculation based on the actual EllipsoidModel.
+	  float scale = scaleHeight;
+	  if (_masterLocator->getCoordinateSystemType() == osgEarth::GeoLocator::GEOGRAPHIC)
+		scale = scaleHeight / 111319.0f;
+
+	  // TODO: Get the map SRS if possible instead of masterLocator's one
+	  osg::Vec3dArray* boundary = (*it)->getOrCreateBoundary(scale, _masterLocator->getDataExtent().getSRS());
+
       if ( boundary )
       {
           osg::Vec3d min, max;
@@ -785,11 +801,6 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             }
         }
     }
-
-    float scaleHeight = 
-        _verticalScaleOverride != 1.0? _verticalScaleOverride :
-        _tile->getTerrain() ? _tile->getTerrain()->getVerticalScale() :
-        1.0f;
 
     osg::ref_ptr<osg::FloatArray> elevations = new osg::FloatArray;
     if (elevations.valid()) elevations->reserve(numVerticesInSurface);        
@@ -1012,7 +1023,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
 #if 1
         //Do a diff on the polygons to get the actual mask skirt
         osg::ref_ptr<osgEarth::Symbology::Geometry> outPoly;
-        maskSkirtPoly->difference(maskPoly, outPoly);
+        maskSkirtPoly->difference(maskPoly.get(), outPoly);
 #else
         osg::ref_ptr<osgEarth::Symbology::Geometry> outPoly = maskSkirtPoly;
 #endif
@@ -1028,7 +1039,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
         
         std::vector<int> skirtIndices;
 
-        osgEarth::Symbology::GeometryIterator i( outPoly, false );
+        osgEarth::Symbology::GeometryIterator i( outPoly.get(), false );
         while( i.hasMore() )
         {
           osgEarth::Symbology::Geometry* part = i.next();
@@ -1361,7 +1372,10 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
     {        
         // build the verts first:
         osg::Vec3Array* skirtVerts = new osg::Vec3Array();
+        osg::Vec3Array* skirtNormals = new osg::Vec3Array();
+
         skirtVerts->reserve( numVerticesInSkirt );
+        skirtNormals->reserve( numVerticesInSkirt );
         
         Indices skirtBreaks;
         skirtBreaks.push_back(0);
@@ -1384,6 +1398,9 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             {
               skirtVerts->push_back( (*surfaceVerts)[orig_i] );
               skirtVerts->push_back( (*surfaceVerts)[orig_i] - ((*skirtVectors)[orig_i])*skirtHeight );
+              skirtNormals->push_back( (*normals)[orig_i] );             
+              skirtNormals->push_back( (*normals)[orig_i] );             
+
 
               if ( _texCompositor->requiresUnitTextureSpace() )
               {
@@ -1415,6 +1432,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             {
               skirtVerts->push_back( (*surfaceVerts)[orig_i] );
               skirtVerts->push_back( (*surfaceVerts)[orig_i] - ((*skirtVectors)[orig_i])*skirtHeight );
+              skirtNormals->push_back( (*normals)[orig_i] );             
+              skirtNormals->push_back( (*normals)[orig_i] );             
 
               if ( _texCompositor->requiresUnitTextureSpace() )
               {
@@ -1446,6 +1465,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             {
               skirtVerts->push_back( (*surfaceVerts)[orig_i] );
               skirtVerts->push_back( (*surfaceVerts)[orig_i] - ((*skirtVectors)[orig_i])*skirtHeight );
+              skirtNormals->push_back( (*normals)[orig_i] );             
+              skirtNormals->push_back( (*normals)[orig_i] );             
 
               if ( _texCompositor->requiresUnitTextureSpace() )
               {
@@ -1477,6 +1498,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             {
               skirtVerts->push_back( (*surfaceVerts)[orig_i] );
               skirtVerts->push_back( (*surfaceVerts)[orig_i] - ((*skirtVectors)[orig_i])*skirtHeight );
+              skirtNormals->push_back( (*normals)[orig_i] );             
+              skirtNormals->push_back( (*normals)[orig_i] );             
 
               if ( _texCompositor->requiresUnitTextureSpace() )
               {
@@ -1496,13 +1519,14 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
         }
 
         skirt->setVertexArray( skirtVerts );
+        skirt->setNormalArray( skirtNormals );
+        skirt->setNormalBinding( osg::Geometry::BIND_PER_VERTEX );
 
         //Add a primative set for each continuous skirt strip
         skirtBreaks.push_back(skirtVerts->size());
         for (int p=1; p < (int)skirtBreaks.size(); p++)
           skirt->addPrimitiveSet( new osg::DrawArrays( GL_TRIANGLE_STRIP, skirtBreaks[p-1], skirtBreaks[p] - skirtBreaks[p-1] ) );
     }
-
 
     bool recalcNormals = elevationLayer != NULL;
 
@@ -1552,10 +1576,26 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             
             if (numValid==4)
             {
-                float e00 = (*elevations)[i00];
-                float e10 = (*elevations)[i10];
-                float e01 = (*elevations)[i01];
-                float e11 = (*elevations)[i11];
+
+				bool VALID = true;
+				for (MaskRecordVector::iterator mr = masks.begin(); mr != masks.end(); ++mr) {
+					float min_i = (*mr)._ndcMin.x() * (double)(numColumns-1);
+					float min_j = (*mr)._ndcMin.y() * (double)(numRows-1);
+					float max_i = (*mr)._ndcMax.x() * (double)(numColumns-1);
+					float max_j = (*mr)._ndcMax.y() * (double)(numRows-1);
+
+					// We test if mask is completely in square
+					if(i+1 >= min_i && i <= max_i && j+1 >= min_j && j <= max_j) {
+						VALID = false;
+						break;
+					}
+				}
+
+				if (VALID) {
+                    float e00 = (*elevations)[i00];
+                    float e10 = (*elevations)[i10];
+                    float e01 = (*elevations)[i01];
+                    float e11 = (*elevations)[i11];
 
                 osg::Vec3f &v00 = (*surfaceVerts)[i00];
                 osg::Vec3f &v10 = (*surfaceVerts)[i10];
@@ -1608,8 +1648,10 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                         (*normals)[i11] += normal2;
                     }
                 }
+            	}
             }
-            else if (numValid==3)
+            // As skirtPoly is filling the mask bbox, we don't need to create isolated triangle
+			/*else if (numValid==3)
             {
                 int validIndices[3];
                 int indexPtr = 0;
@@ -1647,7 +1689,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                     (*normals)[validIndices[1]] += normal;
                     (*normals)[validIndices[2]] += normal;
                 }
-            }            
+            } */
         }
     }
 
@@ -1662,6 +1704,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             nitr->normalize();
         }
     }
+
+  
 
     MeshConsolidator::run( *surface );
 

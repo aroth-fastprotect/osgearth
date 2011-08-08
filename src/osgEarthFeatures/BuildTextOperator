@@ -40,6 +40,7 @@ namespace osgEarth { namespace Features
             const FeatureList& features, 
             const osgEarth::Symbology::TextSymbol *symbol,
             const FilterContext& context);
+
     protected:
 	    bool _hideClutter;
     };

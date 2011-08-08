@@ -63,6 +63,7 @@ CompositeTileSourceOptions::add( TileSource* source, const ImageLayerOptions& op
     Component c;
     c._tileSourceInstance = source;
     c._imageLayerOptions = options;
+    _components.push_back( c );
 }
 
 Config 
@@ -139,10 +140,6 @@ _dynamic( false )
         {
             if ( i->_imageLayerOptions->driver().isSet() )
                 i->_tileSourceOptions = i->_imageLayerOptions->driver().value();
-
-            ImageLayerPreCacheOperation* op = new ImageLayerPreCacheOperation();
-            op->_processor.init( i->_imageLayerOptions.value(), true );
-            _preCacheOp = op;
         }
 
         if ( i->_tileSourceOptions.isSet() )
@@ -223,8 +220,17 @@ CompositeTileSource::createImage( const TileKey& key, ProgressCallback* progress
                 //Only try to get data if the source actually has data
                 if ( source->hasData( key ) )
                 {
+                    osg::ref_ptr< ImageLayerPreCacheOperation > preCacheOp;
+                    if ( i->_imageLayerOptions.isSet() )
+                    {
+                        preCacheOp = new ImageLayerPreCacheOperation();
+                        preCacheOp->_processor.init( i->_imageLayerOptions.value(), true );                        
+                    }
+
+
+
                     ImageOpacityPair imagePair(
-                        source->createImage( key, _preCacheOp.get(), progress ),
+                        source->createImage( key, preCacheOp.get(), progress ),
                         1.0f );
 
                     //If the image is not valid and the progress was not cancelled, blacklist

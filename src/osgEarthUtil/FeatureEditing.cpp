@@ -189,12 +189,12 @@ public:
 
 /****************************************************************/
 FeatureEditor::FeatureEditor( Feature* feature, FeatureSource* source, MapNode* mapNode ):
+_pickColor(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)),
+_color(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)),
+_size( 5.0f ),
 _feature( feature ),
 _source( source ),
-_mapNode( mapNode ),
-_color(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)),
-_pickColor(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)),
-_size( 5.0f )
+_mapNode( mapNode )
 {
     init();
 }

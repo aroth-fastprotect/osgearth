@@ -34,18 +34,18 @@ namespace
 ObjectLocator::ObjectLocator(const osgEarth::Map* map) :
 _map                ( map ),
 _componentsToInherit( COMP_ALL ),
+_rotOrder           ( HPR ),
 _timestamp          ( 0.0 ),
-_isEmpty            ( true ),
-_rotOrder           ( HPR )
+_isEmpty            ( true )
 {
     if ( !_map.valid() )
         OE_WARN << LC << "Illegal: cannot create an ObjectLocator with a NULL Map." << std::endl;
 }
 
 ObjectLocator::ObjectLocator(ObjectLocator* parentLoc, unsigned int inheritMask ) :
+_rotOrder ( HPR ),
 _timestamp( 0.0 ),
-_isEmpty  ( false ),
-_rotOrder ( HPR )
+_isEmpty  ( false )
 {
     setParentLocator( parentLoc, inheritMask );
     _map = parentLoc->_map.get();

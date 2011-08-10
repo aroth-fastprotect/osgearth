@@ -27,10 +27,11 @@ using namespace osgEarth::Util;
 
 #define LC "[LatLongFormatter] "
 
+
 LatLongFormatter::LatLongFormatter(const AngularFormat& defaultFormat,
                                    unsigned             options ) :
-_defaultFormat( defaultFormat ),
 _options      ( options ),
+_defaultFormat( defaultFormat ),
 _prec         ( 4 )
 {
     if ( _defaultFormat == FORMAT_DEFAULT )
@@ -105,6 +106,8 @@ LatLongFormatter::format( const Angular& angle, const AngularFormat& format )
                 buf << d << " " << m << " " << sf;
         }
         break;
+    default:
+        break;
     }
 
     result = buf.str();
@@ -159,15 +162,15 @@ LatLongFormatter::parseAngle( const std::string& input, Angular& out_value )
 
 namespace
 {
-    static char*    GZD_ALPHABET     = "CDEFGHJKLMNPQRSTUVWXX";    // 2 X's because X is a 12 degree high grid zone
-    static char*    UTM_COL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-    static char*    UTM_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUV";
-    static unsigned UTM_ROW_ALPHABET_SIZE = 20;
+    static const char*    GZD_ALPHABET     = "CDEFGHJKLMNPQRSTUVWXX";    // 2 X's because X is a 12 degree high grid zone
+    static const char*    UTM_COL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    static const char*    UTM_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUV";
+    static const unsigned UTM_ROW_ALPHABET_SIZE = 20;
 
-    static char*    UPS_COL_ALPHABET = "ABCFGHJKLPQRSTUXYZ";        // omit I, O, D, E, M, N, V, W
-    static unsigned UPS_COL_ALPHABET_SIZE = 18;
-    static char*    UPS_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";  // omit I, O
-    static unsigned UPS_ROW_ALPHABET_SIZE = 24;
+    static const char*    UPS_COL_ALPHABET = "ABCFGHJKLPQRSTUXYZ";        // omit I, O, D, E, M, N, V, W
+    static const unsigned UPS_COL_ALPHABET_SIZE = 18;
+    static const char*    UPS_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";  // omit I, O
+    static const unsigned UPS_ROW_ALPHABET_SIZE = 24;
 }
 
 MGRSFormatter::MGRSFormatter(Precision               precision,
@@ -253,7 +256,6 @@ MGRSFormatter::format( double latDeg, double lonDeg ) const
 
         // figure out the UTM zone:
         zone = (unsigned)floor((lonDeg+180.0)/6.0);   // [0..59]
-        bool north = latDeg >= 0.0;
 
         // convert the input coordinates to UTM:
         // yes, always use +north so we get Y relative to equator

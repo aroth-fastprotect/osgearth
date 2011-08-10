@@ -148,8 +148,8 @@ _fid( fid )
 }
 
 Feature::Feature( Geometry* geom, const Style& style, FeatureID fid ) :
-_geom ( geom ),
-_fid  ( fid )
+_fid  ( fid ),
+_geom ( geom )
 {
     _style = style;
 }

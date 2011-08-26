@@ -113,7 +113,7 @@ FeatureID FeatureSourceMultiNode::getFID(osg::Drawable * drawable, int primitive
 		osg::Geometry * geometry = drawable->asGeometry();
 		const osg::Geometry::PrimitiveSetList & primSets = geometry->getPrimitiveSetList();
 		unsigned encounteredPrimities = 0;
-		ret = -1;
+		ret = (FeatureID)-1;
 		for(osg::Geometry::PrimitiveSetList::const_iterator it = primSets.begin(); it != primSets.end(); it++)
 		{
 			osg::PrimitiveSet * primitiveSet = (*it).get();
@@ -121,12 +121,12 @@ FeatureID FeatureSourceMultiNode::getFID(osg::Drawable * drawable, int primitive
 			if(encounteredPrimities >= (unsigned)primitiveIndex)
 			{
 				PrimitiveSetFeatureIDMap::const_iterator it = _primitiveSets.find(primitiveSet);
-				ret = (it != _primitiveSets.end())?it->second:-1;
+				ret = (it != _primitiveSets.end())?it->second:(FeatureID)-1;
 				break;
 			}
 		}
 	}
 	else
-		ret = -1;
+		ret = (FeatureID)-1;
 	return ret;
 }

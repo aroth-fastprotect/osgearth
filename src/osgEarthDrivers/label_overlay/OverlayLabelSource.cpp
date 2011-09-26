@@ -96,6 +96,19 @@ public:
                     label->setFontSize( *text->size() );
                 if ( text->font().isSet() )
                     label->setFont( osgText::readFontFile(*text->font()) );
+				if ( text->encoding().isSet() )
+				{
+					osgText::String::Encoding enc;
+					switch(text->encoding().value())
+					{
+					case TextSymbol::ENCODING_ASCII: enc = osgText::String::ENCODING_ASCII; break;
+					case TextSymbol::ENCODING_UTF8: enc = osgText::String::ENCODING_UTF8; break;
+					case TextSymbol::ENCODING_UTF16: enc = osgText::String::ENCODING_UTF16; break;
+					case TextSymbol::ENCODING_UTF32: enc = osgText::String::ENCODING_UTF32; break;
+					default: enc = osgText::String::ENCODING_UNDEFINED; break;
+					}
+					label->setEncoding( enc );
+				}
 
                 Controls::ControlNode* node = new Controls::ControlNode( label, priority );
 

@@ -36,6 +36,7 @@ extern const char* builtinMimeTypeExtMappings[];
 
 Registry::Registry() :
 osg::Referenced(true),
+_gdal_mutex(new OpenThreads::ReentrantMutex),
 _gdal_registered( false ),
 _numGdalMutexGets( 0 ),
 _uidGen( 0 ),
@@ -59,8 +60,7 @@ _caps( 0L )
 
 Registry::~Registry()
 {
-	OGRCleanupAll();
-	GDALDestroyDriverManager();
+	delete _gdal_mutex;
 }
 
 Registry* Registry::instance(bool erase)
@@ -69,8 +69,12 @@ Registry* Registry::instance(bool erase)
 
     if (erase) 
     {   
+		Registry * old = s_registry.get();
         s_registry->destruct();
         s_registry = 0;
+
+        OGRCleanupAll();
+        GDALDestroyDriverManager();
     }
 
     return s_registry.get(); // will return NULL on erase
@@ -78,6 +82,10 @@ Registry* Registry::instance(bool erase)
 
 void Registry::destruct()
 {
+	_global_geodetic_profile = 0;
+	_global_mercator_profile = 0;
+	_cube_profile = 0;
+
     _cacheOverride = 0;
 }
 
@@ -87,7 +95,7 @@ Registry::getGDALMutex()
 {
     //_numGdalMutexGets++;
     //OE_NOTICE << "GDAL = " << _numGdalMutexGets << std::endl;
-    return _gdal_mutex;
+    return *_gdal_mutex;
 }
 
 

@@ -130,7 +130,7 @@ namespace osgEarth
 
         void destruct();
 
-        OpenThreads::ReentrantMutex _gdal_mutex;
+        OpenThreads::ReentrantMutex * _gdal_mutex;
         bool _gdal_registered;
 
         osg::ref_ptr<const Profile> _global_geodetic_profile;

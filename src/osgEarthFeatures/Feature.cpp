@@ -151,7 +151,8 @@ Feature::Feature( Geometry* geom, const Style& style, FeatureID fid ) :
 _fid  ( fid ),
 _geom ( geom )
 {
-    _style = style;
+    if ( !style.empty() )
+    	_style = style;
 }
 
 Feature::Feature( const Feature& rhs, const osg::CopyOp& copyOp ) :

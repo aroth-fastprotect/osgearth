@@ -1305,7 +1305,7 @@ VBox::calcSize(const ControlContext& cx, osg::Vec2f& out_size)
 void
 VBox::calcFill(const ControlContext& cx)
 {
-    Container::calcFill( cx );
+    //Container::calcFill( cx );
 
     float used_x = padding().x();
     float used_y = padding().y() - childSpacing();
@@ -1316,8 +1316,6 @@ VBox::calcFill(const ControlContext& cx)
     for( ControlList::const_iterator i = _controls.begin(); i != _controls.end() && (!hc || !vc); ++i )
     {
         Control* child = i->get();
-
-        //child->calcFill(cx);
 
         used_y += child->margin().y() + childSpacing();
         if ( !hc && child->horizFill() )
@@ -1338,7 +1336,7 @@ VBox::calcFill(const ControlContext& cx)
     if ( vc && renderHeight(vc) < (_renderSize.y() - used_y) )
         renderHeight(vc) = _renderSize.y() - used_y;
    
-    //Container::calcFill( cx );
+    Container::calcFill( cx );
 }
 
 void
@@ -1434,7 +1432,7 @@ HBox::calcSize(const ControlContext& cx, osg::Vec2f& out_size)
 void
 HBox::calcFill(const ControlContext& cx)
 {
-    Container::calcFill( cx );
+    //Container::calcFill( cx );
 
     float used_x = padding().x() - childSpacing();
     float used_y = padding().y();
@@ -1467,7 +1465,7 @@ HBox::calcFill(const ControlContext& cx)
     if ( vc && renderHeight(vc) < (_renderSize.y() - used_y) )
         renderHeight(vc) = _renderSize.y() - used_y;
    
-    //Container::calcFill( cx );
+    Container::calcFill( cx );
 }
 
 void
@@ -1704,9 +1702,12 @@ Grid::calcPos( const ControlContext& cx, const osg::Vec2f& cursor, const osg::Ve
 void
 Grid::draw( const ControlContext& cx, DrawableList& out )
 {
-    Container::draw( cx, out );
-    for( ControlList::const_iterator i = _children.begin(); i != _children.end(); ++i )
-        i->get()->draw( cx, out );
+    if (visible() == true)
+    {
+        Container::draw( cx, out );
+        for( ControlList::const_iterator i = _children.begin(); i != _children.end(); ++i )
+            i->get()->draw( cx, out );
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -1832,6 +1833,7 @@ ControlNode::traverse( osg::NodeVisitor& nv )
     if ( nv.getVisitorType() == osg::NodeVisitor::CULL_VISITOR )
     {
         static osg::Vec3d s_zero(0,0,0);
+        static osg::Vec4d s_zero_w(0,0,0,1);
         osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>( &nv );
 
         //setCullingActive( true );
@@ -1855,9 +1857,17 @@ ControlNode::traverse( osg::NodeVisitor& nv )
         if ( data._canvas.valid() )
         {
             // calculate its screen position:
-            data._screenPos = s_zero * (*cv->getMVPW());
+            //data._screenPos = s_zero * (*cv->getMVPW());
 
-            if ( data._obscured == true )
+            osg::Vec4d clip = s_zero_w * (*cv->getModelViewMatrix()) * (*cv->getProjectionMatrix());
+            osg::Vec3d clip_ndc( clip.x()/clip.w(), clip.y()/clip.w(), clip.z()/clip.w() );
+            data._screenPos = clip_ndc * cv->getWindowMatrix();
+
+            if ( clip_ndc.z() > 1.0 ) // node is behind the near clip plane
+            {
+                data._obscured = true;
+            }
+            else if ( data._obscured == true )
             {
                 data._obscured = false;
                 data._visibleTime = cv->getFrameStamp()->getReferenceTime();

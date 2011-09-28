@@ -224,10 +224,14 @@ OSGTerrainEngineNode::postInitialize( const Map* map, const TerrainOptions& opti
 osg::BoundingSphere
 OSGTerrainEngineNode::computeBound() const
 {
-    if ( _terrain )
+    if ( _terrain && _terrain->getNumChildren() > 0 )
+    {
         return _terrain->getBound();
+    }
     else
+    {
         return TerrainEngineNode::computeBound();
+    }
 }
 
 void
@@ -356,7 +360,9 @@ OSGTerrainEngineNode::createNode( const TileKey& key )
     if ( getNumParents() == 0 )
         return 0L;
 
+#ifdef PROFILING
     osg::Timer_t start = _timer.tick();
+#endif
 
     osg::Node* result = 0L;
 
@@ -372,6 +378,8 @@ OSGTerrainEngineNode::createNode( const TileKey& key )
         result = _keyNodeFactory->createNode( key );
     }
 
+#ifdef PROFILING
+    osg::Timer_t end = osg::Timer::instance()->tick();
     if ( result )
     {
         _tileCount++;
@@ -382,6 +390,7 @@ OSGTerrainEngineNode::createNode( const TileKey& key )
                 << " ms, tiles per sec = " << (double)_tileCount/_timer.time_s() << std::endl;
         }
     }
+#endif
 
     return result;
 }

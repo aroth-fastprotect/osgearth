@@ -316,6 +316,9 @@ TerrainLayer::initTileSource()
         }
     }
 
+	if(opt.cacheOnly().isSet())
+		_actualCacheOnly = opt.cacheOnly().value();
+
     // next check for an override-profile. The profile usually comes from the
     // TileSource itself, but you have the option of overriding:
 	osg::ref_ptr<const Profile> overrideProfile;

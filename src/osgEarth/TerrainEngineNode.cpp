@@ -20,6 +20,7 @@
 #include <osgEarth/Capabilities>
 #include <osgEarth/Registry>
 #include <osgEarth/FindNode>
+#include <osgEarth/TextureCompositor>
 #include <osgDB/ReadFile>
 #include <osg/CullFace>
 #include <osg/PolygonOffset>
@@ -104,13 +105,6 @@ TerrainEngineNode::ImageLayerController::onOpacityChanged( ImageLayer* layer )
         _layerOpacityUniform.setElement( layerNum, layer->getOpacity() );
     else
         OE_WARN << LC << "Odd, onOpacityChanged did not find layer" << std::endl;
-}
-
-// this handler adjusts the uniform set when an image layer's "gamma" value changes
-void
-TerrainEngineNode::ImageLayerController::onGammaChanged( ImageLayer* layer )
-{
-    //TODO
 }
 
 //------------------------------------------------------------------------

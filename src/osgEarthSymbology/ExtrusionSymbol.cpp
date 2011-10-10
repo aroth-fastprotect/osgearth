@@ -40,6 +40,8 @@ ExtrusionSymbol::getConfig() const
     conf.addObjIfSet( "height_expression", _heightExpr );
     conf.addIfSet( "height_reference", "z",   _heightRef, HEIGHT_REFERENCE_Z );
     conf.addIfSet( "height_reference", "msl", _heightRef, HEIGHT_REFERENCE_MSL );
+    conf.addIfSet   ( "wall_style", _wallStyleName );
+    conf.addIfSet   ( "roof_style", _roofStyleName );
     return conf;
 }
 
@@ -51,4 +53,6 @@ ExtrusionSymbol::mergeConfig( const Config& conf )
     conf.getObjIfSet( "height_expression", _heightExpr );
     conf.getIfSet   ( "height_reference", "z",   _heightRef, HEIGHT_REFERENCE_Z );
     conf.getIfSet   ( "height_reference", "msl", _heightRef, HEIGHT_REFERENCE_MSL );
+    conf.getIfSet   ( "wall_style", _wallStyleName );
+    conf.getIfSet   ( "roof_style", _roofStyleName );
 }

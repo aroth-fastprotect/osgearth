@@ -243,18 +243,17 @@ Map::getProfile() const
 Cache*
 Map::getCache() const
 {
-    if ( !_cache.valid() && _mapOptions.cache().isSet() )
+    if ( !_cache.valid() )
     {
         Cache* cache = 0L;
 
         // if there's a cache override in the registry, install it now.
 	    if ( osgEarth::Registry::instance()->getCacheOverride() )
 	    {
-		    OE_INFO << LC << "Overriding map cache with global cache override" << std::endl;
 		    cache = osgEarth::Registry::instance()->getCacheOverride();
 	    }
 
-        if ( !cache )
+        else if ( _mapOptions.cache().isSet() )
         {
             cache = CacheFactory::create( _mapOptions.cache().get() );
         }
@@ -918,9 +917,7 @@ namespace
         unsigned int numValidHeightFields = 0;
 
         if ( out_isFallback )
-        {
             *out_isFallback = false;
-        }
         
         //First pass:  Try to get the exact LOD requested for each enabled heightfield
         for( ElevationLayerVector::const_iterator i = elevLayers.begin(); i != elevLayers.end(); i++ )
@@ -929,8 +926,12 @@ namespace
             if (layer->getProfile() && layer->getEnabled() )
             {
                 osg::HeightField* hf = layer->createHeightField( key, progress );
-                layerValidMap[ layer ] = (hf != 0L);
-                if ( hf )                {
+                //osg::ref_ptr< osg::HeightField > hf;
+                //layer->getHeightField( key, hf, progress );
+                layerValidMap[ layer ] = (hf != 0L); //hf.valid();
+                if ( hf )
+                //if (hf.valid())
+                {
                     numValidHeightFields++;
                     GeoHeightField ghf( hf, key.getExtent(), layer->getProfile()->getVerticalSRS() );
                     heightFields.push_back( ghf );
@@ -949,6 +950,9 @@ namespace
 		//      so it should be safe to remove them too. If something does not work
 		//      e.g. heightfields for calc, you might add these lines again.
         if ( out_isFallback && numValidHeightFields == 0)
+            *out_isFallback = true;
+#else // AMA_HEIGHTFIELD_ONLY_FIX
+        if ( out_isFallback )
             *out_isFallback = true;
 #endif // AMA_HEIGHTFIELD_ONLY_FIX
         //Second pass:  We were either asked to fallback or we might have some heightfields at the requested
@@ -979,10 +983,6 @@ namespace
 
                         heightFields.push_back( GeoHeightField(
                             hf.get(), hf_key.getExtent(), layer->getProfile()->getVerticalSRS() ) );
-
-                        if ( out_isFallback )
-                            *out_isFallback = true;
-
                     }
                 }
             }
@@ -1283,7 +1283,6 @@ MapInfo::worldPointToMapPoint( const osg::Vec3d& input, osg::Vec3d& output ) con
 }
 
 //------------------------------------------------------------------------
-
 MapFrame::MapFrame( const Map* map, Map::ModelParts parts, const std::string& name ) :
 _initialized( false ),
 _map( map ),

@@ -21,6 +21,7 @@
 #define OSGEARTHSYMBOLOGY_ALTITUDE_SYMBOL_H 1
 
 #include <osgEarthSymbology/Symbol>
+#include <osgEarthSymbology/Expression>
 
 namespace osgEarth { namespace Symbology
 {
@@ -42,6 +43,11 @@ namespace osgEarth { namespace Symbology
                 ignoring and discarding the feature's original Z value. */
             CLAMP_TO_TERRAIN,
 
+            /** The feature has a attribute value that describes its height above "height zero",
+                which is typically the ellipsoid or MSL. While this will not actually modify the
+                feature's geometry, it will install ... */
+            CLAMP_ABSOLUTE,
+
             /** Sample the terrain under the point, and ADD the terrain height to the feature's 
                 pre-existing Z value. */
             CLAMP_RELATIVE_TO_TERRAIN
@@ -59,12 +65,12 @@ namespace osgEarth { namespace Symbology
         const optional<float>& clampingResolution() const { return _clampingResolution; }
 
         /** Vertical offset of geometry after clamping */
-        optional<float>& verticalOffset() { return _verticalOffset; }
-        const optional<float>& verticalOffset() const { return _verticalOffset; }
+        optional<NumericExpression>& verticalOffset() { return _verticalOffset; }
+        const optional<NumericExpression>& verticalOffset() const { return _verticalOffset; }
 
         /** Vertical scale factor to apply to geometry's Z after clamping. */
-        optional<float>& verticalScale() { return _verticalScale; }
-        const optional<float>& verticalScale() const { return _verticalScale; }
+        optional<NumericExpression>& verticalScale() { return _verticalScale; }
+        const optional<NumericExpression>& verticalScale() const { return _verticalScale; }
 
     public:
         virtual Config getConfig() const;
@@ -73,8 +79,8 @@ namespace osgEarth { namespace Symbology
     protected:
         optional<Clamping> _clamping;
         optional<float>    _clampingResolution;
-        optional<float>    _verticalOffset;
-        optional<float>    _verticalScale;
+        optional<NumericExpression>  _verticalOffset;
+        optional<NumericExpression>  _verticalScale;
     };
 
 } } // namespace osgEarth::Symbology

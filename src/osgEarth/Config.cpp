@@ -29,6 +29,18 @@ Config& emptyConfig()
     return _emptyConfig;
 }
 
+void
+Config::setURIContext( const URIContext& context )
+{
+    _uriContext = context;
+    for( ConfigSet::iterator i = _children.begin(); i != _children.end(); i++ )
+    { 
+        i->setURIContext( context.add(i->_uriContext) );
+        //URI newURI( i->uriContext(), context );
+        //i->setURIContext( *newURI );
+    }
+}
+
 bool
 Config::loadXML( std::istream& in )
 {

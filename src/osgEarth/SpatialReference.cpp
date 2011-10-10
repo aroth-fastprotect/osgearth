@@ -121,6 +121,7 @@ SpatialReference::createCube()
     return result;
 }
 
+#if 0
 SpatialReference*
 SpatialReference::createLTP( const osg::Vec3d& refPointLLA, const SpatialReference* geoSRS )
 {
@@ -157,6 +158,7 @@ SpatialReference::createLTP( const osg::Vec3d& refPointLLA, const SpatialReferen
 
     return result;
 }
+#endif
 
 SpatialReference*
 SpatialReference::createFromWKT( const std::string& init, const std::string& init_alias, const std::string& name )
@@ -232,23 +234,6 @@ SpatialReference::create( const std::string& init )
     else if ( low == "unified-cube" )
     {
         srs = createCube();
-    }
-
-    // custom srs for an LTP:
-    else if ( low.find( "ltp-enu:" ) == 0 )
-    {
-        StringVector tokens;
-        StringTokenizer(low, tokens, ":", "");
-        if ( tokens.size() == 3 )
-        {
-            StringVector rt;
-            StringTokenizer(tokens[1], rt);
-            if ( rt.size() == 3 )
-            {
-                osg::Vec3d refPt( as<double>(rt[0],0.0), as<double>(rt[1],0.0), as<double>(rt[2],0.0) );
-                srs = createLTP( refPt );
-            }
-        }
     }
 
     else if ( low.find( "+" ) == 0 )
@@ -525,6 +510,50 @@ SpatialReference::getGeographicSRS() const
     }
 
     return _geo_srs.get();
+}
+
+SpatialReference*
+SpatialReference::createTangentPlaneSRS( const osg::Vec3d& pos ) const
+{
+    SpatialReference* result = 0L;
+    osg::Vec3d lla;
+    if ( this->transform(pos, this->getGeographicSRS(), lla) )
+    {
+        result = new LTPSpatialReference( this->getGeographicSRS()->_handle, lla );
+    }
+    else
+    {
+        OE_WARN << LC << "Unable to create LTP SRS" << std::endl;
+    }
+    return result;
+}
+
+SpatialReference*
+SpatialReference::createTransMercFromLongitude( const Angular& lon ) const
+{
+    // note. using tmerc with +lat_0 <> 0 is sloooooow.
+    std::string datum = getDatumName();
+    std::stringstream buf;
+    buf << "+proj=tmerc +lat_0=0"
+        << " +lon_0=" << lon.as(Units::DEGREES)
+        << " +datum=" << (!datum.empty() ? "wgs84" : datum);
+    std::string projstr;
+    projstr = buf.str();
+    return create( projstr );
+}
+
+SpatialReference*
+SpatialReference::createUTMFromLongitude( const Angular& lon ) const
+{
+    // note. UTM is up to 10% faster than TMERC for the same meridian.
+    unsigned zone = 1 + (unsigned)floor((lon.as(Units::DEGREES)+180.0)/6.0);
+    std::string datum = getDatumName();
+    std::stringstream buf;
+    buf << "+proj=utm +zone=" << zone
+        << " +datum=" << (!datum.empty() ? "wgs84" : datum);
+    std::string projstr;
+    projstr = buf.str();
+    return create( projstr );
 }
 
 bool

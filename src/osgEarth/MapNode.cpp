@@ -125,7 +125,7 @@ public:
 MapNode*
 MapNode::load(osg::ArgumentParser& args)
 {
-    for( int i=1; i<args.argc(); ++i )
+    for( unsigned i=1; i<args.argc(); ++i )
     {
         if ( args[i] && endsWith(args[i], ".earth") )
         {
@@ -260,6 +260,10 @@ MapNode::init()
     _overlayDecorator = new OverlayDecorator();
     if ( _mapNodeOptions.overlayVertexWarping().isSet() )
         _overlayDecorator->setVertexWarping( *_mapNodeOptions.overlayVertexWarping() );
+    if ( _mapNodeOptions.overlayBlending().isSet() )
+        _overlayDecorator->setOverlayBlending( *_mapNodeOptions.overlayBlending() );
+    if ( _mapNodeOptions.overlayTextureSize().isSet() )
+        _overlayDecorator->setTextureSize( *_mapNodeOptions.overlayTextureSize() );
     addTerrainDecorator( _overlayDecorator.get() );
 
     // install any pre-existing model layers:

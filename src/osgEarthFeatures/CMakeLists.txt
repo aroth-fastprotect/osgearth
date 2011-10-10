@@ -11,17 +11,16 @@ ENDIF(GEOS_FOUND)
 SET(LIB_NAME osgEarthFeatures)
 
 SET(TARGET_PUBLIC_H
+	AltitudeFilter
     BufferFilter
     BuildGeometryFilter  
     BuildTextFilter
     BuildTextOperator
     Common
-    ClampFilter
     ConvertTypeFilter
     CropFilter
     ExtrudeGeometryFilter
     Feature
-    FeatureNode
     FeatureCursor
     FeatureDisplayLayout
     FeatureGeometryIndex
@@ -51,16 +50,15 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
+	AltitudeFilter.cpp
     BufferFilter.cpp
     BuildGeometryFilter.cpp 
     BuildTextFilter.cpp
     BuildTextOperator.cpp
-    ClampFilter.cpp
     ConvertTypeFilter.cpp
     CropFilter.cpp
     ExtrudeGeometryFilter.cpp
     Feature.cpp
-    FeatureNode.cpp
     FeatureCursor.cpp
     FeatureDisplayLayout.cpp
     FeatureGeometryIndex.cpp

@@ -50,7 +50,12 @@ FeatureNode::init()
         //of the geometry when performing localization or converting to geocentric.
         osg::ref_ptr< Feature > clone = new osgEarth::Features::Feature(*_feature.get(), osg::CopyOp::DEEP_COPY_ALL);        
 
-        osg::Node* node = compiler.compile( clone.get(), *clone->style(), context );
+        osg::Node* node;
+        if ( _style.isSet() )
+            node = compiler.compile( clone.get(), *_style, context );
+        else
+            node = compiler.compile( clone.get(), *clone->style(), context );
+
         setNode( node );
     }
 }
@@ -59,5 +64,12 @@ void
 FeatureNode::setFeature( Feature* feature )
 {
     _feature = feature;
+    init();
+}
+
+void
+FeatureNode::setStyle( const Style& style )
+{
+    _style = style;
     init();
 }

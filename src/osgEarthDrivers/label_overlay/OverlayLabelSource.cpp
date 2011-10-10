@@ -20,6 +20,7 @@
 #include <osgEarthSymbology/Expression>
 #include <osgEarthUtil/Controls>
 #include <osgEarth/Utils>
+#include <osgEarth/ECEF>
 #include <osg/ClusterCullingCallback>
 #include <osg/MatrixTransform>
 #include <osgDB/FileNameUtils>
@@ -52,6 +53,7 @@ public:
         NumericExpression priorityExpr( *text->priority() );
 
         const MapInfo& mi = context.getSession()->getMapInfo();
+        bool makeECEF = mi.isGeocentric();
 
         for( FeatureList::const_iterator i = input.begin(); i != input.end(); ++i )
         {
@@ -64,8 +66,14 @@ public:
                 continue;
 
             osg::Vec3d centroid      = geom->getBounds().center();
-            osg::Vec3d centroidWorld = context.toWorld(centroid);
+            //osg::Vec3d centroidWorld = context.toWorld(centroid);
 
+            if ( makeECEF )
+            {
+                context.profile()->getSRS()->transformToECEF( centroid, centroid );
+            }
+
+#if 0
             if ( context.isGeocentric() && geom->getComponentType() != Geometry::TYPE_POINTSET )
             {
                 // "clamp" the centroid to the ellipsoid
@@ -75,6 +83,7 @@ public:
                 mi.mapPointToWorldPoint(centroidMap, centroidWorld);
                 centroid = context.toLocal(centroidWorld);
             }
+#endif
 
             const std::string& value = feature->eval( contentExpr );
 
@@ -96,19 +105,6 @@ public:
                     label->setFontSize( *text->size() );
                 if ( text->font().isSet() )
                     label->setFont( osgText::readFontFile(*text->font()) );
-				if ( text->encoding().isSet() )
-				{
-					osgText::String::Encoding enc;
-					switch(text->encoding().value())
-					{
-					case TextSymbol::ENCODING_ASCII: enc = osgText::String::ENCODING_ASCII; break;
-					case TextSymbol::ENCODING_UTF8: enc = osgText::String::ENCODING_UTF8; break;
-					case TextSymbol::ENCODING_UTF16: enc = osgText::String::ENCODING_UTF16; break;
-					case TextSymbol::ENCODING_UTF32: enc = osgText::String::ENCODING_UTF32; break;
-					default: enc = osgText::String::ENCODING_UNDEFINED; break;
-					}
-					label->setEncoding( enc );
-				}
 
                 Controls::ControlNode* node = new Controls::ControlNode( label, priority );
 
@@ -116,10 +112,9 @@ public:
                 xform->addChild( node );
 
                 // for a geocentric map, do a simple dot product cull.
-                if ( context.isGeocentric() )
+                if ( makeECEF )
                 {
-                    osg::Vec3d labelNormal = context.toWorld(centroid);
-                    xform->setCullCallback( new CullNodeByHorizon(centroidWorld, mi.getProfile()->getSRS()->getEllipsoid()) );
+                    xform->setCullCallback( new CullNodeByHorizon(centroid, mi.getProfile()->getSRS()->getEllipsoid()) );
                     group->addChild( xform );
                 }
                 else

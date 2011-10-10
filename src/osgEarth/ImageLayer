@@ -55,12 +55,6 @@ namespace osgEarth
         const optional<float>& opacity() const { return _opacity; }
 
         /**
-         * The initial gamma value for this layer's images
-         */
-        optional<double>& gamma() { return _gamma; }
-        const optional<double>& gamma() const { return _gamma; }
-
-        /**
          * The initial minimum camera range at which this layer is visible.
          */
         optional<float>& minVisibleRange() { return _minRange; }
@@ -111,7 +105,6 @@ namespace osgEarth
         void setDefaults();
 
 		optional<float>  _opacity;
-        optional<double> _gamma;
         optional<float>  _minRange;
         optional<float>  _maxRange;
 		optional<osg::Vec4ub> _transparentColor;
@@ -129,7 +122,6 @@ namespace osgEarth
     struct ImageLayerCallback : public TerrainLayerCallback
     {
         virtual void onOpacityChanged( class ImageLayer* layer ) { }
-        virtual void onGammaChanged( class ImageLayer* layer ) { }
     };
 
     typedef void (ImageLayerCallback::*ImageLayerCallbackMethodPtr)(ImageLayer* layer);
@@ -185,8 +177,8 @@ namespace osgEarth
         /**
          * Access to the initialization options used to create this image layer
          */
-        const ImageLayerOptions& getImageLayerOptions() const { return _options; }
-        virtual const TerrainLayerOptions& getTerrainLayerOptions() const { return _options; }
+        const ImageLayerOptions& getImageLayerOptions() const { return _runtimeOptions; }
+        virtual const TerrainLayerOptions& getTerrainLayerOptions() const { return _runtimeOptions; }
 
         /** Adds a property notification callback to this layer */
         void addCallback( ImageLayerCallback* cb );
@@ -200,13 +192,10 @@ namespace osgEarth
     public: // runtime properties
 
         void setOpacity( float opacity );
-        float getOpacity() const { return _actualOpacity; }
-
-        void setGamma( float gamma );
-        float getGamma() const { return _actualGamma; }
+        float getOpacity() const { return *_runtimeOptions.opacity(); }
 
         void disableLODBlending();
-        bool isLODBlendingEnabled() const { return _actualLODBlending; }
+        bool isLODBlendingEnabled() const { return *_runtimeOptions.lodBlending(); }
 
     public: // methods
 
@@ -224,10 +213,11 @@ namespace osgEarth
 
         virtual void initTileSource();
     private:
-        ImageLayerOptions _options;
-        float _actualOpacity;
-        float _actualGamma;
-        bool  _actualLODBlending;
+        //const ImageLayerOptions _options;
+        ImageLayerOptions       _runtimeOptions;
+
+        //float _actualOpacity;        
+        //bool  _actualLODBlending;
 
         osg::ref_ptr<TileSource::ImageOperation> _preCacheOp;
         

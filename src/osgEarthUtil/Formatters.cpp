@@ -27,12 +27,11 @@ using namespace osgEarth::Util;
 
 #define LC "[LatLongFormatter] "
 
-
 LatLongFormatter::LatLongFormatter(const AngularFormat& defaultFormat,
                                    unsigned             options ) :
 _options      ( options ),
 _defaultFormat( defaultFormat ),
-_prec         ( 4 )
+_prec         ( 5 )
 {
     if ( _defaultFormat == FORMAT_DEFAULT )
     {
@@ -41,7 +40,7 @@ _prec         ( 4 )
 }
 
 std::string
-LatLongFormatter::format( const Angular& angle, const AngularFormat& format )
+LatLongFormatter::format( const Angular& angle, int precision, const AngularFormat& format )
 {
     std::stringstream buf;
     std::string result;
@@ -51,15 +50,18 @@ LatLongFormatter::format( const Angular& angle, const AngularFormat& format )
         format == FORMAT_DEFAULT ? _defaultFormat :
         format;
 
-    if ( _prec > 0 )
-        buf << std::setprecision(_prec);
+    if ( precision < 0 )
+        precision = _prec;
+
+    if ( precision > 0 )
+        buf << std::setprecision(precision);
 
     switch( f )
     {
     case FORMAT_DECIMAL_DEGREES:
         {
             if ( _options & USE_SYMBOLS )
-                buf << angle.as(Units::DEGREES) << "°";
+                buf << angle.as(Units::DEGREES) << "\xb0";
             else
                 buf << angle.as(Units::DEGREES);
         }
@@ -182,18 +184,28 @@ _options  ( options )
     if ( referenceSRS )
     {
         _refSRS = referenceSRS->getGeographicSRS();
-        
-        // use the "AL" lettering scheme for these older datum ellipsoids.
-        std::string eName = _refSRS->getEllipsoid()->getName();
-        _useAL = 
-            eName.find("bessel") == std::string::npos ||
-            eName.find("clark")  == std::string::npos ||
-            eName.find("clrk")   == std::string::npos;
     }
     else
     {
         _refSRS = SpatialReference::create( "wgs84" );
+    }
+
+    if ( options & FORCE_AA_SCHEME )
+    {
         _useAL = false;
+    }
+    else if ( options & FORCE_AL_SCHEME )
+    {
+        _useAL = true;
+    }
+    else
+    {
+        // use the "AL" lettering scheme for these older datum ellipsoids.
+        std::string eName = _refSRS->getEllipsoid()->getName();
+        _useAL = 
+            eName.find("bessel") != std::string::npos ||
+            eName.find("clark")  != std::string::npos ||
+            eName.find("clrk")   != std::string::npos;
     }
 }
 
@@ -256,6 +268,7 @@ MGRSFormatter::format( double latDeg, double lonDeg ) const
 
         // figure out the UTM zone:
         zone = (unsigned)floor((lonDeg+180.0)/6.0);   // [0..59]
+        bool north = latDeg >= 0.0;
 
         // convert the input coordinates to UTM:
         // yes, always use +north so we get Y relative to equator

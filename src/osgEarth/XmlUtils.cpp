@@ -19,6 +19,7 @@
 
 #include <osgEarth/XmlUtils>
 #include <osgEarth/StringUtils>
+#include <osgEarth/HTTPClient>
 #include <osg/Notify>
 #include "tinyxml.h"
 #include <algorithm>
@@ -226,7 +227,7 @@ XmlElement::getConfig() const
     {
         XmlNode* n = c->get();
         if ( n->isElement() )
-            conf.children().push_back( static_cast<const XmlElement*>(n)->getConfig() );
+            conf.add( static_cast<const XmlElement*>(n)->getConfig() );
     }
 
     conf.value() = getText();
@@ -247,11 +248,19 @@ XmlText::getValue() const
 }
 
 
+#if 0
 XmlDocument::XmlDocument( const std::string& _source_uri ) :
 XmlElement( "Document" ),
 source_uri( _source_uri )
 {
     //NOP
+}
+#endif
+
+XmlDocument::XmlDocument() :
+XmlElement( "Document" )
+{
+    //nop
 }
 
 XmlDocument::XmlDocument( const Config& conf ) :
@@ -265,21 +274,22 @@ XmlDocument::~XmlDocument()
     //NOP
 }
 
-
-LIKELY_UNUSED_FUNCTION static XmlAttributes
-getAttributes( const char** attrs )
+namespace
 {
-    XmlAttributes map;
-    const char** ptr = attrs;
-    while( *ptr != NULL )
+    XmlAttributes
+    getAttributes( const char** attrs )
     {
-        std::string name = *ptr++;
-        std::string value = *ptr++;
-        std::transform( name.begin(), name.end(), name.begin(), tolower );
-        map[name] = value;
+        XmlAttributes map;
+        const char** ptr = attrs;
+        while( *ptr != NULL )
+        {
+            std::string name = *ptr++;
+            std::string value = *ptr++;
+            std::transform( name.begin(), name.end(), name.begin(), tolower );
+            map[name] = value;
+        }
+        return map;
     }
-    return map;
-}
 
 void processNode(XmlElement* parent, TiXmlNode* node)
 {
@@ -360,11 +370,36 @@ removeDocType(std::string &xmlStr)
     //Now, replace the <!DOCTYPE> element with whitespace
     xmlStr.erase(startIndex, endIndex - startIndex + 1);
 }
-
+}
 
 
 XmlDocument*
-XmlDocument::load( std::istream& in )
+XmlDocument::load( const std::string& location )
+{
+    return load( URI(location) );
+}
+
+XmlDocument*
+XmlDocument::load( const URI& uri )
+{
+    std::string buffer;
+    if ( HTTPClient::readString( uri.full(), buffer ) != HTTPClient::RESULT_OK )
+    {
+        return 0L;
+    }
+
+    std::stringstream buf(buffer);
+    XmlDocument* result = load(buf);
+
+    if ( result )
+        result->_sourceURI = uri;
+
+    return result;
+}
+
+
+XmlDocument*
+XmlDocument::load( std::istream& in, const URIContext& uriContext )
 {
     TiXmlDocument xmlDoc;
 
@@ -385,14 +420,25 @@ XmlDocument::load( std::istream& in )
         buf << xmlDoc.ErrorDesc() << " (row " << xmlDoc.ErrorRow() << ", col " << xmlDoc.ErrorCol() << ")";
         std::string str = buf.str();
         OE_WARN << "Error in XML document: " << str << std::endl;
+        if ( !uriContext.referrer().empty() )
+            OE_WARN << uriContext.referrer() << std::endl;
     }
 
     if ( !xmlDoc.Error() && xmlDoc.RootElement() )
     {
         doc = new XmlDocument();
         processNode( doc,  xmlDoc.RootElement() );
+        doc->_sourceURI = URI("", uriContext);
     }
     return doc;    
+}
+
+Config
+XmlDocument::getConfig() const
+{
+    Config conf = XmlElement::getConfig();
+    conf.setURIContext( _sourceURI.full() );
+    return conf;
 }
 
 #define INDENT 4

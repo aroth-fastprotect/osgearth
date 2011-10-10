@@ -29,17 +29,18 @@ _profile( profile ),
 _isGeocentric( false ),
 _extent( workingExtent, workingExtent )
 {
-    //NOP
+    _resourceCache = new ResourceCache();
 }
 
 FilterContext::FilterContext( const FilterContext& rhs ) :
-_session( rhs._session.get() ),
-_profile( rhs._profile.get() ),
-_isGeocentric( rhs._isGeocentric ),
-_extent( rhs._extent ),
-_referenceFrame( rhs._referenceFrame ),
+_session              ( rhs._session.get() ),
+_profile              ( rhs._profile.get() ),
+_isGeocentric         ( rhs._isGeocentric ),
+_extent               ( rhs._extent ),
+_referenceFrame       ( rhs._referenceFrame ),
 _inverseReferenceFrame( rhs._inverseReferenceFrame ),
-_optimizerHints( rhs._optimizerHints )
+_optimizerHints       ( rhs._optimizerHints ),
+_resourceCache        ( rhs._resourceCache )
 {
     //nop
 }
@@ -72,6 +73,24 @@ FilterContext::toWorld( Geometry* geom ) const
                 *i = *i * _inverseReferenceFrame;
         }
     }
+}
+
+osg::Vec3d
+FilterContext::toMap( const osg::Vec3d& point ) const
+{
+    osg::Vec3d world = toWorld(point);
+    if ( _isGeocentric )
+        _extent->getSRS()->transformFromECEF( world, world );
+    return world;
+}
+
+osg::Vec3d
+FilterContext::fromMap( const osg::Vec3d& point ) const
+{
+    osg::Vec3d world;
+    if ( _isGeocentric )
+        _extent->getSRS()->transformToECEF( point, world );
+    return toLocal(world);
 }
 
 std::string

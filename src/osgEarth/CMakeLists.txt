@@ -26,6 +26,7 @@ SET(TARGET_PUBLIC_H
 	Config
 	Cube
     DrapeableNode
+    ECEF
 	ElevationLayer
     ElevationQuery
 	Export
@@ -81,6 +82,7 @@ SET(TARGET_PUBLIC_H
 	#tinyxml.h # only to simplify merging 
 	TMS
 	Units
+    URI
     Utils
 	Version
 	VerticalSpatialReference
@@ -100,6 +102,7 @@ SET(TARGET_SRC
     Config.cpp
     Cube.cpp
     DrapeableNode.cpp
+    ECEF.cpp
     EGM.cpp
     ElevationLayer.cpp
     ElevationQuery.cpp
@@ -154,6 +157,7 @@ SET(TARGET_SRC
     tinyxmlparser.cpp
     TMS.cpp
     Units.cpp
+    URI.cpp
     Utils.cpp
     Version.cpp
     VerticalSpatialReference.cpp

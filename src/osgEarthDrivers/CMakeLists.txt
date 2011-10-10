@@ -61,6 +61,8 @@ IF(SQLITE3_FOUND)
 ENDIF(SQLITE3_FOUND)
 
 ADD_SUBDIRECTORY(engine_osgterrain)
+
+# not yet ready drivers: droam and seamless
 #ADD_SUBDIRECTORY(engine_droam)
-ADD_SUBDIRECTORY(engine_seamless)
+#ADD_SUBDIRECTORY(engine_seamless)
 

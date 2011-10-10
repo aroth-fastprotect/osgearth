@@ -33,7 +33,11 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_imageoverlay)
 
 	#ADD_SUBDIRECTORY(osgearth_symbology)
-	ADD_SUBDIRECTORY(osgearth_seamless)
+	#ADD_SUBDIRECTORY(osgearth_seamless)
+
+	#testing
+	add_subdirectory(osgearth_resources)
+
 ENDIF(BUILD_OSGEARTH_EXAMPLES)
 
 

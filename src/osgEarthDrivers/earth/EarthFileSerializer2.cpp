@@ -17,36 +17,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include "EarthFileSerializer"
-#include <osgDB/FileNameUtils>
-#include <osgEarth/FileUtils>
 
 using namespace osgEarth;
-
-
-void patchConfigUrlsImpl( Config & conf, const std::string & referenceURI )
-{
-	std::string url = conf.value("url");
-	if(!url.empty())
-	{
-		if(!osgDB::containsServerAddress(url))
-		{
-			std::string newurl = osgEarth::getFullPath(referenceURI, osgDB::convertFileNameToNativeStyle(url));
-			conf.update("url", newurl);
-		}
-	}
-	for(ConfigSet::iterator it = conf.children().begin(); it != conf.children().end(); it++)
-	{
-		Config & c = *it;
-		patchConfigUrlsImpl(c, referenceURI);
-	}
-}
-
-Config patchConfigUrls( const Config& conf, const std::string& referenceURI )
-{
-	Config ret = conf;
-	patchConfigUrlsImpl(ret, referenceURI);
-	return ret;
-}
 
 MapNode*
 EarthFileSerializer2::deserialize( const Config& conf, const std::string& referenceURI ) const
@@ -92,7 +64,7 @@ EarthFileSerializer2::deserialize( const Config& conf, const std::string& refere
         Config layerDriverConf = *i;
         layerDriverConf.add( "default_tile_size", "256" );
 
-        ImageLayerOptions layerOpt( patchConfigUrls( layerDriverConf, referenceURI) );
+        ImageLayerOptions layerOpt( layerDriverConf );
         layerOpt.name() = layerDriverConf.value("name");
         //layerOpt.driver() = TileSourceOptions( layerDriverConf );
 
@@ -110,7 +82,7 @@ EarthFileSerializer2::deserialize( const Config& conf, const std::string& refere
             Config layerDriverConf = *i;
             layerDriverConf.add( "default_tile_size", "16" );
 
-            ElevationLayerOptions layerOpt( patchConfigUrls( layerDriverConf, referenceURI) );
+            ElevationLayerOptions layerOpt( layerDriverConf );
             layerOpt.name() = layerDriverConf.value( "name" );
             //layerOpt.driver() = TileSourceOptions( layerDriverConf );
 
@@ -124,7 +96,7 @@ EarthFileSerializer2::deserialize( const Config& conf, const std::string& refere
     {
         const Config& layerDriverConf = *i;
 
-        ModelLayerOptions layerOpt( patchConfigUrls( layerDriverConf, referenceURI) );
+        ModelLayerOptions layerOpt( layerDriverConf );
         layerOpt.name() = layerDriverConf.value( "name" );
         layerOpt.driver() = ModelSourceOptions( layerDriverConf );
 
@@ -139,8 +111,9 @@ EarthFileSerializer2::deserialize( const Config& conf, const std::string& refere
         Config layerDriverConf = *i;
         if ( !layerDriverConf.hasValue("driver") )
             layerDriverConf.attr("driver") = "feature_geom";
+        //const Config& layerDriverConf = *i;
 
-        ModelLayerOptions layerOpt( patchConfigUrls( layerDriverConf, referenceURI) );
+        ModelLayerOptions layerOpt( layerDriverConf );
         layerOpt.name() = layerDriverConf.value( "name" );
         layerOpt.driver() = ModelSourceOptions( layerDriverConf );
         layerOpt.overlay() = true; // forced on when "overlay" specified
@@ -152,7 +125,7 @@ EarthFileSerializer2::deserialize( const Config& conf, const std::string& refere
     ConfigSet masks = conf.children( "mask" );
     for( ConfigSet::const_iterator i = masks.begin(); i != masks.end(); i++ )
     {
-        Config maskLayerConf = patchConfigUrls( *i, referenceURI);
+        Config maskLayerConf = *i;
 
         MaskLayerOptions options(maskLayerConf);
         options.name() = maskLayerConf.value( "name" );
@@ -160,6 +133,20 @@ EarthFileSerializer2::deserialize( const Config& conf, const std::string& refere
 
         map->addTerrainMaskLayer( new MaskLayer(options) );
     }
+
+    
+    //Add any addition paths specified in the options/osg_file_paths element to the file path.  Useful for pointing osgEarth at resource folders.
+    Config osg_file_paths = conf.child( "options" ).child("osg_file_paths");
+    ConfigSet urls = osg_file_paths.children("url");
+    for (ConfigSet::const_iterator i = urls.begin(); i != urls.end(); i++) 
+    {
+        std::string path = osgEarth::getFullPath( referenceURI, (*i).value());
+        OE_DEBUG << "Adding OSG file path " << path << std::endl;
+        osgDB::Registry::instance()->getDataFilePathList().push_back( path );
+    }
+
+
+
 
     MapNode* mapNode = new MapNode( map, mapNodeOptions );
 

@@ -140,8 +140,8 @@ namespace osgEarth
             output = input * from._toBase / to._toBase;
         }
         static void convertSpeed( const Units& from, const Units& to, double input, double& output ) {
-            from._distance->convertTo( *to._distance, input );
-            output = to._time->convertTo( *from._time, input );
+            double t = from._distance->convertTo( *to._distance, input );
+            output = to._time->convertTo( *from._time, t );
         }
 
 
@@ -218,7 +218,8 @@ namespace osgEarth
     };
 
     struct Angular : public qualified_double<Angular> {
-        Angular() : qualified_double<Angular>(0, Units::RADIANS) { }
+        Angular() : qualified_double<Angular>(0, Units::DEGREES) { }
+        Angular(double value) : qualified_double<Angular>(value, Units::DEGREES) { }
         Angular(double value, const Units& units) : qualified_double<Angular>(value, units) { }
     };
 

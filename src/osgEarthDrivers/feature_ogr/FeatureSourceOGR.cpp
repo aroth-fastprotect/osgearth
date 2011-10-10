@@ -97,7 +97,7 @@ public:
     {
         if ( _options.url().isSet() )
         {
-            _source = osgEarth::getFullPath( referenceURI, _options.url().value() );
+            _source = osgEarth::getFullPath( referenceURI, _options.url()->full() );
         }
         else if ( _options.connection().isSet() )
         {
@@ -111,17 +111,20 @@ public:
     {
         FeatureProfile* result = 0L;
 
+        // see if we have a custom profile.
+        osg::ref_ptr<const Profile> profile;
+        if ( _options.profile().isSet() )
+        {
+            profile = Profile::create( *_options.profile() );
+        }
+
         if ( _geometry.valid() )
         {
             // if the user specified explicit geometry/profile, use that:
             GeoExtent ex;
-            if ( _options.geometryProfileOptions().isSet() )
+            if ( profile.valid() )
             {
-                osg::ref_ptr<const Profile> _profile = Profile::create( 
-                    ProfileOptions(_options.geometryProfileOptions().value())  );
-
-                if ( _profile.valid() )
-                    ex = _profile->getExtent();
+                ex = profile->getExtent();
             }
 
             if ( !ex.isValid() )
@@ -131,6 +134,7 @@ public:
             }
             result = new FeatureProfile( ex );
         }
+
         else if ( !_source.empty() )
         {
             // otherwise, assume we're loading from the URL:
@@ -155,21 +159,30 @@ public:
                 {                    
                     GeoExtent extent;
 
-                    // extract the SRS and Extent:                
-                    OGRSpatialReferenceH srHandle = OGR_L_GetSpatialRef( _layerHandle );
-                    if ( srHandle )
+                    // if the user provided a profile, user that:
+                    if ( profile.valid() )
                     {
-                        osg::ref_ptr<SpatialReference> srs = SpatialReference::createFromHandle( srHandle, false );
-                        if ( srs.valid() )
+                        result = new FeatureProfile( profile->getExtent() );
+                    }
+
+                    else
+                    {
+                        // extract the SRS and Extent:                
+                        OGRSpatialReferenceH srHandle = OGR_L_GetSpatialRef( _layerHandle );
+                        if ( srHandle )
                         {
-                            // extract the full extent of the layer:
-                            OGREnvelope env;
-                            if ( OGR_L_GetExtent( _layerHandle, &env, 1 ) == OGRERR_NONE )
+                            osg::ref_ptr<SpatialReference> srs = SpatialReference::createFromHandle( srHandle, false );
+                            if ( srs.valid() )
                             {
-                                GeoExtent extent( srs.get(), env.MinX, env.MinY, env.MaxX, env.MaxY );
-                                
-                                // got enough info to make the profile!
-                                result = new FeatureProfile( extent );
+                                // extract the full extent of the layer:
+                                OGREnvelope env;
+                                if ( OGR_L_GetExtent( _layerHandle, &env, 1 ) == OGRERR_NONE )
+                                {
+                                    GeoExtent extent( srs.get(), env.MinX, env.MinY, env.MaxX, env.MaxY );
+                                    
+                                    // got enough info to make the profile!
+                                    result = new FeatureProfile( extent );
+                                }
                             }
                         }
                     }

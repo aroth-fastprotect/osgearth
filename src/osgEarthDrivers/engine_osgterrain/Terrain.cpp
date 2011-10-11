@@ -90,17 +90,16 @@ Terrain::Terrain(const MapFrame& update_mapf,
                  const MapFrame& cull_mapf, 
                  OSGTileFactory* tileFactory,
                  bool            quickReleaseGLObjects ) :
-
+_sampleRatio( 1.0f ),
+_verticalScale( 1.0f ),
 _tileFactory( tileFactory ),
+_alwaysUpdate( false ),
+_onDemandDelay( 2 ),
 _registeredWithReleaseGLCallback( false ),
 _update_mapf( update_mapf ),
 _cull_mapf( cull_mapf ),
-_onDemandDelay( 2 ),
 _quickReleaseGLObjects( quickReleaseGLObjects ),
-_quickReleaseCallbackInstalled( false ),
-_alwaysUpdate( false ),
-_sampleRatio( 1.0f ),
-_verticalScale( 1.0f )
+_quickReleaseCallbackInstalled( false )
 {
     this->setThreadSafeRefUnref( true );
 

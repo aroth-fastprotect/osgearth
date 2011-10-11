@@ -137,8 +137,8 @@ _runtimeOptions( options )
 }
 
 TerrainLayer::TerrainLayer( TerrainLayerOptions* options, TileSource* tileSource ) :
-_runtimeOptions( options ),
-_tileSource( tileSource )
+_tileSource( tileSource ),
+_runtimeOptions( options )
 {
     init();
 }

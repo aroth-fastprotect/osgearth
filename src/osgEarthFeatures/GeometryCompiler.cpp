@@ -158,12 +158,6 @@ GeometryCompiler::compile(FeatureList&          workingSet,
     if ( !sharedCX.extent().isSet() )
         sharedCX.extent() = sharedCX.profile()->getExtent();
 
-    // only localize coordinates if the map is geocentric AND the extent is
-    // less than 180 degrees.
-    const MapInfo& mi = sharedCX.getSession()->getMapInfo();
-    GeoExtent workingExtent = sharedCX.extent()->transform( sharedCX.profile()->getSRS()->getGeographicSRS() );
-    bool localize = mi.isGeocentric() && workingExtent.width() < 180.0;
-
     // go through the Style and figure out which filters to use.
     const MarkerSymbol*    marker    = style.get<MarkerSymbol>();
     const PointSymbol*     point     = style.get<PointSymbol>();
@@ -190,6 +184,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
                 point = s_defaultPointSymbol.get(); break;
             case Geometry::TYPE_POLYGON:
                 polygon = s_defaultPolygonSymbol.get(); break;
+            default: break;
             }
         }
     }

@@ -39,13 +39,6 @@ using namespace osgEarth::Symbology;
 
 //------------------------------------------------------------------------
 
-namespace
-{
-    static osg::Node* s_defaultModel =0L;
-}
-
-//------------------------------------------------------------------------
-
 SubstituteModelFilter::SubstituteModelFilter( const Style& style ) :
 _style( style ),
 _cluster( false ),
@@ -123,11 +116,11 @@ SubstituteModelFilter::process(const FeatureList&           features,
 struct ClusterVisitor : public osg::NodeVisitor
     {
         ClusterVisitor( const FeatureList& features, const osg::Matrixd& modelMatrix, FeaturesToNodeFilter* f2n, FilterContext& cx )
-            : _features   ( features ),
-              _modelMatrix( modelMatrix ),
-              _f2n        ( f2n ),
+            : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
+              _features   ( features ),
               _cx         ( cx ),
-              osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN )
+              _modelMatrix( modelMatrix ),
+              _f2n        ( f2n )
         {
             //nop
         }

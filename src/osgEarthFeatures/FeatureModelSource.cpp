@@ -35,11 +35,11 @@ using namespace osgEarth::Symbology;
 
 FeatureModelSourceOptions::FeatureModelSourceOptions( const ConfigOptions& options ) :
 ModelSourceOptions( options ),
-_geomTypeOverride( Geometry::TYPE_UNKNOWN ),
 _lit( true ),
 _maxGranularity_deg( 5.0 ),
 _mergeGeometry( false ),
-_clusterCulling( true )
+_clusterCulling( true ),
+_geomTypeOverride( Geometry::TYPE_UNKNOWN )
 {
     fromConfig( _conf );
 }

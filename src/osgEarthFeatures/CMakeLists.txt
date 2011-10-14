@@ -31,6 +31,7 @@ SET(TARGET_PUBLIC_H
     FeatureNode
     FeatureSource
 	FeatureSourceNode
+	FeatureSourceMeshConsolidator
     FeatureTileSource
     Filter
     FilterContext
@@ -69,6 +70,7 @@ SET(TARGET_SRC
     FeatureNode.cpp
     FeatureSource.cpp
 	FeatureSourceNode.cpp
+	FeatureSourceMeshConsolidator.cpp
     FeatureTileSource.cpp
     Filter.cpp
     FilterContext.cpp

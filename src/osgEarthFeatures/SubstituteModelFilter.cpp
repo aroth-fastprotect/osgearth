@@ -20,7 +20,7 @@
 #include <osgEarthFeatures/MarkerFactory>
 #include <osgEarthFeatures/FeatureSourceNode>
 #include <osgEarthFeatures/GeometryUtils>
-#include <osgEarth/MeshConsolidator>
+#include <osgEarthFeatures/FeatureSourceMeshConsolidator>
 #include <osgEarth/HTTPClient>
 #include <osgEarth/ECEF>
 #include <osg/Drawable>
@@ -115,12 +115,13 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
 struct ClusterVisitor : public osg::NodeVisitor
     {
-        ClusterVisitor( const FeatureList& features, const osg::Matrixd& modelMatrix, FeaturesToNodeFilter* f2n, FilterContext& cx )
+        ClusterVisitor( const FeatureList& features, const osg::Matrixd& modelMatrix, FeaturesToNodeFilter* f2n, FeatureSourceMultiNode * featureNode, FilterContext& cx )
             : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
               _features   ( features ),
               _cx         ( cx ),
               _modelMatrix( modelMatrix ),
-              _f2n        ( f2n )
+              _f2n        ( f2n ),
+              _featureNode(featureNode)
         {
             //nop
         }
@@ -133,8 +134,13 @@ struct ClusterVisitor : public osg::NodeVisitor
             // save the geode's drawables..
             osg::Geode::DrawableList old_drawables = geode.getDrawableList();
 
+			OE_WARN << "ClusterVisitor geode " << &geode << " featureNode=" << _featureNode << " drawables=" << old_drawables.size() << std::endl;
+
             // ..and clear out the drawables list.
             geode.removeDrawables( 0, geode.getNumDrawables() );
+			// ... and remove all drawables from the feature node
+			for( osg::Geode::DrawableList::iterator i = old_drawables.begin(); i != old_drawables.end(); i++ )
+				_featureNode->removeDrawable(i->get());
 
             // foreach each drawable that was originally in the geode...
             for( osg::Geode::DrawableList::iterator i = old_drawables.begin(); i != old_drawables.end(); i++ )
@@ -184,6 +190,7 @@ struct ClusterVisitor : public osg::NodeVisitor
                                 
                                 // add the new cloned, translated drawable back to the geode.
                                 geode.addDrawable( newDrawable.get() );
+								_featureNode->addDrawable(newDrawable.get(), feature->getFID());
                             }
                         }
 
@@ -193,7 +200,7 @@ struct ClusterVisitor : public osg::NodeVisitor
 
             geode.dirtyBound();
 
-            MeshConsolidator::run( geode );
+            FeatureSourceMeshConsolidator::run( geode, _featureNode );
 
             // merge the geometry. Not sure this is necessary
             osgUtil::Optimizer opt;
@@ -207,6 +214,7 @@ struct ClusterVisitor : public osg::NodeVisitor
         FilterContext         _cx;
         osg::Matrixd          _modelMatrix;
         FeaturesToNodeFilter* _f2n;
+        FeatureSourceMultiNode * _featureNode;
     };
 
 
@@ -254,17 +262,21 @@ SubstituteModelFilter::cluster(const FeatureList&           features,
     }
     */
 
-    //For each model, cluster the features that use that model
+	FeatureSource * source = (session!=NULL)?session->getFeatureSource():NULL;
 
+    //For each model, cluster the features that use that model
     for (MarkerToFeatures::iterator i = markerToFeatures.begin(); i != markerToFeatures.end(); ++i)
     {
         osg::Node* clone = dynamic_cast<osg::Node*>( i->first->clone( osg::CopyOp::DEEP_COPY_ALL ) );
 
+		FeatureSourceMultiNode * featureNode = new FeatureSourceMultiNode(source);
+
         // ..and apply the clustering to the copy.
-        ClusterVisitor cv( i->second, _modelMatrix, this, cx );
+        ClusterVisitor cv( i->second, _modelMatrix, this, featureNode, cx );
         clone->accept( cv );
 
-        attachPoint->addChild( clone );
+		featureNode->addChild(clone);
+		attachPoint->addChild( featureNode );
     }
 
     return true;

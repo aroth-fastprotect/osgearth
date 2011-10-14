@@ -94,7 +94,6 @@ Registry* Registry::instance(bool erase)
 
     if (erase) 
     {   
-		Registry * old = s_registry.get();
         s_registry->destruct();
         s_registry = 0;
 

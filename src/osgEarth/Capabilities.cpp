@@ -46,7 +46,7 @@ struct MyGraphicsContext
         traits->doubleBuffer = false;
         traits->sharedContext = 0;
         traits->pbuffer = false;
-		traits->quadBufferStereo = quadBufferStereo;
+        traits->quadBufferStereo = quadBufferStereo;
 
         // Intel graphics adapters dont' support pbuffers, and some of their drivers crash when
         // you try to create them. So by default we will only use the unmapped/pbuffer method
@@ -88,7 +88,7 @@ struct MyGraphicsContext
     }
 
     bool valid() const { return _gc.valid() && _gc->isRealized(); }
-	osg::GraphicsContext * gc() { return _gc.get(); }
+    osg::GraphicsContext * gc() { return _gc.get(); }
 private:
     osg::ref_ptr<osg::GraphicsContext> _gc;
 };
@@ -122,30 +122,30 @@ _supportsQuadBufferStereo( false )
     if ( ::getenv( "OSGEARTH_DISABLE_ATI_WORKAROUNDS" ) != 0L )
         enableATIworkarounds = false;
 
-	bool disableQuadBufferStereoTest = false;
+    bool disableQuadBufferStereoTest = false;
     if ( ::getenv( "OSGEARTH_QUADBUFFER_DISABLE" ) != 0L )
         disableQuadBufferStereoTest = true;
-	// first create a opengl context with quad buffer stereo enabled
-	MyGraphicsContext * mgc;
+    // first create a opengl context with quad buffer stereo enabled
+    MyGraphicsContext * mgc;
 
-	if(!disableQuadBufferStereoTest)
+    if(!disableQuadBufferStereoTest)
     {
-		mgc = new MyGraphicsContext(true);
-		_supportsQuadBufferStereo = mgc->valid();
-	}
-	else
-	{
-		mgc = NULL;
-		_supportsQuadBufferStereo = false;
-	}
-	if(!_supportsQuadBufferStereo)
-	{
-		// delete the old context
-		if(mgc)
-			delete mgc;
-		// second try to create a new graphics context without quad buffer stereo
-		mgc = new MyGraphicsContext(false);
-	}
+        mgc = new MyGraphicsContext(true);
+        _supportsQuadBufferStereo = mgc->valid();
+    }
+    else
+    {
+        mgc = NULL;
+        _supportsQuadBufferStereo = false;
+    }
+    if(!_supportsQuadBufferStereo)
+    {
+        // delete the old context
+        if(mgc)
+            delete mgc;
+        // second try to create a new graphics context without quad buffer stereo
+        mgc = new MyGraphicsContext(false);
+    }
 
     if ( mgc->valid() )
     {
@@ -221,7 +221,7 @@ _supportsQuadBufferStereo( false )
         _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
         OE_INFO << LC << "  2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
 
-		OE_INFO << LC << "  Supports quad buffer stereo = " << SAYBOOL(_supportsQuadBufferStereo) << std::endl;
+        OE_INFO << LC << "  Supports quad buffer stereo = " << SAYBOOL(_supportsQuadBufferStereo) << std::endl;
 
         //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
         //OE_INFO << LC << "  texture2DLod = " << SAYBOOL(_supportsTexture2DLod) << std::endl;

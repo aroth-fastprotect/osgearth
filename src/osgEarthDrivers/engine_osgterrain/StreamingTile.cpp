@@ -553,7 +553,7 @@ StreamingTile::servicePendingElevationRequests( const MapFrame& mapf, int stamp,
         // otherwise, see if it is legal yet to start a new request:
         else if ( readyForNewElevation() )
         {
-            if ( _elevationLOD + 1 == _key.getLevelOfDetail() )
+            if ( _elevationLOD + 1 == (int)_key.getLevelOfDetail() )
             {
                 _elevRequest->setStamp( stamp );
                 _elevRequest->setProgressCallback( new ProgressCallback() );

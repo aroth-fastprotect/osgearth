@@ -92,7 +92,7 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
 
         UID uid;
         unsigned lod, x, y;
-        sscanf( uri.c_str(), "%u.%d_%d_%d.%*s", &uid, &lod, &x, &y );
+        sscanf( uri.c_str(), "%u.%d_%d_%d.%*s", (unsigned int*)&uid, (int*)&lod, (int*)&x, (int*)&y );
 
         FeatureModelGraph* graph = getGraph(uid);
         if ( graph )
@@ -123,7 +123,7 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
     }
 };
 
-REGISTER_OSGPLUGIN(osgearth_pseudo_fmg, osgEarthFeatureModelPseudoLoader);
+REGISTER_OSGPLUGIN(osgearth_pseudo_fmg, osgEarthFeatureModelPseudoLoader)
 
 namespace
 {    
@@ -152,8 +152,8 @@ FeatureModelGraph::FeatureModelGraph(FeatureSource*                   source,
                                      const FeatureModelSourceOptions& options,
                                      FeatureNodeFactory*              factory,
                                      Session*                         session) :
-_source   ( source ),
 _options  ( options ),
+_source ( source ),
 _factory  ( factory ),
 _session  ( session ),
 _dirty    ( false )
@@ -320,7 +320,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
             result = geometry;
         }
 
-        if ( lod < _source->getFeatureProfile()->getMaxLevel() )
+        if ((int)lod < _source->getFeatureProfile()->getMaxLevel())
         {
             // see if there are any more levels. If so, build some pagedlods to bring the
             // next level in.

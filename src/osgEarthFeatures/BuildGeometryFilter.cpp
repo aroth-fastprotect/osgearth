@@ -158,6 +158,8 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     }
                 }
                 break;
+		    default:
+			    break;
             }
             
             osg::Geometry* osgGeom = new osg::Geometry();

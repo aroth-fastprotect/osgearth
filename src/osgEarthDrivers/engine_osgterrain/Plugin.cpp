@@ -68,7 +68,6 @@ public:
     virtual ReadResult readNode(const std::string& uri, const Options* options) const
     {
         static int s_tileCount = 0;
-        static double s_tileTime = 0.0;
         static osg::Timer_t s_startTime;
 
         if ( "osgearth_osgterrain_tile" == osgDB::getFileExtension(uri) )
@@ -88,15 +87,13 @@ public:
             // parse the tile key and engine ID:
             std::string tileDef = osgDB::getNameLessExtension(uri);
             unsigned int lod, x, y, engineID;
-            sscanf(tileDef.c_str(), "%d/%d/%d.%d", &lod, &x, &y, &engineID);
+            sscanf(tileDef.c_str(), "%d/%d/%d.%d", (int*)&lod, (int*)&x, (int*)&y, (int*)&engineID);
 
             // find the appropriate engine:
             osg::ref_ptr<OSGTerrainEngineNode> engineNode;
             OSGTerrainEngineNode::getEngineByUID( (UID)engineID, engineNode );
             if ( engineNode.valid() )
             {
-                osg::Timer_t start = osg::Timer::instance()->tick();
-
                 // assemble the key and create the node:
                 const Profile* profile = engineNode->getMap()->getProfile();
                 TileKey key( lod, x, y, profile );

@@ -56,8 +56,6 @@ namespace
     std::string getTempPath()
     {
     #if defined(WIN32)  && !defined(__CYGWIN__)
-        BOOL fSuccess  = FALSE;
-
         TCHAR lpTempPathBuffer[MAX_PATH];    
 
         //  Gets the temp path env string (no guarantee it's a valid path).
@@ -342,7 +340,6 @@ public:
         ReadResult r = uri.readString( _dbOptions.get() );
 
         const std::string& buffer = r.getString();
-        const Config&      meta   = r.metadata();
 
         bool dataOK = false;
 

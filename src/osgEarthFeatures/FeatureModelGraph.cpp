@@ -299,7 +299,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
         // We will be calculating the LOD ranges here.
         osg::Group* geometry =0L;
 
-        if ( lod >= _source->getFeatureProfile()->getFirstLevel() )
+        if ( (int)lod >= _source->getFeatureProfile()->getFirstLevel() )
         {
             // The extent of this tile:
             GeoExtent tileExtent = s_getTileExtent( lod, tileX, tileY, _usableFeatureExtent );
@@ -340,7 +340,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
                 //}
 
                 // only build sub-pagedlods if we are expecting subtiles at some point:
-                if ( geometry != 0L || lod < _source->getFeatureProfile()->getFirstLevel() )
+                if ( geometry != 0L || (int)lod < _source->getFeatureProfile()->getFirstLevel() )
                 {
                     MapFrame mapf = _session->createMapFrame();
                     buildSubTilePagedLODs( lod, tileX, tileY, &mapf, group.get() );
@@ -574,8 +574,6 @@ FeatureModelGraph::build( const Style& baseStyle, const Query& baseQuery, const 
 
     if ( _source->hasEmbeddedStyles() )
     {
-        const FeatureProfile* profile = _source->getFeatureProfile();
-
         // each feature has its own style, so use that and ignore the style catalog.
         osg::ref_ptr<FeatureCursor> cursor = _source->createFeatureCursor( baseQuery );
         while( cursor.valid() && cursor->hasMore() )

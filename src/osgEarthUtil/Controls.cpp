@@ -1915,7 +1915,6 @@ ControlNodeBin::setFading( bool value )
 void
 ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
 {
-    const osg::Viewport* vp = context._vp.get();
     osg::Vec2f surfaceSize( context._vp->width(), context._vp->height() );
 
     // we don't really need to keep this list in the object, but that prevents it from having to
@@ -2265,7 +2264,7 @@ ControlCanvas::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter
     //Send a frame event to all controls
     if ( ea.getEventType() == osgGA::GUIEventAdapter::FRAME )
     {
-        for( ControlList::const_reverse_iterator i = _controls.rbegin(); i != _controls.rend(); ++i )
+        for( ControlList::reverse_iterator i = _controls.rbegin(); i != _controls.rend(); ++i )
         {
             i->get()->handle(ea, aa, _context);
         }

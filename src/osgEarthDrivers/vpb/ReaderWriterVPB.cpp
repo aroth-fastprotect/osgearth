@@ -187,6 +187,7 @@ public:
 
             if ( rc.succeeded() )
             {
+                _rootNode = rc.getNode();
                 _baseNameToUse = _options.baseName().value();
 
                 _path = osgDB::getFilePath( *_url );

@@ -19,7 +19,9 @@
 #ifndef OSGEARTHFEATURES_FEATURE_FEATURESOURCEMESHCONSOLIDATOR
 #define OSGEARTHFEATURES_FEATURE_FEATURESOURCEMESHCONSOLIDATOR 1
 
-#include <osgEarth/MeshConsolidator>
+#include <osgEarthFeatures/Common>
+#include <osg/Geode>
+#include <osg/Geometry>
 
 namespace osgEarth { namespace Features {
 
@@ -39,12 +41,12 @@ namespace osgEarth { namespace Features {
      * - For geometries with tex coord arrays, all geometries must have the same configuration
      * (i.e., number of texcoord arrays, and the same unit bindings).
      */
-    class OSGEARTHFEATURES_EXPORT FeatureSourceMeshConsolidator : public osgEarth::MeshConsolidator
+    class OSGEARTHFEATURES_EXPORT FeatureSourceMeshConsolidator
     {
     public:
         static void run( osg::Geometry& geom, FeatureSourceMultiNode * featureNode );
 
-		static void run( osg::Geode& geode, FeatureSourceMultiNode * featureNode );
+        static void run( osg::Geode& geode, FeatureSourceMultiNode * featureNode );
     };
 
 }}

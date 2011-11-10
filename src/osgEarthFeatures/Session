@@ -21,9 +21,11 @@
 #define OSGEARTH_FEATURES_SESSION_H 1
 
 #include <osgEarthFeatures/Common>
+#include <osgEarthFeatures/ScriptEngine>
 #include <osgEarthSymbology/Style>
-#include <osgEarthSymbology/ResourceCache>
 #include <osgEarth/ThreadingUtils>
+#include <osgEarth/Cache>
+#include <osgEarth/CachePolicy>
 #include <osgEarth/Map>
 
 namespace osgEarth { namespace Features
@@ -51,16 +53,14 @@ namespace osgEarth { namespace Features
         /**
          * Constructs a new Session that is tied to a map
          */
-        Session( const Map* map, StyleSheet* styles =0L );
-        /**
-         * implement destructor to avoid including real FeatureSource definition
-         */
+        Session( const Map* map, StyleSheet* styles =0L, const osgDB::Options* dbOptions =0L );
 		virtual ~Session();
 
         /**
-         * Sets the reference URI to use to expand relative paths and URLs.
+         * URI Context for relative path resolution.
          */
-        void setReferenceURI( const std::string& referenceURI );
+        void setURIContext( const URIContext& value ) { _uriContext = value; }
+        const URIContext& uriContext() const { return _uriContext; }
 
         /**
          * Gets the underlying map (frame) interface in this session
@@ -81,41 +81,44 @@ namespace osgEarth { namespace Features
         /** Sets the current feature source */
 		void setFeatureSource(FeatureSource * source);
 
-    public: // URIResolver
-
-        /**
-         * Resolves a URI based on the reference URI. You can use this method
-         * to create an absolute URI from a relative one, for example.
-         */
-        std::string resolveURI( const std::string& inputURI ) const;
+        /** The I/O options for operations within this session */
+        const osgDB::Options* getDBOptions() const;
 
     public:
-        void putResource( const std::string& uri, osg::Referenced* object );
+        /**
+         * Stores an object in the shared Session cache.
+         *
+         * WARNING! Don't store things like nodes in here unless you plan
+         * to clone them. This is a multi-threaded store.
+         */
+        void putObject( const std::string& key, osg::Referenced* object );
 
         /**
-         * Gets a resource from the session cache.
-         * @deprecated - in favor of the ResourceLibrary, coming soon.
+         * Gets an object from the shared Session cache.
          */
-        template<typename T> T* getResource( const std::string& uri ) {
-            Threading::ScopedReadLock lock( _resourceMutex );
-            ResourceMap::const_iterator i = _resourceMap.find(uri);
-            return i != _resourceMap.end() ? dynamic_cast<T*>( i->second.get() ) : 0L;
+        template<typename T> T* getObject( const std::string& key ) {
+            Threading::ScopedReadLock lock( _objMapMutex );
+            ObjectMap::const_iterator i = _objMap.find(key);
+            return i != _objMap.end() ? dynamic_cast<T*>( i->second.get() ) : 0L;
         }
 
-        void removeResource( const std::string& uri );
+        void removeObject( const std::string& key );
+
+    public:
+      ScriptEngine* getScriptEngine() const;
 
     private:
+        typedef std::map<std::string, osg::ref_ptr<osg::Referenced> > ObjectMap;
+        ObjectMap                    _objMap;
+        Threading::ReadWriteMutex    _objMapMutex;
 
-        // @deprecated
-        typedef std::map<std::string, osg::ref_ptr<osg::Referenced> > ResourceMap;
-
-        ResourceMap                    _resourceMap;   // deprecate
-        Threading::ReadWriteMutex      _resourceMutex; // deprecate
-        osg::ref_ptr<const Map>        _map;
-        MapInfo                        _mapInfo;
-        std::string                    _referenceURI;
-        osg::ref_ptr<StyleSheet>       _styles;
-		osg::ref_ptr<FeatureSource>    _featureSource;
+        URIContext                         _uriContext;
+        osg::ref_ptr<const Map>            _map;
+        MapInfo                            _mapInfo;
+        osg::ref_ptr<StyleSheet>           _styles;
+        osg::ref_ptr<const osgDB::Options> _dbOptions;
+        osg::ref_ptr<ScriptEngine>     _styleScriptEngine;
+        osg::ref_ptr<FeatureSource>    _featureSource;
     };
 
 } }

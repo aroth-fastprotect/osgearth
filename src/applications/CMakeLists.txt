@@ -4,6 +4,7 @@ SET(TARGET_COMMON_LIBRARIES
     osgEarthFeatures
 	osgEarthUtil
     osgEarthSymbology
+    osgEarthAnnotation
 )
 # OSG Examples
 OPTION(BUILD_OSGEARTH_EXAMPLES "Enable to build osgEarth Examples" OFF)

@@ -15,10 +15,10 @@ MARK_AS_ADVANCED(CURL_IS_STATIC)
 #    ENDIF(CURL_IS_STATIC)
 #ENDIF(WIN32)
 
-SET(LIB_NAME osgEarth)
-
 SET(TARGET_PUBLIC_H
-    Caching
+    Cache
+    CacheBin
+    CachePolicy
 	CacheSeed
 	Capabilities
 	Common
@@ -41,6 +41,7 @@ SET(TARGET_PUBLIC_H
 	ImageLayer
 	ImageMosaic
 	ImageUtils
+    IOTypes
 	JsonUtils
 	Layer
 	Locators
@@ -52,7 +53,7 @@ SET(TARGET_PUBLIC_H
 	MaskLayer
 	MaskNode
     MaskSource
-    MeshConsolidator
+    MemCache
 	ModelLayer
 	ModelSource
     NodeUtils
@@ -60,6 +61,7 @@ SET(TARGET_PUBLIC_H
 	OverlayDecorator
 	Profile
 	Progress
+	Random
 	Registry
 	Revisioning
     ShaderComposition
@@ -86,6 +88,7 @@ SET(TARGET_PUBLIC_H
     Utils
 	Version
 	VerticalSpatialReference
+    Viewpoint
 	XmlUtils
 )
 
@@ -95,7 +98,8 @@ SET(TARGET_H
 	)
 
 SET(TARGET_SRC
-    Caching.cpp
+    Cache.cpp
+    CachePolicy.cpp
     CacheSeed.cpp
 	Capabilities.cpp
     CompositeTileSource.cpp
@@ -115,6 +119,7 @@ SET(TARGET_SRC
     ImageMosaic.cpp
     ImageToHeightFieldConverter.cpp
     ImageUtils.cpp
+    IOTypes.cpp
     JsonUtils.cpp
     Layer.cpp
     Locators.cpp
@@ -126,7 +131,7 @@ SET(TARGET_SRC
     MaskLayer.cpp
     MaskNode.cpp
     MaskSource.cpp
-    MeshConsolidator.cpp
+    MemCache.cpp
 	MimeTypes.cpp
 	ModelLayer.cpp
 	ModelSource.cpp
@@ -135,6 +140,7 @@ SET(TARGET_SRC
 	OverlayDecorator.cpp
     Profile.cpp
 	Progress.cpp
+	Random.cpp
     Registry.cpp
     ShaderComposition.cpp
     ShaderUtils.cpp
@@ -161,10 +167,15 @@ SET(TARGET_SRC
     Utils.cpp
     Version.cpp
     VerticalSpatialReference.cpp
+    Viewpoint.cpp
     XmlUtils.cpp
 )
 
 INCLUDE_DIRECTORIES(${GDAL_INCLUDE_DIR} ${CURL_INCLUDE_DIR} ${OSG_INCLUDE_DIR} )
+
+IF (TINYXML_FOUND)
+    INCLUDE_DIRECTORIES(${TINYXML_INCLUDE_DIR})
+ENDIF (TINYXML_FOUND)
 
 SET(TARGET_LIBRARIES_VARS CURL_LIBRARY GDAL_LIBRARY)
 

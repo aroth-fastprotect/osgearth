@@ -93,11 +93,12 @@ public:
     }
 
     //override
-    void initialize( const std::string& referenceURI )
+    void initialize( const osgDB::Options* dbOptions )
     {
         if ( _options.url().isSet() )
         {
-            _source = osgEarth::getFullPath( referenceURI, _options.url()->full() );
+            _source = _options.url()->full();
+            //_source = osgEarth::getFullPath( referenceURI, _options.url()->full() );
         }
         else if ( _options.connection().isSet() )
         {
@@ -190,16 +191,13 @@ public:
                     // assuming we successfully opened the layer, build a spatial index if requested.
                     if ( _options.buildSpatialIndex() == true )
                     {
-                        OE_INFO << LC << "Building spatial index for " << getName() << " ..." << std::flush;
-
+                        OE_INFO << LC << "Building spatial index for " << getName() << std::endl;
                         std::stringstream buf;
                         const char* name = OGR_FD_GetName( OGR_L_GetLayerDefn( _layerHandle ) );
                         buf << "CREATE SPATIAL INDEX ON " << name; 
 					    std::string bufStr;
 					    bufStr = buf.str();
                         OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
-
-                        OE_INFO << LC << "...done." << std::endl;
                     }
 
                     //Get the feature count
@@ -247,7 +245,7 @@ public:
 	        }
             else
             {
-                OE_INFO << LC << "failed to open dataset at " << _source << " error " << CPLGetLastErrorMsg() << std::endl;
+                OE_INFO << LC << "failed to open dataset at \"" << _source << "\" error " << CPLGetLastErrorMsg() << std::endl;
             }
         }
         else
@@ -439,10 +437,10 @@ protected:
     // read the WKT geometry from a URL, then parse into a Geometry.
     Symbology::Geometry* parseGeometryUrl( const std::string& geomUrl )
     {
-        std::string wkt;
-        if ( HTTPClient::readString( geomUrl, wkt ) == HTTPClient::RESULT_OK )
+        ReadResult r = URI(geomUrl).readString( 0L, CachePolicy::NO_CACHE );
+        if ( r.succeeded() )
         {
-            Config conf( "geometry", wkt );
+            Config conf( "geometry", r.getString() );
             return parseGeometry( conf );
         }
         return 0L;

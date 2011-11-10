@@ -21,6 +21,7 @@
 
 #include <osgEarth/Common>
 #include <osgEarth/ModelSource>
+#include <osgEarth/URI>
 
 namespace osgEarth { namespace Drivers
 {
@@ -29,8 +30,8 @@ namespace osgEarth { namespace Drivers
     class LODScaleOverrideModelOptions : public ModelSourceOptions // NO EXPORT; header only
     {
     public:
-        optional<std::string>& url() { return _url; }
-        const optional<std::string>& url() const { return _url; }
+        optional<URI>& url() { return _url; }
+        const optional<URI>& url() const { return _url; }
 
         optional<float>& lod_scale() { return _lod_scale; }
         const optional<float>& lod_scale() const { return _lod_scale; }
@@ -61,7 +62,7 @@ namespace osgEarth { namespace Drivers
 			conf.getIfSet( "lod_scale", _lod_scale );
         }
 
-        optional<std::string> _url;
+        optional<URI> _url;
 		optional<float> _lod_scale;
     };
 

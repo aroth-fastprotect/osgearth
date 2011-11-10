@@ -21,6 +21,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/Cube>
 #include <osgEarth/LocalTangentPlane>
+#include <osgEarth/ECEF>
 #include <OpenThreads/ScopedLock>
 #include <osg/Notify>
 #include <ogr_api.h>
@@ -335,7 +336,15 @@ _owns_handle( true ),
 _name( name ),
 _init_type( init_type ),
 _init_str( init_str ),
- _is_ltp(false){
+_is_geographic( false ),
+_is_mercator( false ),
+_is_north_polar( false ), 
+_is_south_polar( false ),
+_is_cube( false ),
+_is_contiguous( false ),
+_is_user_defined( false ),
+_is_ltp( false )
+{
     _init_str_lc = init_str;
     std::transform( _init_str_lc.begin(), _init_str_lc.end(), _init_str_lc.begin(), ::tolower );
 }
@@ -685,6 +694,39 @@ SpatialReference::createLocator(double xmin, double ymin, double xmax, double ym
         locator->setTransform( getTransformFromExtents( xmin, ymin, xmax, ymax ) );
     }
     return locator;
+}
+
+void
+SpatialReference::createLocal2World(const osg::Vec3d& xyz, osg::Matrixd& out_local2world ) const
+{
+    if ( isProjected() )
+    {
+        out_local2world = osg::Matrix::translate(xyz);
+    }
+    else
+    {
+        getEllipsoid()->computeLocalToWorldTransformFromLatLongHeight(
+            osg::DegreesToRadians(xyz.y()), osg::DegreesToRadians(xyz.x()), xyz.z(),
+            out_local2world);
+    }
+}
+
+void
+SpatialReference::createWorld2Local(const osg::Vec3d& xyz, osg::Matrixd& out_world2local ) const
+{
+    if ( isProjected() )
+    {
+        out_world2local = osg::Matrix::translate(-xyz);
+    }
+    else
+    {
+        osg::Matrix local2world;
+        getEllipsoid()->computeLocalToWorldTransformFromLatLongHeight(
+            osg::DegreesToRadians(xyz.y()), osg::DegreesToRadians(xyz.x()), xyz.z(),
+            local2world);
+
+        out_world2local = osg::Matrix::inverse(local2world);
+    }
 }
 
 bool

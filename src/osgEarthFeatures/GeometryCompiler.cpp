@@ -20,6 +20,7 @@
 #include <osgEarthFeatures/BuildGeometryFilter>
 #include <osgEarthFeatures/BuildTextFilter>
 #include <osgEarthFeatures/AltitudeFilter>
+#include <osgEarthFeatures/CentroidFilter>
 #include <osgEarthFeatures/ExtrudeGeometryFilter>
 #include <osgEarthFeatures/ScatterFilter>
 #include <osgEarthFeatures/SubstituteModelFilter>
@@ -103,13 +104,8 @@ GeometryCompiler::compile(Feature*              feature,
                           const Style&          style,
                           const FilterContext&  context)
 {
-    if ( !context.profile() ) {
-        OE_WARN << LC << "Valid feature profile required" << std::endl;
-        return 0L;
-    }
-
-    //if ( style.empty() ) {
-    //    OE_WARN << LC << "Non-empty style required" << std::endl;
+    //if ( !context.profile() ) {
+    //    OE_WARN << LC << "Valid feature profile required" << std::endl;
     //    return 0L;
     //}
 
@@ -124,10 +120,10 @@ GeometryCompiler::compile(FeatureCursor*        cursor,
                           const FilterContext&  context)
 
 {
-    if ( !context.profile() ) {
-        OE_WARN << LC << "Valid feature profile required" << std::endl;
-        return 0L;
-    }
+    //if ( !context.profile() ) {
+    //    OE_WARN << LC << "Valid feature profile required" << std::endl;
+    //    return 0L;
+    //}
 
     //if ( style.empty() ) {
     //    OE_WARN << LC << "Non-empty style required" << std::endl;
@@ -155,8 +151,20 @@ GeometryCompiler::compile(FeatureList&          workingSet,
 
     // create a filter context that will track feature data through the process
     FilterContext sharedCX = context;
-    if ( !sharedCX.extent().isSet() )
+    if ( !sharedCX.extent().isSet() && sharedCX.profile() )
+    {
         sharedCX.extent() = sharedCX.profile()->getExtent();
+    }
+
+    // only localize coordinates if the map is geocentric AND the extent is
+    // less than 180 degrees.
+    bool localize = false;
+    if ( sharedCX.isGeoreferenced() )
+    {
+        const MapInfo& mi = sharedCX.getSession()->getMapInfo();
+        GeoExtent workingExtent = sharedCX.extent()->transform( sharedCX.profile()->getSRS()->getGeographicSRS() );
+        localize = mi.isGeocentric() && workingExtent.width() < 180.0;
+    }
 
     // go through the Style and figure out which filters to use.
     const MarkerSymbol*    marker    = style.get<MarkerSymbol>();
@@ -221,6 +229,11 @@ GeometryCompiler::compile(FeatureList&          workingSet,
             scatter.setRandomSeed( *marker->randomSeed() );
             markerCX = scatter.push( workingSet, markerCX );
         }
+        else if ( marker->placement() == MarkerSymbol::PLACEMENT_CENTROID )
+        {
+            CentroidFilter centroid;
+            centroid.push( workingSet, markerCX );
+        }
 
         if ( altRequired )
         {
@@ -237,7 +250,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         {
             //Turn on GL_NORMALIZE so lighting works properly
             resultGroup->getOrCreateStateSet()->setMode(GL_NORMALIZE, osg::StateAttribute::ON );
-            sub.setModelMatrix( osg::Matrixd::scale( *marker->scale() ) );
+            //sub.setModelMatrix( osg::Matrixd::scale( *marker->scale() ) );
         }
 
         sub.setClustering( *_options.clustering() );

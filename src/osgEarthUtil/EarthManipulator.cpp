@@ -585,9 +585,9 @@ EarthManipulator::established()
                 else
                 {
                     setHomeViewpoint( Viewpoint(
-                        _csn->getBound().center(),
+                        safeNode->getBound().center(),
                         0, -89.9, 
-                        _csn->getBound().radius()*2.0) );
+                        safeNode->getBound().radius()*2.0) );
                 }
             }
 

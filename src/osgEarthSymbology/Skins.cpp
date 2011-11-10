@@ -82,9 +82,9 @@ SkinResource::getConfig() const
 }
 
 osg::StateSet*
-SkinResource::createStateSet() const
+SkinResource::createStateSet( const osgDB::Options* dbOptions ) const
 {
-    return createStateSet( createImage() );
+    return createStateSet( createImage(dbOptions) );
 }
 
 osg::StateSet*
@@ -121,15 +121,9 @@ SkinResource::createStateSet( osg::Image* image ) const
 }
 
 osg::Image*
-SkinResource::createImage() const
+SkinResource::createImage( const osgDB::Options* dbOptions ) const
 {
-    osg::ref_ptr<osg::Image> image;
-    if ( HTTPClient::readImageFile( _imageURI->full(), image ) != HTTPClient::RESULT_OK )
-    {
-        //TODO: hmm, perhaps create an "error image" here? or just return NULL
-        //      and let the caller do so.
-    }
-    return image.release();
+    return _imageURI->readImage(dbOptions).releaseImage();
 }
 
 //---------------------------------------------------------------------------
@@ -173,7 +167,7 @@ SkinSymbol::getConfig() const
 
     std::string tagstring = this->tagString();
     if ( !tagstring.empty() )
-        conf.attr("tags") = tagstring;
+        conf.set("tags", tagstring);
 
     return conf;
 }

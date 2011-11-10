@@ -83,7 +83,7 @@ struct RotateImage : public ControlEventHandler
 {
     void onValueChanged( Control* control, float value )
     {
-        s_imageControl->setRotation( value );
+        s_imageControl->setRotation( Angular(value) );
     }
 };
 
@@ -100,8 +100,8 @@ createControls( ControlCanvas* cs )
         center->setVertAlign( Control::ALIGN_CENTER );
 
         // Add an image:
-        osg::ref_ptr<osg::Image> image;
-        if ( HTTPClient::readImageFile("http://demo.pelicanmapping.com/rmweb/readymap_logo.png", image) == HTTPClient::RESULT_OK )
+        osg::ref_ptr<osg::Image> image = osgDB::readImageFile("http://demo.pelicanmapping.com/rmweb/readymap_logo.png");
+        if ( image.valid() )
         {
             s_imageControl = new ImageControl( image.get() );
             s_imageControl->setHorizAlign( Control::ALIGN_CENTER );

@@ -8,14 +8,13 @@ IF (GEOS_FOUND)
     ADD_DEFINITIONS(-DOSGEARTH_HAVE_GEOS)
 ENDIF(GEOS_FOUND)
 
-SET(LIB_NAME osgEarthFeatures)
-
 SET(TARGET_PUBLIC_H
 	AltitudeFilter
     BufferFilter
     BuildGeometryFilter  
     BuildTextFilter
     BuildTextOperator
+    CentroidFilter
     Common
     ConvertTypeFilter
     CropFilter
@@ -38,13 +37,14 @@ SET(TARGET_PUBLIC_H
     GeometryCompiler
 	GeometryUtils
     LabelSource
-    MarkerFactory
 	OgrUtils
     OptimizerHints
     ResampleFilter
     ScaleFilter
     Session
     ScatterFilter
+    Script
+    ScriptEngine
     SubstituteModelFilter
     TransformFilter
     VirtualFeatureSource
@@ -56,6 +56,7 @@ SET(TARGET_SRC
     BuildGeometryFilter.cpp 
     BuildTextFilter.cpp
     BuildTextOperator.cpp
+    CentroidFilter.cpp
     ConvertTypeFilter.cpp
     CropFilter.cpp
     ExtrudeGeometryFilter.cpp
@@ -77,12 +78,12 @@ SET(TARGET_SRC
     GeometryCompiler.cpp
 	GeometryUtils.cpp
     LabelSource.cpp
-    MarkerFactory.cpp
     OptimizerHints.cpp
     ResampleFilter.cpp
     ScaleFilter.cpp
     Session.cpp
     ScatterFilter.cpp
+    ScriptEngine.cpp
     SubstituteModelFilter.cpp
     TransformFilter.cpp
     VirtualFeatureSource.cpp

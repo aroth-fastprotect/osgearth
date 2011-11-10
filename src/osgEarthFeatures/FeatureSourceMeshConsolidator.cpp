@@ -186,6 +186,7 @@ FeatureSourceMeshConsolidator::run( osg::Geode& geode, FeatureSourceMultiNode * 
 	unsigned numTexCoordArrays = 0;
 	unsigned numVertAttribArrays = 0;
     std::vector<unsigned> texCoordArrayUnits;
+    texCoordArrayUnits.reserve(32);
 
 	osg::Geometry::AttributeBinding newColorsBinding;
 	osg::Geometry::AttributeBinding newNormalsBinding;
@@ -200,7 +201,7 @@ FeatureSourceMeshConsolidator::run( osg::Geode& geode, FeatureSourceMultiNode * 
                 continue;
 
 			// optimize it into triangles first:
-			MeshConsolidator::run( *geom );
+			FeatureSourceMeshConsolidator::run( *geom, featureNode );
 
 			osg::Array* verts = geom->getVertexArray();
 			if ( verts )

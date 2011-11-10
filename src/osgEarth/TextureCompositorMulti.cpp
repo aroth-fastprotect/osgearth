@@ -21,6 +21,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/ShaderComposition>
 #include <osgEarth/ShaderUtils>
+#include <osgEarth/TileKey>
 #include <osg/Texture2D>
 #include <osg/TexEnv>
 #include <osg/TexEnvCombine>
@@ -96,7 +97,8 @@ namespace
         }
 
         buf << "uniform float osgearth_ImageLayerOpacity[" << maxSlots << "]; \n"
-            << "uniform bool  osgearth_ImageLayerEnabled[" << maxSlots << "]; \n"
+            //The enabled array is a fixed size.  Make sure this corresponds to the size definition in TerrainEngineNode.cpp
+            << "uniform bool  osgearth_ImageLayerEnabled[" << 16 << "]; \n"  
             << "uniform float osgearth_ImageLayerRange[" << 2 * maxSlots << "]; \n"
             << "uniform float osgearth_ImageLayerAttenuation; \n"
             << "uniform float osgearth_CameraElevation; \n"

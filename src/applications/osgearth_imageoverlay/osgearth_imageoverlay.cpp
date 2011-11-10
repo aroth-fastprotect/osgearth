@@ -33,12 +33,13 @@
 #include <osg/Version>
 #include <osgEarth/Version>
 
-#include <osgEarthUtil/ImageOverlay>
+#include <osgEarthAnnotation/ImageOverlay>
 #if OSG_MIN_VERSION_REQUIRED(2,9,6)
-#include <osgEarthUtil/ImageOverlayEditor>
+#include <osgEarthAnnotation/ImageOverlayEditor>
 #endif
 
 using namespace osgEarth;
+using namespace osgEarth::Annotation;
 using namespace osgEarth::Util;
 using namespace osgEarth::Util::Controls;
 
@@ -192,9 +193,6 @@ main(int argc, char** argv)
       imageFiles.push_back("../data/osgearth.gif");
       imageBounds.push_back( Bounds(-100, 30, -90, 40) );
     }
- 
-
-    bool moveVert = arguments.read("--vert");
 
     // load the .earth file from the command line.
     osg::Node* earthNode = osgDB::readNodeFiles( arguments );

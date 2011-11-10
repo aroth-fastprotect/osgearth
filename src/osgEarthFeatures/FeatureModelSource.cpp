@@ -57,6 +57,8 @@ FeatureModelSourceOptions::fromConfig( const Config& conf )
     conf.getObjIfSet( "paging", _levels ); // backwards compat.. to be deprecated
     conf.getObjIfSet( "gridding", _gridding ); // to be deprecated
     conf.getObjIfSet( "feature_name", _featureNameExpr );
+    conf.getObjIfSet( "cache_policy", _cachePolicy );
+
     conf.getIfSet( "lighting", _lit );
     conf.getIfSet( "max_granularity", _maxGranularity_deg );
     conf.getIfSet( "merge_geometry", _mergeGeometry );
@@ -85,6 +87,7 @@ FeatureModelSourceOptions::getConfig() const
     conf.updateObjIfSet( "gridding", _gridding ); // to be deprecated
     conf.updateObjIfSet( "styles", _styles );
     conf.updateObjIfSet( "layout", _levels );
+    conf.updateObjIfSet( "cache_policy", _cachePolicy );
 
     conf.updateIfSet( "lighting", _lit );
     conf.updateIfSet( "max_granularity", _maxGranularity_deg );
@@ -139,13 +142,16 @@ FeatureModelSource::setFeatureSource( FeatureSource* source )
 }
 
 void 
-FeatureModelSource::initialize( const std::string& referenceURI, const osgEarth::Map* map )
+FeatureModelSource::initialize(const osgDB::Options* dbOptions, 
+                               const osgEarth::Map*  map )
 {
-    ModelSource::initialize( referenceURI, map );
+    ModelSource::initialize( dbOptions, map );
+
+    _dbOptions = dbOptions;
 
     if ( _features.valid() )
     {
-        _features->initialize( referenceURI );
+        _features->initialize( dbOptions );
     }
     else
     {
@@ -170,7 +176,10 @@ FeatureModelSource::createNode( ProgressCallback* progress )
         return 0L;
     }
 
-    Session* session = new Session( _map.get(), _options.styles().get() );
+    Session* session = new Session( 
+        _map.get(), 
+        _options.styles().get(),
+        _dbOptions.get() );
 
     FeatureModelGraph* graph = new FeatureModelGraph( 
         _features.get(), 
@@ -182,9 +191,10 @@ FeatureModelSource::createNode( ProgressCallback* progress )
 }
 
 //------------------------------------------------------------------------
-GeomFeatureNodeFactory::GeomFeatureNodeFactory( const GeometryCompilerOptions& options )
-            : _options( options ) 
+GeomFeatureNodeFactory::GeomFeatureNodeFactory( const GeometryCompilerOptions& options ) : 
+_options( options ) 
 { 
+    //nop
 }
 
 bool GeomFeatureNodeFactory::createOrUpdateNode(       

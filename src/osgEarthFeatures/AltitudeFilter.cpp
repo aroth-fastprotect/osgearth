@@ -47,21 +47,23 @@ AltitudeFilter::setPropertiesFromStyle( const Style& style )
 FilterContext
 AltitudeFilter::push( FeatureList& features, FilterContext& cx )
 {
-    const Session* session = cx.getSession();
-    if ( !session ) {
-        OE_WARN << LC << "No session - session is required for elevation clamping" << std::endl;
-        return cx;
-    }
+    bool clamp = 
+        _altitude.valid() && 
+        _altitude->clamping() != AltitudeSymbol::CLAMP_NONE &&
+        cx.getSession()       != 0L &&
+        cx.profile()          != 0L;
 
-    // the map against which we'll be doing elevation clamping
-    MapFrame mapf = session->createMapFrame( Map::ELEVATION_LAYERS );
+    if ( clamp )
+        pushAndClamp( features, cx );
+    else
+        pushAndDontClamp( features, cx );
 
-    const SpatialReference* mapSRS     = mapf.getProfile()->getSRS();
-    const SpatialReference* featureSRS = cx.profile()->getSRS();
+    return cx;
+}
 
-    // establish an elevation query interface based on the features' SRS.
-    ElevationQuery eq( mapf );
-
+void
+AltitudeFilter::pushAndDontClamp( FeatureList& features, FilterContext& cx )
+{
     NumericExpression scaleExpr;
     if ( _altitude.valid() && _altitude->verticalScale().isSet() )
         scaleExpr = *_altitude->verticalScale();
@@ -70,8 +72,64 @@ AltitudeFilter::push( FeatureList& features, FilterContext& cx )
     if ( _altitude.valid() && _altitude->verticalOffset().isSet() )
         offsetExpr = *_altitude->verticalOffset();
 
-    bool clamp =
-        _altitude->clamping() != AltitudeSymbol::CLAMP_NONE;
+    for( FeatureList::iterator i = features.begin(); i != features.end(); ++i )
+    {
+        Feature* feature = i->get();
+        double maxGeomZ     = -DBL_MAX;
+        double minGeomZ     =  DBL_MAX;
+
+        double scaleZ = 1.0;
+        if ( _altitude.valid() && _altitude->verticalScale().isSet() )
+            scaleZ = feature->eval( scaleExpr );
+
+        double offsetZ = 0.0;
+        if ( _altitude.valid() && _altitude->verticalOffset().isSet() )
+            offsetZ = feature->eval( offsetExpr );
+        
+        GeometryIterator gi( feature->getGeometry() );
+        while( gi.hasMore() )
+        {
+            Geometry* geom = gi.next();
+            for( Geometry::iterator i = geom->begin(); i != geom->end(); ++i )
+            {
+                i->z() *= scaleZ;
+                i->z() += offsetZ;
+
+                if ( i->z() > maxGeomZ )
+                    maxGeomZ = i->z();
+                if ( i->z() < minGeomZ )
+                    minGeomZ = i->z();
+            }
+        }
+
+        if ( minGeomZ != DBL_MAX )
+        {
+            feature->set( "__min_geom_z", minGeomZ );
+            feature->set( "__max_geom_z", maxGeomZ );
+        }
+    }
+}
+
+void
+AltitudeFilter::pushAndClamp( FeatureList& features, FilterContext& cx )
+{
+    const Session* session = cx.getSession();
+
+    // the map against which we'll be doing elevation clamping
+    MapFrame mapf = session->createMapFrame( Map::ELEVATION_LAYERS );
+
+    const SpatialReference* featureSRS = cx.profile()->getSRS();
+
+    // establish an elevation query interface based on the features' SRS.
+    ElevationQuery eq( mapf );
+
+    NumericExpression scaleExpr;
+    if ( _altitude->verticalScale().isSet() )
+        scaleExpr = *_altitude->verticalScale();
+
+    NumericExpression offsetExpr;
+    if ( _altitude->verticalOffset().isSet() )
+        offsetExpr = *_altitude->verticalOffset();
 
     // whether to record a "minimum terrain" value
     bool collectHATs =
@@ -90,11 +148,11 @@ AltitudeFilter::push( FeatureList& features, FilterContext& cx )
 
         double scaleZ = 1.0;
         if ( _altitude.valid() && _altitude->verticalScale().isSet() )
-            scaleZ = feature->eval( scaleExpr );
+            scaleZ = feature->eval( scaleExpr, &cx );
 
         double offsetZ = 0.0;
         if ( _altitude.valid() && _altitude->verticalOffset().isSet() )
-            offsetZ = feature->eval( offsetExpr );
+            offsetZ = feature->eval( offsetExpr, &cx );
         
         GeometryIterator gi( feature->getGeometry() );
         while( gi.hasMore() )
@@ -102,40 +160,37 @@ AltitudeFilter::push( FeatureList& features, FilterContext& cx )
             Geometry* geom = gi.next();
 
             // clamps the entire array to the terrain using the specified resolution.
-            if ( clamp )
+            if ( collectHATs )
             {
-                if ( collectHATs )
+                std::vector<double> elevations;
+                elevations.reserve( geom->size() );
+                eq.getElevations( geom->asVector(), featureSRS, elevations, _maxRes );
+                for( unsigned i=0; i<geom->size(); ++i )
                 {
-                    std::vector<double> elevations;
-                    elevations.reserve( geom->size() );
-                    eq.getElevations( geom->asVector(), featureSRS, elevations, _maxRes );
-                    for( unsigned i=0; i<geom->size(); ++i )
-                    {
-                        double z = (*geom)[i].z() * scaleZ + offsetZ;
-                        double hat =
-                            _altitude->clamping() == AltitudeSymbol::CLAMP_ABSOLUTE ? z - elevations[i] :
-                            z;
+                    double z = (*geom)[i].z() * scaleZ + offsetZ;
+                    double hat =
+                        _altitude->clamping() == AltitudeSymbol::CLAMP_ABSOLUTE ? z - elevations[i] :
+                        z;
 
-                        if ( hat > maxHAT )
-                            maxHAT = hat;
-                        if ( hat < minHAT )
-                            minHAT = hat;
+                    if ( hat > maxHAT )
+                        maxHAT = hat;
+                    if ( hat < minHAT )
+                        minHAT = hat;
 
-                        double elev = elevations[i];
-                        if ( elev > maxTerrainZ )
-                            maxTerrainZ = elev;
-                        if ( elev < minTerrainZ )
-                            minTerrainZ = elev;
+                    double elev = elevations[i];
+                    if ( elev > maxTerrainZ )
+                        maxTerrainZ = elev;
+                    if ( elev < minTerrainZ )
+                        minTerrainZ = elev;
 
-                        (*geom)[i].z() =
-                            _altitude->clamping() == AltitudeSymbol::CLAMP_ABSOLUTE ? z :
-                            z + elevations[i];
-                    }
+                    (*geom)[i].z() =
+                        _altitude->clamping() == AltitudeSymbol::CLAMP_ABSOLUTE ? z :
+                        z + elevations[i];
                 }
-                else
-                {
-                    eq.getElevations( geom->asVector(), featureSRS, true, _maxRes );
-                }
+            }
+            else
+            {
+                eq.getElevations( geom->asVector(), featureSRS, true, _maxRes );
             }
 
             for( Geometry::iterator i = geom->begin(); i != geom->end(); ++i )
@@ -171,6 +226,4 @@ AltitudeFilter::push( FeatureList& features, FilterContext& cx )
             feature->set( "__max_terrain_z", maxTerrainZ );
         }
     }
-
-    return cx;
 }

@@ -614,9 +614,9 @@ QscSpatialReference::transformExtent(const SpatialReference* to_srs,
     }
     else
     {
-        bool ok1 = transform2D(lonmin, latmin, to_srs, in_out_xmin, in_out_ymin,
+        bool ok1 = transform(lonmin, latmin, to_srs, in_out_xmin, in_out_ymin,
                              context);
-        bool ok2 = transform2D(lonmax, latmax, to_srs, in_out_xmax, in_out_ymax,
+        bool ok2 = transform(lonmax, latmax, to_srs, in_out_xmax, in_out_ymax,
                              context);
         ok = ok1 && ok2;
     }

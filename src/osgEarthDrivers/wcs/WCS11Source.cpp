@@ -21,6 +21,7 @@
 #include <osgEarth/HTTPClient>
 #include <osgEarth/ImageToHeightFieldConverter>
 #include <osgEarth/Registry>
+#include <osgEarth/URI>
 #include <osg/Notify>
 #include <osgDB/Registry>
 #include <iostream>
@@ -42,7 +43,9 @@ _options(options)
 }
 
 
-void WCS11Source::initialize( const std::string& referenceURI, const Profile* overrideProfile)
+void
+WCS11Source::initialize(const osgDB::Options* dbOptions,
+                        const Profile*        overrideProfile )
 {
 	if (overrideProfile)
 	{

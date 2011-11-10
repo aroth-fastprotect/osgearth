@@ -23,6 +23,7 @@ SET(TARGET_COMMON_LIBRARIES
 #  NodeKit/Psudo loader plugins
 #
 ADD_SUBDIRECTORY(earth)
+ADD_SUBDIRECTORY(kml)
 
 ADD_SUBDIRECTORY(wcs)
 ADD_SUBDIRECTORY(wms)
@@ -38,6 +39,7 @@ ADD_SUBDIRECTORY(agglite)
 ADD_SUBDIRECTORY(model_simple)
 ADD_SUBDIRECTORY(model_lodovr)
 ADD_SUBDIRECTORY(debug)
+ADD_SUBDIRECTORY(cache_filesystem)
 
 IF(LIBZIP_FOUND)
 	ADD_SUBDIRECTORY(zipfs)
@@ -51,16 +53,22 @@ IF(GDAL_FOUND)
 #  	ADD_SUBDIRECTORY(model_feature_overlay)
 	ADD_SUBDIRECTORY(model_feature_stencil)
 	ADD_SUBDIRECTORY(model_feature_geom)
-	ADD_SUBDIRECTORY(model_feature_label)
+#	ADD_SUBDIRECTORY(model_feature_label)
   	ADD_SUBDIRECTORY(mask_feature)
   	ADD_SUBDIRECTORY(label_overlay)
+  ADD_SUBDIRECTORY(label_annotation)
 ENDIF(GDAL_FOUND)
 
 IF(SQLITE3_FOUND)
-  ADD_SUBDIRECTORY(cache_sqlite3)
+#  ADD_SUBDIRECTORY(cache_sqlite3)
+  ADD_SUBDIRECTORY(mbtiles)
 ENDIF(SQLITE3_FOUND)
 
 ADD_SUBDIRECTORY(engine_osgterrain)
+
+IF(V8_FOUND)
+  ADD_SUBDIRECTORY(script_engine_v8)
+ENDIF(V8_FOUND)
 
 # not yet ready drivers: droam and seamless
 #ADD_SUBDIRECTORY(engine_droam)

@@ -5,7 +5,7 @@ Demonstrates the use of a Resource Library in order to apply "typical" textures
 to extruded buildings.
 -->
 
-<map name="Resource Library Demo" type="geocentric" version="2">
+<map name="Boston Demo" type="geocentric" version="2">
     
     <image name="ReadyMap.org - Imagery" driver="tms">
         <url>http://readymap.org/readymap/tiles/1.0.0/22/</url>
@@ -53,19 +53,20 @@ to extruded buildings.
                     extrusion-flatten:     true;
                     extrusion-wall-style:  building-wall;
                     extrusion-roof-style:  building-rooftop;
-                    extrusion-random-seed: 1;
                     altitude-clamping:     none;
                 }            
                 building-wall {
-                    skin-library: us_resources;
-                    skin-tags:    building;
-                    fill:         #ffffff;
+                    skin-library:     us_resources;
+                    skin-tags:        building;
+                    skin-random-seed: 1;
+                    fill:             #ffffff;
                 }
                 building-rooftop {
-                    skin-library: us_resources;
-                    skin-tags:    rooftop;
-                    skin-tiled:   true;
-                    fill:         #ffffff;
+                    skin-library:     us_resources;
+                    skin-tags:        rooftop;
+                    skin-tiled:       true;
+                    skin-random-seed: 1;
+                    fill:             #ffffff;
                 }
             </style>
         </styles>
@@ -79,9 +80,6 @@ to extruded buildings.
         <terrain>
             <sample_ratio>0.5</sample_ratio>
         </terrain>
-        <cache type="tms">
-            <path>osgearth_cache</path>
-        </cache>
     </options> 
     
     <external>

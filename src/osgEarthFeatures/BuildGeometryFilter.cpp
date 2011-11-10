@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthFeatures/BuildGeometryFilter>
-#include <osgEarth/MeshConsolidator>
+#include <osgEarthFeatures/FeatureSourceMeshConsolidator>
 #include <osgEarthSymbology/TextSymbol>
 #include <osgEarthSymbology/PointSymbol>
 #include <osgEarthSymbology/LineSymbol>
@@ -59,7 +59,7 @@ BuildGeometryFilter::reset()
 {
     _result = 0L;
     _geode = new osg::Geode();
-	_featureNode = new FeatureSourceMultiNode;
+    _featureNode = new FeatureSourceMultiNode;
     _hasLines = false;
     _hasPoints = false;
     _hasPolygons = false;
@@ -68,8 +68,14 @@ BuildGeometryFilter::reset()
 bool
 BuildGeometryFilter::process( FeatureList& features, const FilterContext& context )
 {
-    bool makeECEF = context.getSession()->getMapInfo().isGeocentric();
-    const SpatialReference* srs = context.extent()->getSRS();
+    bool makeECEF = false;
+    const SpatialReference* featureSRS = 0L;
+
+    if ( context.isGeoreferenced() )
+    {
+        makeECEF = context.getSession()->getMapInfo().isGeocentric();
+        featureSRS = context.extent()->getSRS();
+    }
 
     for( FeatureList::iterator f = features.begin(); f != features.end(); ++f )
     {
@@ -153,15 +159,15 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     }
                 }
                 break;
-		    default:
-			    break;
+            default:
+                break;
             }
             
             osg::Geometry* osgGeom = new osg::Geometry();
     
             if ( _featureNameExpr.isSet() )
             {
-                const std::string& name = input->eval( _featureNameExpr.mutable_value() );
+                const std::string& name = input->eval( _featureNameExpr.mutable_value(), &context );
                 osgGeom->setName( name );
             }
     
@@ -195,7 +201,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 if ( makeECEF )
                 {
                     allPoints = new osg::Vec3Array();
-                    ECEF::transformAndLocalize( part->asVector(), allPoints, srs, _world2local );
+                    ECEF::transformAndLocalize( part->asVector(), featureSRS, allPoints, _world2local );
                 }
                 else
                 {
@@ -212,7 +218,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     if ( hole->isValid() )
                     {
                         if ( makeECEF )
-                            ECEF::transformAndLocalize( hole->asVector(), allPoints, srs, _world2local );
+                            ECEF::transformAndLocalize( hole->asVector(), featureSRS, allPoints, _world2local );
                         else
                         	std::copy( hole->begin(), hole->end(), allPoints->begin() + offset );
 
@@ -227,7 +233,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 if ( makeECEF )
                 {
                     osg::Vec3Array* newPart = new osg::Vec3Array();
-                    ECEF::transformAndLocalize( part->asVector(), newPart, srs, _world2local );
+                    ECEF::transformAndLocalize( part->asVector(), featureSRS, newPart, _world2local );
                     osgGeom->setVertexArray( newPart );
                 }
                 else
@@ -260,12 +266,11 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 //osgGeom->setDataVariance( osg::Object::DYNAMIC );
             }
     
-            if ( context.getSession()->getMapInfo().isGeocentric() && part->getType() != Geometry::TYPE_POINTSET )
-//            if ( context.isGeocentric() && part->getType() != Geometry::TYPE_POINTSET )
+            if ( makeECEF && part->getType() != Geometry::TYPE_POINTSET )
             {
                 double threshold = osg::DegreesToRadians( *_maxAngle_deg );
     
-                MeshSubdivider ms( _world2local, _local2world ); //context.referenceFrame(), context.inverseReferenceFrame() );
+                MeshSubdivider ms( _world2local, _local2world );
                 //ms.setMaxElementsPerEBO( INT_MAX );
                 if ( input->geoInterp().isSet() )
                     ms.run( *osgGeom, threshold, *input->geoInterp() );
@@ -278,10 +283,10 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
             (*colors)[0] = color;
             osgGeom->setColorArray( colors );
             osgGeom->setColorBinding( osg::Geometry::BIND_OVERALL );
-    
+
             // add the part to the geode.
-		    _featureNode->addDrawable(osgGeom, input->getFID());
-    
+            _featureNode->addDrawable(osgGeom, input->getFID());
+
             _geode->addDrawable( osgGeom );
         }
     }
@@ -301,7 +306,7 @@ BuildGeometryFilter::push( FeatureList& input, FilterContext& context )
     // convert all geom to triangles and consolidate into minimal set of Geometries
     if ( !_featureNameExpr.isSet() )
     {
-        MeshConsolidator::run( *_geode.get() );
+        FeatureSourceMeshConsolidator::run( *_geode.get(), _featureNode );
     }
 
     osg::Node* result = 0L;
@@ -325,9 +330,9 @@ BuildGeometryFilter::push( FeatureList& input, FilterContext& context )
                     new osg::Point( *pointSymbol->size() ), osg::StateAttribute::ON );
         }
 
-		_featureNode->addChild(_geode.release());
+        _featureNode->addChild(_geode.release());
 
-		result = delocalize( _featureNode.release() );
+        result = delocalize( _featureNode.release() );
     }
     else
     {

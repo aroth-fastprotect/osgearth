@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
+#if 0
 #include <osgEarthFeatures/MarkerFactory>
 #include <osgEarth/Utils>
 #include <osg/TextureRectangle>
@@ -207,3 +208,5 @@ MarkerFactory::createImageFromURI( const URI& uri ) const
 
     return 0L;
 }
+
+#endif

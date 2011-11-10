@@ -33,12 +33,12 @@ KML_IconStyle::scan( const Config& conf, Style& style )
         if ( !iconHref.empty() )
         {
             marker->url() = StringExpression( iconHref );
-            marker->url()->setURIContext( conf.uriContext() );
+            marker->url()->setURIContext( URIContext(conf.referrer()) );
         }
 
         optional<float> scale;
         conf.getIfSet( "scale", scale );
         if ( scale.isSet() )
-            marker->scale() = osg::Vec3f(*scale, *scale, *scale);
+            marker->scale() = NumericExpression( *scale );
     }
 }

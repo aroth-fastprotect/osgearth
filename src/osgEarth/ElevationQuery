@@ -144,16 +144,6 @@ namespace osgEarth
         int getMaxTilesToCache() const;
 
         /**
-         * Sets the elevation interpolation to use when sampling data
-         */
-        void setInterpolation( ElevationInterpolation interp );
-
-        /**
-         * Gets the elevation interpolation to use when sampling data
-         */
-        ElevationInterpolation getElevationInterpolation() const;
-
-        /**
         * Sets the maximum level override for elevation queries.
         * A value of -1 turns off the override.
         */
@@ -164,6 +154,11 @@ namespace osgEarth
         */
         int getMaxLevelOverride() const;
 
+        /**
+         * Gets the average time per query
+         */
+        double getAverageQueryTime() const { return _queries > 0.0 ? _totalTime/_queries : 0.0; }
+
     private:
         MapFrame _mapf;
         unsigned _maxCacheSize;
@@ -171,11 +166,12 @@ namespace osgEarth
         unsigned int _maxDataLevel;
         int _maxLevelOverride;
         Technique _technique;
-        ElevationInterpolation _interpolation;
 
         typedef LRUCache< TileKey, osg::ref_ptr<osgTerrain::TerrainTile> > TileCache;
         TileCache _tileCache;
 
+        double _queries;
+        double _totalTime;
 
     private:
         void postCTOR();

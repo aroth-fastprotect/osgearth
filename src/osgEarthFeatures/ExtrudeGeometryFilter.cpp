@@ -188,12 +188,14 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
                                        const SkinResource*     roofSkin,
                                        FilterContext&          cx )
 {
-    //todo: establish reference frame for going to geocentric. This will ultimately
-    // passed in to the function.
-    const SpatialReference* srs = cx.extent()->getSRS();
+    bool makeECEF = false;
+    const SpatialReference* srs = 0L;
 
-    // whether to convert the final geometry to localized ECEF
-    bool makeECEF = cx.getSession()->getMapInfo().isGeocentric();
+    if ( cx.isGeoreferenced() )
+    {
+       srs = cx.extent()->getSRS();
+       makeECEF = cx.getSession()->getMapInfo().isGeocentric();
+    }
 
     bool made_geom = false;
 
@@ -279,10 +281,10 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
 
             // if our data is lat/long, we need to reproject the geometry and the bounds into a projected
             // coordinate system in order to properly generate tex coords.
-            if ( srs->isGeographic() )
+            if ( srs && srs->isGeographic() )
             {
                 osg::Vec2d geogCenter = roofBounds.center2d();
-                roofProjSRS = srs->createUTMFromLongitude( geogCenter.x() );
+                roofProjSRS = srs->createUTMFromLongitude( Angular(geogCenter.x()) );
                 roofBounds.transform( srs, roofProjSRS.get() );
                 osg::ref_ptr<Geometry> projectedInput = input->clone();
                 srs->transformPoints( roofProjSRS.get(), projectedInput->asVector() );
@@ -345,9 +347,7 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
 
     double     targetLen = -DBL_MAX;
     osg::Vec3d minLoc(DBL_MAX, DBL_MAX, DBL_MAX);
-    double     minLoc_len = DBL_MAX;
     osg::Vec3d maxLoc(0,0,0);
-    double     maxLoc_len = 0;
 
     // Initial pass over the geometry does two things:
     // 1: Calculate the minimum Z across all parts.
@@ -428,7 +428,7 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
             {
                 double xr, yr;
 
-                if ( srs->isGeographic() )
+                if ( srs && srs->isGeographic() )
                 {
                     osg::Vec3d projRoofPt;
                     srs->transform( roofPt, roofProjSRS.get(), projRoofPt );
@@ -449,8 +449,8 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
 
             if ( makeECEF )
             {
-                ECEF::transformAndLocalize( basePt, basePt, srs, _world2local );
-                ECEF::transformAndLocalize( roofPt, roofPt, srs, _world2local );
+                ECEF::transformAndLocalize( basePt, srs, basePt, _world2local );
+                ECEF::transformAndLocalize( roofPt, srs, roofPt, _world2local );
             }
 
             if ( base )
@@ -613,6 +613,10 @@ ExtrudeGeometryFilter::addDrawable( osg::Drawable* drawable, osg::StateSet* stat
 bool
 ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
 {
+    // seed our random number generators
+    Random wallSkinPRNG( _wallSkinSymbol.valid()? *_wallSkinSymbol->randomSeed() : 0, Random::METHOD_FAST );
+    Random roofSkinPRNG( _roofSkinSymbol.valid()? *_roofSkinSymbol->randomSeed() : 0, Random::METHOD_FAST );
+
     for( FeatureList::iterator f = features.begin(); f != features.end(); ++f )
     {
         Feature* input = f->get();
@@ -652,7 +656,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             }
             else if ( _heightExpr.isSet() )
             {
-                height = input->eval( _heightExpr.mutable_value() );
+                height = input->eval( _heightExpr.mutable_value(), &context );
             }
             else
             {
@@ -663,7 +667,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             float offset = 0.0;
             if ( _heightOffsetExpr.isSet() )
             {
-                offset = input->eval( _heightOffsetExpr.mutable_value() );
+                offset = input->eval( _heightOffsetExpr.mutable_value(), &context );
             }
 
             osg::StateSet* wallStateSet = 0L;
@@ -677,7 +681,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
                 {
                     SkinSymbol querySymbol( *_wallSkinSymbol.get() );
                     querySymbol.objectHeight() = fabs(height) - offset;
-                    wallSkin = _wallResLib->getSkin( &querySymbol, input->getFID() + 151 );
+                    wallSkin = _wallResLib->getSkin( &querySymbol, wallSkinPRNG );
                 }
 
                 else
@@ -693,7 +697,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
                 if ( _roofResLib.valid() )
                 {
                     SkinSymbol querySymbol( *_roofSkinSymbol.get() );
-                    roofSkin = _roofResLib->getSkin( &querySymbol, input->getFID() + 151 );
+                    roofSkin = _roofResLib->getSkin( &querySymbol, roofSkinPRNG );
                 }
 
                 else
@@ -770,7 +774,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
 
                 std::string name;
                 if ( !_featureNameExpr.empty() )
-                    name = input->eval( _featureNameExpr );
+                    name = input->eval( _featureNameExpr, &context );
 
                 //MeshConsolidator::run( *walls.get() );
                 addDrawable( walls.get(), wallStateSet, name );
@@ -808,13 +812,14 @@ ExtrudeGeometryFilter::push( FeatureList& input, FilterContext& context )
     _wallResLib = 0L;
     _roofResLib = 0L;
 
-    const StyleSheet* sheet = context.getSession()->styles();
+    const StyleSheet* sheet = context.getSession() ? context.getSession()->styles() : 0L;
 
     if ( sheet != 0L )
     {
         if ( _wallSkinSymbol.valid() && _wallSkinSymbol->libraryName().isSet() )
         {
-            _wallResLib = sheet->getResourceLibrary( *_wallSkinSymbol->libraryName() );
+            _wallResLib = sheet->getResourceLibrary( *_wallSkinSymbol->libraryName(), context.getDBOptions() );
+
             if ( !_wallResLib.valid() )
             {
                 OE_WARN << LC << "Unable to load resource library '" << *_wallSkinSymbol->libraryName() << "'"
@@ -824,7 +829,7 @@ ExtrudeGeometryFilter::push( FeatureList& input, FilterContext& context )
 
         if ( _roofSkinSymbol.valid() && _roofSkinSymbol->libraryName().isSet() )
         {
-            _roofResLib = sheet->getResourceLibrary( *_roofSkinSymbol->libraryName() );
+            _roofResLib = sheet->getResourceLibrary( *_roofSkinSymbol->libraryName(), context.getDBOptions() );
             if ( !_roofResLib.valid() )
             {
                 OE_WARN << LC << "Unable to load resource library '" << *_roofSkinSymbol->libraryName() << "'"
@@ -837,7 +842,7 @@ ExtrudeGeometryFilter::push( FeatureList& input, FilterContext& context )
     computeLocalizers( context );
 
     // push all the features through the extruder.
-    bool ok = process( input, context );
+    process( input, context );
 
     // convert everything to triangles and combine drawables.
     if ( _mergeGeometry == true && _featureNameExpr.empty() )

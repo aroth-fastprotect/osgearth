@@ -686,7 +686,7 @@ EulerSpatialReference::transform(double x, double y,
     if ( !_initialized )
         const_cast<EulerSpatialReference*>(this)->init();
     if (!to_srs->isEquivalentTo(getGeographicSRS()))
-        return SpatialReference::transform2D(x, y, to_srs, out_x, out_y, context);
+        return SpatialReference::transform(x, y, to_srs, out_x, out_y, context);
     if (EulerSpatialReference::preTransform(x, y, context))
     {
         out_x = x;
@@ -708,7 +708,7 @@ bool EulerSpatialReference::transformPoints(const SpatialReference* to_srs,
         if ( !_initialized )
             const_cast<EulerSpatialReference*>(this)->init();
         if (!to_srs->isEquivalentTo(getGeographicSRS()))
-            return SpatialReference::transformPoints(to_srs, x, y, NULL, numPoints,
+            return SpatialReference::transformPoints(to_srs, x, y, numPoints,
                                                      context, ignore_errors);
         bool success = true;
         for (unsigned int i = 0; i < numPoints; ++i)

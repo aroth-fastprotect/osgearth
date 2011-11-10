@@ -60,7 +60,7 @@ public:
     }
 
 public:
-    void initialize( const std::string& referenceURI, const Profile* overrideProfile)
+    void initialize( const osgDB::Options* options, const Profile* overrideProfile)
     {
         setProfile( Profile::create(
             "epsg:4326",

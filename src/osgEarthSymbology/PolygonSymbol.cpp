@@ -22,6 +22,7 @@ using namespace osgEarth;
 using namespace osgEarth::Symbology;
 
 PolygonSymbol::PolygonSymbol( const Config& conf ) :
+Symbol( conf ),
 _fill( Fill() )
 {
     mergeConfig(conf);

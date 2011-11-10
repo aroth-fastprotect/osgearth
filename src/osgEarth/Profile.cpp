@@ -22,6 +22,7 @@
 #include <osgEarth/TileKey>
 #include <osgEarth/Cube>
 #include <osgEarth/SpatialReference>
+#include <osgEarth/StringUtils>
 #include <osgDB/FileNameUtils>
 #include <algorithm>
 #include <sstream>
@@ -272,6 +273,9 @@ _vsrs( vsrs )
 
     if ( !_vsrs.valid() )
         _vsrs = Registry::instance()->getDefaultVSRS();
+
+    // gen the signature
+    _signature = Stringify() << std::hex << hashString( toProfileOptions().getConfig().toJSON() );
 }
 
 Profile::Profile(const SpatialReference* srs,
@@ -294,6 +298,9 @@ _vsrs( vsrs )
 
     if ( !_vsrs.valid() )
         _vsrs = Registry::instance()->getDefaultVSRS();
+
+    // gen the signature
+    _signature = Stringify() << std::hex << hashString( toProfileOptions().getConfig().toJSON() );
 }
 
 Profile::ProfileType
@@ -340,6 +347,21 @@ Profile::toString() const
 	return bufStr;
 }
 
+ProfileOptions
+Profile::toProfileOptions() const
+{
+    ProfileOptions op;
+    op.srsString() = getSRS()->getInitString();
+    op.vsrsString() = getVerticalSRS()->getInitString();
+    op.bounds()->xMin() = _extent.xMin();
+    op.bounds()->yMin() = _extent.yMin();
+    op.bounds()->xMax() = _extent.xMax();
+    op.bounds()->yMax() = _extent.yMax();
+    op.numTilesWideAtLod0() = _numTilesWideAtLod0;
+    op.numTilesHighAtLod0() = _numTilesHighAtLod0;
+    return op;
+}
+
 void
 Profile::getRootKeys( std::vector<TileKey>& out_keys ) const
 {
@@ -384,12 +406,13 @@ Profile::getProfileTypeFromSRS(const std::string& srs_string)
 bool
 Profile::isEquivalentTo( const Profile* rhs ) const
 {
-    return
-        rhs &&
-        _extent.isValid() && rhs->getExtent().isValid() &&
-        _extent == rhs->getExtent() &&
-        _numTilesWideAtLod0 == rhs->_numTilesWideAtLod0 &&
-        _numTilesHighAtLod0 == rhs->_numTilesHighAtLod0;
+    return rhs && getSignature() == rhs->getSignature();
+    //return
+    //    rhs &&
+    //    _extent.isValid() && rhs->getExtent().isValid() &&
+    //    _extent == rhs->getExtent() &&
+    //    _numTilesWideAtLod0 == rhs->_numTilesWideAtLod0 &&
+    //    _numTilesHighAtLod0 == rhs->_numTilesHighAtLod0;
 }
 
 void

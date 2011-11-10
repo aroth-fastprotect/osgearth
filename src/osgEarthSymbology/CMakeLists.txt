@@ -8,8 +8,6 @@ IF (GEOS_FOUND)
     ADD_DEFINITIONS(-DOSGEARTH_HAVE_GEOS)
 ENDIF(GEOS_FOUND)
 
-SET(LIB_NAME osgEarthSymbology)
-
 SET(TARGET_PUBLIC_H
 #   header files go here
 	AGG.h
@@ -25,8 +23,10 @@ SET(TARGET_PUBLIC_H
     GeometryRasterizer
 	LineFunctor
     LineSymbol
-    MeshSubdivider
+    MarkerResource
     MarkerSymbol
+    MeshConsolidator
+    MeshSubdivider
     PointSymbol
     PolygonSymbol
 	Query
@@ -53,8 +53,10 @@ SET(TARGET_SRC
     GEOS.cpp
     GeometryRasterizer.cpp
     LineSymbol.cpp
-    MeshSubdivider.cpp
+    MarkerResource.cpp
     MarkerSymbol.cpp
+    MeshConsolidator.cpp
+    MeshSubdivider.cpp
     PointSymbol.cpp
     PolygonSymbol.cpp
     Query.cpp

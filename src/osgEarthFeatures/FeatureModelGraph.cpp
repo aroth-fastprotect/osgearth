@@ -248,15 +248,16 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
     double centerZ = 0.0;
     if ( mapf )
     {
-        // note: use the lowest possible resolution to speed up queries
+        // Use an appropriate resolution for this extents width
+        double resolution = workingExtent.width();             
         ElevationQuery query( *mapf );
-        query.getElevation( center, mapf->getProfile()->getSRS(), center.z(), DBL_MAX );
+        query.getElevation( center, mapf->getProfile()->getSRS(), center.z(), resolution );
         centerZ = center.z();
     }
 
     corner.x() = workingExtent.xMin();
     corner.y() = workingExtent.yMin();
-    corner.z() = 0.0;
+    corner.z() = 0;
 
     if ( _session->getMapInfo().isGeocentric() )
     {
@@ -264,7 +265,7 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
         workingExtent.getSRS()->transformToECEF( corner, corner );
     }
 
-    return osg::BoundingSphered( center, (center-corner).length() + fabs(centerZ) );
+    return osg::BoundingSphered( center, (center-corner).length() );
 }
 
 void
@@ -313,6 +314,9 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
             float tileFactor = _options.levels().isSet() ? _options.levels()->tileSizeFactor().get() : 15.0f;
             double maxRange =  tileBound.radius() * tileFactor;
             FeatureLevel level( 0, maxRange );
+            //OE_NOTICE << "(" << lod << ": " << tileX << ", " << tileY << ")" << std::endl;
+            //OE_NOTICE << "  extent = " << tileExtent.width() << "x" << tileExtent.height() << std::endl;
+            //OE_NOTICE << "  tileFactor = " << tileFactor << " maxRange=" << maxRange << " radius=" << tileBound.radius() << std::endl;
             
             // Construct a tile key that will be used to query the source for this tile.
             TileKey key(lod, tileX, tileY, _source->getFeatureProfile()->getProfile());

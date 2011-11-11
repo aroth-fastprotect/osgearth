@@ -1173,7 +1173,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
               for (osgEarth::Symbology::Polygon::iterator mit = maskPoly->begin(); mit != maskPoly->end(); ++mit)
               {
                 osg::Vec3d p1 = *mit;
-				osgEarth::Symbology::Polygon::iterator mitEnd = maskPoly->end();
+                osgEarth::Symbology::Polygon::iterator mitEnd = maskPoly->end();
                 osg::Vec3d p3 = (mit == (--mitEnd)) ? maskPoly->front() : (*(mit + 1));
 
                 //Truncated vales to compensate for accuracy issues

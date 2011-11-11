@@ -187,7 +187,6 @@ public:
       osg::Matrix _worldToLocal;
 };
 
-
 /****************************************************************/
 FeatureEditor::FeatureEditor( Feature* feature, FeatureSource* source, MapNode* mapNode ):
 _pickColor(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)),

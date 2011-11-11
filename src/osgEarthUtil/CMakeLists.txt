@@ -17,7 +17,7 @@ SET(TARGET_PUBLIC_H
 	MeasureTool
 	ObjectPlacer
 	ObjectLocator
-	OceanSurfaceNode
+    #OceanSurfaceNode
 	SkyNode
 	SpatialData
 	StarData
@@ -36,7 +36,7 @@ SET(TARGET_SRC
 	MeasureTool.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
-    OceanSurfaceNode.cpp
+    #OceanSurfaceNode.cpp
     SpatialData.cpp
     SkyNode.cpp
 	WFS.cpp

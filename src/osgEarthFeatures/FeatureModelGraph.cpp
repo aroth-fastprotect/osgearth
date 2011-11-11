@@ -333,7 +333,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
             osg::ref_ptr<osg::Group> group = new osg::Group();
 
             // calculate the LOD of the next level:
-            if ( lod+1 != ~0 )
+            if ( lod+1 != ~0u )
             {
                 //if ( geometry == 0L )
                 //{

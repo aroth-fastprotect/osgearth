@@ -90,7 +90,7 @@ _bufsize( 1024000 )
 KMZArchive::~KMZArchive()
 {
     if ( _buf )
-        delete [] _buf;
+        delete [] (char*)_buf;
 }
 
 void 

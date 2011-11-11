@@ -41,14 +41,14 @@ namespace osgEarth
             CSTYPE_GEOCENTRIC,
             CSTYPE_GEOCENTRIC_CUBE,
             CSTYPE_PROJECTED
-        };		
+        };
 
     public:
         MapOptions( const ConfigOptions& options =ConfigOptions() )
             : ConfigOptions( options ),
+              _cachePolicy ( CachePolicy()),
               _cstype( CSTYPE_GEOCENTRIC ),
               _referenceURI(""),
-              _cachePolicy ( CachePolicy()),
               _elevationInterpolation(INTERP_BILINEAR)
         {
             fromConfig(_conf);

@@ -119,6 +119,8 @@ namespace
 
 Control::Control() :
 _x(0), _y(0), _width(1), _height(1),
+_hfill( false ),
+_vfill( false ),
 _margin( Gutter(0) ),
 _padding( Gutter(2) ),
 _visible( true ),
@@ -128,9 +130,7 @@ _backColor( osg::Vec4f(0,0,0,0) ),
 _foreColor( osg::Vec4f(1,1,1,1) ),
 _activeColor( osg::Vec4f(.4,.4,.4,1) ),
 _active( false ),
-_absorbEvents( false ),
-_hfill( false ),
-_vfill( false )
+_absorbEvents( false )
 {
     //nop
 }
@@ -1886,8 +1886,8 @@ ControlNode::traverse( osg::NodeVisitor& nv )
 
 ControlNode::PerViewData::PerViewData() :
 _obscured   ( true ),
-_visibleTime( 0.0 ),
-_screenPos  ( 0.0, 0.0, 0.0 )
+_screenPos  ( 0.0, 0.0, 0.0 ),
+_visibleTime( 0.0 )
 {
     //nop
 }
@@ -1895,9 +1895,9 @@ _screenPos  ( 0.0, 0.0, 0.0 )
 // ---------------------------------------------------------------------------
 
 ControlNodeBin::ControlNodeBin() :
-_sortingEnabled( true ),
 _sortByDistance( true ),
-_fading        ( true )
+_fading        ( true ),
+_sortingEnabled( true )
 {
     _group = new Group();
 

@@ -18,7 +18,7 @@
  */
 #include <osgEarthFeatures/ExtrudeGeometryFilter>
 #include <osgEarthSymbology/MeshSubdivider>
-#include <osgEarth/MeshConsolidator>
+#include <osgEarthSymbology/MeshConsolidator>
 #include <osgEarth/ECEF>
 #include <osg/ClusterCullingCallback>
 #include <osg/Geode>

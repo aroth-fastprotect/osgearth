@@ -37,12 +37,11 @@ TerrainLayerOptions::TerrainLayerOptions( const ConfigOptions& options ) :
 ConfigOptions       ( options ),
 _minLevel           ( 0 ),
 _maxLevel           ( 99 ),
-_cachePolicy        ( CachePolicy::USAGE_DEFAULT ),
 _loadingWeight      ( 1.0f ),
 _exactCropping      ( false ),
 _enabled            ( true ),
-_reprojectedTileSize( 256 )
-
+_reprojectedTileSize( 256 ),
+_cachePolicy        ( CachePolicy::USAGE_DEFAULT )
 {
     setDefaults();
     fromConfig( _conf ); 
@@ -141,8 +140,8 @@ _runtimeOptions( options )
 }
 
 TerrainLayer::TerrainLayer( TerrainLayerOptions* options, TileSource* tileSource ) :
-_runtimeOptions( options ),
-_tileSource    ( tileSource )
+_tileSource    ( tileSource ),
+_runtimeOptions( options )
 {
     init();
 }

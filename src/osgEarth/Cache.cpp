@@ -30,10 +30,9 @@ using namespace osgEarth::Threading;
 #define LC "[Cache] "
 
 //------------------------------------------------------------------------
-
 Cache::Cache( const CacheOptions& options ) :
-_options( options ),
-_ok     ( true )
+_ok     ( true ),
+_options( options )
 {
     //nop
 }

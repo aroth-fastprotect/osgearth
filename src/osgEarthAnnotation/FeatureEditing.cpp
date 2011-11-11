@@ -26,12 +26,12 @@ using namespace osgEarth::Features;
 
 /****************************************************************/
 AddPointHandler::AddPointHandler(Feature* feature, FeatureListSource* source, const osgEarth::SpatialReference* mapSRS):
-_feature(feature),
-_source( source ),
-_mapSRS( mapSRS ),
+_mouseButton( osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON ),
 _mouseDown( false ),
 _firstMove( false ),
-_mouseButton( osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON ),
+_source( source ),
+_feature(feature),
+_mapSRS( mapSRS ),
 _intersectionMask( 0xffffffff )
 {
 }
@@ -117,9 +117,9 @@ class MoveFeatureDraggerCallback : public osgManipulator::DraggerCallback
 {
 public:
     MoveFeatureDraggerCallback(Feature* feature, FeatureSource* source, const Map* map, int point):
+      _map(map),
       _feature(feature),
       _source(source),
-      _map(map),
       _point(point)
       {}
 
@@ -187,14 +187,15 @@ public:
       osg::Matrix _worldToLocal;
 };
 
+
 /****************************************************************/
 FeatureEditor::FeatureEditor( Feature* feature, FeatureSource* source, MapNode* mapNode ):
+_pickColor(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)),
+_color(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)),
+_size( 5.0f ),
 _feature( feature ),
 _source( source ),
-_mapNode( mapNode ),
-_color(osg::Vec4(0.0f, 1.0f, 0.0f, 1.0f)),
-_pickColor(osg::Vec4(1.0f, 1.0f, 0.0f, 1.0f)),
-_size( 5.0f )
+_mapNode( mapNode )
 {
     init();
 }

@@ -42,7 +42,7 @@ namespace osgEarth { namespace Features
      * @param name
      *      Name of the script
      */
-    Script( const std::string& code="", const std::string& language="javascript", const std::string& name="" ) : _code(code), _language(language), _name(name) { };
+    Script( const std::string& code="", const std::string& language="javascript", const std::string& name="" ) : _name(name), _language(language), _code(code) { };
     
     /**
      * Sets the name of this script.
@@ -103,8 +103,8 @@ namespace osgEarth { namespace Features
   class OSGEARTHFEATURES_EXPORT ScriptResult : public osg::Referenced
   {
   public:
-    ScriptResult() : _value(""), _success(false), _msg("Script result not set") {}
-    ScriptResult(const std::string& val, bool success=true, const std::string& message="") : _value(val), _success(success), _msg(message) {}
+    ScriptResult() : _value(""), _msg("Script result not set"), _success(false) {}
+    ScriptResult(const std::string& val, bool success=true, const std::string& message="") : _value(val), _msg(message), _success(success) {}
 
     bool success() const { return _success; }
 

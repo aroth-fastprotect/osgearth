@@ -201,7 +201,7 @@ struct ClusterVisitor : public osg::NodeVisitor
             // save the geode's drawables..
             osg::Geode::DrawableList old_drawables = geode.getDrawableList();
 
-            OE_WARN << "ClusterVisitor geode " << &geode << " featureNode=" << _featureNode << " drawables=" << old_drawables.size() << std::endl;
+            //OE_DEBUG << "ClusterVisitor geode " << &geode << " featureNode=" << _featureNode << " drawables=" << old_drawables.size() << std::endl;
 
             // ..and clear out the drawables list.
             geode.removeDrawables( 0, geode.getNumDrawables() );

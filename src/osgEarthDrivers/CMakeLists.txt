@@ -12,11 +12,9 @@ IF(MSVC80 OR MSVC90)
     ENDIF()
 ENDIF()
 
-#OpenThreads, osg, osgDB and osgUtil are included elsewhere.
-SET(TARGET_COMMON_LIBRARIES 
-    osgEarth
+LIST(APPEND TARGET_COMMON_LIBRARIES 
+    OpenThreads osg osgDB osgUtil osgEarth
 )
-#SET(TARGET_COMMON_LIBRARIES osg osgDB osgUtil osgEarth)
 
 ############################################################
 #

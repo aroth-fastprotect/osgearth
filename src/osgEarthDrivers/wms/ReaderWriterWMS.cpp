@@ -248,7 +248,7 @@ public:
         }
 
         //TODO: won't need this for OSG 2.9+, b/c of mime-type support
-        _prototype = _prototype + std::string("&.") + _formatToUse;
+        //_prototype = _prototype + std::string("&.") + _formatToUse;
 
         // populate the data metadata:
         // TODO

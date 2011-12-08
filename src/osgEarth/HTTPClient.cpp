@@ -676,6 +676,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
     errorBuf[0] = 0;
     curl_easy_setopt( _curl_handle, CURLOPT_ERRORBUFFER, (void*)errorBuf );
 
+    curl_easy_setopt( _curl_handle, CURLOPT_SSL_VERIFYPEER, (void*)0 );
     curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)&sp);
     CURLcode res = curl_easy_perform( _curl_handle );
     curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)0 );

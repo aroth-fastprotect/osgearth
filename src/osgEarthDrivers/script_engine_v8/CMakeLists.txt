@@ -12,7 +12,7 @@ SET(TARGET_PUBLIC_H
     JSWrappers
     V8Util
 )
-LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthFeatures)
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthFeatures osgEarthSymbology)
 LIST(APPEND TARGET_LIBRARIES_VARS V8_LIBRARY)
 
 SETUP_PLUGIN(osgearth_scriptengine_javascript)

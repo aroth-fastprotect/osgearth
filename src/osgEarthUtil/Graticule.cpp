@@ -119,7 +119,8 @@ _textColor( 1,1,0,1 )
     {
         std::stringstream buf;
         buf << "0_" << _id << "." << GRID_MARKER << "." << GRATICLE_EXTENSION;
-        std::string bufStr = buf.str();
+        std::string bufStr;
+        bufStr = buf.str();
         osg::ProxyNode* proxy = new osg::ProxyNode();
         proxy->setFileName( 0, bufStr );
         proxy->setCenterMode( osg::ProxyNode::USER_DEFINED_CENTER );
@@ -132,7 +133,8 @@ _textColor( 1,1,0,1 )
     {
         std::stringstream buf;
         buf << "0_" << _id << "." << TEXT_MARKER << "." << GRATICLE_EXTENSION;
-        std::string bufStr = buf.str();
+        std::string bufStr;
+        bufStr = buf.str();
 
         osg::ProxyNode* proxy = new osg::ProxyNode();
         proxy->setFileName( 0, bufStr );
@@ -154,8 +156,6 @@ _textColor( 1,1,0,1 )
     //program->addShader( new osg::Shader( osg::Shader::VERTEX, s_vertexShader ) );
     //program->addShader( new osg::Shader( osg::Shader::FRAGMENT, s_fragmentShader ) );
     //set->setAttributeAndModes( program, osg::StateAttribute::ON );
-
-    this->addEventCallback( new AutoClipPlaneCallback( _map.get() ) );
 }
 
 void
@@ -250,7 +250,7 @@ namespace
         }
 
         osgText::Text* t = new osgText::Text();
-        t->setFont( "fonts/arial.ttf" );
+        t->setFont( Registry::instance()->getDefaultFont() );
         t->setAlignment( osgText::Text::CENTER_BOTTOM );
         t->setCharacterSizeMode( osgText::Text::SCREEN_COORDS );
         t->setCharacterSize( size );
@@ -260,7 +260,8 @@ namespace
 
         std::stringstream buf;
         buf << std::fixed << std::setprecision(3) << value;
-        std::string bufStr = buf.str();
+        std::string bufStr;
+        bufStr = buf.str();
         t->setText( bufStr );
 
         if ( rotation != 0.0f ) 
@@ -411,7 +412,8 @@ Graticule::createGridLevel( unsigned int levelNum ) const
             plod->addChild( group, nextLevel._maxRange, level._maxRange );
             std::stringstream buf;
             buf << levelNum+1 << "_" << getID() << "." << GRID_MARKER << "." << GRATICLE_EXTENSION;
-            std::string bufStr = buf.str();
+            std::string bufStr;
+            bufStr = buf.str();
             plod->setFileName( 1, bufStr );
             plod->setRange( 1, 0, nextLevel._maxRange );
             result = plod;
@@ -498,7 +500,8 @@ Graticule::createTextLevel( unsigned int levelNum ) const
             plod->addChild( group, nextLevel._maxRange, level._maxRange );
             std::stringstream buf;
             buf << levelNum+1 << "_" << getID() << "." << TEXT_MARKER << "." << GRATICLE_EXTENSION;
-            std::string bufStr = buf.str();
+            std::string bufStr;
+            bufStr = buf.str();
             plod->setFileName( 1, bufStr );
             plod->setRange( 1, 0, nextLevel._maxRange );
             result = plod;

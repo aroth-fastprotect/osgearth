@@ -321,7 +321,7 @@ TerrainLayer::getCacheBin( const Profile* profile )
     }
 
     // the cache bin ID is the cache IF concatenated with the profile signature.
-    std::string binId = *_runtimeOptions->cacheId() + "_" + profile->getSignature();
+    std::string binId = *_runtimeOptions->cacheId() + std::string("_") + profile->getSignature();
 
     {
         Threading::ScopedReadLock shared(_cacheBinsMutex);
@@ -429,7 +429,7 @@ bool
 TerrainLayer::getCacheBinMetadata( const Profile* profile, CacheBinMetadata& output )
 {
     // the cache bin ID is the cache IF concatenated with the profile signature.
-    std::string binId = *_runtimeOptions->cacheId() + "_" + profile->getSignature();
+    std::string binId = *_runtimeOptions->cacheId() + std::string("_") + profile->getSignature();
     CacheBin* bin = getCacheBin( profile );
     if ( bin )
     {
@@ -518,7 +518,7 @@ bool
 TerrainLayer::isKeyValid(const TileKey& key) const
 {
 	if (!key.valid()) return false;
-	
+
     // Check to see if explicit levels of detail are set
     if ( _runtimeOptions->minLevel().isSet() && (int)key.getLevelOfDetail() < _runtimeOptions->minLevel().value() )
         return false;
@@ -528,6 +528,13 @@ TerrainLayer::isKeyValid(const TileKey& key) const
     // Check to see if levels of detail based on resolution are set
     if ( getProfile() )
     {
+        if ( !getProfile()->isEquivalentTo( key.getProfile() ) )
+        {
+            OE_DEBUG << LC
+                << "TerrainLayer::isKeyValid called with key of a different profile" << std::endl;
+            //return true;
+        }
+
         if ( _runtimeOptions->minLevelResolution().isSet() )
         {        
             unsigned int minLevel = getProfile()->getLevelOfDetailForHorizResolution(

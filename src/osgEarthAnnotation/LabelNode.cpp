@@ -19,53 +19,17 @@
 
 #include <osgEarthAnnotation/LabelNode>
 #include <osgEarthAnnotation/Decluttering>
+#include <osgEarthAnnotation/AnnotationUtils>
 #include <osgEarthSymbology/Color>
 #include <osgText/Text>
 #include <osg/Depth>
+
+#define LC "[LabelNode] "
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
 using namespace osgEarth::Symbology;
 
-
-osg::Drawable* 
-LabelUtils::createText(const osg::Vec3&   positionOffset,
-                       const std::string& text,
-                       const TextSymbol*  symbol )
-{
-    osgText::Text* t = new osgText::Text();
-    t->setText( text );
-
-    if ( symbol && symbol->pixelOffset().isSet() )
-    {
-        t->setPosition( osg::Vec3(
-            positionOffset.x() + symbol->pixelOffset()->x(),
-            positionOffset.y() + symbol->pixelOffset()->y(),
-            positionOffset.z() ) );
-    }
-    else
-    {
-        t->setPosition( positionOffset );
-    }
-
-    t->setAutoRotateToScreen( false );
-    t->setCharacterSizeMode( osgText::Text::OBJECT_COORDS );
-    t->setCharacterSize( symbol && symbol->size().isSet() ? *symbol->size() : 16.0f );
-    t->setFont( osgText::readFontFile( symbol && symbol->font().isSet() ? *symbol->font() : "arial.ttf" ) );
-    t->setColor( symbol && symbol->fill().isSet() ? symbol->fill()->color() : Color::White );
-
-    if ( symbol && symbol->halo().isSet() )
-    {
-        t->setBackdropColor( symbol->halo()->color() );
-        t->setBackdropType( osgText::Text::OUTLINE );
-    }
-
-    // this disables the default rendering bin set by osgText::Font. Necessary if we're
-    // going to do decluttering at a higher level
-    t->getOrCreateStateSet()->setRenderBinToInherit();
-
-    return t;
-}
 
 //-------------------------------------------------------------------
 
@@ -75,7 +39,8 @@ LabelNode::LabelNode(MapNode*            mapNode,
                      const TextSymbol*   symbol ) :
 
 OrthoNode( mapNode->getMap()->getProfile()->getSRS(), position ),
-_text( text )
+_text    ( text ),
+_geode   ( 0L )
 {
     init( symbol );
 }
@@ -85,9 +50,18 @@ LabelNode::LabelNode(const SpatialReference* mapSRS,
                      const std::string&      text,
                      const TextSymbol*       symbol ) :
 
-//LocalizedNode( mapSRS, position, false ), //true ),
 OrthoNode( mapSRS, position ),
-_text( text )
+_text    ( text ),
+_geode   ( 0L )
+{
+    init( symbol );
+}
+
+LabelNode::LabelNode(const std::string&  text,
+                     const TextSymbol*   symbol ) :
+OrthoNode(),
+_text    ( text ),
+_geode   ( 0L )
 {
     init( symbol );
 }
@@ -98,13 +72,55 @@ LabelNode::init( const TextSymbol* symbol )
     // The following setup will result is a proper dynamic bounding box for the text.
     // If you just use osgText's rotate-to-screen and SCREEN_COORDS setup, you do not
     // get a proper bounds.
-    osg::Drawable* t = LabelUtils::createText( osg::Vec3(0,0,0), _text, symbol );
+    osg::Drawable* t = AnnotationUtils::createTextDrawable( _text, symbol, osg::Vec3(0,0,0) );
 
     osg::StateSet* stateSet = t->getOrCreateStateSet();
     stateSet->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), 1 );
 
-    osg::Geode* geode = new osg::Geode();
-    geode->addDrawable( t );
+    _geode = new osg::Geode();
+    _geode->addDrawable( t );
 
-    this->attach( geode );
+    this->attach( _geode );
+}
+
+void
+LabelNode::setText( const std::string& text )
+{
+    if ( !_dynamic )
+    {
+        OE_WARN << LC << "Illegal state: cannot change a LabelNode that is not dynamic" << std::endl;
+        return;
+    }
+
+    osgText::Text* d = dynamic_cast<osgText::Text*>(_geode->getDrawable(0));
+    if ( d )
+    {
+        d->setText( text );
+        d->dirtyDisplayList();
+    }
+}
+
+void
+LabelNode::setAnnotationData( AnnotationData* data )
+{
+    OrthoNode::setAnnotationData( data );
+
+    // override this method so we can attach the anno data to the drawables.
+    const osg::Geode::DrawableList& list = _geode->getDrawableList();
+    for( osg::Geode::DrawableList::const_iterator i = list.begin(); i != list.end(); ++i )
+    {
+        i->get()->setUserData( data );
+    }
+}
+
+void
+LabelNode::setDynamic( bool dynamic )
+{
+    OrthoNode::setDynamic( dynamic );
+
+    osgText::Text* d = dynamic_cast<osgText::Text*>(_geode->getDrawable(0));
+    if ( d )
+    {
+        d->setDataVariance( dynamic ? osg::Object::DYNAMIC : osg::Object::STATIC );
+    }    
 }

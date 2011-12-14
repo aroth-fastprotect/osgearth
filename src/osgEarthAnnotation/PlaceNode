@@ -19,7 +19,7 @@
 #ifndef OSGEARTH_ANNOTATION_PLACE_NODE_H
 #define OSGEARTH_ANNOTATION_PLACE_NODE_H 1
 
-#include <osgEarthAnnotation/LocalizedNode>
+#include <osgEarthAnnotation/OrthoNode>
 #include <osgEarth/MapNode>
 #include <osgEarthSymbology/Style>
 #include <osgEarthUtil/Controls>
@@ -65,6 +65,13 @@ namespace osgEarth { namespace Annotation
          */
         void setStyle( const Style& style );
         const Style& getStyle() const { return _style; }
+        
+
+    public: // OrthoNode override
+
+        virtual void setAnnotationData( AnnotationData* data );
+
+        virtual void setDynamic( bool value );
 
     private:
         osg::ref_ptr<osg::Image>   _image;
@@ -74,6 +81,8 @@ namespace osgEarth { namespace Annotation
         osg::ref_ptr<Container>    _container;
         osg::ref_ptr<ImageControl> _icon;
         osg::ref_ptr<LabelControl> _label;
+
+        class osg::Geode*          _geode;
 
         void init();
     };

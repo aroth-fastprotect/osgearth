@@ -54,11 +54,17 @@ static GraticuleRegistry s_graticuleRegistry;
 #define TEXT_MARKER "t"
 #define GRID_MARKER "g"
 
+#ifdef __GNUC__
+#define LIKELY_UNUSED_VARIABLE __attribute__ ((unused))
+#else
+#define LIKELY_UNUSED_VARIABLE
+#endif
+
 //---------------------------------------------------------------------------
 
 namespace
 {
-    char s_vertexShader[] =
+    LIKELY_UNUSED_VARIABLE char s_vertexShader[] =
         "varying vec3 Normal; \n"
         "void main(void) \n"
         "{ \n"
@@ -67,7 +73,7 @@ namespace
         "    gl_FrontColor = gl_Color; \n"
         "} \n";
 
-    char s_fragmentShader[] =
+    LIKELY_UNUSED_VARIABLE char s_fragmentShader[] =
         "varying vec3 Normal; \n"
         "void main(void) \n"
         "{ \n"

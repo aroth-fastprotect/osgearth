@@ -90,7 +90,7 @@ _bufsize( 1024000 )
 KMZArchive::~KMZArchive()
 {
     if ( _buf )
-        delete [] _buf;
+        delete [] (char*)_buf;
 }
 
 void 
@@ -231,7 +231,7 @@ KMZArchive::readToBuffer( const std::string& fileInZip, std::ostream& iobuf ) co
         }
         if ( err > 0 )
         {
-            for( unsigned i=0; i<err; ++i )
+            for( int i=0; i<err; ++i )
             {
                 iobuf.put( *(((char*)_buf)+i) );
             }

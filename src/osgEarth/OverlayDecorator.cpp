@@ -645,8 +645,6 @@ OverlayDecorator::updateRTTCamera( osg::NodeVisitor& nv )
 void
 OverlayDecorator::cull( osgUtil::CullVisitor* cv )
 {
-    static int s_frame = 1;
-
     osg::Vec3 eye = cv->getEyePoint();
 
     double eyeLen;

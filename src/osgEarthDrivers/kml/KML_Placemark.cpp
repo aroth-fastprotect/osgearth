@@ -117,7 +117,7 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
     osg::Group* parent =
         cx._options->iconAndLabelGroup().valid() ?
         cx._options->iconAndLabelGroup().get() :
-        cx._groupStack.top();
+        cx._groupStack.top().get();
 
 
     if ( fNode && pNode )

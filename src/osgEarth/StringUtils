@@ -30,6 +30,12 @@
 #include <map>
 #include <ctype.h>
 
+#ifdef __GNUC__
+#define LIKELY_UNUSED_FUNCTION __attribute__ ((unused))
+#else
+#define LIKELY_UNUSED_FUNCTION
+#endif
+
 namespace osgEarth
 {
     extern OSGEARTH_EXPORT const std::string EMPTY_STRING;
@@ -47,7 +53,7 @@ namespace osgEarth
     /**
      * True is "ref" starts with "pattern"
      */
-    static
+    LIKELY_UNUSED_FUNCTION static
     bool startsWith( const std::string& ref, const std::string& pattern )
     {
         return ref.find( pattern ) == 0;
@@ -56,7 +62,7 @@ namespace osgEarth
     /**
      * True is "ref" ends with "pattern"
      */
-    static
+    LIKELY_UNUSED_FUNCTION static
     bool endsWith( const std::string& ref, const std::string& pattern )
     {
         return ref.find( pattern ) == ref.length()-pattern.length();
@@ -124,7 +130,7 @@ namespace osgEarth
 
     // template specialization for string
     template<> inline std::string
-    as<std::string>( const std::string& str, const std::string& default_value )
+    as<std::string>( const std::string& str, const std::string& )
     {
         return str;
     }

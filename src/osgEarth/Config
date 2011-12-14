@@ -60,7 +60,7 @@ namespace osgEarth
 
         Config( const std::string& key, const std::string& value ) : _key( key ), _defaultValue( value ), _emptyConfig(0L) { }
 
-        Config( const Config& rhs ) : _key(rhs._key), _defaultValue(rhs._defaultValue), _children(rhs._children), _refMap(rhs._refMap), _referrer(rhs._referrer), _emptyConfig(0L) { }
+        Config( const Config& rhs ) : _key(rhs._key), _defaultValue(rhs._defaultValue), _children(rhs._children), _referrer(rhs._referrer), _emptyConfig(0L), _refMap(rhs._refMap) { }
 
         ~Config() { if ( _emptyConfig ) delete _emptyConfig; }
 
@@ -403,6 +403,7 @@ namespace osgEarth
             }
             return *this;
         }
+        virtual ~ConfigOptions() { }
 
         void merge( const ConfigOptions& rhs ) {
             _conf.merge( rhs._conf );
@@ -414,7 +415,7 @@ namespace osgEarth
         Config newConfig() const { Config c; c.setReferrer(referrer()); return c; }
 
     protected:
-        virtual void mergeConfig( const Config& conf ) { }
+        virtual void mergeConfig( const Config& ) { }
 
         Config _conf;
     };
@@ -427,6 +428,7 @@ namespace osgEarth
     public:
         DriverConfigOptions( const ConfigOptions& rhs =ConfigOptions() )
             : ConfigOptions( rhs ) { fromConfig( _conf ); }
+        virtual ~DriverConfigOptions() { }
 
         /** Gets or sets the name of the driver to load */
         void setDriver( const std::string& value ) { _driver = value; }

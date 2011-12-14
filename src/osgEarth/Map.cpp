@@ -55,6 +55,7 @@ MapCallback::onMapModelChanged( const MapModelChange& change )
         onImageLayerMoved( change.getImageLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
 		case MapModelChange::MOVE_MODEL_LAYER:
 				onModelLayerMoved( change.getModelLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
+    default: break;
     }
 }
 
@@ -1031,7 +1032,7 @@ namespace
 
 	    else if (heightFields.size() == 1)
 	    {
-            if ( lowestLOD == key.getLevelOfDetail() )
+            if ( (unsigned)lowestLOD == key.getLevelOfDetail() )
             {
 		        //If we only have on heightfield, just return it.
 		        out_result = heightFields[0].takeHeightField();

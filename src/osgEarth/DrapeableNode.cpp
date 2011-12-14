@@ -25,9 +25,9 @@ using namespace osgEarth;
 
 DrapeableNode::DrapeableNode( MapNode* mapNode, bool draped ) :
 _mapNode  ( mapNode ),
-_newDraped( draped ),
 _draped   ( false ),
-_dirty    ( false )
+_dirty    ( false ),
+_newDraped( draped )
 {
     // create a container group that will house the culler. This culler
     // allows a draped node, which sits under the MapNode's OverlayDecorator,

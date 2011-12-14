@@ -143,7 +143,7 @@ TransformFilter::push( Feature* input, FilterContext& context )
 
         // first transform the geometry to the output SRS:            
         if ( needsSRSXform )
-            context.profile()->getSRS()->transformPoints( _outputSRS.get(), geom->asVector(), false );
+            context.profile()->getSRS()->transformPoints( _outputSRS.get(), geom->asVector(), NULL, false );
 
         // update the bounding box.
         if ( _localize )

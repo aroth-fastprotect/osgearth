@@ -92,7 +92,7 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
 
         UID uid;
         unsigned lod, x, y;
-        sscanf( uri.c_str(), "%u.%d_%d_%d.%*s", &uid, &lod, &x, &y );
+        sscanf( uri.c_str(), "%u.%d_%d_%d.%*s", (unsigned int*)&uid, (int*)&lod, (int*)&x, (int*)&y );
 
         FeatureModelGraph* graph = getGraph(uid);
         if ( graph )
@@ -123,7 +123,7 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
     }
 };
 
-REGISTER_OSGPLUGIN(osgearth_pseudo_fmg, osgEarthFeatureModelPseudoLoader);
+REGISTER_OSGPLUGIN(osgearth_pseudo_fmg, osgEarthFeatureModelPseudoLoader)
 
 namespace
 {    
@@ -152,8 +152,8 @@ FeatureModelGraph::FeatureModelGraph(FeatureSource*                   source,
                                      const FeatureModelSourceOptions& options,
                                      FeatureNodeFactory*              factory,
                                      Session*                         session) :
-_source   ( source ),
 _options  ( options ),
+_source ( source ),
 _factory  ( factory ),
 _session  ( session ),
 _dirty    ( false )
@@ -300,7 +300,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
         // We will be calculating the LOD ranges here.
         osg::Group* geometry =0L;
 
-        if ( lod >= _source->getFeatureProfile()->getFirstLevel() )
+        if ( (int)lod >= _source->getFeatureProfile()->getFirstLevel() )
         {
             // The extent of this tile:
             GeoExtent tileExtent = s_getTileExtent( lod, tileX, tileY, _usableFeatureExtent );
@@ -324,7 +324,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
             result = geometry;
         }
 
-        if ( lod < _source->getFeatureProfile()->getMaxLevel() )
+        if ((int)lod < _source->getFeatureProfile()->getMaxLevel())
         {
             // see if there are any more levels. If so, build some pagedlods to bring the
             // next level in.
@@ -333,7 +333,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
             osg::ref_ptr<osg::Group> group = new osg::Group();
 
             // calculate the LOD of the next level:
-            if ( lod+1 != ~0 )
+            if ( lod+1 != ~0u )
             {
                 //if ( geometry == 0L )
                 //{
@@ -344,7 +344,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
                 //}
 
                 // only build sub-pagedlods if we are expecting subtiles at some point:
-                if ( geometry != 0L || lod < _source->getFeatureProfile()->getFirstLevel() )
+                if ( geometry != 0L || (int)lod < _source->getFeatureProfile()->getFirstLevel() )
                 {
                     MapFrame mapf = _session->createMapFrame();
                     buildSubTilePagedLODs( lod, tileX, tileY, &mapf, group.get() );
@@ -578,8 +578,6 @@ FeatureModelGraph::build( const Style& baseStyle, const Query& baseQuery, const 
 
     if ( _source->hasEmbeddedStyles() )
     {
-        const FeatureProfile* profile = _source->getFeatureProfile();
-
         // each feature has its own style, so use that and ignore the style catalog.
         osg::ref_ptr<FeatureCursor> cursor = _source->createFeatureCursor( baseQuery );
         while( cursor.valid() && cursor->hasMore() )

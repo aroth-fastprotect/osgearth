@@ -118,7 +118,6 @@ AltitudeFilter::pushAndClamp( FeatureList& features, FilterContext& cx )
     // the map against which we'll be doing elevation clamping
     MapFrame mapf = session->createMapFrame( Map::ELEVATION_LAYERS );
 
-    const SpatialReference* mapSRS     = mapf.getProfile()->getSRS();
     const SpatialReference* featureSRS = cx.profile()->getSRS();
 
     // establish an elevation query interface based on the features' SRS.

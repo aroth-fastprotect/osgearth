@@ -52,7 +52,6 @@ ConvertTypeFilter::push( FeatureList& input, FilterContext& context )
         return context;
     }
 
-    bool ok = true;
     for( FeatureList::iterator i = input.begin(); i != input.end(); ++i )
     {
         Feature* input = i->get();

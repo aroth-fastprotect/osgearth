@@ -347,9 +347,7 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
 
     double     targetLen = -DBL_MAX;
     osg::Vec3d minLoc(DBL_MAX, DBL_MAX, DBL_MAX);
-    double     minLoc_len = DBL_MAX;
     osg::Vec3d maxLoc(0,0,0);
-    double     maxLoc_len = 0;
 
     // Initial pass over the geometry does two things:
     // 1: Calculate the minimum Z across all parts.
@@ -844,7 +842,7 @@ ExtrudeGeometryFilter::push( FeatureList& input, FilterContext& context )
     computeLocalizers( context );
 
     // push all the features through the extruder.
-    bool ok = process( input, context );
+    process( input, context );
 
     // convert everything to triangles and combine drawables.
     if ( _mergeGeometry == true && _featureNameExpr.empty() )

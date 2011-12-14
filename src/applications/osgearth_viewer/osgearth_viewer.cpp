@@ -585,8 +585,6 @@ main(int argc, char** argv)
     osg::Group* root = new osg::Group();
     root->addChild( earthNode );
 
-    // create a graticule and clip plane handler.
-    Graticule* graticule = 0L;
     osgEarth::MapNode* mapNode = osgEarth::MapNode::findMapNode( earthNode );
     if ( mapNode )
     {

@@ -178,14 +178,13 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
 struct ClusterVisitor : public osg::NodeVisitor
 {
-        ClusterVisitor( const FeatureList& features, const MarkerSymbol* symbol, FeaturesToNodeFilter* f2n, FeatureSourceMultiNode * featureNode, FilterContext& cx )
-            : _features   ( features ),
+        ClusterVisitor( const FeatureList& features, const MarkerSymbol* symbol, FeaturesToNodeFilter* f2n, FilterContext& cx )
+            : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
+              _features   ( features ),
+              _cx         ( cx ),
               _symbol     ( symbol ),
               //_modelMatrix( modelMatrix ),
-              _f2n        ( f2n ),
-              _cx         ( cx ),
-              _featureNode(featureNode),
-              osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN )
+              _f2n        ( f2n )
         {
             //nop
         }

@@ -6,6 +6,8 @@ ENDIF(DYNAMIC_OSGEARTH)
 
 SET(TARGET_PUBLIC_H
     AnnotationData
+    AnnotationNode
+    AnnotationUtils
     CircleNode
     Common
     Decluttering
@@ -15,12 +17,15 @@ SET(TARGET_PUBLIC_H
     ImageOverlay
     LabelNode
     LocalizedNode
+    OrthoNode
     PlaceNode
     TrackNode
 )
 
 SET(TARGET_SRC
     AnnotationData.cpp
+    AnnotationNode.cpp
+    AnnotationUtils.cpp
     CircleNode.cpp
     Decluttering.cpp
     EllipseNode.cpp
@@ -28,6 +33,7 @@ SET(TARGET_SRC
     ImageOverlay.cpp
     LabelNode.cpp
     LocalizedNode.cpp
+    OrthoNode.cpp
     PlaceNode.cpp
     TrackNode.cpp
 )

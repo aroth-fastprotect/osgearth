@@ -316,8 +316,20 @@ namespace osgEarth { namespace Threading
     {
         DATA& get(KEY k)
         {
-            osgEarth::Threading::ScopedReadLock lock(_mutex);
+            {
+                osgEarth::Threading::ScopedReadLock readLock(_mutex);
+                typename std::map<KEY,DATA>::iterator i = _data.find(k);
+                if ( i != _data.end() )
+                    return i->second;
+            }
+            {
+                osgEarth::Threading::ScopedWriteLock lock(_mutex);
+                typename std::map<KEY,DATA>::iterator i = _data.find(k);
+                if ( i != _data.end() )
+                    return i->second;
+                else
             return _data[k];
+        }
         }
 
         void remove(KEY k)

@@ -109,8 +109,6 @@ _quickReleaseCallbackInstalled( false )
 
     // register for events in order to support ON_DEMAND frame scheme
     setNumChildrenRequiringEventTraversal( 1 );
-
-    getOrCreateStateSet()->setMode(GL_BLEND , osg::StateAttribute::ON);    
 }
 
 Terrain::~Terrain()

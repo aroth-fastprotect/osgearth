@@ -24,6 +24,7 @@ SET(TARGET_PUBLIC_H
 	Common
 	CompositeTileSource
 	Config
+    Containers
 	Cube
     DrapeableNode
     ECEF

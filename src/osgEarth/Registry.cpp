@@ -42,13 +42,15 @@ using namespace OpenThreads;
 extern const char* builtinMimeTypeExtMappings[];
 
 Registry::Registry() :
-osg::Referenced(true),
-_gdal_mutex(new OpenThreads::ReentrantMutex),
-_gdal_registered( false ),
+osg::Referenced  (true),
+_gdal_mutex      (new OpenThreads::ReentrantMutex),
+_gdal_registered ( false ),
 _numGdalMutexGets( 0 ),
-_uidGen( 0 ),
-_caps( 0L )
+_uidGen          ( 0 ),
+_caps            ( 0L ),
+_defaultFont     ( 0L )
 {
+    // set up GDAL and OGR.
     OGRRegisterAll();
     GDALAllRegister();
 
@@ -67,10 +69,16 @@ _caps( 0L )
     // activate KMZ support
     osgDB::Registry::instance()->addFileExtensionAlias( "kmz", "kml" );
     osgDB::Registry::instance()->addArchiveExtension( "kmz" );
+
 #if OSG_MIN_VERSION_REQUIRED(3,0,0)
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kml+xml", "kml" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kmz", "kmz" );
 #endif
+
+    // pre-load OSG's ZIP plugin so that we can use it in URIs
+    std::string zipLib = osgDB::Registry::instance()->createLibraryNameForExtension( "zip" );
+    if ( !zipLib.empty() )
+        osgDB::Registry::instance()->loadLibrary( zipLib );    
 
     // set up our default r/w options to NOT cache archives!
     _defaultOptions = new osgDB::Options();
@@ -97,16 +105,32 @@ _caps( 0L )
         }
     }
 
+    // activate cache-only mode from the environment
     if ( ::getenv("OSGEARTH_CACHE_ONLY") )
     {
         _defaultCachePolicy = CachePolicy::CACHE_ONLY;
         OE_INFO << LC << "CACHE-ONLY MODE set from environment variable" << std::endl;
     }
 
-    if ( ::getenv("OSGEARTH_NO_CACHE") )
+    // activate no-cache mode from the environment
+    else if ( ::getenv("OSGEARTH_NO_CACHE") )
     {
         _defaultCachePolicy = CachePolicy::NO_CACHE;
         OE_INFO << LC << "NO-CACHE MODE set from environment variable" << std::endl;
+    }
+
+    // load a default font
+
+    const char* envFont = ::getenv("OSGEARTH_DEFAULT_FONT");
+    if ( envFont )
+    {
+        _defaultFont = osgText::readFontFile( std::string(envFont) );
+    }
+    if ( !_defaultFont.valid() )
+    {
+#ifdef WIN32
+        _defaultFont = osgText::readFontFile("arial.ttf");
+#endif
     }
 }
 
@@ -320,9 +344,24 @@ Registry::setShaderFactory( ShaderFactory* lib )
         _shaderLib = lib;
 }
 
+void
+Registry::setDefaultFont( osgText::Font* font )
+{
+    Threading::ScopedWriteLock exclusive(_regMutex);
+    _defaultFont = font;
+}
+
+osgText::Font*
+Registry::getDefaultFont()
+{
+    Threading::ScopedReadLock shared(_regMutex);
+    return _defaultFont.get();
+}
+
 UID
 Registry::createUID()
 {
+    //todo: use OpenThreads::Atomic for this
     static Mutex s_uidGenMutex;
     ScopedLock<Mutex> lock( s_uidGenMutex );
     return (UID)( _uidGen++ );

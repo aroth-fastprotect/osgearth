@@ -15,6 +15,7 @@ SET(TARGET_PUBLIC_H
     Formatters
 	Graticule
 	MeasureTool
+	NearFarGroup
 	ObjectPlacer
 	ObjectLocator
     #OceanSurfaceNode
@@ -34,6 +35,7 @@ SET(TARGET_SRC
     Formatters.cpp
 	Graticule.cpp
 	MeasureTool.cpp
+	NearFarGroup.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     #OceanSurfaceNode.cpp

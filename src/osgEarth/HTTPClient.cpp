@@ -573,7 +573,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
 		std::string proxy_password = _proxySettings.get().password();
 		if (!proxy_username.empty() && !proxy_password.empty())
 		{
-			proxy_auth = proxy_username + ":" + proxy_password;
+            proxy_auth = proxy_username + std::string(":") + proxy_password;
 		}
 	}
 
@@ -676,11 +676,13 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
     errorBuf[0] = 0;
     curl_easy_setopt( _curl_handle, CURLOPT_ERRORBUFFER, (void*)errorBuf );
 
-    curl_easy_setopt( _curl_handle, CURLOPT_SSL_VERIFYPEER, (void*)0 );
     curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)&sp);
     CURLcode res = curl_easy_perform( _curl_handle );
     curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)0 );
     curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSDATA, (void*)0);
+
+    //Disable peer certificate verification to allow us to access in https servers where the peer certificate cannot be verified.
+    curl_easy_setopt( _curl_handle, CURLOPT_SSL_VERIFYPEER, (void*)0 );
 
     long response_code = 0L;
 	if (!proxy_addr.empty())

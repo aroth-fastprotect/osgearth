@@ -25,7 +25,7 @@
 #include <osgEarthFeatures/Filter>
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/MarkerResource>
-#include <osgEarth/Utils>
+#include <osgEarth/Containers>
 
 namespace osgEarth { namespace Features
 {
@@ -80,8 +80,8 @@ namespace osgEarth { namespace Features
         Style                     _style;
         bool                      _cluster;
         bool                      _merge;
-        //osg::Matrixd              _modelMatrix;
         StringExpression          _featureNameExpr;
+        osg::ref_ptr<ResourceLibrary> _markerLib;
 
         typedef LRUCache<URI, osg::ref_ptr<MarkerResource> > MarkerCache;
         MarkerCache _markerCache;

@@ -87,6 +87,8 @@ namespace osgEarth
          */
         static MapNode* load( class osg::ArgumentParser& arguments );
 
+
+
     public:
 
         virtual const char* libraryName() const { return "osgEarth"; }
@@ -218,6 +220,7 @@ namespace osgEarth
 
         osg::ref_ptr< ModelLayerCallback > _modelLayerCallback;
         osg::ref_ptr< MapCallback > _mapCallback;
+    
     
         void init();
         void adjustEventTraversalCount( int delta );

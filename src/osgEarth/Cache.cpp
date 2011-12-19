@@ -30,9 +30,10 @@ using namespace osgEarth::Threading;
 #define LC "[Cache] "
 
 //------------------------------------------------------------------------
+
 Cache::Cache( const CacheOptions& options ) :
-_ok     ( true ),
-_options( options )
+_options( options ),
+_ok     ( true )
 {
     //nop
 }
@@ -86,7 +87,7 @@ CacheFactory::create( const CacheOptions& options )
         osg::ref_ptr<osgDB::ReaderWriter::Options> rwopt = new osgDB::ReaderWriter::Options();
         rwopt->setPluginData( CACHE_OPTIONS_TAG, (void*)&options );
 
-        std::string driverExt = ".osgearth_cache_" + options.getDriver();
+        std::string driverExt = std::string(".osgearth_cache_") + options.getDriver();
         osgDB::ReaderWriter::ReadResult rr = osgDB::readObjectFile( driverExt, rwopt.get() );
         result = dynamic_cast<Cache*>( rr.getObject() );
         if ( !result )

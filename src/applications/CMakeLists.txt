@@ -14,6 +14,7 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	SET(TARGET_DEFAULT_PREFIX "application_")
 	SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
 
+	ADD_SUBDIRECTORY(osgearth_clamp)
 	ADD_SUBDIRECTORY(osgearth_manip)
 	ADD_SUBDIRECTORY(osgearth_seed)
     ADD_SUBDIRECTORY(osgearth_composite)
@@ -24,20 +25,14 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_featureinfo)
 	ADD_SUBDIRECTORY(osgearth_map)
 	ADD_SUBDIRECTORY(osgearth_annotation)
+	ADD_SUBDIRECTORY(osgearth_tracks)
 	ADD_SUBDIRECTORY(osgearth_featureeditor)
 	ADD_SUBDIRECTORY(osgearth_measure)
 	ADD_SUBDIRECTORY(osgearth_controls)
 	ADD_SUBDIRECTORY(osgearth_shadercomp)
 	ADD_SUBDIRECTORY(osgearth_tilesource)
-	ADD_SUBDIRECTORY(osgearth_labels)
 	ADD_SUBDIRECTORY(osgearth_imageoverlay)
-
-	#ADD_SUBDIRECTORY(osgearth_symbology)
-	#ADD_SUBDIRECTORY(osgearth_seamless)
-
-	#testing
-	add_subdirectory(osgearth_resources)
-
+	ADD_SUBDIRECTORY(osgearth_city)
 ENDIF(BUILD_OSGEARTH_EXAMPLES)
 
 

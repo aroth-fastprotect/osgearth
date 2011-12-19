@@ -160,7 +160,8 @@ std::string
 Bounds::toString() const {
     std::stringstream buf;
     buf << "(" << xMin() << "," << yMin() << " => " << xMax() << "," << yMax() << ")";
-    std::string result = buf.str();
+    std::string result;
+    result = buf.str();
     return result;
 }
 

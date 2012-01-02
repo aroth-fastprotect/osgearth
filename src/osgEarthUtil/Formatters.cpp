@@ -164,15 +164,15 @@ LatLongFormatter::parseAngle( const std::string& input, Angular& out_value )
 
 namespace
 {
-    static char*    GZD_ALPHABET     = "CDEFGHJKLMNPQRSTUVWXX";    // 2 X's because X is a 12 degree high grid zone
-    static char*    UTM_COL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-    static char*    UTM_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUV";
-    static unsigned UTM_ROW_ALPHABET_SIZE = 20;
+    static const char*    GZD_ALPHABET     = "CDEFGHJKLMNPQRSTUVWXX";    // 2 X's because X is a 12 degree high grid zone
+    static const char*    UTM_COL_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+    static const char*    UTM_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUV";
+    static const unsigned UTM_ROW_ALPHABET_SIZE = 20;
 
-    static char*    UPS_COL_ALPHABET = "ABCFGHJKLPQRSTUXYZ";        // omit I, O, D, E, M, N, V, W
-    static unsigned UPS_COL_ALPHABET_SIZE = 18;
-    static char*    UPS_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";  // omit I, O
-    static unsigned UPS_ROW_ALPHABET_SIZE = 24;
+    static const char*    UPS_COL_ALPHABET = "ABCFGHJKLPQRSTUXYZ";        // omit I, O, D, E, M, N, V, W
+    static const unsigned UPS_COL_ALPHABET_SIZE = 18;
+    static const char*    UPS_ROW_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";  // omit I, O
+    static const unsigned UPS_ROW_ALPHABET_SIZE = 24;
 
     static std::string s_lateralZoneSpecs[] = {
         "+proj=utm +zone=1 +north +units=m",  "+proj=utm +zone=2 +north +units=m",

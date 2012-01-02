@@ -980,8 +980,6 @@ namespace
 	    //Get a HeightField for each of the enabled layers
 	    GeoHeightFieldVector heightFields;
 
-        unsigned int numValidHeightFields = 0;
-
         if ( out_isFallback )
         {
             *out_isFallback = false;

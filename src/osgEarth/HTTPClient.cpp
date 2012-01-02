@@ -339,9 +339,15 @@ HTTPClient::~HTTPClient()
 }
 
 void
-HTTPClient::setProxySettings( const ProxySettings &proxySettings )
+HTTPClient::setProxySettings( const optional<ProxySettings> & proxySettings )
 {
 	_proxySettings = proxySettings;
+}
+
+const optional<ProxySettings> & 
+HTTPClient::getProxySettings()
+{
+    return _proxySettings;
 }
 
 const std::string& HTTPClient::getUserAgent()

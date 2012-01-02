@@ -424,13 +424,11 @@ _continuous( rhs._continuous ),
 _has_pending_viewpoint( rhs._has_pending_viewpoint ),
 _setting_viewpoint( rhs._setting_viewpoint ),
 _arc_height( rhs._arc_height ),
-_after_first_frame( rhs._after_first_frame ),
 _settings( new Settings( *rhs._settings.get() ) ),
 _homeViewpoint( rhs._homeViewpoint.get() ),
 _homeViewpointDuration( rhs._homeViewpointDuration ),
 _frame_count( rhs._frame_count ),
-_lastPointOnEarth( rhs._lastPointOnEarth ),
-_arc_height( rhs._arc_height )
+_lastPointOnEarth( rhs._lastPointOnEarth )
 {
 }
 

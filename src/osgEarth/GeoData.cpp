@@ -156,6 +156,11 @@ Bounds::radius2d() const {
     return (center2d() - osg::Vec2d(xMin(),yMin())).length();
 }
 
+double
+Bounds::area2d() const {
+    return width() * height();
+}
+
 std::string
 Bounds::toString() const {
     std::stringstream buf;
@@ -448,8 +453,8 @@ GeoExtent::toString() const
 
     buf << ", SRS=" << _srs->getName();
 
-	std::string bufStr;
-	bufStr = buf.str();
+	 std::string bufStr;
+	 bufStr = buf.str();
     return bufStr;
 }
 

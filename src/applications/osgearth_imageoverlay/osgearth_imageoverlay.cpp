@@ -196,6 +196,9 @@ main(int argc, char** argv)
       imageBounds.push_back( Bounds(-100, 30, -90, 40) );
     }
  
+
+    bool moveVert = arguments.read("--vert");
+
     // load the .earth file from the command line.
     osg::Node* earthNode = osgDB::readNodeFiles( arguments );
     if (!earthNode)

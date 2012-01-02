@@ -50,6 +50,7 @@ namespace osgEarth { namespace Drivers
 
     public:
         WFSFeatureOptions( const ConfigOptions& opt =ConfigOptions() ) : FeatureSourceOptions( opt ) {
+            setDriver( "wfs" );
             fromConfig( _conf );
         }
 
@@ -81,7 +82,7 @@ namespace osgEarth { namespace Drivers
 
         optional<URI>         _url;        
         optional<std::string> _typename;
-        optional<Config> _geometryProfileConf;
+        optional<Config>      _geometryProfileConf;
         optional<std::string> _outputFormat;
         optional<unsigned>    _maxFeatures;            
     };

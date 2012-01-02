@@ -18,6 +18,8 @@
  */
 #include <osgEarthFeatures/BufferFilter>
 
+#define LC "[BufferFilter] "
+
 using namespace osgEarth;
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
@@ -39,17 +41,17 @@ BufferFilter::isSupported()
         OE_NOTICE << "BufferFilter NOT SUPPORTED - please compile osgEarth with GEOS" << std::endl; }
 
 BufferFilter::BufferFilter() :
-_distance( 1.0 ),
+_distance   ( 1.0 ),
 _numQuadSegs( 0 ),
-_capStyle( Stroke::LINECAP_DEFAULT )
+_capStyle   ( Stroke::LINECAP_DEFAULT )
 {
     //NOP
 }
 
 BufferFilter::BufferFilter( const BufferFilter& rhs ) :
-_distance( rhs._distance ),
+_distance   ( rhs._distance ),
 _numQuadSegs( rhs._numQuadSegs ),
-_capStyle( rhs._capStyle )
+_capStyle   ( rhs._capStyle )
 {
     //NOP
 }
@@ -64,10 +66,10 @@ BufferFilter::push( FeatureList& input, FilterContext& context )
     }
 
     //OE_NOTICE << "Buffer: input = " << input.size() << " features" << std::endl;
-    for( FeatureList::iterator i = input.begin(); i != input.end(); ++i )
+    for( FeatureList::iterator i = input.begin(); i != input.end(); )
     {
-        Feature* input = i->get();
-        if ( !input || !input->getGeometry() )
+        Feature* feature = i->get();
+        if ( !feature || !feature->getGeometry() )
             continue;
 
         osg::ref_ptr<Symbology::Geometry> output;
@@ -82,9 +84,15 @@ BufferFilter::push( FeatureList& input, FilterContext& context )
 
         params._cornerSegs = _numQuadSegs;
 
-        if ( input->getGeometry()->buffer( _distance.value(), output, params ) )
+        if ( feature->getGeometry()->buffer( _distance.value(), output, params ) )
         {
-            input->setGeometry( output.get() );
+            feature->setGeometry( output.get() );
+            ++i;
+        }
+        else
+        {
+            i = input.erase( i );
+            OE_INFO << LC << "feature " << feature->getFID() << " yielded no geometry" << std::endl;
         }
     }
 

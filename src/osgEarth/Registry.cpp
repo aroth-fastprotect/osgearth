@@ -322,6 +322,12 @@ Registry::getCapabilities() const
     return *_caps;
 }
 
+void
+Registry::setCapabilities( Capabilities* caps )
+{
+    _caps = caps;
+}
+
 static OpenThreads::Mutex s_initCapsMutex;
 void
 Registry::initCapabilities()

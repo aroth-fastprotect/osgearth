@@ -27,7 +27,7 @@ SET(TARGET_PUBLIC_H
 	FeatureListSource
     FeatureModelGraph
     FeatureModelSource    
-    FeatureNode
+    #FeatureNode
     FeatureSource
 	FeatureSourceNode
 	FeatureSourceMeshConsolidator
@@ -68,7 +68,7 @@ SET(TARGET_SRC
 	FeatureListSource.cpp
     FeatureModelGraph.cpp
     FeatureModelSource.cpp
-    FeatureNode.cpp
+    #FeatureNode.cpp
     FeatureSource.cpp
 	FeatureSourceNode.cpp
 	FeatureSourceMeshConsolidator.cpp

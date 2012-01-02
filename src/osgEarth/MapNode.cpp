@@ -266,6 +266,8 @@ MapNode::init()
         _overlayDecorator->setOverlayBlending( *_mapNodeOptions.overlayBlending() );
     if ( _mapNodeOptions.overlayTextureSize().isSet() )
         _overlayDecorator->setTextureSize( *_mapNodeOptions.overlayTextureSize() );
+    if ( _mapNodeOptions.overlayMipMapping().isSet() )
+        _overlayDecorator->setMipMapping( *_mapNodeOptions.overlayMipMapping() );
     addTerrainDecorator( _overlayDecorator.get() );
 
     // install any pre-existing model layers:
@@ -312,7 +314,7 @@ MapNode::~MapNode()
 
     ModelLayerVector modelLayers;
     _map->getModelLayers( modelLayers );
-    //Remove our model callback from any of the model layers in the map
+    //Remove our model callback from any of the model layers in the map    
     for (osgEarth::ModelLayerVector::iterator itr = modelLayers.begin(); itr != modelLayers.end(); ++itr)
     {
         this->onModelLayerRemoved( itr->get() );        
@@ -336,6 +338,18 @@ Map*
 MapNode::getMap()
 {
     return _map.get();
+}
+
+const Map*
+MapNode::getMap() const
+{
+    return _map.get();
+}
+
+const SpatialReference*
+MapNode::getMapSRS() const
+{
+    return getMap()->getProfile()->getSRS();
 }
 
 TerrainEngineNode*

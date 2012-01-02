@@ -46,9 +46,9 @@ using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
 BuildGeometryFilter::BuildGeometryFilter( const Style& style ) :
-_style( style ),
-_maxAngle_deg( 5.0 ),
-_geoInterp( GEOINTERP_RHUMB_LINE ),
+_style        ( style ),
+_maxAngle_deg ( 5.0 ),
+_geoInterp    ( GEOINTERP_RHUMB_LINE ),
 _mergeGeometry( false )
 {
     reset();
@@ -89,15 +89,15 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
             Geometry* part = parts.next();
             
             osg::PrimitiveSet::Mode primMode = osg::PrimitiveSet::POINTS;
-    
+
             const Style& myStyle = input->style().isSet() ? *input->style() : _style;
-    
+
             osg::Vec4f color = osg::Vec4(1,1,1,1);
             bool tessellatePolys = true;
-    
+
             bool setWidth = input->style().isSet(); // otherwise it will be set globally, we assume
             float width = 1.0f;
-    
+
             switch( part->getType() )
             {
             case Geometry::TYPE_POINTSET:
@@ -111,7 +111,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     }
                 }
                 break;
-    
+
             case Geometry::TYPE_LINESTRING:
                 {
                     _hasLines = true;
@@ -124,7 +124,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     }
                 }
                 break;
-    
+
             case Geometry::TYPE_RING:
                 {
                     _hasLines = true;
@@ -137,7 +137,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     }
                 }
                 break;
-    
+
             case Geometry::TYPE_POLYGON:
                 {
                     primMode = osg::PrimitiveSet::LINE_LOOP; // loop will tessellate into polys
@@ -161,28 +161,28 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     }
                 }
                 break;
-            default:
-                break;
+		    default:
+			    break;
             }
             
             osg::Geometry* osgGeom = new osg::Geometry();
-    
+
             if ( _featureNameExpr.isSet() )
             {
                 const std::string& name = input->eval( _featureNameExpr.mutable_value(), &context );
                 osgGeom->setName( name );
             }
-    
+
             // NOTE: benchmarking reveals VBOs to be much slower (for static data, at least)
             //osgGeom->setUseVertexBufferObjects( true );
             //osgGeom->setUseDisplayList( false );
-    
+
             if ( setWidth && width != 1.0f )
             {
                 osgGeom->getOrCreateStateSet()->setAttributeAndModes(
                     new osg::LineWidth( width ), osg::StateAttribute::ON );
             }
-    
+
             if (_hasLines)
             {
                 const LineSymbol* line = myStyle.getSymbol<LineSymbol>();
@@ -193,7 +193,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                     osgGeom->getOrCreateStateSet()->setAttributeAndModes( lineStipple, osg::StateAttribute::ON );
                 }
             }
-        
+            
             if (part->getType() == Geometry::TYPE_POLYGON && static_cast<Polygon*>(part)->getHoles().size() > 0 )
             {
                 Polygon* poly = static_cast<Polygon*>(part);
@@ -203,10 +203,10 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 osg::Vec3Array* allPoints = new osg::Vec3Array();
                 transformAndLocalize( part->asVector(), featureSRS, allPoints, mapSRS, _world2local, makeECEF );
 
-            	osgGeom->addPrimitiveSet( new osg::DrawArrays( primMode, 0, part->size() ) );
+                osgGeom->addPrimitiveSet( new osg::DrawArrays( primMode, 0, part->size() ) );
 
                 int offset = part->size();
-    
+
                 for( RingCollection::const_iterator h = poly->getHoles().begin(); h != poly->getHoles().end(); ++h )
                 {
                     Geometry* hole = h->get();
@@ -228,11 +228,11 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 osgGeom->addPrimitiveSet( new osg::DrawArrays( primMode, 0, part->size() ) );
                 osgGeom->setVertexArray( allPoints );
             }
-    
+
             // tessellate all polygon geometries. Tessellating each geometry separately
             // with TESS_TYPE_GEOMETRY is much faster than doing the whole bunch together
             // using TESS_TYPE_DRAWABLE.
-    
+
             if ( part->getType() == Geometry::TYPE_POLYGON && tessellatePolys )
             {
                 osgUtil::Tessellator tess;
@@ -240,22 +240,22 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 //tess.setWindingType( osgUtil::Tessellator::TESS_WINDING_ODD );
                 tess.setTessellationType( osgUtil::Tessellator::TESS_TYPE_GEOMETRY );
                 tess.setWindingType( osgUtil::Tessellator::TESS_WINDING_POSITIVE );
-    
+
                 tess.retessellatePolygons( *osgGeom );
-    
+
                 // the tessellator results in a collection of trifans, strips, etc. This step will
                 // consolidate those into one (or more if necessary) GL_TRIANGLES primitive.
                 //NOTE: this now happens elsewhere 
                 //MeshConsolidator::run( *osgGeom );
-    
+
                 // mark this geometry as DYNAMIC because otherwise the OSG optimizer will destroy it.
                 //osgGeom->setDataVariance( osg::Object::DYNAMIC );
             }
-    
+
             if ( makeECEF && part->getType() != Geometry::TYPE_POINTSET )
             {
                 double threshold = osg::DegreesToRadians( *_maxAngle_deg );
-    
+
                 MeshSubdivider ms( _world2local, _local2world );
                 //ms.setMaxElementsPerEBO( INT_MAX );
                 if ( input->geoInterp().isSet() )
@@ -265,10 +265,16 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
             }
 
             // NOTE! per-vertex colors makes the optimizer destroy the geometry....
-            osg::Vec4Array* colors = new osg::Vec4Array(1);
-            (*colors)[0] = color;
+            //osg::Vec4Array* colors = new osg::Vec4Array(1);
+            //(*colors)[0] = color;
+            //osgGeom->setColorArray( colors );
+            //osgGeom->setColorBinding( osg::Geometry::BIND_OVERALL );
+
+            osg::Vec4Array* colors = new osg::Vec4Array( osgGeom->getVertexArray()->getNumElements() );
+            colors->assign( colors->size(), color );
             osgGeom->setColorArray( colors );
-            osgGeom->setColorBinding( osg::Geometry::BIND_OVERALL );
+            osgGeom->setColorBinding( osg::Geometry::BIND_PER_VERTEX );
+            
 
             // add the part to the geode.
             _featureNode->addDrawable(osgGeom, input->getFID());

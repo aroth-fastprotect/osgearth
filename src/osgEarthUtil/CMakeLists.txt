@@ -5,10 +5,12 @@ ELSE (DYNAMIC_OSGEARTH)
 ENDIF(DYNAMIC_OSGEARTH)
 
 SET(TARGET_PUBLIC_H
+	AnnotationEvents
 	AutoClipPlaneHandler
 	Common
 	Controls
 	ClampCallback
+    DPLineSegmentIntersector
 	EarthManipulator
 	ElevationManager
 	Export
@@ -19,6 +21,7 @@ SET(TARGET_PUBLIC_H
 	ObjectPlacer
 	ObjectLocator
     #OceanSurfaceNode
+    Pickers
 	SkyNode
 	SpatialData
 	StarData
@@ -27,9 +30,11 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
+	AnnotationEvents.cpp
 	AutoClipPlaneHandler.cpp
 	ClampCallback.cpp
     Controls.cpp
+    DPLineSegmentIntersector.cpp
 	EarthManipulator.cpp
 	ElevationManager.cpp
     Formatters.cpp
@@ -39,6 +44,7 @@ SET(TARGET_SRC
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     #OceanSurfaceNode.cpp
+    Pickers.cpp
     SpatialData.cpp
     SkyNode.cpp
 	WFS.cpp
@@ -51,6 +57,7 @@ SET(TARGET_ADDED_LIBRARIES
 	osgEarth
 	osgEarthFeatures
 	osgEarthSymbology
+	osgEarthAnnotation
     osg
     osgUtil
     osgSim

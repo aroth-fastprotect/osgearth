@@ -17,7 +17,6 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 
-#include <osgEarthFeatures/FeatureNode>
 #include <osgEarthFeatures/FeatureSourceNode>
 #include <osgEarthFeatures/FeatureSourceMeshConsolidator>
 #include <osg/TriangleFunctor>

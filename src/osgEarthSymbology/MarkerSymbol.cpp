@@ -24,7 +24,7 @@ using namespace osgEarth::Symbology;
 MarkerSymbol::MarkerSymbol( const Config& conf ) :
 Symbol     ( conf ),
 _placement ( PLACEMENT_CENTROID ),
-_density( 25.0f ),
+_density   ( 25.0f ),
 _randomSeed( 0 )
 {
     mergeConfig( conf );
@@ -44,6 +44,7 @@ MarkerSymbol::getConfig() const
     conf.addIfSet( "placement", "random",   _placement, PLACEMENT_RANDOM );
     conf.addIfSet( "density", _density );
     conf.addIfSet( "random_seed", _randomSeed );
+    conf.addIfSet( "is_model", _isModelHint );
     conf.addNonSerializable( "MarkerSymbol::image", _image.get() );
     conf.addNonSerializable( "MarkerSymbol::node", _node.get() );
     return conf;
@@ -54,13 +55,14 @@ MarkerSymbol::mergeConfig( const Config& conf )
 {
     conf.getObjIfSet( "url", _url );
     conf.getObjIfSet( "library", _libraryName );
-    conf.getObjIfSet( "scale", _scale );
+    conf.getObjIfSet( "scale", _scale );    
     conf.getIfSet( "placement", "vertex",   _placement, PLACEMENT_VERTEX );
     conf.getIfSet( "placement", "interval", _placement, PLACEMENT_INTERVAL );
     conf.getIfSet( "placement", "random",   _placement, PLACEMENT_RANDOM );
     conf.getIfSet( "density", _density );
     conf.getIfSet( "random_seed", _randomSeed );
     conf.getIfSet( "orientation", _orientation);
+    conf.getIfSet( "is_model", _isModelHint );
     _image = conf.getNonSerializable<osg::Image>( "MarkerSymbol::image" );
     _node = conf.getNonSerializable<osg::Node>( "MarkerSymbol::node" );
 }

@@ -21,12 +21,13 @@
 #include <osgEarth/GeoMath>
 
 #include <osgEarthFeatures/Feature>
+#include <osgEarthAnnotation/FeatureNode>
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgEarth::Symbology;
 using namespace osgEarth::Features;
-
+using namespace osgEarth::Annotation;
 
 
 
@@ -56,7 +57,7 @@ _intersectionMask(0xffffffff)
     _feature->style() = style;
 
     _featureNode = new FeatureNode( _mapNode.get(), _feature.get(), false);
-
+    
 
     //Disable lighting and depth testing for the feature graph
     _featureNode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);

@@ -174,10 +174,10 @@ GeometryCompiler::compile(FeatureList&          workingSet,
     const ExtrusionSymbol* extrusion = style.get<ExtrusionSymbol>();
     const AltitudeSymbol*  altitude  = style.get<AltitudeSymbol>();
     const TextSymbol*      text      = style.get<TextSymbol>();
-    
+
     // if the style was empty, use some defaults based on the geometry type of the
     // first feature.
-    if ( style.empty() && workingSet.size() > 0 )
+    if ( !point && !line && !polygon && !marker && !extrusion && !text && workingSet.size() > 0 )
     {
         Feature* first = workingSet.begin()->get();
         Geometry* geom = first->getGeometry();
@@ -261,7 +261,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         if ( node )
         {
             resultGroup->addChild( node );
-    	}
+        }
     }
 
     // extruded geometry
@@ -286,7 +286,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         if ( node )
         {
             resultGroup->addChild( node );
-    	}
+        }
     }
 
     // simple geometry
@@ -314,7 +314,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         if ( node )
         {
             resultGroup->addChild( node );
-    	}
+        }
     }
 
     if ( text )
@@ -332,7 +332,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         if ( node )
         {
             resultGroup->addChild( node );
-    	}
+        }
     }
 
     resultGroup->getOrCreateStateSet()->setMode( GL_BLEND, 1 );

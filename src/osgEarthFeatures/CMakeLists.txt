@@ -30,7 +30,7 @@ SET(LIB_PUBLIC_HEADERS
 	FeatureListSource
     FeatureModelGraph
     FeatureModelSource
-    FeatureNode
+    #FeatureNode
     FeatureSource
 	FeatureSourceNode
 	FeatureSourceMeshConsolidator
@@ -72,7 +72,7 @@ ADD_LIBRARY(${LIB_NAME} SHARED
 	FeatureListSource.cpp
     FeatureModelGraph.cpp
     FeatureModelSource.cpp
-    FeatureNode.cpp
+    #FeatureNode.cpp
     FeatureSource.cpp
 	FeatureSourceNode.cpp
 	FeatureSourceMeshConsolidator.cpp

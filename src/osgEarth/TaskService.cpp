@@ -243,7 +243,8 @@ TaskService::TaskService( const std::string& name, int numThreads ):
 osg::Referenced( true ),
 _numThreads(0),
 _lastRemoveFinishedThreadsStamp(0),
-_name(name)
+_name(name),
+_numThreads( 0 )
 {
     _queue = new TaskRequestQueue();
     setNumThreads( numThreads );

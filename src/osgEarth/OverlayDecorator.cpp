@@ -329,16 +329,18 @@ OverlayDecorator::reinit()
             else
                 _rttCamera->attach( osg::Camera::STENCIL_BUFFER, GL_STENCIL_INDEX );
 
-            _rttCamera->getOrCreateStateSet()->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
+            osg::StateSet* rttStateSet = _rttCamera->getOrCreateStateSet();
+
+            rttStateSet->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
 
             if ( _rttBlending )
             {
                 osg::BlendFunc* blendFunc = new osg::BlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-                _rttCamera->getOrCreateStateSet()->setAttributeAndModes(blendFunc, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
+                rttStateSet->setAttributeAndModes(blendFunc, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE);
             }
             else
             {
-                _rttCamera->getOrCreateStateSet()->setMode(GL_BLEND, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE);
+                rttStateSet->setMode(GL_BLEND, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE);
             }
             //Enable blending on the RTT camera with pre-multiplied alpha.
             //osg::BlendFunc* blendFunc = new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE);
@@ -357,6 +359,11 @@ OverlayDecorator::reinit()
                 else
                     _rttCamera->addChild( _overlayGraph.get() );
             }
+
+            // overlay geometry is rendered with no depth testing, and in the order it's found in the
+            // scene graph... until further notice...
+            rttStateSet->setMode(GL_DEPTH_TEST, 0);
+            rttStateSet->setBinName( "TraversalOrderBin" );
         }
     }
 

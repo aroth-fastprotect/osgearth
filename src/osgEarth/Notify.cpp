@@ -47,6 +47,7 @@ using namespace osgEarth;
 
 using namespace std;
 
+#ifdef USE_THREAD_SAFE_NOTIFY
 #ifdef _WIN32
 extern "C" unsigned long __stdcall GetCurrentThreadId();
 #else
@@ -60,6 +61,7 @@ static unsigned getCurrentThreadId()
 	return (unsigned)::syscall(SYS_gettid);
 #endif
 }
+#endif // USE_THREAD_SAFE_NOTIFY
 
 namespace osgEarth {
 
@@ -91,7 +93,12 @@ struct NullStream : public std::ostream
  */
 struct NotifyStreamBuffer : public std::stringbuf
 {
-	NotifyStreamBuffer() : _severity(osg::NOTICE), _mutex(OpenThreads::Mutex::MUTEX_RECURSIVE), _ownerThreadId(0)
+	NotifyStreamBuffer() 
+		: _severity(osg::NOTICE)
+#ifdef USE_THREAD_SAFE_NOTIFY
+		, _mutex(OpenThreads::Mutex::MUTEX_RECURSIVE)
+		, _ownerThreadId(0)
+#endif // USE_THREAD_SAFE_NOTIFY
 	{
 	}
 	~NotifyStreamBuffer()
@@ -114,16 +121,20 @@ private:
 		if (_handler.valid())
 			_handler->notify(_severity, pbase());
 		pubseekpos(0, std::ios_base::out); // or str(std::string())
-
+#ifdef USE_THREAD_SAFE_NOTIFY
 		unlock();
+#endif // USE_THREAD_SAFE_NOTIFY
 		return 0;
 	}
 	virtual std::streamsize xsputn (const char_type* p, std::streamsize n)
 	{
+#ifdef USE_THREAD_SAFE_NOTIFY
 		lock();
+#endif // USE_THREAD_SAFE_NOTIFY
 		return std::stringbuf::xsputn(p, n);
 	}
 
+#ifdef USE_THREAD_SAFE_NOTIFY
 	void lock()
 	{
 		unsigned currentThread = ::getCurrentThreadId();
@@ -139,12 +150,15 @@ private:
 		_ownerThreadId.exchange(0);
 		_mutex.unlock();
 	}
+#endif // USE_THREAD_SAFE_NOTIFY
 
 private:
 	osg::ref_ptr<osg::NotifyHandler> _handler;
 	osg::NotifySeverity _severity;
+#ifdef USE_THREAD_SAFE_NOTIFY
 	OpenThreads::Mutex _mutex;
 	OpenThreads::Atomic _ownerThreadId;
+#endif // USE_THREAD_SAFE_NOTIFY
 };
 
 struct NotifyStream : public std::ostream

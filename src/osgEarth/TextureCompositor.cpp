@@ -502,8 +502,6 @@ TextureCompositor::init()
 
     bool isAuto = _tech == TerrainOptions::COMPOSITING_AUTO;
 
-    const Capabilities& caps = Registry::instance()->getCapabilities();
-
     // MULTITEXTURE_GPU is the current default.
     
     if (_tech == TerrainOptions::COMPOSITING_MULTITEXTURE_GPU ||

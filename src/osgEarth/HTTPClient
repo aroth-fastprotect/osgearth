@@ -156,10 +156,10 @@ namespace osgEarth
             std::stringstream _stream;
         };
         typedef std::vector< osg::ref_ptr<Part> > Parts;
-        Parts       _parts;
-        long        _response_code;
+        Parts _parts;
+        long _response_code;
         std::string _mimeType;
-        bool        _cancelled;
+        bool _cancelled;
 
         Config getHeadersAsConfig() const;
 
@@ -199,8 +199,11 @@ namespace osgEarth
 
         /** Sets up proxy info to use in all HTTP requests.
             TODO: This should probably move into the Registry */
-		static void setProxySettings( const ProxySettings &proxySettings );
+		static void setProxySettings( const optional<ProxySettings> &proxySettings );
 
+        /** Gets up proxy info to use in all HTTP requests.
+            TODO: This should probably move into the Registry */
+        static const optional<ProxySettings> & getProxySettings();
 
     public:
         /**
@@ -251,11 +254,11 @@ namespace osgEarth
         /**
          * Performs an HTTP "GET".
          */
-        static HTTPResponse get( const HTTPRequest&    request,
+        static HTTPResponse get( const HTTPRequest& request,
                                  const osgDB::Options* dbOptions =0L,
                                  ProgressCallback*     progress  =0L );
 
-        static HTTPResponse get( const std::string&    url,
+        static HTTPResponse get( const std::string& url,
                                  const osgDB::Options* options  =0L,
                                  ProgressCallback*     progress =0L );
 
@@ -265,11 +268,11 @@ namespace osgEarth
 
         void readOptions( const osgDB::ReaderWriter::Options* options, std::string &proxy_host, std::string &proxy_port ) const;
 
-        HTTPResponse doGet( const HTTPRequest&    request,
+        HTTPResponse doGet( const HTTPRequest& request,
                             const osgDB::Options* options  =0L,
                             ProgressCallback*     callback =0L ) const;
 
-        HTTPResponse doGet( const std::string&    url,
+        HTTPResponse doGet( const std::string& url,
                             const osgDB::Options* options  =0L,
                             ProgressCallback*     callback =0L ) const;
 
@@ -324,7 +327,7 @@ namespace osgEarth
         bool doDownload(const std::string& url, const std::string& filename);
 
     private:
-        void*       _curl_handle;
+        void *_curl_handle;
         std::string _previousPassword;
         long        _previousHttpAuthentication;
 

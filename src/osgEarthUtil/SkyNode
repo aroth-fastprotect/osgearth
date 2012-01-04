@@ -67,7 +67,7 @@ namespace osgEarth { namespace Util
         //override
         virtual osg::BoundingSphere computeBound() const;
 
-    private:
+    protected:
         struct StarData
         {
             std::string name;

@@ -5,4 +5,6 @@ SET(TARGET_PUBLIC_H
   TMSOptions
 )
 
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthUtil)
+
 SETUP_PLUGIN(osgearth_tms)

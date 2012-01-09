@@ -16,6 +16,7 @@ SET(TARGET_PUBLIC_H
 	Export
     Formatters
 	Graticule
+	LineOfSight
 	MeasureTool
 	NearFarGroup
 	ObjectPlacer
@@ -25,6 +26,8 @@ SET(TARGET_PUBLIC_H
 	SkyNode
 	SpatialData
 	StarData
+    TMS
+    TMSPackager
 	WFS
 	WMS
 )
@@ -39,6 +42,7 @@ SET(TARGET_SRC
 	ElevationManager.cpp
     Formatters.cpp
 	Graticule.cpp
+	LineOfSight.cpp
 	MeasureTool.cpp
 	NearFarGroup.cpp
 	ObjectPlacer.cpp
@@ -47,6 +51,8 @@ SET(TARGET_SRC
     Pickers.cpp
     SpatialData.cpp
     SkyNode.cpp
+    TMS.cpp
+    TMSPackager.cpp
 	WFS.cpp
     WMS.cpp
 )

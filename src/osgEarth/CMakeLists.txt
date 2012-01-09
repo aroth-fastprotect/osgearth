@@ -81,9 +81,6 @@ SET(TARGET_PUBLIC_H
 	TileKey
 	TileSource
 	ThreadingUtils
-	#tinystr.h # only to simplify merging
-	#tinyxml.h # only to simplify merging 
-	TMS
 	Units
     URI
     Utils
@@ -97,8 +94,14 @@ SET(TARGET_H
     tinystr.h
     tinyxml.h 
 	)
+LIST(APPEND TARGET_SRC
+    tinystr.cpp
+    tinyxml.cpp
+    tinyxmlerror.cpp
+    tinyxmlparser.cpp
+	)
 
-SET(TARGET_SRC
+LIST(APPEND TARGET_SRC
     Cache.cpp
     CachePolicy.cpp
     CacheSeed.cpp
@@ -158,11 +161,6 @@ SET(TARGET_SRC
     TileFactory.cpp
     TileKey.cpp
     TileSource.cpp
-    tinystr.cpp
-    tinyxml.cpp
-    tinyxmlerror.cpp
-    tinyxmlparser.cpp
-    TMS.cpp
     Units.cpp
     URI.cpp
     Utils.cpp

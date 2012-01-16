@@ -352,6 +352,12 @@ MapNode::getMapSRS() const
     return getMap()->getProfile()->getSRS();
 }
 
+Terrain*
+MapNode::getTerrain()
+{
+    return getTerrainEngine()->getTerrain();
+}
+
 TerrainEngineNode*
 MapNode::getTerrainEngine() const
 {

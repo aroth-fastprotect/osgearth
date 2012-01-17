@@ -11,6 +11,9 @@ SET(OSGEARTH_SONAMES TRUE)
 FAST_PACKAGE_GEOS()
 FAST_PACKAGE_QT4()
 FIND_PACKAGE(V8)
+FAST_PACKAGE_MINIZIP()
+
+OPTION(OSGEARTH_USE_QT "Enable to use Qt (build Qt-dependent libraries, plugins and examples)" ON)
 
 SET (WITH_EXTERNAL_TINYXML FALSE CACHE BOOL "Use bundled or system wide version of TinyXML")
 IF (WITH_EXTERNAL_TINYXML)

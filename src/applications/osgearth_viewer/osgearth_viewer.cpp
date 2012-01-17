@@ -28,7 +28,6 @@
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/AutoClipPlaneHandler>
 #include <osgEarthUtil/Controls>
-#include <osgEarthUtil/Graticule>
 #include <osgEarthUtil/SkyNode>
 #include <osgEarthUtil/Formatters>
 #include <osgEarthSymbology/Color>
@@ -62,7 +61,7 @@ usage( const std::string& msg )
     return -1;
 }
 
-static EarthManipulator* s_manip         = 0L;
+static EarthManipulator* s_manip         =0L;
 static Control*          s_controlPanel  =0L;
 static SkyNode*          s_sky           =0L;
 static OceanSurfaceNode* s_ocean         =0L;
@@ -251,7 +250,7 @@ createControlPanel( osgViewer::View* view, std::vector<Viewpoint>& vps )
         skySlider->setHorizFill( true, 200 );
         skySlider->addEventHandler( new SkySliderHandler );
     }
-    
+
     // ocean sliders:
     if ( s_ocean )
     {
@@ -576,7 +575,7 @@ main(int argc, char** argv)
     osg::Node* earthNode = osgDB::readNodeFiles( arguments );
     if (!earthNode)
         return usage( "Unable to load earth model." );
-
+    
     // install our default manipulator:
     s_manip = new EarthManipulator();
     s_manip->getSettings()->setArcViewpointTransitions( true );
@@ -651,7 +650,7 @@ main(int argc, char** argv)
             Decluttering::setOptions( DeclutteringOptions(declutterConf) );
         }
 
-        //Add a control panel to the scene
+        // Add a control panel to the scene
         root->addChild( ControlCanvas::get( &viewer ) );
         if ( viewpoints.size() > 0 || s_sky || s_ocean )
         {

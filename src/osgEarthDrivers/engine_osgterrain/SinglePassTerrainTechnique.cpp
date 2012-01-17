@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include "SinglePassTerrainTechnique"
-#include "Terrain"
+#include "TerrainNode"
 #include "Tile"
 
 #include <osgEarth/Cube>
@@ -71,6 +71,7 @@ SinglePassTerrainTechnique::SinglePassTerrainTechnique( TextureCompositor* compo
 CustomTerrainTechnique(),
 _debug( false ),
 _verticalScaleOverride(1.0f),
+_atomicCallOnce(0),
 _initCount(0),
 _pendingFullUpdate( false ),
 _pendingGeometryUpdate(false),
@@ -85,6 +86,7 @@ SinglePassTerrainTechnique::SinglePassTerrainTechnique(const SinglePassTerrainTe
 CustomTerrainTechnique( rhs, copyop ),
 _debug( rhs._debug ),
 _verticalScaleOverride( rhs._verticalScaleOverride ),
+_atomicCallOnce( 0 ),
 _initCount( 0 ),
 _pendingFullUpdate( false ),
 _pendingGeometryUpdate( false ),
@@ -139,6 +141,14 @@ SinglePassTerrainTechnique::compile( const TileUpdate& update, ProgressCallback*
     if ( !_tile ) 
     {
         OE_WARN << LC << "Illegal; terrain tile is null" << std::endl;
+        return;
+    }
+
+    // only legal to call this once and only once.
+    // lame. i know. but it's friday
+    if ( _atomicCallOnce.OR(0x01) != 0 )
+    {
+        //OE_WARN << LC << "Tried to call more than once and was locked out" << std::endl;
         return;
     }
 
@@ -1263,7 +1273,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
               }
             }
           }
-      
+ 
           //Create stitching skirts
           if (createSkirt && skirtIndices.size() > 0)
           {
@@ -1587,8 +1597,8 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
     surface->addPrimitiveSet(elements.get());
     
     osg::ref_ptr<osg::Vec3Array> skirtVectors = new osg::Vec3Array( *normals );
-    
-    if (!normals)
+
+          if (!normals)
         createSkirt = false;
     
     // New separated skirts.
@@ -1721,7 +1731,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
             else
             {
               skirtVerts->push_back( (*surfaceVerts)[orig_i] );
-              skirtVerts->push_back( (*surfaceVerts)[orig_i] - ((*skirtVectors)[orig_i])*skirtHeight );
+              skirtVerts->push_back( (*surfaceVerts)[orig_i] - ((*skirtVectors)[orig_i])*skirtHeight );              
               skirtNormals->push_back( (*normals)[orig_i] );             
               skirtNormals->push_back( (*normals)[orig_i] );             
 
@@ -1751,7 +1761,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
         for (int p=1; p < (int)skirtBreaks.size(); p++)
           skirt->addPrimitiveSet( new osg::DrawArrays( GL_TRIANGLE_STRIP, skirtBreaks[p-1], skirtBreaks[p] - skirtBreaks[p-1] ) );
     }
-
+    
     bool recalcNormals = elevationLayer != NULL;
 
     //Clear out the normals
@@ -1816,10 +1826,10 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
 				}
 
 				if (VALID) {
-                    float e00 = (*elevations)[i00];
-                    float e10 = (*elevations)[i10];
-                    float e01 = (*elevations)[i01];
-                    float e11 = (*elevations)[i11];
+					float e00 = (*elevations)[i00];
+					float e10 = (*elevations)[i10];
+					float e01 = (*elevations)[i01];
+					float e11 = (*elevations)[i11];
 
                 osg::Vec3f &v00 = (*surfaceVerts)[i00];
                 osg::Vec3f &v10 = (*surfaceVerts)[i10];
@@ -1872,7 +1882,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
                         (*normals)[i11] += normal2;
                     }
                 }
-            	}
+				}
             }
             // As skirtPoly is filling the mask bbox, we don't need to create isolated triangle
 			/*else if (numValid==3)

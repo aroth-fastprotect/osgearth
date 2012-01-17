@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthSymbology/MeshSubdivider>
-#include <osgEarthSymbology/LineFunctor>
+#include <osgEarth/LineFunctor>
 #include <osgEarth/GeoMath>
 #include <osg/TriangleFunctor>
 #include <osg/TriangleIndexFunctor>
@@ -292,7 +292,7 @@ namespace
         GLuint _i0, _i1;
     };
 
-    typedef std::queue<Line> LineQueue;
+    typedef std::queue<Line>  LineQueue;
     typedef std::vector<Line> LineVector;
 
 #if 0
@@ -444,7 +444,7 @@ namespace
 
             _lines.push( Line(record(v0,t0,c0), record(v1,t1,c1)) );
         }
-    };       
+    };         
     
     /**
      * Populates the geometry object with a collection of index elements primitives.

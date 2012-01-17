@@ -26,6 +26,7 @@ SET(TARGET_PUBLIC_H
 	Config
     Containers
 	Cube
+    CullingUtils
     DrapeableNode
     ECEF
 	ElevationLayer
@@ -45,6 +46,7 @@ SET(TARGET_PUBLIC_H
     IOTypes
 	JsonUtils
 	Layer
+    LineFunctor
 	Locators
     LocalTangentPlane
 	Map
@@ -71,6 +73,7 @@ SET(TARGET_PUBLIC_H
 	SpatialReference
 	StringUtils
 	TaskService
+    Terrain
     TerrainLayer
     TerrainOptions
 	TerrainEngineNode
@@ -109,6 +112,7 @@ LIST(APPEND TARGET_SRC
     CompositeTileSource.cpp
     Config.cpp
     Cube.cpp
+    CullingUtils.cpp
     DrapeableNode.cpp
     ECEF.cpp
     EGM.cpp
@@ -152,6 +156,7 @@ LIST(APPEND TARGET_SRC
     SpatialReference.cpp
     StringUtils.cpp
     TaskService.cpp
+    Terrain.cpp
     TerrainLayer.cpp
     TerrainOptions.cpp
     TerrainEngineNode.cpp

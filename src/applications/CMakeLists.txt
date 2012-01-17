@@ -23,6 +23,7 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_elevation)
 	ADD_SUBDIRECTORY(osgearth_features)
 	ADD_SUBDIRECTORY(osgearth_featureinfo)
+	ADD_SUBDIRECTORY(osgearth_los)
 	ADD_SUBDIRECTORY(osgearth_map)
 	ADD_SUBDIRECTORY(osgearth_annotation)
 	ADD_SUBDIRECTORY(osgearth_tracks)
@@ -33,11 +34,18 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_tilesource)
 	ADD_SUBDIRECTORY(osgearth_imageoverlay)
 	ADD_SUBDIRECTORY(osgearth_city)
-ENDIF(BUILD_OSGEARTH_EXAMPLES)
+	ADD_SUBDIRECTORY(osgearth_graticule)
 
+	IF (QT4_FOUND AND NOT ANDROID AND OSGEARTH_USE_QT)
+	    ADD_SUBDIRECTORY(osgearth_qt)
+	ENDIF()
+
+ENDIF(BUILD_OSGEARTH_EXAMPLES)
 
 SET(TARGET_DEFAULT_PREFIX "")
 SET(TARGET_DEFAULT_LABEL_PREFIX "Applications")
 # always build osgearth_version
 ADD_SUBDIRECTORY(osgearth_version)
+ADD_SUBDIRECTORY(osgearth_package)
 ADD_SUBDIRECTORY(osgearth_viewer)
+

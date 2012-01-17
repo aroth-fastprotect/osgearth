@@ -191,7 +191,7 @@ MapNode::init()
     // TODO: this should probably happen elsewhere, like in the registry?
     if ( _mapNodeOptions.proxySettings().isSet() )
     {
-		HTTPClient::setProxySettings( _mapNodeOptions.proxySettings().get() );
+		HTTPClient::setProxySettings( _mapNodeOptions.proxySettings() );
     }
 
     // establish global driver options. These are OSG reader-writer options that
@@ -350,6 +350,12 @@ const SpatialReference*
 MapNode::getMapSRS() const
 {
     return getMap()->getProfile()->getSRS();
+}
+
+Terrain*
+MapNode::getTerrain()
+{
+    return getTerrainEngine()->getTerrain();
 }
 
 TerrainEngineNode*

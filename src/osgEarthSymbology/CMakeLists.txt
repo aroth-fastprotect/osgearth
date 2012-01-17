@@ -21,7 +21,6 @@ SET(TARGET_PUBLIC_H
     GeometryFactory
     GEOS
     GeometryRasterizer
-	LineFunctor
     LineSymbol
     MarkerResource
     MarkerSymbol

@@ -35,7 +35,6 @@ namespace osgEarth { namespace QtGui
 {
     using namespace osgEarth;
     using namespace osgEarth::Annotation;
-    using namespace osgEarth::QtGui;
 
     struct DataManagerMapCallback;
     struct DataManagerElevationLayerCallback;

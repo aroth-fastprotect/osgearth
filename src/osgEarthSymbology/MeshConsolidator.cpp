@@ -196,7 +196,6 @@ MeshConsolidator::run( osg::Geode& geode )
     unsigned numVerts = 0;
     unsigned numColors = 0;
     unsigned numNormals = 0;
-    unsigned numTexCoordArrays = 0;
     unsigned numVertAttribArrays = 0;
     std::vector<unsigned> texCoordArrayUnits;
     texCoordArrayUnits.reserve(32);

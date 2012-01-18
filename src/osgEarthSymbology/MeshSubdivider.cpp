@@ -511,8 +511,6 @@ namespace
         //LineFunctor<LineData> data;
         geom.accept( data );
     
-        int numLinesIn = data._lines.size();
-
         LineVector done;
         done.reserve( 2 * data._lines.size() );
 

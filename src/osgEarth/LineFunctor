@@ -787,7 +787,6 @@ namespace osgEarth
                 case(GL_LINES):
                 {
                     IndexPointer iptr = indices;
-                    Index first = *iptr;
                     for(GLsizei i=1;i<count;i+=2,iptr+=2)
                     {
                         T::line(*iptr,*(iptr+1));
@@ -797,7 +796,6 @@ namespace osgEarth
                 case(GL_LINE_STRIP):
                 {
                     IndexPointer iptr = indices;
-                    Index first = *iptr;
                     for(GLsizei i=1;i<count;i+=1,++iptr)
                     {
                         T::line(*iptr,*(iptr+1));
@@ -885,7 +883,6 @@ namespace osgEarth
                 case(GL_LINES):
                 {
                     IndexPointer iptr = indices;
-                    Index first = *iptr;
                     for(GLsizei i=1;i<count;i+=2,iptr+=2)
                     {
                         T::line(*iptr,*(iptr+1));
@@ -895,7 +892,6 @@ namespace osgEarth
                 case(GL_LINE_STRIP):
                 {
                     IndexPointer iptr = indices;
-                    Index first = *iptr;
                     for(GLsizei i=1;i<count;i+=1,++iptr)
                     {
                         T::line(*iptr,*(iptr+1));
@@ -983,7 +979,6 @@ namespace osgEarth
                 case(GL_LINES):
                 {
                     IndexPointer iptr = indices;
-                    Index first = *iptr;
                     for(GLsizei i=1;i<count;i+=2,iptr+=2)
                     {
                         T::line(*iptr,*(iptr+1));
@@ -993,7 +988,6 @@ namespace osgEarth
                 case(GL_LINE_STRIP):
                 {
                     IndexPointer iptr = indices;
-                    Index first = *iptr;
                     for(GLsizei i=1;i<count;i+=1,++iptr)
                     {
                         T::line(*iptr,*(iptr+1));

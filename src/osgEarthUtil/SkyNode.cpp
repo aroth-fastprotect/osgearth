@@ -135,7 +135,7 @@ namespace
 
         osg::Geometry* geom = new osg::Geometry();
 
-        int latSegments = 100;
+        int latSegments = 50;
         int lonSegments = 2 * latSegments;
 
         double segmentSize = 180.0/(double)latSegments; // degrees

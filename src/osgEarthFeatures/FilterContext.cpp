@@ -25,12 +25,28 @@ using namespace osgEarth::Features;
 FilterContext::FilterContext(Session*               session,
                              const FeatureProfile*  profile,
                              const GeoExtent&       workingExtent ) :
-_session( session ),
-_profile( profile ),
+_session     ( session ),
+_profile     ( profile ),
 _isGeocentric( false ),
 _extent( workingExtent, workingExtent )
 {
     _resourceCache = new ResourceCache( session ? session->getDBOptions() : 0L );
+
+    // attempt to establish a working extent if we don't have one:
+
+    if (!_extent->isValid() &&
+        profile &&
+        profile->getExtent().isValid() )
+    {
+        _extent = profile->getExtent();
+    }
+
+    if (!_extent->isValid() &&
+        session && 
+        session->getMapInfo().getProfile() )
+    {
+        _extent = session->getMapInfo().getProfile()->getExtent();
+    }
 }
 
 FilterContext::FilterContext( const FilterContext& rhs ) :

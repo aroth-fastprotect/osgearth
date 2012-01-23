@@ -18,6 +18,7 @@ SET(TARGET_PUBLIC_H
     Common
     ConvertTypeFilter
     CropFilter
+    DepthAdjustment
     ExtrudeGeometryFilter
     Feature
     FeatureCursor
@@ -37,6 +38,7 @@ SET(TARGET_PUBLIC_H
     GeometryCompiler
 	GeometryUtils
     LabelSource
+    MeshClamper
 	OgrUtils
     OptimizerHints
     ResampleFilter
@@ -46,6 +48,8 @@ SET(TARGET_PUBLIC_H
     Script
     ScriptEngine
     SubstituteModelFilter
+    TessellateOperator
+    TextSymbolizer
     TransformFilter
     VirtualFeatureSource
 )
@@ -59,6 +63,7 @@ SET(TARGET_SRC
     CentroidFilter.cpp
     ConvertTypeFilter.cpp
     CropFilter.cpp
+    DepthAdjustment.cpp
     ExtrudeGeometryFilter.cpp
     Feature.cpp
     FeatureCursor.cpp
@@ -78,6 +83,7 @@ SET(TARGET_SRC
     GeometryCompiler.cpp
 	GeometryUtils.cpp
     LabelSource.cpp
+    MeshClamper.cpp
     OptimizerHints.cpp
     ResampleFilter.cpp
     ScaleFilter.cpp
@@ -85,6 +91,8 @@ SET(TARGET_SRC
     ScatterFilter.cpp
     ScriptEngine.cpp
     SubstituteModelFilter.cpp
+    TessellateOperator.cpp
+    TextSymbolizer.cpp
     TransformFilter.cpp
     VirtualFeatureSource.cpp
 )

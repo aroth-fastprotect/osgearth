@@ -70,6 +70,7 @@ namespace osgEarth { namespace Symbology
 
         /** Adds a symbol to the collection. */
         void addSymbol(Symbol* symbol);
+        void add(Symbol* symbol) { addSymbol(symbol); }
 
 		/** Remove a symbol from the collection */
 		bool removeSymbol (Symbol* symbol);
@@ -88,6 +89,9 @@ namespace osgEarth { namespace Symbology
             return 0L;
         }
         template<typename T> T* get() { return getSymbol<T>(); } // alias
+
+        template<typename T> bool has() { return get<T>() != 0L; }
+        template<typename T> const bool has() const { return get<T>() != 0L; }
 
         /** Gets a typed symbol from the style (the first one found) */
         template<typename T>
@@ -133,7 +137,7 @@ namespace osgEarth { namespace Symbology
         optional<URI>               _uri;
     };
 
-    typedef std::vector<Style> StyleList;
+    typedef std::vector<Style>           StyleList;
     typedef std::map<std::string, Style> StyleMap;
 
     /**
@@ -174,7 +178,7 @@ namespace osgEarth { namespace Symbology
         optional<Query>       _query;
     };
 
-    typedef std::list<StyleSelector> StyleSelectorList;
+    typedef std::list<StyleSelector>   StyleSelectorList;
     typedef std::vector<StyleSelector> StyleSelectorVector;
 
 

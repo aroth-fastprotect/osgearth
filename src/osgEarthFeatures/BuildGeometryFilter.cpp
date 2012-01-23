@@ -70,7 +70,7 @@ namespace
 
 BuildGeometryFilter::BuildGeometryFilter( const Style& style ) :
 _style        ( style ),
-_maxAngle_deg ( 5.0 ),
+_maxAngle_deg ( 1.0 ),
 _geoInterp    ( GEOINTERP_RHUMB_LINE ),
 _mergeGeometry( false )
 {
@@ -118,8 +118,8 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
             bool  hasPolyOutline     = false;
 
             const PointSymbol*   pointSymbol = myStyle.get<PointSymbol>();
-            const LineSymbol*    lineSymbol = myStyle.get<LineSymbol>();
-            const PolygonSymbol* polySymbol = myStyle.get<PolygonSymbol>();
+            const LineSymbol*    lineSymbol  = myStyle.get<LineSymbol>();
+            const PolygonSymbol* polySymbol  = myStyle.get<PolygonSymbol>();
 
             // resolve the geometry type from the component type and the symbology:
             Geometry::Type renderType;
@@ -153,7 +153,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
                 lineSymbol ? lineSymbol->stroke()->color() :
                 pointSymbol ? pointSymbol->fill()->color() :
                 osg::Vec4f(1,1,1,1);
-
+            
             osg::Geometry* osgGeom = new osg::Geometry();
 
             if ( _featureNameExpr.isSet() )
@@ -201,14 +201,21 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
             // subdivide the mesh if necessary to conform to an ECEF globe:
             if ( makeECEF && renderType != Geometry::TYPE_POINTSET )
             {
-                double threshold = osg::DegreesToRadians( *_maxAngle_deg );
+                // check for explicit tessellation disable:
+                const LineSymbol* line = _style.get<LineSymbol>();
+                bool disableTess = line && line->tessellation().isSetTo(0);
 
-                MeshSubdivider ms( _world2local, _local2world );
-                //ms.setMaxElementsPerEBO( INT_MAX );
-                if ( input->geoInterp().isSet() )
-                    ms.run( *osgGeom, threshold, *input->geoInterp() );
-                else
-                    ms.run( *osgGeom, threshold, *_geoInterp );
+                if ( makeECEF && !disableTess )
+                {
+                    double threshold = osg::DegreesToRadians( *_maxAngle_deg );
+
+                    MeshSubdivider ms( _world2local, _local2world );
+                    //ms.setMaxElementsPerEBO( INT_MAX );
+                    if ( input->geoInterp().isSet() )
+                        ms.run( *osgGeom, threshold, *input->geoInterp() );
+                    else
+                        ms.run( *osgGeom, threshold, *_geoInterp );
+                }
             }
 
             // add the part to the geode.

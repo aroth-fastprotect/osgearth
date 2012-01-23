@@ -5,6 +5,7 @@ ELSE (DYNAMIC_OSGEARTH)
 ENDIF(DYNAMIC_OSGEARTH)
 
 SET(TARGET_PUBLIC_H
+	AnnotationSettings
     AnnotationData
     AnnotationNode
     AnnotationUtils
@@ -27,6 +28,7 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
+	AnnotationSettings.cpp
     AnnotationData.cpp
     AnnotationNode.cpp
     AnnotationUtils.cpp

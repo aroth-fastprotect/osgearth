@@ -147,7 +147,7 @@ namespace osgEarth { namespace Features
 
         /** Geodetic interpolation method. */
         optional<GeoInterpolation>& geoInterp() { return _geoInterp; }
-        const optional<GeoInterpolation>& geomInterp() const { return _geoInterp; }
+        const optional<GeoInterpolation>& geoInterp() const { return _geoInterp; }
 
         /** populates the variables of an expression with attribute values and evals the expression. */
         double eval( NumericExpression& expr, FilterContext const* context=0L ) const;
@@ -156,10 +156,10 @@ namespace osgEarth { namespace Features
         const std::string& eval( StringExpression& expr, FilterContext const* context=0L ) const;
 
     protected:
-        FeatureID _fid;
+        FeatureID                         _fid;
         osg::ref_ptr<Symbology::Geometry> _geom;
-        AttributeTable _attrs;
-        optional<Style> _style;
+        AttributeTable                    _attrs;
+        optional<Style>                   _style;
         optional<GeoInterpolation>        _geoInterp;
     };
 

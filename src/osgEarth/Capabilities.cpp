@@ -104,6 +104,7 @@ _maxGPUTextureCoordSets ( 1 ),
 _maxTextureSize         ( 256 ),
 _maxFastTextureSize     ( 256 ),
 _maxLights              ( 1 ),
+_depthBits              ( 0 ),
 _supportsGLSL           ( false ),
 _GLSLversion            ( 1.0f ),
 _supportsTextureArrays  ( false ),
@@ -173,6 +174,9 @@ _supportsQuadBufferStereo( false )
 
         glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
         OE_INFO << LC << "  Max GPU texture coordinate sets = " << _maxGPUTextureCoordSets << std::endl;
+
+        glGetIntegerv( GL_DEPTH_BITS, &_depthBits );
+        OE_INFO << LC << "  Depth buffer bits = " << _depthBits << std::endl;
 
         // Use the texture-proxy method to determine the maximum texture size 
         glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );

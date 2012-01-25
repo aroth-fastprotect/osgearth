@@ -75,7 +75,7 @@ namespace osgEarth
 		 */
 		optional<osg::Vec4ub>& transparentColor() { return _transparentColor; }
         const optional<osg::Vec4ub>& transparentColor() const { return _transparentColor; }
-
+        
         /**
          * Whether LOD blending is enabled for this layer
          */
@@ -105,7 +105,7 @@ namespace osgEarth
      */
     struct ImageLayerCallback : public TerrainLayerCallback
     {
-        virtual void onOpacityChanged( class ImageLayer* layer ) { }
+        virtual void onOpacityChanged( class ImageLayer* layer ) { }        
     };
 
     typedef void (ImageLayerCallback::*ImageLayerCallbackMethodPtr)(ImageLayer* layer);
@@ -128,10 +128,10 @@ namespace osgEarth
         void process( osg::ref_ptr<osg::Image>& image ) const;
 
     private:
-        ImageLayerOptions _options;
-        osg::Vec4f _chromaKey;
+        ImageLayerOptions                  _options;
+        osg::Vec4f                         _chromaKey;
         osg::ref_ptr<osg::Image>           _noDataImage;
-        bool _layerInTargetProfile;
+        bool                               _layerInTargetProfile;
     };
 
     //--------------------------------------------------------------------
@@ -177,7 +177,7 @@ namespace osgEarth
 
         void setOpacity( float opacity );
         float getOpacity() const { return *_runtimeOptions.opacity(); }
-
+        
         void disableLODBlending();
         bool isLODBlendingEnabled() const { return *_runtimeOptions.lodBlending(); }
 
@@ -192,18 +192,20 @@ namespace osgEarth
 
         // Fetches an image from the underlying TileSource whose data matches that of the
         // key extent.
-        osg::Image* createImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback);
+        //osg::Image* createImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback);
+        GeoImage createImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback);
 
         // Fetches multiple images from the TileSource; mosaics/reprojects/crops as necessary, and
         // returns a single tile. This is called by createImageFromTileSource() if the key profile
         // doesn't match the layer profile.
-        osg::Image* assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback);
+        //osg::Image* assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback);
+        GeoImage assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback);
 
 
         virtual void initTileSource();
 
     protected:
-        ImageLayerOptions       _runtimeOptions;
+        ImageLayerOptions _runtimeOptions;
 
         osg::ref_ptr<TileSource::ImageOperation> _preCacheOp;
         

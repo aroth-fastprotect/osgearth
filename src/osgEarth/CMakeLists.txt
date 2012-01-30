@@ -27,6 +27,8 @@ SET(TARGET_PUBLIC_H
     Containers
 	Cube
     CullingUtils
+    DepthOffset
+    DPLineSegmentIntersector
     DrapeableNode
     ECEF
 	ElevationLayer
@@ -113,6 +115,8 @@ LIST(APPEND TARGET_SRC
     Config.cpp
     Cube.cpp
     CullingUtils.cpp
+    DepthOffset.cpp
+    DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
     ECEF.cpp
     EGM.cpp

@@ -203,7 +203,7 @@ struct OgrUtils
                 break;
             case osgEarth::Symbology::Geometry::TYPE_RING:
                 requestedType = wkbLinearRing;
-                break;
+                break;            
 			default:
 				break;
             }
@@ -288,7 +288,7 @@ struct OgrUtils
         return output;
     }
 
-    static Feature* createFeature( OGRFeatureH handle )
+    static Feature* createFeature( OGRFeatureH handle, const SpatialReference* srs )
     {
         long fid = OGR_F_GetFID( handle );
 
@@ -300,6 +300,8 @@ struct OgrUtils
             Symbology::Geometry* geom = OgrUtils::createGeometry( geomRef );
             feature->setGeometry( geom );
         }
+
+        feature->setSRS( srs );
 
         int numAttrs = OGR_F_GetFieldCount(handle); 
         for (int i = 0; i < numAttrs; ++i) 
@@ -333,12 +335,6 @@ struct OgrUtils
                         feature->set( name, std::string(value) );
                     }
             }
-                                 
-            //const char* field_value= OGR_F_GetFieldAsString(handle, i); 
-            //std::string value = std::string( field_value); 
-            ////Make the name lower case 
-            //feature->set(name, value);
-            ////feature->setAttr(name, value); 
         } 
 
         return feature;

@@ -34,10 +34,10 @@ using namespace osgEarth::Symbology;
 //------------------------------------------------------------------------
 
 FeatureModelSourceOptions::FeatureModelSourceOptions( const ConfigOptions& options ) :
-ModelSourceOptions( options ),
-_lit( true ),
-_maxGranularity_deg( 5.0 ),
-_mergeGeometry( false ),
+ModelSourceOptions ( options ),
+_lit               ( true ),
+_maxGranularity_deg( 1.0 ),
+_mergeGeometry     ( false ),
 _clusterCulling( true ),
 _geomTypeOverride( Geometry::TYPE_UNKNOWN )
 {
@@ -52,16 +52,16 @@ FeatureModelSourceOptions::fromConfig( const Config& conf )
     //    _featureOptions->merge( conf.child("features") );
     _featureSource = conf.getNonSerializable<FeatureSource>("feature_source");
 
-    conf.getObjIfSet( "styles", _styles );
+    conf.getObjIfSet( "styles",       _styles );
     conf.getObjIfSet( "layout",       _layout );
     conf.getObjIfSet( "paging",       _layout ); // backwards compat.. to be deprecated
-    conf.getObjIfSet( "gridding", _gridding ); // to be deprecated
+    conf.getObjIfSet( "gridding",     _gridding ); // to be deprecated
     conf.getObjIfSet( "feature_name", _featureNameExpr );
     conf.getObjIfSet( "cache_policy", _cachePolicy );
 
     conf.getIfSet( "lighting", _lit );
     conf.getIfSet( "max_granularity", _maxGranularity_deg );
-    conf.getIfSet( "merge_geometry", _mergeGeometry );
+    conf.getIfSet( "merge_geometry",  _mergeGeometry );
     conf.getIfSet( "cluster_culling", _clusterCulling );
 
     std::string gt = conf.value( "geometry_type" );
@@ -84,14 +84,14 @@ FeatureModelSourceOptions::getConfig() const
         conf.addNonSerializable("feature_source", _featureSource.get());
     }
     //conf.updateObjIfSet( "feature_source", _featureSource);
-    conf.updateObjIfSet( "gridding", _gridding ); // to be deprecated
-    conf.updateObjIfSet( "styles", _styles );
+    conf.updateObjIfSet( "gridding",     _gridding ); // to be deprecated
+    conf.updateObjIfSet( "styles",       _styles );
     conf.updateObjIfSet( "layout",       _layout );
     conf.updateObjIfSet( "cache_policy", _cachePolicy );
 
     conf.updateIfSet( "lighting", _lit );
     conf.updateIfSet( "max_granularity", _maxGranularity_deg );
-    conf.updateIfSet( "merge_geometry", _mergeGeometry );
+    conf.updateIfSet( "merge_geometry",  _mergeGeometry );
     conf.updateIfSet( "cluster_culling", _clusterCulling );
 
 

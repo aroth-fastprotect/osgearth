@@ -10,7 +10,6 @@ SET(TARGET_PUBLIC_H
 	Common
 	Controls
 	ClampCallback
-    DPLineSegmentIntersector
 	EarthManipulator
 	ElevationManager
 	Export
@@ -40,7 +39,6 @@ SET(TARGET_SRC
 	AutoClipPlaneHandler.cpp
 	ClampCallback.cpp
     Controls.cpp
-    DPLineSegmentIntersector.cpp
 	EarthManipulator.cpp
 	ElevationManager.cpp
     Formatters.cpp

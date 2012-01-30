@@ -18,7 +18,6 @@ SET(TARGET_PUBLIC_H
     Common
     ConvertTypeFilter
     CropFilter
-    DepthAdjustment
     ExtrudeGeometryFilter
     Feature
     FeatureCursor
@@ -63,7 +62,6 @@ SET(TARGET_SRC
     CentroidFilter.cpp
     ConvertTypeFilter.cpp
     CropFilter.cpp
-    DepthAdjustment.cpp
     ExtrudeGeometryFilter.cpp
     Feature.cpp
     FeatureCursor.cpp

@@ -780,13 +780,18 @@ ConstGeometryIterator::fetchNext()
 
 //----------------------------------------------------------------------------
 
-ConstSegmentIterator::ConstSegmentIterator( const Geometry* verts, bool closeLoop ) :
+ConstSegmentIterator::ConstSegmentIterator( const Geometry* verts, bool forceClosedLoop ) :
 _verts(&verts->asVector()),
 _iter(verts->begin()),
 _done(),
-_closeLoop(closeLoop)
+_closeLoop(forceClosedLoop)
 {
     _done = _verts->size() < 2;
+
+    if ( !forceClosedLoop )
+    {
+        _closeLoop = dynamic_cast<const Ring*>(verts) != 0L;
+    }
 }
 
 Segment

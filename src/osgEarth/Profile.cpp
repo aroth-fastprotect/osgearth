@@ -34,11 +34,11 @@ using namespace osgEarth;
 //------------------------------------------------------------------------
 
 ProfileOptions::ProfileOptions( const ConfigOptions& options ) :
-ConfigOptions( options ),
-_namedProfile( "" ),
-_srsInitString( "" ),
-_vsrsInitString( "" ),
-_bounds( Bounds() ),
+ConfigOptions      ( options ),
+_namedProfile      ( "" ),
+_srsInitString     ( "" ),
+_vsrsInitString    ( "" ),
+_bounds            ( Bounds() ),
 _numTilesWideAtLod0( 1 ),
 _numTilesHighAtLod0( 1 )
 {
@@ -46,9 +46,9 @@ _numTilesHighAtLod0( 1 )
 }
 
 ProfileOptions::ProfileOptions( const std::string& namedProfile ) :
-_srsInitString( "" ),
-_vsrsInitString( "" ),
-_bounds( Bounds() ),
+_srsInitString     ( "" ),
+_vsrsInitString    ( "" ),
+_bounds            ( Bounds() ),
 _numTilesWideAtLod0( 1 ),
 _numTilesHighAtLod0( 1 )
 {
@@ -259,7 +259,7 @@ Profile::Profile(const SpatialReference* srs,
                  unsigned int numTilesWideAtLod0,
                  unsigned int numTilesHighAtLod0) :
 osg::Referenced( true ),
-_vsrs( vsrs )
+_vsrs          ( vsrs )
 {
     _extent = GeoExtent( srs, xmin, ymin, xmax, ymax );
 
@@ -285,7 +285,7 @@ Profile::Profile(const SpatialReference* srs,
                  unsigned int numTilesWideAtLod0,
                  unsigned int numTilesHighAtLod0 ) :
 osg::Referenced( true ),
-_vsrs( vsrs )
+_vsrs          ( vsrs )
 {
     _extent = GeoExtent( srs, xmin, ymin, xmax, ymax );
 
@@ -525,7 +525,7 @@ void
 Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<TileKey>& out_intersectingKeys) const
 {
     // assume a non-crossing extent here.
-    if ( key_ext.crossesDateLine() )
+    if ( key_ext.crossesAntimeridian() )
     {
         OE_WARN << "Profile::addIntersectingTiles cannot process date-line cross" << std::endl;
         return;
@@ -624,10 +624,10 @@ Profile::getIntersectingTiles(const GeoExtent& extent, std::vector<TileKey>& out
             return;
     }
 
-    if ( ext.crossesDateLine() )
+    if ( ext.crossesAntimeridian() )
     {
         GeoExtent first, second;
-        if (ext.splitAcrossDateLine( first, second ))
+        if (ext.splitAcrossAntimeridian( first, second ))
         {
             addIntersectingTiles( first, out_intersectingKeys );
             addIntersectingTiles( second, out_intersectingKeys );

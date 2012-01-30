@@ -180,8 +180,16 @@ _dirty(false)
         _source->getFeatureProfile()->getExtent(), 
         &_featureExtentClamped );
 
-    // same, back into feature coords:
-    _usableFeatureExtent = _usableMapExtent.transform( _source->getFeatureProfile()->getSRS() );
+    if(_usableMapExtent.isValid())
+    {
+        // same, back into feature coords:
+        _usableFeatureExtent = _usableMapExtent.transform( _source->getFeatureProfile()->getSRS() );
+    }
+    else
+    {
+        _usableMapExtent = _source->getFeatureProfile()->getExtent();
+        _usableFeatureExtent = _usableMapExtent;
+    }
 
     // world-space bounds of the feature layer
     _fullWorldBound = getBoundInWorldCoords( _usableMapExtent, 0L );

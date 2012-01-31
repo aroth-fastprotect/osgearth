@@ -36,7 +36,7 @@ using namespace osgEarth::Symbology;
 FeatureModelSourceOptions::FeatureModelSourceOptions( const ConfigOptions& options ) :
 ModelSourceOptions ( options ),
 _lit               ( true ),
-_maxGranularity_deg( 5.0 ),
+_maxGranularity_deg( 1.0 ),
 _mergeGeometry     ( false ),
 _clusterCulling( true ),
 _geomTypeOverride( Geometry::TYPE_UNKNOWN )

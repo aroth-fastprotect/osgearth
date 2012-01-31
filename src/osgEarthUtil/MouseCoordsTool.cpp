@@ -18,6 +18,7 @@
  */
 
 #include <osgEarthUtil/MouseCoordsTool>
+#include <osgEarthUtil/LatLongFormatter>
 #include <osgViewer/View>
 
 using namespace osgEarth;

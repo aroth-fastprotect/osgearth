@@ -13,13 +13,15 @@ SET(TARGET_PUBLIC_H
 	EarthManipulator
 	ElevationManager
 	Export
-    Formatters
+    Formatter
     GeodeticGraticule
+    LatLongFormatter
 	LineOfSight
 	MeasureTool
+    MGRSFormatter
 	MGRSGraticule
 	MouseCoordsTool
-	NearFarGroup
+    #NearFarGroup	
 	ObjectPlacer
 	ObjectLocator
     #OceanSurfaceNode
@@ -41,13 +43,14 @@ SET(TARGET_SRC
     Controls.cpp
 	EarthManipulator.cpp
 	ElevationManager.cpp
-    Formatters.cpp
     GeodeticGraticule.cpp
+    LatLongFormatter.cpp
 	LineOfSight.cpp
 	MeasureTool.cpp
+    MGRSFormatter.cpp
 	MGRSGraticule.cpp
 	MouseCoordsTool.cpp
-	NearFarGroup.cpp
+    #NearFarGroup.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
     #OceanSurfaceNode.cpp

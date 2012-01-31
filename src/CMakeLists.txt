@@ -1,13 +1,13 @@
 #the old construct SUBDIRS( was substituded by ADD_SUBDIRECTORY that is to be preferred according on CMake docs.
 FOREACH( lib
-        osgEarth
+         osgEarth
          osgEarthAnnotation
-        osgEarthFeatures
-        osgEarthUtil
+         osgEarthFeatures
+         osgEarthUtil
          osgEarthSymbology )
 
     ADD_SUBDIRECTORY(${lib})
-
+    
     SET_PROPERTY(TARGET ${lib} PROPERTY FOLDER "Libs")
 
 ENDFOREACH( lib )
@@ -17,7 +17,7 @@ ADD_SUBDIRECTORY( applications )
 
 IF (QT4_FOUND AND NOT ANDROID AND OSGEARTH_USE_QT)
     ADD_SUBDIRECTORY(osgEarthQt)
-    #SET_PROPERTY(TARGET osgEarthQt PROPERTY FOLDER "Libs")
+    SET_PROPERTY(TARGET osgEarthQt PROPERTY FOLDER "Libs")
 ENDIF()
 
 IF(MSVC80)

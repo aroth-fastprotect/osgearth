@@ -43,7 +43,7 @@ using namespace osgEarth::Symbology;
 
 namespace
 {
-    UID _uid = 0;
+    UID                               _uid         = 0;
     Threading::ReadWriteMutex         _fmgMutex;
     std::map<UID, FeatureModelGraph*> _fmgRegistry;
 
@@ -56,7 +56,7 @@ namespace
         return str;
     }
 
-    osg::Group* createPagedNode( const osg::BoundingSphered& bs, const std::string& uri, float minRange, float maxRange )
+    osg::Group* createPagedNode( const osg::BoundingSphered& bs, const std::string& uri, float minRange, float maxRange, float priOffset, float priScale )
     {
 #ifdef USE_PROXY_NODE_FOR_TESTING
         osg::ProxyNode* p = new osg::ProxyNode();
@@ -70,6 +70,8 @@ namespace
         p->setRadius(std::max((float)bs.radius(),maxRange));
         p->setFileName( 0, uri );
         p->setRange( 0, minRange, maxRange );
+        p->setPriorityOffset( 0, priOffset );
+        p->setPriorityScale( 0, priScale );
 #endif
         return p;
     }
@@ -153,12 +155,12 @@ namespace
 FeatureModelGraph::FeatureModelGraph(FeatureSource*                   source,
                                      const FeatureModelSourceOptions& options,
                                      FeatureNodeFactory*              factory,
-                                     Session*                         session ) :
-_options( options ),
+                                     Session*                         session) :
+_options  ( options ),
 _source ( source ),
-_factory( factory ),
-_session( session ),
-_dirty(false)
+_factory  ( factory ),
+_session  ( session ),
+_dirty    ( false )
 {
     _uid = osgEarthFeatureModelPseudoLoader::registerGraph( this );
 
@@ -180,16 +182,8 @@ _dirty(false)
         _source->getFeatureProfile()->getExtent(), 
         &_featureExtentClamped );
 
-    if(_usableMapExtent.isValid())
-    {
-        // same, back into feature coords:
-        _usableFeatureExtent = _usableMapExtent.transform( _source->getFeatureProfile()->getSRS() );
-    }
-    else
-    {
-        _usableMapExtent = _source->getFeatureProfile()->getExtent();
-        _usableFeatureExtent = _usableMapExtent;
-    }
+    // same, back into feature coords:
+    _usableFeatureExtent = _usableMapExtent.transform( _source->getFeatureProfile()->getSRS() );
 
     // world-space bounds of the feature layer
     _fullWorldBound = getBoundInWorldCoords( _usableMapExtent, 0L );
@@ -255,7 +249,7 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
 
     workingExtent.getCentroid( center.x(), center.y() );
     
-    double centerZ = 0.0;
+    double centerZ = 0.0;    
     if ( mapf )
     {
         // Use an appropriate resolution for this extents width
@@ -263,7 +257,7 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
         ElevationQuery query( *mapf );
         query.getElevation( center, mapf->getProfile()->getSRS(), center.z(), resolution );
         centerZ = center.z();
-    }
+    }    
 
     corner.x() = workingExtent.xMin();
     corner.y() = workingExtent.yMin();
@@ -292,7 +286,14 @@ FeatureModelGraph::setupPaging()
     std::string uri = s_makeURI( _uid, 0, 0, 0 );
 
     // bulid the top level Paged LOD:
-    osg::Group* pagedNode = createPagedNode( bs, uri, 0.0f, maxRange );
+    osg::Group* pagedNode = createPagedNode( 
+        bs, 
+        uri, 
+        0.0f, 
+        maxRange, 
+        *_options.layout()->priorityOffset(), 
+        *_options.layout()->priorityScale() );
+
     this->addChild( pagedNode );
 }
 
@@ -305,7 +306,7 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
     osg::Group* result = 0L;
     
     if ( _useTiledSource )
-    {        
+    {       
         // A "tiled" source has a pre-generted tile hierarchy, but no range information.
         // We will be calculating the LOD ranges here.
         osg::Group* geometry =0L;
@@ -484,7 +485,13 @@ FeatureModelGraph::buildSubTilePagedLODs(unsigned        parentLOD,
                     << "; radius = " << subtile_bs.radius()
                     << std::endl;
 
-                osg::Group* pagedNode = createPagedNode( subtile_bs, uri, 0.0f, maxRange );
+                osg::Group* pagedNode = createPagedNode( 
+                    subtile_bs, 
+                    uri, 
+                    0.0f, maxRange, 
+                    *_options.layout()->priorityOffset(), 
+                    *_options.layout()->priorityScale() );
+
                 parent->addChild( pagedNode );
             }
         }
@@ -609,8 +616,8 @@ FeatureModelGraph::build( const Style& baseStyle, const Query& baseQuery, const 
                 osg::Group* styleGroup = _factory->getOrCreateStyleGroup(*feature->style(), _session.get());
                 if ( styleGroup )
                 {
-                if ( !group->containsNode( styleGroup ) )
-                    group->addChild( styleGroup );                
+                    if ( !group->containsNode( styleGroup ) )
+                        group->addChild( styleGroup );
                 }
 
                 if ( _factory->createOrUpdateNode( cursor.get(), *feature->style(), context, node ) )
@@ -618,7 +625,7 @@ FeatureModelGraph::build( const Style& baseStyle, const Query& baseQuery, const 
                     if ( node.valid() )
                     {
                         if ( styleGroup )
-                        	styleGroup->addChild( node.get() );
+                            styleGroup->addChild( node.get() );
                         else
                             group->addChild( node.get() );
                     }

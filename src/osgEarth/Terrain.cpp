@@ -57,8 +57,10 @@ namespace
 //---------------------------------------------------------------------------
 
 Terrain::Terrain(osg::Node* graph, const Profile* mapProfile, bool geocentric) :
-_graph     ( graph ),
+_callbacks (),
+_callbacksMutex(),
 _profile   ( mapProfile ),
+_graph     ( graph ),
 _geocentric( geocentric )
 {
     //nop

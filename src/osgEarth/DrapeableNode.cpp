@@ -44,10 +44,11 @@ namespace
 //------------------------------------------------------------------------
 
 DrapeableNode::DrapeableNode( MapNode* mapNode, bool draped ) :
-_mapNode  ( mapNode ),
 _draped   ( false ),
 _dirty    ( false ),
-_newDraped( draped )
+_newDraped( draped ),
+_overlayProxyContainer(),
+_mapNode  ( mapNode )
 {
     // create a container group that will house the culler. This culler
     // allows a draped node, which sits under the MapNode's OverlayDecorator,

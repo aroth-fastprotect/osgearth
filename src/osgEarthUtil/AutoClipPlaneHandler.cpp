@@ -156,14 +156,15 @@ namespace
 //--------------------------------------------------------------------------
 
 AutoClipPlaneCullCallback::AutoClipPlaneCullCallback( Map* map ) :
-_map                 ( map ),
 _active              ( false ),
 _minNearFarRatio     ( 0.00001 ),
 _maxNearFarRatio     ( 0.0005 ),
 _haeThreshold        ( 250.0 ),
-_rp                  ( -1 ),
 _rp2                 ( -1 ),
-_autoFarPlaneClamping( true )
+_rp                  ( -1 ),
+_autoFarPlaneClamping( true ),
+_map                 ( map ),
+_clampers            ()
 {
     if ( map )
     {

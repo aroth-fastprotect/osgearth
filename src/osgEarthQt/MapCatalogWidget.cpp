@@ -51,8 +51,8 @@ namespace
   class CustomActionTreeItem : public QTreeWidgetItem, public ActionableTreeItem
   {
   public:
-	  CustomActionTreeItem(osg::Referenced* obj) : _obj(obj), QTreeWidgetItem() {};
-	  CustomActionTreeItem(osg::Referenced* obj, const QStringList &strings) : _obj(obj), QTreeWidgetItem(strings) {};
+	  CustomActionTreeItem(osg::Referenced* obj) : QTreeWidgetItem(), _obj(obj) {};
+	  CustomActionTreeItem(osg::Referenced* obj, const QStringList &strings) : QTreeWidgetItem(strings), _obj(obj) {};
   	
 	  osg::Referenced* getObj() const { return _obj.get(); }
 	  void setSource(osg::Referenced* obj) { _obj = obj; }
@@ -73,8 +73,8 @@ namespace
   class LayerTreeItem : public QTreeWidgetItem, public ActionableTreeItem
   {
   public:
-    LayerTreeItem(osgEarth::Layer* layer, osgEarth::Map* map) : _layer(layer), _map(map), QTreeWidgetItem() {};
-	  LayerTreeItem(osgEarth::Layer* layer, osgEarth::Map* map, const QStringList &strings) : _layer(layer), _map(map), QTreeWidgetItem(strings) {};
+    LayerTreeItem(osgEarth::Layer* layer, osgEarth::Map* map) : QTreeWidgetItem(), _layer(layer), _map(map) {};
+	  LayerTreeItem(osgEarth::Layer* layer, osgEarth::Map* map, const QStringList &strings) : QTreeWidgetItem(strings), _layer(layer), _map(map) {};
   	
 	  osgEarth::Layer* getLayer() const { return _layer.get(); }
 
@@ -147,8 +147,8 @@ namespace
   class ToggleNodeTreeItem : public QTreeWidgetItem, public ActionableTreeItem
   {
   public:
-    ToggleNodeTreeItem(osg::Node* node) : _node(node), QTreeWidgetItem() {};
-	  ToggleNodeTreeItem(osg::Node* node, const QStringList &strings) : _node(node), QTreeWidgetItem(strings) {};
+    ToggleNodeTreeItem(osg::Node* node) : QTreeWidgetItem(), _node(node) {};
+	  ToggleNodeTreeItem(osg::Node* node, const QStringList &strings) : QTreeWidgetItem(strings), _node(node) {};
   	
 	  osg::Node* getNode() const { return _node.get(); }
 
@@ -162,8 +162,8 @@ namespace
   class AnnotationTreeItem : public ToggleNodeTreeItem
   {
   public:
-    AnnotationTreeItem(osgEarth::Annotation::AnnotationNode* annotation, osgEarth::Map* map) : _annotation(annotation), _map(map), ToggleNodeTreeItem(annotation) {};
-	  AnnotationTreeItem(osgEarth::Annotation::AnnotationNode* annotation, osgEarth::Map* map, const QStringList &strings) : _annotation(annotation), _map(map), ToggleNodeTreeItem(annotation, strings) {};
+    AnnotationTreeItem(osgEarth::Annotation::AnnotationNode* annotation, osgEarth::Map* map) : ToggleNodeTreeItem(annotation), _annotation(annotation), _map(map) {};
+	  AnnotationTreeItem(osgEarth::Annotation::AnnotationNode* annotation, osgEarth::Map* map, const QStringList &strings) : ToggleNodeTreeItem(annotation, strings), _annotation(annotation), _map(map) {};
   	
 	  osgEarth::Annotation::AnnotationNode* getAnnotation() const { return _annotation.get(); }
 
@@ -201,8 +201,8 @@ namespace
   class ViewpointTreeItem : public QTreeWidgetItem, public ActionableTreeItem
   {
   public:
-    ViewpointTreeItem(osgEarth::Viewpoint vp) : _vp(vp), QTreeWidgetItem() {};
-	  ViewpointTreeItem(osgEarth::Viewpoint vp, const QStringList &strings) : _vp(vp), QTreeWidgetItem(strings) {};
+    ViewpointTreeItem(osgEarth::Viewpoint vp) : QTreeWidgetItem(), _vp(vp) {};
+	  ViewpointTreeItem(osgEarth::Viewpoint vp, const QStringList &strings) : QTreeWidgetItem(strings), _vp(vp) {};
   	
 	  const osgEarth::Viewpoint& getViewpoint() const { return _vp; }
 

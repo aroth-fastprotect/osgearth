@@ -84,10 +84,12 @@ namespace
             osg::NodeVisitor*         proxyNV,
             osg::BoundingBox&         out_bbox) :
 
-        OverlayDecorator::InternalNodeVisitor(osg::NodeVisitor::TRAVERSE_ACTIVE_CHILDREN),
+            OverlayDecorator::InternalNodeVisitor(osg::NodeVisitor::TRAVERSE_ACTIVE_CHILDREN),
             _bbox    (out_bbox),
-            _original( polytope ),
             _proxyNV ( proxyNV ),
+            _original( polytope ),
+            _polytopeStack(),
+            _matrixStack(),
             _coarse  ( false )
         {
             _polytopeStack.push( polytope );

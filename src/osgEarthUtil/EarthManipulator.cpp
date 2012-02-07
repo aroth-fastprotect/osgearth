@@ -398,11 +398,10 @@ EarthManipulator::Settings::setAutoViewpointDurationLimits( double minSeconds, d
 
 /************************************************************************/
 
-
 EarthManipulator::EarthManipulator() :
 osgGA::MatrixManipulator(),
-_last_action      ( ACTION_NULL ),
-_frame_count      ( 0 )
+_frame_count      ( 0 ),
+_last_action      ( ACTION_NULL )
 {
     reinitialize();
     configureDefaultSettings();
@@ -425,9 +424,9 @@ _has_pending_viewpoint( rhs._has_pending_viewpoint ),
 _setting_viewpoint( rhs._setting_viewpoint ),
 _arc_height( rhs._arc_height ),
 _settings( new Settings( *rhs._settings.get() ) ),
+_frame_count( rhs._frame_count ),
 _homeViewpoint( rhs._homeViewpoint.get() ),
 _homeViewpointDuration( rhs._homeViewpointDuration ),
-_frame_count( rhs._frame_count ),
 _lastPointOnEarth( rhs._lastPointOnEarth )
 {
 }

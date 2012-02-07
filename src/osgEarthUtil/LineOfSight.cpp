@@ -77,16 +77,18 @@ static bool getRelativeWorld(double x, double y, double relativeHeight, MapNode*
     return false;    
 }
 
-
 LineOfSightNode::LineOfSightNode(osgEarth::MapNode *mapNode):
 _mapNode(mapNode),
-_start(0,0,0),
-_end(0,0,0),
-_hit(0,0,0),
 _hasLOS( true ),
+_displayMode( MODE_SPLIT ),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
-_displayMode( MODE_SPLIT ),
+_hit(0,0,0),
+_start(0,0,0),
+_end(0,0,0),
+_startWorld(0,0,0),
+_endWorld(0,0,0),
+_hitWorld(0,0,0),
 _altitudeMode( ALTITUDE_ABSOLUTE )
 {
     compute(_mapNode.get());
@@ -97,13 +99,16 @@ _altitudeMode( ALTITUDE_ABSOLUTE )
 
 LineOfSightNode::LineOfSightNode(osgEarth::MapNode *mapNode, const osg::Vec3d& start, const osg::Vec3d& end):
 _mapNode(mapNode),
-_start(start),
-_end(end),
-_hit(0,0,0),
 _hasLOS( true ),
+_displayMode( MODE_SPLIT ),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
-_displayMode( MODE_SPLIT ),
+_hit(0,0,0),
+_start(start),
+_end(end),
+_startWorld(0,0,0),
+_endWorld(0,0,0),
+_hitWorld(0,0,0),
 _altitudeMode( ALTITUDE_ABSOLUTE )
 {
     compute(_mapNode.get());    
@@ -510,18 +515,18 @@ private:
     RadialLineOfSightNode* _los;
 };
 
-
 RadialLineOfSightNode::RadialLineOfSightNode( MapNode* mapNode):
-_mapNode( mapNode ),
 _numSpokes(20),
 _radius(500),
-_center(0,0,0),
+_displayMode( MODE_SPLIT ),
+_fill(false),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
 _outlineColor( 1.0f, 1.0f, 1.0f, 1.0f),
-_displayMode( MODE_SPLIT ),
-_altitudeMode( ALTITUDE_ABSOLUTE ),
-_fill(false)
+_center(0,0,0),
+_centerWorld(0,0,0),
+_mapNode( mapNode ),
+_altitudeMode( ALTITUDE_ABSOLUTE )
 {
     compute(_mapNode.get());
     _terrainChangedCallback = new RadialLineOfSightNodeTerrainChangedCallback( this );

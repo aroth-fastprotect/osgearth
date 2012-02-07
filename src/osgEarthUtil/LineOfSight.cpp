@@ -77,6 +77,7 @@ static bool getRelativeWorld(double x, double y, double relativeHeight, MapNode*
     return false;    
 }
 
+
 LineOfSightNode::LineOfSightNode(osgEarth::MapNode *mapNode):
 _mapNode(mapNode),
 _hasLOS( true ),
@@ -514,6 +515,7 @@ public:
 private:
     RadialLineOfSightNode* _los;
 };
+
 
 RadialLineOfSightNode::RadialLineOfSightNode( MapNode* mapNode):
 _numSpokes(20),

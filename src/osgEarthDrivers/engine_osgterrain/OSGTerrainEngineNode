@@ -52,7 +52,7 @@ public: // TerrainEngineNode overrides
     virtual void validateTerrainOptions( TerrainOptions& options );
     virtual const TerrainOptions& getTerrainOptions() const { return _terrainOptions; }
     virtual void traverse( osg::NodeVisitor& );
-    virtual osg::BoundingSphere computeBound() const;
+    virtual osg::BoundingSphere computeBound() const;    
 
 public: // MapCallback adapter functions
     void onMapInfoEstablished( const MapInfo& mapInfo ); // not virtual!
@@ -67,9 +67,27 @@ public: // statics
     static void unregisterEngine( UID uid );
     static void getEngineByUID( UID uid, osg::ref_ptr<OSGTerrainEngineNode>& output );
 
+public:
+    class ElevationChangedCallback : public ElevationLayerCallback
+    {
+    public:
+        ElevationChangedCallback( OSGTerrainEngineNode* terrain );
+
+       virtual void onEnabledChanged( TerrainLayer* layer );
+
+        OSGTerrainEngineNode* _terrain;
+        friend class OSGTerrainEngineNode;
+    };
+
 private:
     void init();
     void syncMapModel();
+
+    /**
+     * Reloads all the tiles in the terrain due to a data model change
+     */
+    void refresh();
+
 
     void addImageLayer( ImageLayer* layer );
     void addElevationLayer( ElevationLayer* layer );
@@ -92,6 +110,8 @@ private:
     osgEarth::Drivers::OSGTerrainOptions _terrainOptions;
     Revision                             _shaderLibRev;
     osg::ref_ptr<TaskServiceManager>     _taskServiceMgr;
+
+    osg::ref_ptr< ElevationChangedCallback > _elevationCallback;
 
     // store a separate map frame for each of the traversal threads
     MapFrame* _update_mapf; // map frame for the main/update traversal thread

@@ -23,6 +23,7 @@ SET(TARGET_PUBLIC_H
     LocalizedNode
     OrthoNode
     PlaceNode
+	RectangleNode
     ScaleDecoration
     TrackNode
 )
@@ -42,6 +43,7 @@ SET(TARGET_SRC
     ImageOverlay.cpp
     LabelNode.cpp
     LocalizedNode.cpp
+	RectangleNode.cpp
     OrthoNode.cpp
     PlaceNode.cpp
     TrackNode.cpp

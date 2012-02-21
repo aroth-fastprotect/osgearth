@@ -229,7 +229,8 @@ namespace osgEarth
         DataExtentList& getDataExtents() { return _dataExtents; }
 
 	    /**
-    	 * Creates an image for the given TileKey
+    	 * Creates an image for the given TileKey. The TileKey's profile must match
+         * the profile of the TileSource.
 		 */
         virtual osg::Image* createImage(
             const TileKey&        key,
@@ -237,7 +238,8 @@ namespace osgEarth
             ProgressCallback*     progress  =0L );
 
         /**
-         * Creates a heightfield for the given TileKey
+         * Creates a heightfield for the given TileKey. The TileKey's profile must match
+         * the profile of the TileSource.
          */
         virtual osg::HeightField* createHeightField(
             const TileKey&        key,
@@ -350,7 +352,7 @@ namespace osgEarth
         virtual bool isSameKindAs(const osg::Object* obj) const { return dynamic_cast<const TileSource*>(obj)!=NULL; }
         virtual const char* className() const { return "TileSource"; }
         virtual const char* libraryName() const { return "osgEarth"; }
-
+   
     protected:
 
         virtual ~TileSource();
@@ -381,7 +383,7 @@ namespace osgEarth
     private:
 
         osg::ref_ptr<const Profile> _profile;
-        const TileSourceOptions _options;
+        const TileSourceOptions     _options;
 
         friend class Map;
         friend class MapEngine;

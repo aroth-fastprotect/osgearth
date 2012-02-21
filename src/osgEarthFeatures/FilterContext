@@ -81,12 +81,6 @@ namespace osgEarth { namespace Features
         const optional<GeoExtent>& extent() const { return _extent; }
 
         /**
-         * Whether to assume a geocentric coordinate system for geographic profiles.
-         */
-        //bool isGeocentric() const { return _isGeocentric; }
-        //bool& isGeocentric() { return _isGeocentric; }
-
-        /**
          * Whether this context has a non-identity reference frame
          */
         bool hasReferenceFrame() const { return !_referenceFrame.isIdentity(); }
@@ -157,13 +151,13 @@ namespace osgEarth { namespace Features
         const osgDB::Options* getDBOptions() const;
 
     protected:
-        osg::ref_ptr<Session> _session;
+        osg::ref_ptr<Session>              _session;
         osg::ref_ptr<const FeatureProfile> _profile;
-        bool _isGeocentric;
-        optional<GeoExtent> _extent;
-        osg::Matrixd _referenceFrame;
-        osg::Matrixd _inverseReferenceFrame;
-        OptimizerHints _optimizerHints;
+        bool                               _isGeocentric;
+        optional<GeoExtent>                _extent;
+        osg::Matrixd                       _referenceFrame;
+        osg::Matrixd                       _inverseReferenceFrame;
+        OptimizerHints                     _optimizerHints;
         osg::ref_ptr<ResourceCache>        _resourceCache;
     };
 

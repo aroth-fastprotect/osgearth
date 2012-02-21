@@ -29,7 +29,7 @@ using namespace osgEarth::Symbology;
 
 
 EllipseNode::EllipseNode(MapNode*          mapNode,
-                         const osg::Vec3d& position,
+                         const GeoPoint&   position,
                          const Linear&     radiusMajor,
                          const Linear&     radiusMinor,
                          const Angular&    rotationAngle,
@@ -120,7 +120,7 @@ EllipseNode::getRotationAngle() const
 }
 
 void 
-EllipseNode::setRotationAngle(Angular& rotationAngle)
+EllipseNode::setRotationAngle(const Angular& rotationAngle)
 {
     if (_rotationAngle != rotationAngle)
     {
@@ -133,6 +133,9 @@ EllipseNode::setRotationAngle(Angular& rotationAngle)
 void
 EllipseNode::rebuild()
 {
+    std::string currentDecoration = getDecoration();
+    clearDecoration();
+
     //Remove all children from this node
     removeChildren( 0, getNumChildren() );
 
@@ -166,4 +169,6 @@ EllipseNode::rebuild()
 
         applyStyle( _style, _draped );
     }
+
+    setDecoration( currentDecoration );
 }

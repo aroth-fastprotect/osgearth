@@ -85,11 +85,13 @@ TerrainLayerOptions::getConfig( bool isolate ) const
     conf.updateIfSet( "max_data_level", _maxDataLevel);
     conf.updateIfSet( "reprojected_tilesize", _reprojectedTileSize);
 
+    conf.updateIfSet( "vdatum", _vertDatum );
+
     conf.updateIfSet   ( "cacheid",      _cacheId );
     conf.updateIfSet   ( "cache_format", _cacheFormat );
     conf.updateObjIfSet( "cache_policy", _cachePolicy );
 
-    //Merge the TileSource options
+    // Merge the TileSource options
     if ( !isolate && driver().isSet() )
         conf.merge( driver()->getConfig() );
 
@@ -101,7 +103,7 @@ TerrainLayerOptions::fromConfig( const Config& conf )
 {
     _name = conf.value("name");
     conf.getIfSet( "min_level", _minLevel );
-    conf.getIfSet( "max_level", _maxLevel );
+    conf.getIfSet( "max_level", _maxLevel );        
     conf.getIfSet( "min_level_resolution", _minLevelResolution );
     conf.getIfSet( "max_level_resolution", _maxLevelResolution );
     conf.getIfSet( "loading_weight", _loadingWeight );
@@ -110,6 +112,9 @@ TerrainLayerOptions::fromConfig( const Config& conf )
     conf.getObjIfSet( "profile", _profile );
     conf.getIfSet( "max_data_level", _maxDataLevel);
     conf.getIfSet( "reprojected_tilesize", _reprojectedTileSize);
+
+    conf.getIfSet( "vdatum", _vertDatum );
+    conf.getIfSet( "vsrs", _vertDatum );    // back compat
 
     conf.getIfSet   ( "cacheid",      _cacheId );
     conf.getIfSet   ( "cache_format", _cacheFormat );
@@ -172,7 +177,7 @@ void
 TerrainLayer::init()
 {
     _tileSourceInitialized = false;
-    _tileSize          = 256;
+    _tileSize              = 256;
 }
 
 void
@@ -182,12 +187,12 @@ TerrainLayer::overrideCachePolicy( const CachePolicy& policy )
 }
 
 void
-TerrainLayer::setCache(Cache* cache)
+TerrainLayer::setCache( Cache* cache )
 {
     if (_cache.get() != cache && 
         _runtimeOptions->cachePolicy()->usage() != CachePolicy::USAGE_NO_CACHE )
     {
-        _cache = cache;        
+        _cache = cache;
 
         // Initialize a cache bin for this layer.
         if ( _cache.valid() )
@@ -270,6 +275,18 @@ TerrainLayer::getProfile() const
         if ( _tileSource.valid() && !_profile.valid() )
         {
             const_cast<TerrainLayer*>(this)->_profile = _tileSource->getProfile();
+
+            // check for a vertical datum override:
+            if ( _profile.valid() && _runtimeOptions->verticalDatum().isSet() )
+            {
+                std::string vdatum = toLower( *_runtimeOptions->verticalDatum() );
+                if ( _profile->getSRS()->getVertInitString() != vdatum )
+                {
+                    ProfileOptions po = _profile->toProfileOptions();
+                    po.vsrsString() = vdatum;
+                    const_cast<TerrainLayer*>(this)->_profile = Profile::create(po);
+                }
+            }
         }
     }
     
@@ -288,7 +305,7 @@ TerrainLayer::getMaxDataLevel() const
 
     //Try the TileSource
 	TileSource* ts = getTileSource();
-	if (ts)
+	if ( ts )
 	{
 		return ts->getMaxDataLevel();
 	}
@@ -320,9 +337,23 @@ TerrainLayer::getCacheBin( const Profile* profile )
         return 0L;
     }
 
-    // the cache bin ID is the cache IF concatenated with the profile signature.
-    std::string binId = *_runtimeOptions->cacheId() + std::string("_") + profile->getSignature();
+    // the cache bin ID is the cache ID concatenated with the FULL profile signature.
+    std::string binId = *_runtimeOptions->cacheId() + std::string("_") + profile->getFullSignature();
 
+    return getCacheBin( profile, binId );
+}
+
+CacheBin*
+TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
+{
+    // in no-cache mode, there are no cache bins.
+    if (_runtimeOptions->cachePolicy().isSet() &&
+        _runtimeOptions->cachePolicy()->usage() == CachePolicy::USAGE_NO_CACHE )
+    {
+        return 0L;
+    }
+
+    // see if the cache bin already exists and return it if so
     {
         Threading::ScopedReadLock shared(_cacheBinsMutex);
         CacheBinInfoMap::iterator i = _cacheBins.find( binId );
@@ -330,6 +361,7 @@ TerrainLayer::getCacheBin( const Profile* profile )
             return i->second._bin.get();
     }
 
+    // create/open the cache bin.
     {
         Threading::ScopedWriteLock exclusive(_cacheBinsMutex);
 
@@ -429,7 +461,7 @@ bool
 TerrainLayer::getCacheBinMetadata( const Profile* profile, CacheBinMetadata& output )
 {
     // the cache bin ID is the cache IF concatenated with the profile signature.
-    std::string binId = *_runtimeOptions->cacheId() + std::string("_") + profile->getSignature();
+    std::string binId = *_runtimeOptions->cacheId() + std::string("_") + profile->getFullSignature();
     CacheBin* bin = getCacheBin( profile );
     if ( bin )
     {
@@ -496,7 +528,7 @@ TerrainLayer::initTileSource()
             _tileSource = NULL;
 		}
 	}
-    
+
     // Set the profile from the TileSource if possible:
     if ( _tileSource.valid() )
     {
@@ -509,7 +541,7 @@ TerrainLayer::initTileSource()
     {
         OE_NOTICE << LC << "Could not initialize TileSource " << _name << ", but a cache exists. Setting layer to cache-only mode." << std::endl;
         _runtimeOptions->cachePolicy()->usage() = CachePolicy::USAGE_CACHE_ONLY;
-	}
+    }
 
     _tileSourceInitialized = true;
 }
@@ -518,8 +550,8 @@ bool
 TerrainLayer::isKeyValid(const TileKey& key) const
 {
 	if (!key.valid()) return false;
-	
-    //Check to see if explicit levels of detail are set
+
+    // Check to see if explicit levels of detail are set
     if ( _runtimeOptions->minLevel().isSet() && (int)key.getLevelOfDetail() < _runtimeOptions->minLevel().value() )
         return false;
 	if ( _runtimeOptions->maxLevel().isSet() && (int)key.getLevelOfDetail() > _runtimeOptions->maxLevel().value() ) 

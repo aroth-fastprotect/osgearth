@@ -16,6 +16,7 @@ MARK_AS_ADVANCED(CURL_IS_STATIC)
 #ENDIF(WIN32)
 
 SET(TARGET_PUBLIC_H
+	Bounds
     Cache
     CacheBin
     CachePolicy
@@ -34,10 +35,10 @@ SET(TARGET_PUBLIC_H
 	ElevationLayer
     ElevationQuery
 	Export
-	EGM
 	FileUtils
 	FindNode
 	GeoData
+    Geoid
 	GeoMath
 	HeightFieldUtils
 	HTTPClient
@@ -90,7 +91,7 @@ SET(TARGET_PUBLIC_H
     URI
     Utils
 	Version
-	VerticalSpatialReference
+	VerticalDatum
     Viewpoint
 	XmlUtils
 )
@@ -107,6 +108,7 @@ LIST(APPEND TARGET_SRC
 	)
 
 LIST(APPEND TARGET_SRC
+	Bounds.cpp
     Cache.cpp
     CachePolicy.cpp
     CacheSeed.cpp
@@ -119,11 +121,11 @@ LIST(APPEND TARGET_SRC
     DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
     ECEF.cpp
-    EGM.cpp
     ElevationLayer.cpp
     ElevationQuery.cpp
     FileUtils.cpp
     GeoData.cpp
+    Geoid.cpp
     GeoMath.cpp
     HeightFieldUtils.cpp
     HTTPClient.cpp
@@ -174,7 +176,7 @@ LIST(APPEND TARGET_SRC
     URI.cpp
     Utils.cpp
     Version.cpp
-    VerticalSpatialReference.cpp
+	VerticalDatum.cpp
     Viewpoint.cpp
     XmlUtils.cpp
 )

@@ -42,7 +42,7 @@ using namespace OpenThreads;
 extern const char* builtinMimeTypeExtMappings[];
 
 Registry::Registry() :
-osg::Referenced  (true),
+osg::Referenced  ( true ),
 _gdal_mutex      (new OpenThreads::ReentrantMutex),
 _gdal_registered ( false ),
 _numGdalMutexGets( 0 ),
@@ -68,13 +68,13 @@ _defaultFont     ( 0L )
 
     // activate KMZ support
     osgDB::Registry::instance()->addFileExtensionAlias( "kmz", "kml" );
-    osgDB::Registry::instance()->addArchiveExtension( "kmz" );
+    osgDB::Registry::instance()->addArchiveExtension( "kmz" );    
 
 #if OSG_MIN_VERSION_REQUIRED(3,0,0)
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kml+xml", "kml" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kmz", "kmz" );
 #endif
-
+    
     // pre-load OSG's ZIP plugin so that we can use it in URIs
     std::string zipLib = osgDB::Registry::instance()->createLibraryNameForExtension( "zip" );
     if ( !zipLib.empty() )
@@ -212,7 +212,7 @@ Registry::getGlobalMercatorProfile() const
             /*const_cast<Registry*>(this)->_global_mercator_profile = Profile::create(
                 srs, -e, -e, e, e, 0L, 1, 1 );*/
             const_cast<Registry*>(this)->_global_mercator_profile = Profile::create(
-                srs, MERC_MINX, MERC_MINY, MERC_MAXX, MERC_MAXY, 0L, 1, 1 );
+                srs, MERC_MINX, MERC_MINY, MERC_MAXX, MERC_MAXY, 1, 1 );
         }
     }
     return _global_mercator_profile.get();
@@ -246,13 +246,13 @@ Registry::getNamedProfile( const std::string& name ) const
         return NULL;
 }
 
-const VerticalSpatialReference*
-Registry::getDefaultVSRS() const
-{
-    if ( !_defaultVSRS.valid() )
-        const_cast<Registry*>(this)->_defaultVSRS = new VerticalSpatialReference( Units::METERS );
-    return _defaultVSRS.get();
-}
+//const VerticalSpatialReference*
+//Registry::getDefaultVSRS() const
+//{
+//    if ( !_defaultVSRS.valid() )
+//        const_cast<Registry*>(this)->_defaultVSRS = new VerticalSpatialReference( Units::METERS );
+//    return _defaultVSRS.get();
+//}
 
 osgEarth::Cache*
 Registry::getCache() const
@@ -283,7 +283,7 @@ Registry::getReaderWriterForMimeType(const std::string& mimeType)
 }
 
 bool
-Registry::isBlacklisted(const std::string &filename)
+Registry::isBlacklisted(const std::string& filename)
 {
     Threading::ScopedReadLock sharedLock(_blacklistMutex);
     return (_blacklistedFilenames.count(filename)==1);

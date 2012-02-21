@@ -734,7 +734,7 @@ EarthManipulator::getSRS() const
 
         if ( _cached_srs.valid() )
         {
-            OE_INFO << "[EarthManip] cached SRS: "
+            OE_DEBUG << "[EarthManip] cached SRS: "
                 << _cached_srs->getName()
                 << ", geocentric=" << _is_geocentric
                 << std::endl;
@@ -1310,14 +1310,14 @@ EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapt
             // bail out of continuous mode if necessary:
             _continuous = false;
             addMouseEvent( ea );
-			if (_mouse_down_event)
-			{
-				action = _settings->getAction( EVENT_MOUSE_DOUBLE_CLICK, _mouse_down_event->getButtonMask(), _mouse_down_event->getModKeyMask() );
-				if ( handlePointAction( action, ea.getX(), ea.getY(), aa.asView() ) )
-					aa.requestRedraw();
-				resetMouse( aa );
-				handled = true;
-			}
+            if (_mouse_down_event)
+            {
+                action = _settings->getAction( EVENT_MOUSE_DOUBLE_CLICK, _mouse_down_event->getButtonMask(), _mouse_down_event->getModKeyMask() );
+                if ( handlePointAction( action, ea.getX(), ea.getY(), aa.asView() ) )
+                    aa.requestRedraw();
+                resetMouse( aa );
+                handled = true;
+            }
             break;
 
         case osgGA::GUIEventAdapter::MOVE: // MOVE not currently bindable

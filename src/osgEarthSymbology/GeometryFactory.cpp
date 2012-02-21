@@ -32,7 +32,7 @@ _srs( srs )
 
 Geometry*
 GeometryFactory::createCircle(const osg::Vec3d& center,
-                              const Linear&     radius,
+                              const Distance&   radius,
                               unsigned          numSegments,
                               Geometry*         geomToUse)
 {
@@ -83,12 +83,13 @@ GeometryFactory::createCircle(const osg::Vec3d& center,
 
 Geometry*
 GeometryFactory::createArc(const osg::Vec3d& center,
-                           const Linear&     radius,
-                           const Angular&    start,
-                           const Angular&    end,
-                           unsigned          numSegments)
+                           const Distance&   radius,
+                           const Angle&      start,
+                           const Angle&      end,
+                           unsigned          numSegments,
+                           Geometry*         geomToUse)
 {
-    Geometry* geom = new LineString();
+    Geometry* geom = geomToUse? geomToUse : new LineString();
 
     if ( numSegments == 0 )
     {
@@ -100,6 +101,10 @@ GeometryFactory::createArc(const osg::Vec3d& center,
 
     double startRad = std::min( start.as(Units::RADIANS), end.as(Units::RADIANS) );
     double endRad   = std::max( start.as(Units::RADIANS), end.as(Units::RADIANS) );
+
+    if ( endRad == startRad )
+        endRad += 2*osg::PI;
+
     double span     = endRad - startRad;    
     double step     = span/(double)numSegments;
 
@@ -133,14 +138,16 @@ GeometryFactory::createArc(const osg::Vec3d& center,
         }
     }
 
+    geom->rewind(Geometry::ORIENTATION_CCW);
+
     return geom;
 }
 
 Geometry*
 GeometryFactory::createEllipse(const osg::Vec3d& center,
-                               const Linear&     radiusMajor,
-                               const Linear&     radiusMinor,
-                               const Angular&    rotationAngle,
+                               const Distance&   radiusMajor,
+                               const Distance&   radiusMinor,
+                               const Angle&      rotationAngle,
                                unsigned          numSegments,
                                Geometry*         geomToUse)
 {
@@ -203,11 +210,9 @@ GeometryFactory::createEllipse(const osg::Vec3d& center,
 }
 
 Geometry*
-GeometryFactory::createRectangle(
-                                 const osg::Vec3d& center,
-                                 const Linear& width,
-                                 const Linear& height
-                                 )
+GeometryFactory::createRectangle(const osg::Vec3d& center,
+                                 const Distance&   width,
+                                 const Distance&   height )
 {
     Geometry* geom = new Polygon();
     

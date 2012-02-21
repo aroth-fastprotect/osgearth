@@ -52,12 +52,17 @@ ModelLayerOptions::setDefaults()
 Config
 ModelLayerOptions::getConfig() const
 {
-    Config conf = ConfigOptions::getConfig();
+    //Config conf = ConfigOptions::getConfig();
+    Config conf = ConfigOptions::newConfig();
 
     conf.updateIfSet( "name", _name );
     conf.updateIfSet( "overlay", _overlay );
     conf.updateIfSet( "enabled", _enabled );
     conf.updateIfSet( "lighting", _lighting );
+
+    // Merge the ModelSource options
+    if ( driver().isSet() )
+        conf.merge( driver()->getConfig() );
 
     return conf;
 }
@@ -69,6 +74,9 @@ ModelLayerOptions::fromConfig( const Config& conf )
     conf.getIfSet( "overlay", _overlay );
     conf.getIfSet( "enabled", _enabled );
     conf.getIfSet( "lighting", _lighting );
+
+    if ( conf.hasValue("driver") )
+        driver() = ModelSourceOptions(conf);
 }
 
 void

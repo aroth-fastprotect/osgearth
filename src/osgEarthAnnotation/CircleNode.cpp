@@ -32,7 +32,7 @@ using namespace osgEarth::Symbology;
 
 
 CircleNode::CircleNode(MapNode*           mapNode,
-                       const osg::Vec3d&  position,
+                       const GeoPoint&    position,
                        const Linear&      radius,
                        const Style&       style,
                        bool               draped,
@@ -95,6 +95,8 @@ CircleNode::setStyle( const Style& style )
 void
 CircleNode::rebuild()
 {
+    std::string currentDecoration = getDecoration();
+    clearDecoration();
 
     //Remove all children from this node
     removeChildren( 0, getNumChildren() );
@@ -131,4 +133,6 @@ CircleNode::rebuild()
 
         applyStyle( _style, _draped );
     }
+
+    setDecoration( currentDecoration );
 }

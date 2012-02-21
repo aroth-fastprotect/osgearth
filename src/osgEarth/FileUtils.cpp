@@ -62,6 +62,11 @@ std::string osgEarth::getFullPath(const std::string& relativeTo, const std::stri
     //If they didn't specify a relative path, just return the relativeTo
     if (relativePath.empty()) return relativeTo;
 
+    std::string::size_type pos(relativePath.find("file://"));
+    if (pos != std::string::npos)
+    {
+        return relativePath.substr(pos + 7,std::string::npos);
+    }
 
     //Note:  Modified from VPB
 
@@ -120,8 +125,6 @@ bool osgEarth::isZipPath(const std::string &path)
 std::string osgEarth::getTempPath()
 {
 #if defined(WIN32)  && !defined(__CYGWIN__)
-    BOOL fSuccess  = FALSE;
-
     TCHAR lpTempPathBuffer[MAX_PATH];    
 
     //  Gets the temp path env string (no guarantee it's a valid path).

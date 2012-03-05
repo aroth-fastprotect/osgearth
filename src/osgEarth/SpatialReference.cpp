@@ -361,9 +361,7 @@ _is_contiguous  ( false ),
 _is_user_defined( false ),
 _is_ltp         ( false ),
 _is_plate_carre ( false ),
-_name           ( name ),
-_init_type      ( init_type ),
-_init_str       ( init_str )
+_init_type      ( init_type )
 {
     // nop
 }

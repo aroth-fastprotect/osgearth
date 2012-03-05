@@ -40,9 +40,9 @@ _maxLevel           ( 99 ),
 _loadingWeight      ( 1.0f ),
 _exactCropping      ( false ),
 _enabled            ( true ),
-_cachePolicy        ( CachePolicy::USAGE_DEFAULT )
-_visible            ( true ),
-_reprojectedTileSize( 256 )
+_reprojectedTileSize( 256 ),
+_cachePolicy        ( CachePolicy::USAGE_DEFAULT ),
+_visible            ( true )
 {
     setDefaults();
     fromConfig( _conf ); 

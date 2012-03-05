@@ -358,6 +358,9 @@ namespace
             }
         }
 
+        if ( result.getObject() )
+            result.getObject()->setName( uri.base() );
+
         return result;
     }
 }

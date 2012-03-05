@@ -137,13 +137,6 @@ _tileCreationTime( 0.0 )
     _elevationCallback = new ElevationChangedCallback( this );
 }
 
-OSGTerrainEngineNode::OSGTerrainEngineNode( const OSGTerrainEngineNode& rhs, const osg::CopyOp& op ) :
-TerrainEngineNode( rhs, op )
-{
-    //nop - this copy ctor will never get called since this is a plugin instance.
-    OE_WARN << LC << "ILLEGAL STATE in OSGTerrainEngineNode Copy CTOR" << std::endl;
-}
-
 OSGTerrainEngineNode::~OSGTerrainEngineNode()
 {
     unregisterEngine( _uid );
@@ -287,13 +280,18 @@ OSGTerrainEngineNode::refresh()
     std::vector< TileKey > keys;
     _update_mapf->getProfile()->getRootKeys( keys );
 
+    if (_terrainOptions.enableBlending().value())
+    {
+        _terrain->getOrCreateStateSet()->setMode(GL_BLEND , osg::StateAttribute::ON);    
+    }
+
     addChild( _terrain );
 
     for( unsigned i=0; i<keys.size(); ++i )
     {
         osg::Node* node;
         if ( _keyNodeFactory.valid() )
-            node = _keyNodeFactory->createNode( keys[i] );
+            node = _keyNodeFactory->createRootNode( keys[i] );
         else
             node = _tileFactory->createSubTiles( *_update_mapf, _terrain, keys[i], true );
 
@@ -413,7 +411,7 @@ OSGTerrainEngineNode::onMapInfoEstablished( const MapInfo& mapInfo )
     {
         osg::Node* node;
         if ( _keyNodeFactory.valid() )
-            node = _keyNodeFactory->createNode( keys[i] );
+            node = _keyNodeFactory->createRootNode( keys[i] );
         else
             node = _tileFactory->createSubTiles( *_update_mapf, _terrain, keys[i], true );
 

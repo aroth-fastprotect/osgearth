@@ -115,7 +115,6 @@ TextSymbol::mergeConfig( const Config& conf )
     conf.getIfSet( "encoding", "utf16", _encoding, ENCODING_UTF16 );
     conf.getIfSet( "encoding", "utf32", _encoding, ENCODING_UTF32 );
 
-
     conf.getIfSet( "alignment", "left_top",                _alignment, ALIGN_LEFT_TOP );
     conf.getIfSet( "alignment", "left_center",             _alignment, ALIGN_LEFT_CENTER );
     conf.getIfSet( "alignment", "left_bottom",             _alignment, ALIGN_LEFT_BOTTOM );

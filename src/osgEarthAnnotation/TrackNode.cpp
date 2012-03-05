@@ -58,6 +58,19 @@ TrackNode::init( const TrackNodeFieldSchema& schema )
 {
     _geode = new osg::Geode();
 
+    if ( _image.valid() )
+    {
+        // apply the image icon.
+        osg::Geometry* imageGeom = AnnotationUtils::createImageGeometry( 
+            _image.get(),             // image
+            osg::Vec2s(0,0) );        // offset
+
+        if ( imageGeom )
+        {
+            _geode->addDrawable( imageGeom );
+        }
+    }
+
     if ( !schema.empty() )
     {
         // turn the schema defs into text drawables and record a map so we can
@@ -87,19 +100,6 @@ TrackNode::init( const TrackNodeFieldSchema& schema )
         }
     }
     
-    if ( _image.valid() )
-    {
-        // apply the image icon.
-        osg::Geometry* imageGeom = AnnotationUtils::createImageGeometry( 
-            _image.get(),             // image
-            osg::Vec2s(0,0) );        // offset
-
-        if ( imageGeom )
-        {
-            _geode->addDrawable( imageGeom );
-        }
-    }
-
     // ensure depth testing always passes, and disable depth buffer writes.
     osg::StateSet* stateSet = _geode->getOrCreateStateSet();
     stateSet->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), 1 );

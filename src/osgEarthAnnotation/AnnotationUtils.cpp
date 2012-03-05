@@ -27,6 +27,7 @@
 #include <osg/BlendFunc>
 #include <osg/CullFace>
 #include <osg/MatrixTransform>
+#include <osg/LightModel>
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
@@ -594,6 +595,12 @@ AnnotationUtils::create2DQuad( const osg::BoundingBox& box, float padding, const
     geom->setColorArray( c );
     geom->setColorBinding( osg::Geometry::BIND_OVERALL );
 
+    // add the static "isText=true" uniform; this is a hint for the annotation shaders
+    // if they get installed.
+    static osg::ref_ptr<osg::Uniform> s_isTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
+    s_isTextUniform->set( false );
+    geom->getOrCreateStateSet()->addUniform( s_isTextUniform.get() );
+
     return geom;
 }
 
@@ -621,7 +628,7 @@ AnnotationUtils::create2DOutline( const osg::BoundingBox& box, float padding, co
     geom->setColorBinding( osg::Geometry::BIND_OVERALL );
 
     static osg::ref_ptr<osg::Uniform> s_isNotTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
-    s_isNotTextUniform->set( true );
+    s_isNotTextUniform->set( false );
     geom->getOrCreateStateSet()->addUniform( s_isNotTextUniform.get() );
 
     return geom;
@@ -636,9 +643,14 @@ AnnotationUtils::installTwoPassAlpha(osg::Node* node)
   g1->getOrCreateStateSet()->setRenderingHint( osg::StateSet::TRANSPARENT_BIN );
   g1->getOrCreateStateSet()->setAttributeAndModes( new osg::BlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA), 1);
 
+  // for semi-transpareny items, we want the lighting to "shine through"
+  osg::LightModel* lm = new osg::LightModel();
+  lm->setTwoSided( true );
+  g1->getOrCreateStateSet()->setAttributeAndModes( lm );
+
   // next start a traversal order bin so we draw in the proper order:
   osg::Group* g2 = new osg::Group();
-  g2->getOrCreateStateSet()->setBinName("TraversalOrderBin");
+  g2->getOrCreateStateSet()->setRenderBinDetails(0, "TraversalOrderBin");
   g1->addChild( g2 );
 
   // next, create a group for the first pass (backfaces only):

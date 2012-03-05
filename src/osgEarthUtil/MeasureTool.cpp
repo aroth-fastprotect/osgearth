@@ -23,6 +23,8 @@
 #include <osgEarthFeatures/Feature>
 #include <osgEarthAnnotation/FeatureNode>
 
+#define LC "[MeasureTool] "
+
 using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgEarth::Symbology;
@@ -44,13 +46,16 @@ _isPath( false ),
 _mapNode( mapNode ),
 _intersectionMask(0xffffffff)
 {
+    if ( !mapNode || mapNode->getMapSRS()->isProjected() )
+    {
+        OE_WARN << LC << "Sorry, MeasureTool does not yet support projected maps" << std::endl;
+    }
+
     AltitudeSymbol* alt = new AltitudeSymbol();
     alt->clamping() = AltitudeSymbol::CLAMP_TO_TERRAIN;
 
     // Define the path feature:
-    _feature = new Feature();
-    _feature->setGeometry( new LineString() );
-    _feature->setSRS( mapNode->getMapSRS() );
+    _feature = new Feature(new LineString(), mapNode->getMapSRS());
     _feature->geoInterp() = _geoInterpolation;    
 
     //Define a style for the line
@@ -199,6 +204,7 @@ bool MeasureToolHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIAct
 #endif
 
                     fireDistanceChanged();
+                    aa.requestRedraw();
                 }
             }
         }
@@ -208,6 +214,7 @@ bool MeasureToolHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIAct
         {
             //_gotFirstLocation = false;
             _finished = true;     
+            aa.requestRedraw(); 
             return true;
         }
     }
@@ -229,6 +236,7 @@ bool MeasureToolHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIAct
                 }
                 _featureNode->init();
                 fireDistanceChanged();
+                aa.requestRedraw();
             }
         }
     }    

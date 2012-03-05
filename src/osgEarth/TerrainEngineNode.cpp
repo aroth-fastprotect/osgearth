@@ -19,8 +19,8 @@
 #include <osgEarth/TerrainEngineNode>
 #include <osgEarth/Capabilities>
 #include <osgEarth/Registry>
-#include <osgEarth/FindNode>
 #include <osgEarth/TextureCompositor>
+#include <osgEarth/NodeUtils>
 #include <osgDB/ReadFile>
 #include <osg/CullFace>
 #include <osg/PolygonOffset>

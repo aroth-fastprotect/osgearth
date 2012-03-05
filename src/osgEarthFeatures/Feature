@@ -108,7 +108,6 @@ namespace osgEarth { namespace Features
     class OSGEARTHFEATURES_EXPORT Feature : public osg::Object
     {
     public:
-        Feature( FeatureID fid =0L );
 
         Feature( Geometry* geom, const SpatialReference* srs, const Style& style =Style(), FeatureID fid =0L );
 
@@ -138,12 +137,6 @@ namespace osgEarth { namespace Features
         void setSRS( const SpatialReference* srs );
 
         /**
-         * Gets the geospatial extent of this feature. Both the Geometry and the SRS
-         * must be non-NULL for this to work.
-         */
-        //const GeoExtent& getExtent() const;
-
-        /** 
          * Gets the geocentric bounding box that contains the data in this 
          * feature's geometry.
          */
@@ -185,6 +178,9 @@ namespace osgEarth { namespace Features
         const std::string& eval( StringExpression& expr, FilterContext const* context=0L ) const;
 
     protected:
+
+        Feature( FeatureID fid =0L );
+
         FeatureID                            _fid;
         osg::ref_ptr<Symbology::Geometry>    _geom;
         osg::ref_ptr<const SpatialReference> _srs;

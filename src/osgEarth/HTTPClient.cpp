@@ -807,13 +807,13 @@ namespace
             std::string mimeType = response.getMimeType();
             if ( !mimeType.empty() )
             {
-                reader = osgEarth::Registry::instance()->getReaderWriterForMimeType(mimeType);
+            	reader = osgDB::Registry::instance()->getReaderWriterForMimeType(mimeType);
             }
 
             if ( !reader )
             {
-            // Try to find a reader by file extension.
-            std::string ext = osgDB::getFileExtension( url );
+            	// Try to find a reader by file extension.
+            	std::string ext = osgDB::getFileExtension( url );
                 reader = osgDB::Registry::instance()->getReaderWriterForExtension( ext );
             }
 
@@ -875,6 +875,10 @@ HTTPClient::doReadImage(const std::string&    location,
                 }
             }
     }
+
+    // set the source name
+    if ( result.getImage() )
+        result.getImage()->setName( location );
 
     return result;
 }

@@ -29,10 +29,10 @@ SET(LIB_PUBLIC_HEADERS
     ObjectPlacer
     ObjectLocator
     #OceanSurfaceNode
-    Pickers
     SkyNode
     SpatialData
     StarData
+	TerrainProfile
     TMS
     TMSPackager
     UTMGraticule
@@ -58,9 +58,9 @@ SET(LIB_COMMON_FILES
     ObjectPlacer.cpp
     ObjectLocator.cpp
     #OceanSurfaceNode.cpp
-    Pickers.cpp
     SpatialData.cpp
     SkyNode.cpp
+	TerrainProfile.cpp
     TMS.cpp
     TMSPackager.cpp
     UTMGraticule.cpp

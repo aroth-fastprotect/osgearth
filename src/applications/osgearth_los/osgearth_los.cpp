@@ -31,7 +31,6 @@
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
-using namespace osgEarth::Annotation;
 
 
 osg::AnimationPath* createAnimationPath( MapNode* mapNode, const osg::Vec3& center, float radius,double looptime)
@@ -138,7 +137,8 @@ main(int argc, char** argv)
 
     //Create a relative point to point LineOfSightNode.
     LineOfSightNode* relativeLOS = new LineOfSightNode( mapNode, osg::Vec3d(-121.2, 46.1, 10), osg::Vec3d(-121.488, 46.2054, 10));
-    relativeLOS->setAltitudeMode( AltitudeMode::RELATIVE_TO_TERRAIN );
+    relativeLOS->setStartAltitudeMode( AltitudeMode::RELATIVE_TO_TERRAIN );
+    relativeLOS->setEndAltitudeMode( AltitudeMode::RELATIVE_TO_TERRAIN );
     root->addChild( relativeLOS );
     relativeLOS->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
 

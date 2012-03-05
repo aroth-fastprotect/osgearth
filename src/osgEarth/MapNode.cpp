@@ -18,7 +18,7 @@
 */
 #include <osgEarth/MapNode>
 #include <osgEarth/MaskNode>
-#include <osgEarth/FindNode>
+#include <osgEarth/NodeUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/ShaderComposition>
 #include <osgEarth/OverlayDecorator>
@@ -297,7 +297,7 @@ MapNode::init()
     dirtyBound();
 
     // register for event traversals so we can deal with blacklisted filenames
-    adjustEventTraversalCount( 1 );
+    ADJUST_EVENT_TRAV_COUNT( this, 1 );
 }
 
 MapNode::~MapNode()
@@ -399,6 +399,9 @@ MapNode::isGeocentric() const
 void
 MapNode::onModelLayerAdded( ModelLayer* layer, unsigned int index )
 {
+    if ( !layer->getEnabled() )
+        return;
+
     osg::Node* node = layer->getOrCreateNode();
 
     layer->addCallback(_modelLayerCallback.get() );
@@ -558,14 +561,6 @@ MapNode::removeTerrainDecorator(osg::Group* decorator)
         }
         dirtyBound();
     }
-}
-
-void
-MapNode::adjustEventTraversalCount( int delta )
-{
-    int oldCount = this->getNumChildrenRequiringEventTraversal();
-    if ( oldCount + delta >= 0 )
-        this->setNumChildrenRequiringEventTraversal( (unsigned int)(oldCount + delta) );
 }
 
 void

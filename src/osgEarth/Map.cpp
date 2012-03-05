@@ -1026,7 +1026,7 @@ namespace
         for( ElevationLayerVector::const_iterator i = elevLayers.begin(); i != elevLayers.end(); i++ )
         {
             ElevationLayer* layer = i->get();
-            if ( layer->getEnabled() )
+            if ( layer->getVisible() )
             {
                 GeoHeightField geoHF = layer->createHeightField( keyToUse, progress );
 

@@ -24,7 +24,8 @@
 #include <osgEarthAnnotation/LocalizedNode>
 #include <osgEarthAnnotation/CircleNode>
 #include <osgEarthAnnotation/EllipseNode>
-#include <osgEarthAnnotation/Draggers>
+#include <osgEarthAnnotation/RectangleNode>
+#include <osgEarth/Draggers>
 #include <osgEarth/MapNode>
 
 namespace osgEarth { namespace Annotation {
@@ -48,7 +49,7 @@ namespace osgEarth { namespace Annotation {
 
     protected:
         osg::ref_ptr< LocalizedNode > _node;
-        IntersectingDragger* _dragger;
+        Dragger* _dragger;
     };
 
     class OSGEARTHANNO_EXPORT CircleNodeEditor : public LocalizedNodeEditor
@@ -69,7 +70,7 @@ namespace osgEarth { namespace Annotation {
 
         double _bearing;
 
-        IntersectingDragger* _radiusDragger;
+        Dragger* _radiusDragger;
     };
 
     class OSGEARTHANNO_EXPORT EllipseNodeEditor : public LocalizedNodeEditor
@@ -77,8 +78,8 @@ namespace osgEarth { namespace Annotation {
     public:
         /**
          * Create a new EllipseNodeEditor
-         * @param localizedNode
-         *        The LocalizedNode to edit
+         * @param ellipseNode
+         *        The EllipseNodeEditor to edit
          */
         EllipseNodeEditor(EllipseNode* ellipseNode);    
         
@@ -86,9 +87,30 @@ namespace osgEarth { namespace Annotation {
 
         virtual void updateDraggers();
 
-        IntersectingDragger* _majorDragger;
-        IntersectingDragger* _minorDragger;
+        Dragger* _majorDragger;
+        Dragger* _minorDragger;
     };
+
+    class OSGEARTHANNO_EXPORT RectangleNodeEditor : public LocalizedNodeEditor
+    {
+    public:
+        /**
+         * Create a new RectangleNodeEditor
+         * @param rectangleNode
+         *        The RectangleNodeEditor to edit
+         */
+        RectangleNodeEditor(RectangleNode* rectangleNode);    
+        
+        ~RectangleNodeEditor();    
+
+        virtual void updateDraggers();
+
+        Dragger* _llDragger;
+        Dragger* _lrDragger;
+        Dragger* _urDragger;
+        Dragger* _ulDragger;
+    };
+
 } } // namespace osgEarth::Annotation
 
 #endif // OSGEARTHANNO_FEATURE_EDITING_H

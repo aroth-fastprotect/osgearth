@@ -41,7 +41,7 @@ SET(LIB_PUBLIC_HEADERS
 	GeometryUtils
     LabelSource
     MeshClamper
-	OgrUtils
+    OgrUtils
     OptimizerHints	
     ResampleFilter
     ScaleFilter

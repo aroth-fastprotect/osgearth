@@ -797,25 +797,25 @@ HTTPClient::doDownload(const std::string &url, const std::string &filename)
 }
 
 namespace
-    {
+{
     osgDB::ReaderWriter*
     getReader( const std::string& url, const HTTPResponse& response )
+    {
+        osgDB::ReaderWriter* reader = 0L;
+
+        // try to look up a reader by mime-type first:
+        std::string mimeType = response.getMimeType();
+        if ( !mimeType.empty() )
         {
-            osgDB::ReaderWriter* reader = 0L;
+            reader = osgDB::Registry::instance()->getReaderWriterForMimeType(mimeType);
+        }
 
-            // try to look up a reader by mime-type first:
-            std::string mimeType = response.getMimeType();
-            if ( !mimeType.empty() )
-            {
-                reader = osgEarth::Registry::instance()->getReaderWriterForMimeType(mimeType);
-            }
-
-            if ( !reader )
-            {
+        if ( !reader )
+        {
             // Try to find a reader by file extension.
             std::string ext = osgDB::getFileExtension( url );
-                reader = osgDB::Registry::instance()->getReaderWriterForExtension( ext );
-            }
+            reader = osgDB::Registry::instance()->getReaderWriterForExtension( ext );
+        }
 
         return reader;
     }
@@ -875,6 +875,10 @@ HTTPClient::doReadImage(const std::string&    location,
                 }
             }
     }
+
+    // set the source name
+    if ( result.getImage() )
+        result.getImage()->setName( location );
 
     return result;
 }

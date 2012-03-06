@@ -29,6 +29,7 @@ SET(TARGET_PUBLIC_H
 	SkyNode
 	SpatialData
 	StarData
+	TerrainProfile
     TMS
     TMSPackager
     UTMGraticule
@@ -57,6 +58,7 @@ SET(TARGET_SRC
     Pickers.cpp
     SpatialData.cpp
     SkyNode.cpp
+	TerrainProfile.cpp
     TMS.cpp
     TMSPackager.cpp
     UTMGraticule.cpp

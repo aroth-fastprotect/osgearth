@@ -340,8 +340,8 @@ void ElevationLayerControlWidget::initUi()
 void ElevationLayerControlWidget::onEnabledCheckStateChanged(int state)
 {
   bool checked = state == Qt::Checked;
-  if (_layer.valid() && _layer->getEnabled() != checked)
-    _layer->setEnabled(checked);
+  if (_layer.valid() && _layer->getVisible() != checked)
+    _layer->setVisible(checked);
 }
 
 void ElevationLayerControlWidget::setLayerEnabled(bool enabled)
@@ -439,8 +439,8 @@ void ImageLayerControlWidget::initUi()
 void ImageLayerControlWidget::onCheckStateChanged(int state)
 {
   bool checked = state == Qt::Checked;
-  if (_layer.valid() && _layer->getEnabled() != checked)
-    _layer->setEnabled(checked);
+  if (_layer.valid() && _layer->getVisible() != checked)
+    _layer->setVisible(checked);
 }
 
 void ImageLayerControlWidget::onSliderValueChanged(int value)
@@ -550,8 +550,8 @@ void ModelLayerControlWidget::initUi()
 void ModelLayerControlWidget::onEnabledCheckStateChanged(int state)
 {
   bool checked = state == Qt::Checked;
-  if (_layer.valid() && _layer->getEnabled() != checked)
-    _layer->setEnabled(checked);
+  if (_layer.valid() && _layer->getVisible() != checked)
+    _layer->setVisible(checked);
 }
 
 void ModelLayerControlWidget::onOverlayCheckStateChanged(int state)

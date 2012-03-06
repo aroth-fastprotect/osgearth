@@ -399,6 +399,9 @@ MapNode::isGeocentric() const
 void
 MapNode::onModelLayerAdded( ModelLayer* layer, unsigned int index )
 {
+    if ( !layer->getEnabled() )
+        return;
+
     osg::Node* node = layer->getOrCreateNode();
 
     layer->addCallback(_modelLayerCallback.get() );

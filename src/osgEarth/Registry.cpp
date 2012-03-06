@@ -44,7 +44,6 @@ extern const char* builtinMimeTypeExtMappings[];
 
 Registry::Registry() :
 osg::Referenced  ( true ),
-_gdal_mutex      (new OpenThreads::ReentrantMutex),
 _gdal_registered ( false ),
 _numGdalMutexGets( 0 ),
 _uidGen          ( 0 ),
@@ -135,9 +134,26 @@ _defaultFont     ( 0L )
     }
 }
 
+class SpatialReferenceCacheClear : public osgEarth::SpatialReference
+{
+public:
+    static void clear()
+    {
+        osgEarth::SpatialReference::getSRSCache().clear();
+    }
+};
+
 Registry::~Registry()
 {
-	delete _gdal_mutex;
+#ifdef _WIN32
+    SpatialReferenceCacheClear::clear();
+#endif // _WIN32
+
+    _global_geodetic_profile = 0;
+    _global_mercator_profile = 0;
+    _cube_profile = 0;
+
+    //nop
 }
 
 Registry* 
@@ -160,11 +176,24 @@ Registry::instance(bool erase)
 void 
 Registry::destruct()
 {
+#ifdef _WIN32
+    SpatialReferenceCacheClear::clear();
+#endif // _WIN32
+
 	_global_geodetic_profile = 0;
 	_global_mercator_profile = 0;
 	_cube_profile = 0;
 
     _cache = 0L;
+
+    _blacklistedFilenames.clear();
+    _shaderLib = 0;
+    _taskServiceManager = 0;
+    _caps = 0;
+    _defaultOptions = 0;
+    _uriReadCallback = 0;
+    _defaultFont = 0;
+    _unitsVector.clear();
 }
 
 
@@ -173,7 +202,7 @@ Registry::getGDALMutex()
 {
     //_numGdalMutexGets++;
     //OE_NOTICE << "GDAL = " << _numGdalMutexGets << std::endl;
-    return *_gdal_mutex;
+    return _gdal_mutex;
 }
 
 

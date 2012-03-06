@@ -310,6 +310,7 @@ struct ViewpointHandler : public osgGA::GUIEventHandler
             {
                 s_controlPanel->setVisible( !s_controlPanel->visible() );
             }
+            aa.requestRedraw();
         }
         return false;
     }

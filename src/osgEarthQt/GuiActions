@@ -47,9 +47,9 @@ namespace osgEarth { namespace QtGui
       if (terrain)
       {
         terrain->getProfile()->getLatLongExtent().xMin();
-        if (terrain->getEnabled() != _enabled)
+        if (terrain->getVisible() != _enabled)
         {
-          terrain->setEnabled(_enabled);
+          terrain->setVisible(_enabled);
           return true;
         }
       }
@@ -58,9 +58,9 @@ namespace osgEarth { namespace QtGui
         osgEarth::ModelLayer* model = dynamic_cast<osgEarth::ModelLayer*>(_layer.get());
         if (model)
         {
-          if (model->getEnabled() != _enabled)
+          if (model->getVisible() != _enabled)
           {
-            model->setEnabled(_enabled);
+            model->setVisible(_enabled);
             return true;
           }
         }

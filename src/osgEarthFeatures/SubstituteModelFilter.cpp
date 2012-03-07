@@ -168,8 +168,9 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
                     FeatureSourceNode* xform = new FeatureSourceNode(source, input->getFID());
                     xform->setMatrix( mat );
-                    xform->setDataVariance( osg::Object::STATIC );
+
                     xform->addChild( model.get() );
+
                     attachPoint->addChild( xform );
 
                     // name the feature if necessary

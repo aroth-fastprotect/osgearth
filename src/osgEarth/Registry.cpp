@@ -44,7 +44,6 @@ extern const char* builtinMimeTypeExtMappings[];
 
 Registry::Registry() :
 osg::Referenced  ( true ),
-_gdal_mutex      (new OpenThreads::ReentrantMutex),
 _gdal_registered ( false ),
 _numGdalMutexGets( 0 ),
 _uidGen          ( 0 ),
@@ -137,7 +136,7 @@ _defaultFont     ( 0L )
 
 Registry::~Registry()
 {
-	delete _gdal_mutex;
+    //nop
 }
 
 Registry* 
@@ -165,6 +164,20 @@ Registry::destruct()
 	_cube_profile = 0;
 
     _cache = 0L;
+
+    _shaderLib = 0;
+
+    _taskServiceManager = 0;
+
+    _caps = 0;
+
+    _defaultOptions = 0;
+
+    _uriReadCallback = 0;
+
+    _defaultFont = 0;
+
+    _unitsVector.clear();
 }
 
 
@@ -173,7 +186,7 @@ Registry::getGDALMutex()
 {
     //_numGdalMutexGets++;
     //OE_NOTICE << "GDAL = " << _numGdalMutexGets << std::endl;
-    return *_gdal_mutex;
+    return _gdal_mutex;
 }
 
 

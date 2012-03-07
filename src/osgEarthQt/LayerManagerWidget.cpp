@@ -56,7 +56,7 @@ namespace
     void onEnabledChanged(TerrainLayer* layer)
     {
       if (_widget)
-        _widget->setLayerEnabled(layer->getEnabled());
+        _widget->setLayerVisible(layer->getVisible());
     }
 
   private:
@@ -77,7 +77,7 @@ namespace
     void onEnabledChanged(TerrainLayer* layer)
     {
       if (_widget)
-        _widget->setLayerEnabled(layer->getEnabled());
+        _widget->setLayerVisible(layer->getVisible());
     }
 
   private:
@@ -92,7 +92,7 @@ namespace
     void onEnabledChanged(ModelLayer* layer)
     {
       if (_widget && layer)
-        _widget->setLayerEnabled(layer->getEnabled());
+        _widget->setLayerVisible(layer->getVisible());
     }
 
     void onOverlayChanged(ModelLayer* layer)
@@ -317,10 +317,10 @@ void ElevationLayerControlWidget::initUi()
   if (_layer.valid())
   {
     // create enabled checkbox
-    _enabledCheckBox = new QCheckBox();
-    _enabledCheckBox->setCheckState(_layer->getEnabled() ? Qt::Checked : Qt::Unchecked);
-    connect(_enabledCheckBox, SIGNAL(stateChanged(int)), this, SLOT(onEnabledCheckStateChanged(int)));
-    _headerBoxLayout->addWidget(_enabledCheckBox);
+    _visibleCheckBox = new QCheckBox();
+    _visibleCheckBox->setCheckState(_layer->getVisible() ? Qt::Checked : Qt::Unchecked);
+    connect(_visibleCheckBox, SIGNAL(stateChanged(int)), this, SLOT(onEnabledCheckStateChanged(int)));
+    _headerBoxLayout->addWidget(_visibleCheckBox);
 
     // create name label
     QLabel* label = new QLabel(tr(!_layer->getName().empty() ? _layer->getName().c_str() : "Elevation Layer"));
@@ -344,10 +344,10 @@ void ElevationLayerControlWidget::onEnabledCheckStateChanged(int state)
     _layer->setVisible(checked);
 }
 
-void ElevationLayerControlWidget::setLayerEnabled(bool enabled)
+void ElevationLayerControlWidget::setLayerVisible(bool visible)
 {
-  if ((_enabledCheckBox->checkState() == Qt::Checked) != enabled)
-    _enabledCheckBox->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
+  if ((_visibleCheckBox->checkState() == Qt::Checked) != visible)
+    _visibleCheckBox->setCheckState(visible ? Qt::Checked : Qt::Unchecked);
 }
 
 osgEarth::UID ElevationLayerControlWidget::getUID()
@@ -407,10 +407,10 @@ void ImageLayerControlWidget::initUi()
   if (_layer.valid())
   {
     // create enabled checkbox
-    _enabledCheckBox = new QCheckBox();
-    _enabledCheckBox->setCheckState(_layer->getEnabled() ? Qt::Checked : Qt::Unchecked);
-    connect(_enabledCheckBox, SIGNAL(stateChanged(int)), this, SLOT(onCheckStateChanged(int)));
-    _headerBoxLayout->addWidget(_enabledCheckBox);
+    _visibleCheckBox = new QCheckBox();
+    _visibleCheckBox->setCheckState(_layer->getVisible() ? Qt::Checked : Qt::Unchecked);
+    connect(_visibleCheckBox, SIGNAL(stateChanged(int)), this, SLOT(onCheckStateChanged(int)));
+    _headerBoxLayout->addWidget(_visibleCheckBox);
 
     // create name label
     QLabel* label = new QLabel(tr(!_layer->getName().empty() ? _layer->getName().c_str() : "Image Layer"));
@@ -450,10 +450,10 @@ void ImageLayerControlWidget::onSliderValueChanged(int value)
     _layer->setOpacity(opacity);
 }
 
-void ImageLayerControlWidget::setLayerEnabled(bool enabled)
+void ImageLayerControlWidget::setLayerVisible(bool visible)
 {
-  if ((_enabledCheckBox->checkState() == Qt::Checked) != enabled)
-    _enabledCheckBox->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
+  if ((_visibleCheckBox->checkState() == Qt::Checked) != visible)
+    _visibleCheckBox->setCheckState(visible ? Qt::Checked : Qt::Unchecked);
 }
 
 void ImageLayerControlWidget::setLayerOpacity(float opacity)
@@ -520,10 +520,10 @@ void ModelLayerControlWidget::initUi()
   if (_layer.valid())
   {
     // create enabled checkbox
-    _enabledCheckBox = new QCheckBox();
-    _enabledCheckBox->setCheckState(_layer->getEnabled() ? Qt::Checked : Qt::Unchecked);
-    connect(_enabledCheckBox, SIGNAL(stateChanged(int)), this, SLOT(onEnabledCheckStateChanged(int)));
-    _headerBoxLayout->addWidget(_enabledCheckBox);
+    _visibleCheckBox = new QCheckBox();
+    _visibleCheckBox->setCheckState(_layer->getVisible() ? Qt::Checked : Qt::Unchecked);
+    connect(_visibleCheckBox, SIGNAL(stateChanged(int)), this, SLOT(onEnabledCheckStateChanged(int)));
+    _headerBoxLayout->addWidget(_visibleCheckBox);
 
     // create name label
     QLabel* label = new QLabel(tr(!_layer->getName().empty() ? _layer->getName().c_str() : "Model Layer"));
@@ -561,10 +561,10 @@ void ModelLayerControlWidget::onOverlayCheckStateChanged(int state)
     _layer->setOverlay(checked);
 }
 
-void ModelLayerControlWidget::setLayerEnabled(bool enabled)
+void ModelLayerControlWidget::setLayerVisible(bool visible)
 {
-  if ((_enabledCheckBox->checkState() == Qt::Checked) != enabled)
-    _enabledCheckBox->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
+  if ((_visibleCheckBox->checkState() == Qt::Checked) != visible)
+    _visibleCheckBox->setCheckState(visible ? Qt::Checked : Qt::Unchecked);
 }
 
 void ModelLayerControlWidget::setLayerOverlay(bool overlay)

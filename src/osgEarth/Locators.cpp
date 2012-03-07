@@ -22,6 +22,12 @@
 #include <osgEarth/Map>
 #include <osg/Notify>
 
+#ifdef __GNUC__
+#define LIKELY_UNUSED_FUNCTION __attribute__ ((unused))
+#else
+#define LIKELY_UNUSED_FUNCTION
+#endif
+
 using namespace osgEarth;
 
 GeoLocator::GeoLocator() :
@@ -164,13 +170,13 @@ lonToU(double lon) {
     return (lon + 180.0) / 360.0;
 }
 
-static double
+LIKELY_UNUSED_FUNCTION static double
 latToV(double lat) {
     double sin_lat = sin( osg::DegreesToRadians( lat ) );
     return 0.5 - log( (1+sin_lat) / (1-sin_lat) ) / (4*osg::PI);
 }
 
-static void
+LIKELY_UNUSED_FUNCTION static void
 getUV(const GeoExtent& ext,
       double lon, double lat,
       double& out_u, double& out_v)

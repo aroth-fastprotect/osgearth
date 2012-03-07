@@ -43,7 +43,7 @@ namespace
   {
   public:
     virtual Action* getDoubleClickAction(const ViewVector& views) { return 0L; }
-    virtual Action* getCheckStateAction() { return 0L; }
+    virtual Action* getCheckStateAction(ViewVector& views) { return 0L; }
     virtual Action* getSelectionAction(bool selected) { return 0L; }
   };
 
@@ -70,6 +70,7 @@ namespace
   };
 
   //---------------------------------------------------------------------------
+
   class LayerTreeItem : public QTreeWidgetItem, public ActionableTreeItem
   {
   public:
@@ -78,7 +79,10 @@ namespace
   	
 	  osgEarth::Layer* getLayer() const { return _layer.get(); }
 
-    Action* getCheckStateAction() { return new SetLayerEnabledAction(_layer.get(), checkState(0) == Qt::Checked); }
+    Action* getCheckStateAction(ViewVector& views)
+    { 
+        return new SetLayerVisibleAction(views, _layer.get(), checkState(0) == Qt::Checked); 
+    }
 
     Action* getDoubleClickAction(const ViewVector& views)
     {
@@ -350,7 +354,7 @@ void MapCatalogWidget::onTreeItemChanged(QTreeWidgetItem* item, int col)
   ActionableTreeItem* actionable = dynamic_cast<ActionableTreeItem*>(item);
 	if (actionable)
 	{
-    Action* action = actionable->getCheckStateAction();
+      Action* action = actionable->getCheckStateAction(_views);
     if (action)
       _manager->doAction(this, action);
   }
@@ -417,7 +421,7 @@ void MapCatalogWidget::refreshElevationLayers()
     {
       LayerTreeItem* layerItem = new LayerTreeItem(*it, _map);
       layerItem->setText(0, QString( (*it)->getName().c_str() ) );
-      //layerItem->setCheckState(0, (*it)->getEnabled() ? Qt::Checked : Qt::Unchecked);
+      //layerItem->setCheckState(0, (*it)->getVisible() ? Qt::Checked : Qt::Unchecked);
 			_elevationsItem->addChild(layerItem);
     }
 
@@ -451,7 +455,7 @@ void MapCatalogWidget::refreshImageLayers()
     {
       LayerTreeItem* layerItem = new LayerTreeItem(*it, _map);
       layerItem->setText(0, QString( (*it)->getName().c_str() ) );
-			layerItem->setCheckState(0, (*it)->getEnabled() ? Qt::Checked : Qt::Unchecked);
+			layerItem->setCheckState(0, (*it)->getVisible() ? Qt::Checked : Qt::Unchecked);
 			_imagesItem->addChild(layerItem);
     }
 
@@ -485,7 +489,7 @@ void MapCatalogWidget::refreshModelLayers()
     {
       LayerTreeItem* layerItem = new LayerTreeItem(*it, _map);
       layerItem->setText(0, QString( (*it)->getName().c_str() ) );
-			layerItem->setCheckState(0, (*it)->getEnabled() ? Qt::Checked : Qt::Unchecked);
+			layerItem->setCheckState(0, (*it)->getVisible() ? Qt::Checked : Qt::Unchecked);
 			_modelsItem->addChild(layerItem);
     }
 

@@ -31,12 +31,6 @@
 #include <map>
 #include <ctype.h>
 
-#ifdef __GNUC__
-#define LIKELY_UNUSED_FUNCTION __attribute__ ((unused))
-#else
-#define LIKELY_UNUSED_FUNCTION
-#endif
-
 namespace osgEarth
 {
     extern OSGEARTH_EXPORT const std::string EMPTY_STRING;

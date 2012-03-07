@@ -1475,8 +1475,6 @@ EarthManipulator::serviceTask()
 
         switch( _task->_type )
         {
-			case TASK_NONE:
-				break;
             case TASK_PAN:
                 pan( dt * _task->_dx, dt * _task->_dy );
                 break;

@@ -134,8 +134,25 @@ _defaultFont     ( 0L )
     }
 }
 
+class SpatialReferenceCacheClear : public osgEarth::SpatialReference
+{
+public:
+    static void clear()
+    {
+        osgEarth::SpatialReference::getSRSCache().clear();
+    }
+};
+
 Registry::~Registry()
 {
+#ifdef _WIN32
+    SpatialReferenceCacheClear::clear();
+#endif // _WIN32
+
+    _global_geodetic_profile = 0;
+    _global_mercator_profile = 0;
+    _cube_profile = 0;
+
     //nop
 }
 
@@ -159,24 +176,23 @@ Registry::instance(bool erase)
 void 
 Registry::destruct()
 {
+#ifdef _WIN32
+    SpatialReferenceCacheClear::clear();
+#endif // _WIN32
+
 	_global_geodetic_profile = 0;
 	_global_mercator_profile = 0;
 	_cube_profile = 0;
 
     _cache = 0L;
 
+    _blacklistedFilenames.clear();
     _shaderLib = 0;
-
     _taskServiceManager = 0;
-
     _caps = 0;
-
     _defaultOptions = 0;
-
     _uriReadCallback = 0;
-
     _defaultFont = 0;
-
     _unitsVector.clear();
 }
 

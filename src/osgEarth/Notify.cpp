@@ -47,29 +47,12 @@ using namespace osgEarth;
 
 using namespace std;
 
-#ifdef USE_THREAD_SAFE_NOTIFY
-#ifdef _WIN32
-extern "C" unsigned long __stdcall GetCurrentThreadId();
-#else
-#include <sys/syscall.h> 
-#endif
-static unsigned getCurrentThreadId()
-{
-#ifdef _WIN32
-	return (unsigned)::GetCurrentThreadId();
-#else
-	return (unsigned)::syscall(SYS_gettid);
-#endif
-}
-#endif // USE_THREAD_SAFE_NOTIFY
-
 namespace osgEarth {
 
 class NullStreamBuffer : public std::streambuf
 {
     private:
-    
-        virtual streamsize xsputn (const char_type*, streamsize n)
+    std::streamsize xsputn(const std::streambuf::char_type *str, std::streamsize n)
         {
             return n;
         }
@@ -77,33 +60,28 @@ class NullStreamBuffer : public std::streambuf
 
 struct NullStream : public std::ostream
 {
+public:
     NullStream():
-        std::ostream(new NullStreamBuffer) {}
+        std::ostream(new NullStreamBuffer)
+    { _buffer = dynamic_cast<NullStreamBuffer *>(rdbuf()); }
         
-    virtual ~NullStream()
+    ~NullStream()
     {
-        delete rdbuf();
         rdbuf(0);
+        delete _buffer;
     }
-};
 
+protected:
+    NullStreamBuffer* _buffer;
+};
 
 /** Stream buffer calling notify handler when buffer is synchronized (usually on std::endl).
  * Stream stores last notification severity to pass it to handler call.
  */
 struct NotifyStreamBuffer : public std::stringbuf
 {
-	NotifyStreamBuffer() 
-		: _severity(osg::NOTICE)
-#ifdef USE_THREAD_SAFE_NOTIFY
-		, _mutex(OpenThreads::Mutex::MUTEX_RECURSIVE)
-		, _ownerThreadId(0)
-#endif // USE_THREAD_SAFE_NOTIFY
+    NotifyStreamBuffer() : _severity(osg::NOTICE)
 	{
-	}
-	~NotifyStreamBuffer()
-	{
-		sync();
 	}
 
 	void setNotifyHandler(osg::NotifyHandler *handler) { _handler = handler; }
@@ -115,50 +93,17 @@ struct NotifyStreamBuffer : public std::stringbuf
 
 private:
 
-	virtual int sync()
+    int sync()
 	{
 		sputc(0); // string termination
 		if (_handler.valid())
 			_handler->notify(_severity, pbase());
 		pubseekpos(0, std::ios_base::out); // or str(std::string())
-#ifdef USE_THREAD_SAFE_NOTIFY
-		unlock();
-#endif // USE_THREAD_SAFE_NOTIFY
 		return 0;
 	}
-	virtual std::streamsize xsputn (const char_type* p, std::streamsize n)
-	{
-#ifdef USE_THREAD_SAFE_NOTIFY
-		lock();
-#endif // USE_THREAD_SAFE_NOTIFY
-		return std::stringbuf::xsputn(p, n);
-	}
 
-#ifdef USE_THREAD_SAFE_NOTIFY
-	void lock()
-	{
-		unsigned currentThread = ::getCurrentThreadId();
-		if(_ownerThreadId != currentThread)
-		{
-			_mutex.lock();
-			_ownerThreadId.exchange(currentThread);
-		}
-	}
-
-	void unlock()
-	{
-		_ownerThreadId.exchange(0);
-		_mutex.unlock();
-	}
-#endif // USE_THREAD_SAFE_NOTIFY
-
-private:
 	osg::ref_ptr<osg::NotifyHandler> _handler;
 	osg::NotifySeverity _severity;
-#ifdef USE_THREAD_SAFE_NOTIFY
-	OpenThreads::Mutex _mutex;
-	OpenThreads::Atomic _ownerThreadId;
-#endif // USE_THREAD_SAFE_NOTIFY
 };
 
 struct NotifyStream : public std::ostream
@@ -198,14 +143,14 @@ static osgEarth::NotifyStream *g_NotifyStream = NULL;
 void
 osgEarth::setNotifyLevel(osg::NotifySeverity severity)
 {
-    osgEarth::initNotifyLevel();
+    if(s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
     osgearth_g_NotifyLevel = severity;
 }
 
 osg::NotifySeverity
 osgEarth::getNotifyLevel()
 {
-    osgEarth::initNotifyLevel();
+    if(s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
     return osgearth_g_NotifyLevel;
 }
 
@@ -261,17 +206,19 @@ osgEarth::initNotifyLevel()
 	s_osgEarthNeedNotifyInit = false;
 
 	return true;
+
 }
 
+#ifndef OSG_NOTIFY_DISABLED
 bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 {
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
     return severity<=getNotifyLevel();
 }
-
+#endif
 
 void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
 {
-	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
 	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
 	if (buffer)
 		buffer->setNotifyHandler(handler);

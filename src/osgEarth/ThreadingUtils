@@ -36,6 +36,7 @@ namespace osgEarth { namespace Threading
     typedef OpenThreads::ScopedLock<OpenThreads::Mutex> ScopedMutexLock;
     typedef OpenThreads::Thread Thread;
 
+    OSGEARTH_EXPORT unsigned getCurrentThreadId();
 #ifdef USE_CUSTOM_READ_WRITE_LOCK
 
     /**
@@ -299,14 +300,14 @@ namespace osgEarth { namespace Threading
     {
         T& get() {
             ScopedMutexLock lock(_mutex);
-            return _data[OpenThreads::Thread::CurrentThread()];
+            return _data[getCurrentThreadId()];
         }
         const T& get() const {
             ScopedMutexLock lock(_mutex);
-            return _data[OpenThreads::Thread::CurrentThread()];
+            return _data[getCurrentThreadId()];
         }
     private:
-        std::map<OpenThreads::Thread*,T> _data;
+        std::map<unsigned,T> _data;
         OpenThreads::Mutex               _mutex;
     };
 

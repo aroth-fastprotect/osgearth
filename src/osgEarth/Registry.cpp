@@ -39,6 +39,23 @@ using namespace OpenThreads;
 
 #define LC "[Registry] "
 
+#ifdef _WIN32
+extern "C" unsigned long __stdcall GetCurrentThreadId();
+#else
+#include <sys/syscall.h>
+#endif
+
+namespace osgEarth { namespace Threading {
+    unsigned getCurrentThreadId()
+    {
+    #ifdef _WIN32
+        return (unsigned)::GetCurrentThreadId();
+    #else
+        return (unsigned)::syscall(SYS_gettid);
+    #endif
+    }
+} }
+
 // from MimeTypes.cpp
 extern const char* builtinMimeTypeExtMappings[];
 

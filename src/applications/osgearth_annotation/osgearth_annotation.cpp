@@ -281,7 +281,6 @@ main(int argc, char** argv)
             Linear(100, Units::MILES),
             Angular(0, Units::DEGREES),
             ellipseStyle,
-
             true );
         annoGroup->addChild( ellipse );
         editorGroup->addChild( new EllipseNodeEditor( ellipse ) );

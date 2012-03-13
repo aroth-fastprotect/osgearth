@@ -169,6 +169,7 @@ Registry::~Registry()
 
     _global_geodetic_profile = 0;
     _global_mercator_profile = 0;
+	_spherical_mercator_profile = 0;
     _cube_profile = 0;
 
     //nop
@@ -200,6 +201,7 @@ Registry::destruct()
 
 	_global_geodetic_profile = 0;
 	_global_mercator_profile = 0;
+	_spherical_mercator_profile = 0;
 	_cube_profile = 0;
 
     _cache = 0L;

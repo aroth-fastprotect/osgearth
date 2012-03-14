@@ -98,8 +98,9 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
         unsigned lod, x, y;
         sscanf( uri.c_str(), "%u.%d_%d_%d.%*s", (unsigned int*)&uid, (int*)&lod, (int*)&x, (int*)&y );
 
-        FeatureModelGraph* graph = getGraph(uid);
-        if ( graph )
+        osg::ref_ptr<FeatureModelGraph> graph;
+        getGraph(uid, graph);
+        if ( graph.valid() )
             return ReadResult( graph->load( lod, x, y, uri ) );
         else
             return ReadResult::ERROR_IN_READING_FILE;
@@ -119,11 +120,15 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
         _fmgRegistry.erase( uid );
     }
 
-    static FeatureModelGraph* getGraph( UID uid ) 
+    static bool getGraph( UID uid, osg::ref_ptr<FeatureModelGraph> graph)
     {
+        bool ret;
         Threading::ScopedReadLock lock( _fmgMutex );
         std::map<UID, FeatureModelGraph*>::const_iterator i = _fmgRegistry.find( uid );
-        return i != _fmgRegistry.end() ? i->second : 0L;
+        ret = (i != _fmgRegistry.end());
+        if(ret)
+            graph = i->second;
+        return ret;
     }
 };
 

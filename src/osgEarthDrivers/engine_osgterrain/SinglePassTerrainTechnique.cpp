@@ -70,6 +70,7 @@ namespace
 SinglePassTerrainTechnique::SinglePassTerrainTechnique( TextureCompositor* compositor ) :
 CustomTerrainTechnique(),
 _debug( false ),
+_compileMutex(OpenThreads::Mutex::MUTEX_RECURSIVE),
 _verticalScaleOverride(1.0f),
 _atomicCallOnce(0),
 _initCount(0),
@@ -85,6 +86,7 @@ _frontGeodeInstalled( false )
 SinglePassTerrainTechnique::SinglePassTerrainTechnique(const SinglePassTerrainTechnique& rhs, const osg::CopyOp& copyop):
 CustomTerrainTechnique( rhs, copyop ),
 _debug( rhs._debug ),
+_compileMutex(OpenThreads::Mutex::MUTEX_RECURSIVE),
 _verticalScaleOverride( rhs._verticalScaleOverride ),
 _atomicCallOnce( 0 ),
 _initCount( 0 ),

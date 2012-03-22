@@ -291,6 +291,7 @@ public:
                 return new FeatureCursorOGR( 
                     dsHandle,
                     layerHandle, 
+                    this,
                     getFeatureProfile(),
                     query, 
                     _options.filters() );
@@ -323,13 +324,18 @@ public:
     virtual Feature* getFeature( FeatureID fid )
     {
         Feature* result = NULL;
-        OGRFeatureH handle = OGR_L_GetFeature( _layerHandle, fid);
-        if (handle)
+
+        if ( !isBlacklisted(fid) )
         {
-            const FeatureProfile* p = getFeatureProfile();
-            const SpatialReference* srs = p ? p->getSRS() : 0L;
-            result = OgrUtils::createFeature( handle, srs );
-            OGR_F_Destroy( handle );
+            OGR_SCOPED_LOCK;
+            OGRFeatureH handle = OGR_L_GetFeature( _layerHandle, fid);
+            if (handle)
+            {
+                const FeatureProfile* p = getFeatureProfile();
+                const SpatialReference* srs = p ? p->getSRS() : 0L;
+                result = OgrUtils::createFeature( handle, srs );
+                OGR_F_Destroy( handle );
+            }
         }
         return result;
     }
@@ -379,24 +385,6 @@ public:
                     }
                 }
             }
-
-            //    std::string value = feature->getAttr( name );
-            //    if (!value.empty())
-            //    {
-            //        switch( OGR_Fld_GetType( field_handle_ref ) )
-            //        {
-            //        case OFTInteger:
-            //            OGR_F_SetFieldInteger( feature_handle, field_index, as<int>(value, 0) );
-            //            break;
-            //        case OFTReal:
-            //            OGR_F_SetFieldDouble( feature_handle, field_index, as<double>(value, 0.0) );
-            //            break;
-            //        case OFTString:
-            //            OGR_F_SetFieldString( feature_handle, field_index, value.c_str() );
-            //            break;                    
-            //        }
-            //    }
-            //}
 
             // assign the geometry:
             OGRFeatureDefnH def = ::OGR_L_GetLayerDefn( _layerHandle );

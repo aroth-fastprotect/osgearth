@@ -95,6 +95,7 @@ Terrain::getHeight(double     mapX,
 
     osgUtil::LineSegmentIntersector* lsi = new osgUtil::LineSegmentIntersector(start, end);
     osgUtil::IntersectionVisitor iv( lsi );
+    lsi->setIntersectionLimit(osgUtil::Intersector::LIMIT_ONE);
 
     if ( patch )
         patch->accept( iv );

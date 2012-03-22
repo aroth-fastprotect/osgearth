@@ -154,10 +154,13 @@ namespace
 
 //--------------------------------------------------------------------------
 
-AutoClipPlaneCullCallback::AutoClipPlaneCullCallback( Map* map ) :
+AutoClipPlaneCullCallback::AutoClipPlaneCullCallback( MapNode* mapNode ) :
+_mapNode             ( mapNode ),
 _active              ( false ),
-_minNearFarRatio     ( 0.00001 ),
-_maxNearFarRatio     ( 0.0005 ),
+//_minNearFarRatio     ( 0.00001 ),
+//_maxNearFarRatio     ( 0.0005 ),
+_minNearFarRatio     ( 0.00001  ),
+_maxNearFarRatio     ( 0.00005 ),
 _haeThreshold        ( 250.0 ),
 _rp2                 ( -1 ),
 _rp                  ( -1 ),
@@ -165,9 +168,10 @@ _autoFarPlaneClamping( true ),
 _map                 ( map ),
 _clampers            ()
 {
-    if ( map )
+    if ( mapNode )
     {
-        if ( map->isGeocentric() )
+        osgEarth::Map* map = mapNode->getMap();
+        if ( mapNode->getMap()->isGeocentric() )
         {
             // Select the minimal radius..
             const osg::EllipsoidModel* em = map->getProfile()->getSRS()->getEllipsoid();
@@ -247,6 +251,7 @@ AutoClipPlaneCullCallback::operator()( osg::Node* node, osg::NodeVisitor* nv )
         osgUtil::CullVisitor* cv = dynamic_cast<osgUtil::CullVisitor*>( nv );
         if ( cv )
         {
+            osgEarth::Map* map = _mapNode.valid() ? _mapNode->getMap() : 0;
             osg::Camera* cam = cv->getCurrentCamera();
             osg::ref_ptr<osg::CullSettings::ClampProjectionMatrixCallback>& clamper = _clampers.get(cam);
             if ( !clamper.valid() )
@@ -276,9 +281,9 @@ AutoClipPlaneCullCallback::operator()( osg::Node* node, osg::NodeVisitor* nv )
                 // ElevationQuery in the future..
                 //osg::Vec3d loc;
                 GeoPoint loc;
-                if ( _map.valid() )
+                if ( map )
                 {
-                    _map->worldPointToMapPoint( eye, loc );
+                    map->worldPointToMapPoint( eye, loc );
                 }
                 else
                 {
@@ -287,7 +292,16 @@ AutoClipPlaneCullCallback::operator()( osg::Node* node, osg::NodeVisitor* nv )
                     em.convertXYZToLatLongHeight( eye.x(), eye.y(), eye.z(), loc.y(), loc.x(), loc.z() );
                 }
                 
+                //double hae = loc.z();
                 double hae = loc.z();
+                if (_mapNode.valid())
+                {
+                    double height = 0.0;
+                    _mapNode->getTerrain()->getHeight(loc.x(), loc.y(), &height);
+                    //OE_NOTICE << "got height " << height << std::endl;
+                    hae -= height;
+                    //OE_NOTICE << "HAE=" << hae <<  std::endl;
+                }
 
                 // ramp a new near/far ratio based on the HAE.
                 c->_nearFarRatio = Utils::remap( hae, 0.0, _haeThreshold, _minNearFarRatio, _maxNearFarRatio );

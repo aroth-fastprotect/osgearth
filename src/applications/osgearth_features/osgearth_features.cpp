@@ -46,7 +46,7 @@ using namespace osgEarth::Util;
 
 int usage( const std::string& app )
 {
-    OE_NOTICE "\n" << app << "\n"
+    OE_NOTICE << "\n" << app << "\n"
         << "    --rasterize           : draw features as rasterized image tiles \n"
         << "    --overlay             : draw features as projection texture \n"
         << "    --stencil             : draw features using the stencil buffer \n"

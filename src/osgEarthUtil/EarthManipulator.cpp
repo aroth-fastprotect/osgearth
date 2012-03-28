@@ -400,7 +400,7 @@ EarthManipulator::Settings::setAutoViewpointDurationLimits( double minSeconds, d
 
 
 EarthManipulator::EarthManipulator() :
-osgGA::MatrixManipulator(),
+osgGA::CameraManipulator(),
 _frame_count      ( 0 ),
 _last_action      ( ACTION_NULL )
 {
@@ -409,6 +409,7 @@ _last_action      ( ACTION_NULL )
 }
 
 EarthManipulator::EarthManipulator( const EarthManipulator& rhs ) :
+osgGA::CameraManipulator( rhs ),
 _srs_lookup_failed( rhs._srs_lookup_failed ),
 _time_s_last_frame( rhs._time_s_last_frame  ),
 _delta_t( rhs._delta_t ),
@@ -1098,11 +1099,15 @@ EarthManipulator::intersect(const osg::Vec3d& start, const osg::Vec3d& end, osg:
 }
 
 void
-EarthManipulator::home(const osgGA::GUIEventAdapter& ,osgGA::GUIActionAdapter& us)
+EarthManipulator::home(double unused)
 {
     handleAction( ACTION_HOME, 0, 0, 0 );
-    //if (getAutoComputeHomePosition()) computeHomePosition();
-    //setByLookAt(_homeEye, _homeCenter, _homeUp);
+}
+
+void
+EarthManipulator::home(const osgGA::GUIEventAdapter& ,osgGA::GUIActionAdapter& us)
+{
+    home( 0.0 );
     us.requestRedraw();
 }
 

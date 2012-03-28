@@ -40,6 +40,7 @@ SET(LIB_PUBLIC_HEADERS
     ElevationQuery
     Export
     FileUtils
+    GeoCommon
     GeoData
     Geoid
     GeoMath
@@ -67,6 +68,7 @@ SET(LIB_PUBLIC_HEADERS
     ModelSource
     NodeUtils
 	Notify
+	optional
 	OverlayDecorator
 	Pickers
     Profile

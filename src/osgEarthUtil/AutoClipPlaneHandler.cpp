@@ -165,7 +165,6 @@ _haeThreshold        ( 250.0 ),
 _rp2                 ( -1 ),
 _rp                  ( -1 ),
 _autoFarPlaneClamping( true ),
-_map                 ( map ),
 _clampers            ()
 {
     if ( mapNode )

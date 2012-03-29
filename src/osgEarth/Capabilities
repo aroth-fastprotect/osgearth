@@ -100,6 +100,10 @@ namespace osgEarth
         Capabilities();
 
     private:
+        bool        readCache();
+        bool        writeCache();
+
+    private:
         int  _maxFFPTextureUnits;
         int  _maxGPUTextureUnits;
         int  _maxGPUTextureCoordSets;

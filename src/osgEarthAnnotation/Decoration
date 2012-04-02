@@ -79,8 +79,8 @@ namespace osgEarth { namespace Annotation
 
     public:
         osg::ref_ptr<Decoration> _tech;
-        osg::ref_ptr<Callback>  _callback;
-        std::string             _name;
+        osg::ref_ptr<Callback>   _callback;
+        std::string              _name;
     };
 
     //-----------------------------------------------------------------------

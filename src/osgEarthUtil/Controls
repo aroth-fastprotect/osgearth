@@ -159,6 +159,11 @@ namespace osgEarth { namespace Util { namespace Controls
     class OSGEARTHUTIL_EXPORT Control : public osg::Referenced
     {
     public:
+        enum Side
+        {
+            SIDE_TOP, SIDE_BOTTOM, SIDE_LEFT, SIDE_RIGHT
+        };
+
         enum Alignment
         {
             ALIGN_NONE, ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT, ALIGN_TOP, ALIGN_BOTTOM
@@ -195,11 +200,13 @@ namespace osgEarth { namespace Util { namespace Controls
         void setSize( float w, float h );
 
         void setMargin( const Gutter& value );
+        void setMargin( Side side, float value );
         const Gutter& margin() const { return _margin; }
 
         // space between container and its content
         void setPadding( const Gutter& value );
         void setPadding( float globalValue );
+        void setPadding( Side side, float value );
         const Gutter& padding() const { return _padding; }
 
         void setVertAlign( const Alignment& value );
@@ -240,7 +247,7 @@ namespace osgEarth { namespace Util { namespace Controls
         void setAbsorbEvents( bool value ) { _absorbEvents = value; }
         bool getAbsorbEvents() const { return _absorbEvents; }
 
-        void addEventHandler( ControlEventHandler* handler );
+        void addEventHandler( ControlEventHandler* handler, bool fire =false );
 
     public:
         
@@ -278,6 +285,8 @@ namespace osgEarth { namespace Util { namespace Controls
 
         ControlEventHandlerList _eventHandlers;
 
+        virtual void fireValueChanged( ControlEventHandler* handler =0L ) { }
+
     private:
         osgEarth::optional<float> _x, _y, _width, _height;
         bool _hfill, _vfill;
@@ -307,7 +316,18 @@ namespace osgEarth { namespace Util { namespace Controls
 
         LabelControl(
             const std::string& value,
-            const osg::Vec4f&  foreColor );
+            const osg::Vec4f&  foreColor,
+            float              fontSize  =18.0f );
+
+        LabelControl(
+            Control*            valueControl,
+            const osg::Vec4f&   foreColor,
+            float               fontSize =18.0f );
+
+        LabelControl(
+            Control*            valueControl,
+            float               fontSize =18.0f,
+            const osg::Vec4f&   fontColor =osg::Vec4f(1,1,1,1) );
 
         void setText( const std::string& value );
         const std::string& text() const { return _text; }
@@ -394,7 +414,7 @@ namespace osgEarth { namespace Util { namespace Controls
     protected:
         virtual bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa, ControlContext& cx );
 
-        void fireValueChanged();
+        virtual void fireValueChanged( ControlEventHandler* one =0L );
 
     private:
         float _min, _max, _value;
@@ -418,7 +438,7 @@ namespace osgEarth { namespace Util { namespace Controls
     protected:
         virtual bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa, ControlContext& cx );
 
-        void fireValueChanged();
+        virtual void fireValueChanged( ControlEventHandler* one =0L );
 
     private:
         bool _value;

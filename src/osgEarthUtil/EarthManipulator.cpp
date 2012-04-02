@@ -2061,15 +2061,12 @@ EarthManipulator::handlePointAction( const Action& action, float mx, float my, o
 				{
 					Viewpoint here = getViewpoint();
 
-					if ( getSRS() && _is_geocentric )
-					{
-						double lat_r, lon_r, h;
-						getSRS()->getEllipsoid()->convertXYZToLatLongHeight(
-							point.x(), point.y(), point.z(),
-							lat_r, lon_r, h );
-						point.set( osg::RadiansToDegrees(lon_r), osg::RadiansToDegrees(lat_r), h );
-					}
-					here.setFocalPoint( point );
+                	if ( !here.getSRS() )
+            	        return false;
+
+        	        osg::Vec3d pointVP;
+    	            here.getSRS()->transformFromWorld(point, pointVP);
+	                here.setFocalPoint( pointVP );
 
 					double duration_s = action.getDoubleOption(OPTION_DURATION, 1.0);
 					double range_factor = action.getDoubleOption(OPTION_GOTO_RANGE_FACTOR, 1.0);

@@ -113,7 +113,6 @@ TessellateOperator::operator()( Feature* feature, FilterContext& context ) const
 
         for( Geometry::const_iterator v = g->begin(); v != g->end(); ++v )
         {
-            const osg::Vec3d& p0 = *v;
             if ( v != g->end()-1 ) // not last vert
             {
                 if ( isGeo )

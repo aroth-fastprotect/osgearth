@@ -113,9 +113,9 @@ void CacheSeed::seed( Map* map )
         {
             hasCaches = true;
 
-			if (opt.minLevel().isSet() && opt.minLevel().get() < (unsigned)src_min_level)
+			if (opt.minLevel().isSet() && opt.minLevel().get() < (int)src_min_level)
                 src_min_level = opt.minLevel().get();
-			if (opt.maxLevel().isSet() && opt.maxLevel().get() > (unsigned)src_max_level)
+			if (opt.maxLevel().isSet() && opt.maxLevel().get() > (int)src_max_level)
                 src_max_level = opt.maxLevel().get();
 		}
     }

@@ -483,7 +483,6 @@ namespace osgEarth
             }
             return *this;
         }
-        virtual ~ConfigOptions() { }
 
         void merge( const ConfigOptions& rhs ) {
             _conf.merge( rhs._conf );

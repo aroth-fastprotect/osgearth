@@ -20,6 +20,7 @@
 #include <osgEarthAnnotation/FeatureEditing>
 #include <osgEarthAnnotation/Draggers>
 
+using namespace osgEarth;
 using namespace osgEarth::Annotation;
 using namespace osgEarth::Symbology;
 using namespace osgEarth::Features;

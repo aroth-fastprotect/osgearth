@@ -267,6 +267,36 @@ Control::setMargin( const Gutter& value ) {
 }
 
 void
+Control::setMargin( Side side, float value ) {
+    switch(side) {
+        case SIDE_TOP:
+            if ( _margin.top() != value ) {
+                _margin.top() = value;
+                dirty();
+            }
+            break;
+        case SIDE_BOTTOM:
+            if ( _margin.bottom() != value ) {
+                _margin.bottom() = value;
+                dirty();
+            }
+            break;
+        case SIDE_LEFT:
+            if ( _margin.left() != value ) {
+                _margin.left() = value;
+                dirty();
+            }
+            break;
+        case SIDE_RIGHT:
+            if ( _margin.right() != value ) {
+                _margin.right() = value;
+                dirty();
+            }
+            break;
+    }
+}
+
+void
 Control::setPadding( const Gutter& value )
 {
     if ( value != _padding ) {
@@ -281,6 +311,36 @@ Control::setPadding( float value ) {
     if ( g != _padding ) {
         _padding = g;
         dirty();
+    }
+}
+
+void
+Control::setPadding( Side side, float value ) {
+    switch(side) {
+        case SIDE_TOP:
+            if ( _padding.top() != value ) {
+                _padding.top() = value;
+                dirty();
+            }
+            break;
+        case SIDE_BOTTOM:
+            if ( _padding.bottom() != value ) {
+                _padding.bottom() = value;
+                dirty();
+            }
+            break;
+        case SIDE_LEFT:
+            if ( _padding.left() != value ) {
+                _padding.left() = value;
+                dirty();
+            }
+            break;
+        case SIDE_RIGHT:
+            if ( _padding.right() != value ) {
+                _padding.right() = value;
+                dirty();
+            }
+            break;
     }
 }
 
@@ -352,9 +412,11 @@ Control::setActiveColor( const osg::Vec4f& value ) {
 }
 
 void
-Control::addEventHandler( ControlEventHandler* handler )
+Control::addEventHandler( ControlEventHandler* handler, bool fire )
 {
     _eventHandlers.push_back( handler );
+    if ( fire )
+        fireValueChanged( handler );
 }
 
 bool
@@ -528,12 +590,40 @@ Control::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa, 
 
 // ---------------------------------------------------------------------------
 
-// override osg Text to get at some of the internal properties
-struct LabelText : public osgText::Text
+namespace
 {
-    const osg::BoundingBox& getTextBB() const { return _textBB; }
-    const osg::Matrix& getATMatrix(int contextID) const { return _autoTransformCache[contextID]._matrix; }
-};
+    // override osg Text to get at some of the internal properties
+    struct LabelText : public osgText::Text
+    {
+        const osg::BoundingBox& getTextBB() const { return _textBB; }
+        const osg::Matrix& getATMatrix(int contextID) const { return _autoTransformCache[contextID]._matrix; }
+    };
+
+    // writes a value to a label
+    struct ValueLabelHandler : public ControlEventHandler
+    {
+        osg::observer_ptr<LabelControl> _label;
+        ValueLabelHandler( LabelControl* label ) : _label(label) { }
+        void onValueChanged( class Control* control, bool value ) { 
+            if ( _label.valid() ) _label->setText( Stringify() << value ); }
+        void onValueChanged( class Control* control, double value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << std::setprecision(16) << value ); }
+        void onValueChanged( class Control* control, float value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << value ); }
+        void onValueChanged( class Control* control, int value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << value ); }
+        void onValueChanged( class Control* control, const osg::Vec3f& value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << std::setprecision(8) << value.x() << ", " << value.y() << ", " << value.z() ); }
+        void onValueChanged( class Control* control, const osg::Vec2f& value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << std::setprecision(8) << value.x() << ", " << value.y() ); }
+        void onValueChanged( class Control* control, const osg::Vec3d& value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << std::setprecision(16) << value.x() << ", " << value.y() << ", " << value.z() ); }
+        void onValueChanged( class Control* control, const osg::Vec2d& value ) {
+            if ( _label.valid() ) _label->setText( Stringify() << std::setprecision(16) << value.x() << ", " << value.y() ); }
+        void onValueChanged( class Control* control, const std::string& value ) {
+            if ( _label.valid() ) _label->setText( value ); }
+    };
+}
 
 LabelControl::LabelControl(const std::string& text,
                            float fontSize,
@@ -548,16 +638,45 @@ _encoding( osgText::String::ENCODING_UNDEFINED )
 }
 
 LabelControl::LabelControl(const std::string& text,
+                           const osg::Vec4f&  foreColor,
+                           float              fontSize ):
+_text    ( text ),
+_fontSize( fontSize ),
+_encoding( osgText::String::ENCODING_UNDEFINED )
+{    	
+    setFont( Registry::instance()->getDefaultFont() );   
+    setForeColor( foreColor );
+    setBackColor( osg::Vec4f(0,0,0,0) );
+}
+
+LabelControl::LabelControl(Control*           valueControl,
+                           float              fontSize,
                            const osg::Vec4f& foreColor):
-_text( text ),
-_fontSize( 18.0f ),
+_fontSize( fontSize ),
+_encoding( osgText::String::ENCODING_UNDEFINED )
+{
+    setFont( Registry::instance()->getDefaultFont() );    
+    setForeColor( foreColor );
+    setBackColor( osg::Vec4f(0,0,0,0) );
+
+    if ( valueControl )
+        valueControl->addEventHandler( new ValueLabelHandler(this), true );
+}
+
+LabelControl::LabelControl(Control*           valueControl,
+                           const osg::Vec4f&  foreColor,
+                           float              fontSize ):
+_fontSize( fontSize ),
 _encoding( osgText::String::ENCODING_UNDEFINED )
 {    	
     setFont( Registry::instance()->getDefaultFont() );   
     setForeColor( foreColor );
     setBackColor( osg::Vec4f(0,0,0,0) );
     
+    if ( valueControl )
+        valueControl->addEventHandler( new ValueLabelHandler(this), true );
 }
+
 
 void
 LabelControl::setText( const std::string& value )
@@ -880,11 +999,18 @@ _value(value)
 }
 
 void
-HSliderControl::fireValueChanged()
+HSliderControl::fireValueChanged( ControlEventHandler* oneHandler )
 {
-    for( ControlEventHandlerList::const_iterator i = _eventHandlers.begin(); i != _eventHandlers.end(); ++i )
+    if ( oneHandler )
     {
-        i->get()->onValueChanged( this, _value );
+        oneHandler->onValueChanged( this, _value );
+    }
+    else
+    {
+        for( ControlEventHandlerList::const_iterator i = _eventHandlers.begin(); i != _eventHandlers.end(); ++i )
+        {
+            i->get()->onValueChanged( this, _value );
+        }
     }
 }
 
@@ -1017,11 +1143,18 @@ _value( value )
 }
 
 void
-CheckBoxControl::fireValueChanged()
+CheckBoxControl::fireValueChanged( ControlEventHandler* oneHandler )
 {
-    for( ControlEventHandlerList::const_iterator i = _eventHandlers.begin(); i != _eventHandlers.end(); ++i )
+    if ( oneHandler )
     {
-        i->get()->onValueChanged( this, _value );
+        oneHandler->onValueChanged( this, _value );
+    }
+    else
+    {
+        for( ControlEventHandlerList::const_iterator i = _eventHandlers.begin(); i != _eventHandlers.end(); ++i )
+        {
+            i->get()->onValueChanged( this, _value );
+        }
     }
 }
 
@@ -1910,7 +2043,7 @@ namespace osgEarth { namespace Util { namespace Controls
             // must save the manipulator matrix b/c calling setSceneData causes
             // the view to call home() on the manipulator.
             osg::Matrixd savedMatrix;
-            osgGA::MatrixManipulator* manip = view2->getCameraManipulator();
+            osgGA::CameraManipulator* manip = view2->getCameraManipulator();
             if ( manip )
                 savedMatrix = manip->getMatrix();
 
@@ -2121,7 +2254,7 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
               const osg::Vec2f& size = control->renderSize();
 
               // calculate the rendering offset based on alignment:
-              float x, y;
+              float x = 0.f, y = 0.f;
 
               if ( node->anchorPoint().isSet() )
               {

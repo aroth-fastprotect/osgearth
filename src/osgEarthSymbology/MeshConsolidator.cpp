@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
+
 #include <osgEarthSymbology/MeshConsolidator>
 #include <osg/TriangleFunctor>
 #include <osg/TriangleIndexFunctor>
@@ -23,10 +24,11 @@
 #include <map>
 #include <iterator>
 
+using namespace osgEarth::Symbology;
+
 #define LC "[MeshConsolidator] "
 
 using namespace osgEarth;
-using namespace osgEarth::Symbology;
 
 //------------------------------------------------------------------------
 
@@ -120,6 +122,23 @@ namespace
             }
         }
 
+        // check that all primitive sets share the same user data
+        osg::Geometry::PrimitiveSetList& pslist = geom.getPrimitiveSetList();
+        osg::Referenced* lastUserData = 0L;
+        for( osg::Geometry::PrimitiveSetList::const_iterator i = pslist.begin(); i != pslist.end(); ++i )
+        {
+            osg::Referenced* userData = i->get()->getUserData();
+            if ( i == pslist.begin() || userData == lastUserData )
+            {
+                lastUserData = userData;
+            }
+            else
+            {
+                OE_WARN << LC << "Differing user data in a primset list!" << std::endl;
+                return false;
+            }
+        }
+
         return true;
     }
 }
@@ -156,6 +175,10 @@ MeshConsolidator::run( osg::Geometry& geom )
 
     if ( triSets.size() > 0 )
     {
+        // we are assuming at this point that all the primitive sets in a single geometry
+        // share a single user data structure.
+        osg::Referenced* sharedUserData = triSets[0]->getUserData();
+
         osg::Array* vertexArray = geom.getVertexArray();
         unsigned numVerts = vertexArray->getNumElements();
         osg::Geometry::PrimitiveSetList newPrimSets;
@@ -183,7 +206,10 @@ MeshConsolidator::run( osg::Geometry& geom )
         }
 
         for( osg::Geometry::PrimitiveSetList::iterator i = newPrimSets.begin(); i != newPrimSets.end(); ++i )
+        {
+            i->get()->setUserData( sharedUserData );
             nonTriSets.push_back( i->get() );
+    	}
     }
 
     geom.setPrimitiveSetList( nonTriSets );
@@ -212,7 +238,7 @@ MeshConsolidator::run( osg::Geode& geode )
                 continue;
 
             // optimize it into triangles first:
-            run( *geom );
+			MeshConsolidator::run( *geom );
 
             osg::Array* verts = geom->getVertexArray();
             if ( verts )
@@ -355,11 +381,18 @@ MeshConsolidator::run( osg::Geode& geode )
                     }
                 }
 
+                osg::ref_ptr<osg::Referenced> sharedUserData;
+
                 for( unsigned j=0; j < geom->getNumPrimitiveSets(); ++j )
                 {
                     osg::PrimitiveSet* pset = geom->getPrimitiveSet(j);
                     osg::PrimitiveSet* newpset = 0L;
                     
+                    // all primsets have the same user data (or else we would not have made it this far
+                    // since canOptimize would be false)
+                    if ( !sharedUserData.valid() )
+                        sharedUserData = pset->getUserData();
+
                     if ( dynamic_cast<osg::DrawElementsUByte*>(pset) )
                         newpset = remake( static_cast<osg::DrawElementsUByte*>(pset), numVerts, offset );
                     else if ( dynamic_cast<osg::DrawElementsUShort*>(pset) )
@@ -371,6 +404,8 @@ MeshConsolidator::run( osg::Geode& geode )
 
                     if ( newpset )
                     {
+                        newpset->setUserData( sharedUserData.get() );
+
                         newPrimSets.push_back( newpset );
                     }
                 }

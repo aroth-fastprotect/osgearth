@@ -138,6 +138,17 @@ namespace osgEarth
             osg::Node* patch                    =0L) const;
 
         /**
+         * Same as above, but you pass in an SRS describing the x,y coords.
+         */
+        bool getHeight(
+            const SpatialReference* srs,
+            double                  x,
+            double                  y,
+            double*                 out_heightAboveMSL,
+            double*                 out_heightAboveEllipsoid =0L,
+            osg::Node*              patch                    =0L) const;
+
+        /**
          * Returns the world coordinates under the mouse.
          * @param view
          *      View in which to do the query

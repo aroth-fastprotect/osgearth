@@ -34,6 +34,7 @@ namespace osgEarth { namespace Features
     using namespace osgEarth::Symbology;
 
 	class FeatureSource;
+
     /**
      * Session is a state object that exists throughout the life of one or more related
      * feature compilations.

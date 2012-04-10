@@ -91,6 +91,7 @@ Session::getScriptEngine() const
 { 
   return _styleScriptEngine.get();
 }
+
 FeatureSource *
 Session::getFeatureSource() const 
 { 

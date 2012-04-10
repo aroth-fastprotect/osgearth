@@ -270,7 +270,6 @@ static std::string                 _userAgent = USER_AGENT;
 HTTPClient&
 HTTPClient::getClient()
 {
-#if 1
     static Threading::PerThread< osg::ref_ptr<HTTPClient> > s_clientPerThread;
 
     osg::ref_ptr<HTTPClient>& client = s_clientPerThread.get();
@@ -278,32 +277,6 @@ HTTPClient::getClient()
         client = new HTTPClient();
 
     return *client.get();
-#else
-typedef std::map< OpenThreads::Thread*, osg::ref_ptr<HTTPClient> >    ThreadClientMap;        
-static Threading::ReadWriteMutex   _threadClientMapMutex;
-static ThreadClientMap             _threadClientMap;
-
-    OpenThreads::Thread* current = OpenThreads::Thread::CurrentThread();
-
-    // first try the map:
-    {
-        Threading::ScopedReadLock sharedLock(_threadClientMapMutex);
-        ThreadClientMap::iterator i = _threadClientMap.find(current);
-        if ( i != _threadClientMap.end() )
-            return *i->second.get();
-    }
-
-    // not there; add it.
-    {
-        Threading::ScopedWriteLock exclusiveLock(_threadClientMapMutex);
-
-        // normally, we'd double check b/c of the race condition, but since the map is being 
-        // indexed by the actual thread pointer, there's no chance of a race.
-        HTTPClient* client = new HTTPClient();
-        _threadClientMap[current] = client;
-        return *client;
-    }
-#endif
 }
 
 HTTPClient::HTTPClient()
@@ -797,25 +770,28 @@ HTTPClient::doDownload(const std::string &url, const std::string &filename)
 }
 
 namespace
-    {
+{
     osgDB::ReaderWriter*
     getReader( const std::string& url, const HTTPResponse& response )
-        {
-            osgDB::ReaderWriter* reader = 0L;
+    {
+        osgDB::ReaderWriter* reader = 0L;
 
+        // try extension first:
+        std::string ext = osgDB::getFileExtension( url );
+        if ( !ext.empty() )
+        {
+            reader = osgDB::Registry::instance()->getReaderWriterForExtension( ext );
+        }
+
+        if ( !reader )
+        {
             // try to look up a reader by mime-type first:
             std::string mimeType = response.getMimeType();
             if ( !mimeType.empty() )
             {
-            	reader = osgDB::Registry::instance()->getReaderWriterForMimeType(mimeType);
+                reader = osgDB::Registry::instance()->getReaderWriterForMimeType(mimeType);
             }
-
-            if ( !reader )
-            {
-            	// Try to find a reader by file extension.
-            	std::string ext = osgDB::getFileExtension( url );
-                reader = osgDB::Registry::instance()->getReaderWriterForExtension( ext );
-            }
+        }
 
         return reader;
     }

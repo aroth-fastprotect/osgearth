@@ -353,7 +353,7 @@ StringExpression::init()
     bool inQuotes = false;
     int inVar = 0;
     int startPos = 0;
-    for (int i=0; i < _src.length(); i++)
+    for (int i=0; i < (int)_src.length(); i++)
     {
       if (_src[i] == '"')
       {
@@ -440,6 +440,18 @@ StringExpression::set( const Variable& var, const std::string& value )
     {
         a.second = value;
         _dirty = true;
+    }
+}
+
+void
+StringExpression::set( const std::string& varName, const std::string& value )
+{
+    for( Variables::const_iterator v = _vars.begin(); v != _vars.end(); ++v )
+    {
+        if ( v->first == varName )
+        {
+            set( *v, value );
+        }
     }
 }
 

@@ -28,6 +28,16 @@
 
 #define LC "[ImageUtils] "
 
+
+#if defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE)
+#    define GL_RGB8_INTERNAL  GL_RGB8_OES
+#    define GL_RGB8A_INTERNAL GL_RGBA8_OES
+#else
+#    define GL_RGB8_INTERNAL  GL_RGB8
+#    define GL_RGB8A_INTERNAL GL_RGBA8
+#endif
+
+
 using namespace osgEarth;
 
 osg::Image*
@@ -54,9 +64,9 @@ ImageUtils::normalizeImage( osg::Image* image )
     if ( image->getDataType() == GL_UNSIGNED_BYTE )
     {
         if ( image->getPixelFormat() == GL_RGB )
-            image->setInternalTextureFormat( GL_RGB8 );
+            image->setInternalTextureFormat( GL_RGB8_INTERNAL );
         else if ( image->getPixelFormat() == GL_RGBA )
-            image->setInternalTextureFormat( GL_RGBA8 );
+            image->setInternalTextureFormat( GL_RGB8A_INTERNAL );
     }
 }
 
@@ -139,7 +149,7 @@ ImageUtils::resizeImage(const osg::Image* input,
         {
             // for unsupported write formats, convert to RGBA8 automatically.
             output->allocateImage( out_s, out_t, 1, GL_RGBA, GL_UNSIGNED_BYTE );
-            output->setInternalTextureFormat( GL_RGBA8 );
+            output->setInternalTextureFormat( GL_RGB8A_INTERNAL );
         }
     }
     else
@@ -156,11 +166,6 @@ ImageUtils::resizeImage(const osg::Image* input,
     {       
         PixelReader read( input );
         PixelWriter write( output.get() );
-
-        unsigned int pixel_size_bytes = input->getRowSizeInBytes() / in_s;
-
-        unsigned char* dataOffset = output->getMipmapData(mipmapLevel);
-        unsigned int   dataRowSizeBytes = output->getRowSizeInBytes() >> mipmapLevel;
 
         for( unsigned int output_row=0; output_row < out_t; output_row++ )
         {
@@ -380,7 +385,7 @@ ImageUtils::createEmptyImage()
     // each time.
     osg::Image* image = new osg::Image;
     image->allocateImage(1,1,1, GL_RGBA, GL_UNSIGNED_BYTE);
-    image->setInternalTextureFormat( GL_RGBA8 );
+    image->setInternalTextureFormat( GL_RGB8A_INTERNAL );
     unsigned char *data = image->data(0,0);
     memset(data, 0, 4);
     return image;
@@ -403,8 +408,8 @@ ImageUtils::convert(const osg::Image* image, GLenum pixelFormat, GLenum dataType
     {
         GLenum texFormat = image->getInternalTextureFormat();
         if (dataType != GL_UNSIGNED_BYTE
-            || (pixelFormat == GL_RGB && texFormat == GL_RGB8)
-            || (pixelFormat == GL_RGBA && texFormat == GL_RGBA8))
+            || (pixelFormat == GL_RGB  && texFormat == GL_RGB8_INTERNAL)
+            || (pixelFormat == GL_RGBA && texFormat == GL_RGB8A_INTERNAL))
         return cloneImage(image);
     }
     if ( !canConvert(image, pixelFormat, dataType) )
@@ -414,9 +419,9 @@ ImageUtils::convert(const osg::Image* image, GLenum pixelFormat, GLenum dataType
     result->allocateImage(image->s(), image->t(), image->r(), pixelFormat, dataType);
 
     if ( pixelFormat == GL_RGB && dataType == GL_UNSIGNED_BYTE )
-        result->setInternalTextureFormat( GL_RGB8 );
+        result->setInternalTextureFormat( GL_RGB8_INTERNAL );
     else if ( pixelFormat == GL_RGBA && dataType == GL_UNSIGNED_BYTE )
-        result->setInternalTextureFormat( GL_RGBA8 );
+        result->setInternalTextureFormat( GL_RGB8A_INTERNAL );
     else
         result->setInternalTextureFormat( pixelFormat );
 
@@ -813,7 +818,6 @@ namespace
     {
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m )
         {
-            GLubyte* ptr = (GLubyte*)iw->data(s,t,r,m);
             OE_WARN << LC << "Target GL_UNSIGNED_BYTE_3_3_2 not yet implemented" << std::endl;
         }
     };

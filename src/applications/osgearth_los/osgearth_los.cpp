@@ -61,7 +61,7 @@ osg::AnimationPath* createAnimationPath( MapNode* mapNode, const osg::Vec3& cent
     osg::Vec3d firstPosition;
     osg::Quat firstRotation;
 
-    for (unsigned int i = 0; i < numSamples; i++)
+    for (unsigned int i = 0; i < (unsigned)numSamples; i++)
     {
         double angle = delta * (double)i;
         osg::Quat quat(angle, up );
@@ -122,7 +122,7 @@ main(int argc, char** argv)
     viewer.setCameraManipulator( manip );
     
     root->addChild( earthNode );    
-    viewer.getCamera()->addCullCallback( new AutoClipPlaneCullCallback(mapNode->getMap()) );
+    viewer.getCamera()->addCullCallback( new AutoClipPlaneCullCallback(mapNode));
 
     //Create a point to point LineOfSightNode.
     LineOfSightNode* los = new LineOfSightNode( mapNode, osg::Vec3d(-121.665, 46.0878, 1258.00), osg::Vec3d(-121.488, 46.2054, 3620.11));

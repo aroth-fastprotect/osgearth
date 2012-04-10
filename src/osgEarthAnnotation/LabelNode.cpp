@@ -20,6 +20,7 @@
 #include <osgEarthAnnotation/LabelNode>
 #include <osgEarthAnnotation/Decluttering>
 #include <osgEarthAnnotation/AnnotationUtils>
+#include <osgEarthAnnotation/AnnotationRegistry>
 #include <osgEarthSymbology/Color>
 #include <osgText/Text>
 #include <osg/Depth>
@@ -42,9 +43,10 @@ LabelNode::LabelNode(MapNode*            mapNode,
 
 OrthoNode( mapNode, position ),
 _text    ( text ),
-_geode   ( 0L )
+_geode   ( 0L ),
+_style   ( style )
 {
-    init( style );
+    init();
 }
 
 LabelNode::LabelNode(MapNode*            mapNode,
@@ -56,9 +58,8 @@ OrthoNode( mapNode, position ),
 _text    ( text ),
 _geode   ( 0L )
 {
-    Style style;
-    style.add( const_cast<TextSymbol*>(symbol) );
-    init( style );
+    _style.add( const_cast<TextSymbol*>(symbol) );
+    init();
 }
 
 LabelNode::LabelNode(MapNode*            mapNode,
@@ -69,9 +70,10 @@ LabelNode::LabelNode(MapNode*            mapNode,
 
 OrthoNode( mapNode, GeoPoint(mapNode->getMapSRS(), x, y, 0) ),
 _text    ( text ),
-_geode   ( 0L )
+_geode   ( 0L ),
+_style   ( style )
 {
-    init( style );
+    init();
 }
 
 LabelNode::LabelNode(const SpatialReference* mapSRS,
@@ -83,18 +85,18 @@ OrthoNode( mapSRS, position ),
 _text    ( text ),
 _geode   ( 0L )
 {
-    Style style;
-    style.add( const_cast<TextSymbol*>(symbol) );
-    init( style );
+    _style.add( const_cast<TextSymbol*>(symbol) );
+    init();
 }
 
 LabelNode::LabelNode(const std::string&  text,
                      const Style&        style ) :
 OrthoNode(),
 _text    ( text ),
-_geode   ( 0L )
+_geode   ( 0L ),
+_style   ( style )
 {
-    init( style );
+    init();
 }
 
 LabelNode::LabelNode(MapNode*          mapNode,
@@ -102,30 +104,26 @@ LabelNode::LabelNode(MapNode*          mapNode,
 OrthoNode( mapNode, GeoPoint(mapNode->getMapSRS()) ),
 _geode   ( 0L )
 {
-    Style style;
-    style.add( const_cast<TextSymbol*>(symbol) );
-    init( style );
+    _style.add( const_cast<TextSymbol*>(symbol) );
+    init();
 }
 
 void
-LabelNode::init( const Style& style )
+LabelNode::init()
 {
-    const TextSymbol* symbol = style.get<TextSymbol>();
-
-    // The following setup will result is a proper dynamic bounding box for the text.
-    // If you just use osgText's rotate-to-screen and SCREEN_COORDS setup, you do not
-    // get a proper bounds.
-    osg::Drawable* t = AnnotationUtils::createTextDrawable( _text, symbol, osg::Vec3(0,0,0) );
+    const TextSymbol* symbol = _style.get<TextSymbol>();
 
     _geode = new osg::Geode();
-    _geode->addDrawable( t );
+
+    osg::Drawable* t = AnnotationUtils::createTextDrawable( _text, symbol, osg::Vec3(0,0,0) );
+    _geode->addDrawable(t);
 
     osg::StateSet* stateSet = _geode->getOrCreateStateSet();
     stateSet->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), 1 );
 
     getAttachPoint()->addChild( _geode );
 
-    applyStyle( style );
+    applyStyle( _style );
 }
 
 void
@@ -168,4 +166,35 @@ LabelNode::setDynamic( bool dynamic )
     {
         d->setDataVariance( dynamic ? osg::Object::DYNAMIC : osg::Object::STATIC );
     }    
+}
+
+
+
+//-------------------------------------------------------------------
+
+OSGEARTH_REGISTER_ANNOTATION( label, osgEarth::Annotation::LabelNode );
+
+
+LabelNode::LabelNode(MapNode*      mapNode,
+                     const Config& conf ) :
+OrthoNode( mapNode, GeoPoint::INVALID )
+{
+    conf.getObjIfSet( "style",  _style );
+    conf.getIfSet   ( "text",   _text );
+
+    if ( conf.hasChild("position") )
+        setPosition( GeoPoint(conf.child("position")) );
+
+    init();
+}
+
+Config
+LabelNode::getConfig() const
+{
+    Config conf( "label" );
+    conf.add   ( "text",   _text );
+    conf.addObj( "style",  _style );
+    conf.addObj( "position", getPosition() );
+
+    return conf;
 }

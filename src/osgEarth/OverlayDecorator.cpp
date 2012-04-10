@@ -1006,8 +1006,6 @@ OverlayDecorator::getPerViewData(osg::View* key)
 void
 OverlayDecorator::traverse( osg::NodeVisitor& nv )
 {
-    bool isCull = nv.getVisitorType() == osg::NodeVisitor::CULL_VISITOR;
-
     if ( _overlayGraph.valid() && _textureUnit.isSet() )
     {
         // in the CULL traversal, find the per-view data associated with the 

@@ -8,6 +8,7 @@ SET(TARGET_PUBLIC_H
 	AnnotationSettings
     AnnotationData
     AnnotationNode
+    AnnotationRegistry
     AnnotationUtils
     CircleNode
     Common
@@ -16,7 +17,7 @@ SET(TARGET_PUBLIC_H
     EllipseNode
     Export
     FeatureNode
-    GeometryNode
+    LocalGeometryNode
     HighlightDecoration
     ImageOverlay
     LabelNode
@@ -32,13 +33,14 @@ SET(TARGET_SRC
 	AnnotationSettings.cpp
     AnnotationData.cpp
     AnnotationNode.cpp
+    AnnotationRegistry.cpp
     AnnotationUtils.cpp
     CircleNode.cpp
     Decluttering.cpp
     Decoration.cpp
     EllipseNode.cpp
     FeatureNode.cpp
-    GeometryNode.cpp
+    LocalGeometryNode.cpp
     HighlightDecoration.cpp
     ImageOverlay.cpp
     LabelNode.cpp

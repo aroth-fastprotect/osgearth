@@ -24,6 +24,7 @@
 #include <osgEarth/OverlayDecorator>
 #include <osgEarth/TextureCompositor>
 #include <osgEarth/URI>
+#include <osgEarth/DrapeableNode>
 #include <osg/ArgumentParser>
 #include <osg/PagedLOD>
 
@@ -385,9 +386,9 @@ MapNode::getMapNodeOptions() const
 }
 
 MapNode*
-MapNode::findMapNode( osg::Node* graph )
+MapNode::findMapNode( osg::Node* graph, unsigned travmask )
 {
-    return findTopMostNodeOfType<MapNode>( graph );
+    return findRelativeNodeOfType<MapNode>( graph, travmask );
 }
 
 bool
@@ -426,8 +427,14 @@ MapNode::onModelLayerAdded( ModelLayer* layer, unsigned int index )
             {
                 if ( layer->getOverlay() )
                 {
-                    _overlayModels->addChild( node ); // todo: index?
+#if 0
+                    _overlayModels->addChild( node );
                     updateOverlayGraph();
+#else
+                    DrapeableNode* draper = new DrapeableNode( this );
+                    draper->addChild( node );
+                    _models->insertChild( index, draper );
+#endif
                 }
                 else
                 {

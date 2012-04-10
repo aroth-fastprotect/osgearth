@@ -37,6 +37,7 @@ SET(TARGET_PUBLIC_H
 	Export
 	FileUtils
 	FindNode
+	GeoCommon
 	GeoData
     Geoid
 	GeoMath
@@ -64,6 +65,7 @@ SET(TARGET_PUBLIC_H
 	ModelSource
     NodeUtils
 	Notify
+	optional
 	OverlayDecorator
 	Profile
 	Progress
@@ -172,6 +174,7 @@ LIST(APPEND TARGET_SRC
     TileFactory.cpp
     TileKey.cpp
     TileSource.cpp
+    ThreadingUtils.cpp
     Units.cpp
     URI.cpp
     Utils.cpp

@@ -21,6 +21,7 @@
 #include "FileLocationCallback"
 #include "LODFactorCallback"
 #include <osgEarth/Registry>
+#include <osgEarth/HeightFieldUtils>
 #include <osg/PagedLOD>
 #include <osg/CullStack>
 #include <osg/Uniform>
@@ -31,6 +32,7 @@ using namespace osgEarth;
 using namespace OpenThreads;
 
 #define LC "[SerialKeyNodeFactory] "
+
 
 SerialKeyNodeFactory::SerialKeyNodeFactory(TileBuilder*             builder,
                                            const OSGTerrainOptions& options,
@@ -60,9 +62,12 @@ SerialKeyNodeFactory::addTile(Tile* tile, bool tileHasRealData, bool tileHasLodB
 
     osg::Node* result = 0L;
 
-    // Only add the next tile if it hasn't been blacklisted
+    // Only add the next tile if all the following are true:
+    // 1. Either there's real tile data, or a maxLOD is explicity set in the options;
+    // 2. The tile isn't blacklisted; and
+    // 3. We are still below the max LOD.
     bool wrapInPagedLOD =
-        tileHasRealData &&
+        (tileHasRealData || _options.maxLOD().isSet()) &&
         !osgEarth::Registry::instance()->isBlacklisted( uri ) &&
         tile->getKey().getLevelOfDetail() < (unsigned)*_options.maxLOD();
 
@@ -170,7 +175,8 @@ SerialKeyNodeFactory::createNode( const TileKey& key )
 
     osg::Group* root = 0L;
 
-    if ( tileHasAnyRealData || key.getLevelOfDetail() == 0 )
+    // assemble the tile.
+    if ( tileHasAnyRealData || _options.maxLOD().isSet() || key.getLevelOfDetail() == 0 )
     {
         // Now postprocess them and assemble into a tile group.
         root = new osg::Group();

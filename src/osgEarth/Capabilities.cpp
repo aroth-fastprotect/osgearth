@@ -24,6 +24,15 @@
 #include <osg/GL2Extensions>
 #include <osg/Texture>
 #include <osgViewer/Version>
+#include <osgEarth/Config>
+#include <osgEarth/XmlUtils>
+#include <osgEarth/Version>
+
+#include <fstream>
+
+#ifdef _WIN32
+extern "C" unsigned long __stdcall GetTempPathA(unsigned long nBufferLength,char * lpBuffer );
+#endif
 
 using namespace osgEarth;
 
@@ -127,134 +136,249 @@ _supportsQuadBufferStereo( false )
 	bool disableQuadBufferStereoTest = false;
     if ( ::getenv( "OSGEARTH_QUADBUFFER_DISABLE" ) != 0L )
         disableQuadBufferStereoTest = true;
-	// first create a opengl context with quad buffer stereo enabled
-	MyGraphicsContext * mgc;
 
-	if(!disableQuadBufferStereoTest)
+    if(!readCache())
     {
-		mgc = new MyGraphicsContext(true);
-		_supportsQuadBufferStereo = mgc->valid();
-	}
-	else
-	{
-		mgc = NULL;
-		_supportsQuadBufferStereo = false;
-	}
-	if(!_supportsQuadBufferStereo)
-	{
-		// delete the old context
-		if(mgc)
-			delete mgc;
-		// second try to create a new graphics context without quad buffer stereo
-		mgc = new MyGraphicsContext(false);
-	}
+        // only detect the hardware when the cache failed
 
-    if ( mgc->valid() )
-    {
-        osg::GraphicsContext* gc = mgc->gc();
-        unsigned int id = gc->getState()->getContextID();
-        const osg::GL2Extensions* GL2 = osg::GL2Extensions::Get( id, true );
-
-        OE_INFO << LC << "Detected hardware capabilities:" << std::endl;
-
-        _vendor = std::string( reinterpret_cast<const char*>(glGetString(GL_VENDOR)) );
-        OE_INFO << LC << "  Vendor = " << _vendor << std::endl;
-
-        _renderer = std::string( reinterpret_cast<const char*>(glGetString(GL_RENDERER)) );
-        OE_INFO << LC << "  Renderer = " << _renderer << std::endl;
-
-        _version = std::string( reinterpret_cast<const char*>(glGetString(GL_VERSION)) );
-        OE_INFO << LC << "  Version = " << _version << std::endl;
-
-        glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
-        OE_INFO << LC << "  Max FFP texture units = " << _maxFFPTextureUnits << std::endl;
-
-        glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &_maxGPUTextureUnits );
-        OE_INFO << LC << "  Max GPU texture units = " << _maxGPUTextureUnits << std::endl;
-
-        glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
-        OE_INFO << LC << "  Max GPU texture coordinate sets = " << _maxGPUTextureCoordSets << std::endl;
-
-        glGetIntegerv( GL_DEPTH_BITS, &_depthBits );
-        OE_INFO << LC << "  Depth buffer bits = " << _depthBits << std::endl;
-
-#if !(defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE))
-        // Use the texture-proxy method to determine the maximum texture size 
-        glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );
-        for( int s = _maxTextureSize; s > 2; s >>= 1 )
+        // first create a opengl context with quad buffer stereo enabled
+        MyGraphicsContext * mgc;
+	    if(!disableQuadBufferStereoTest)
         {
-            glTexImage2D( GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, s, s, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0L );
-            GLint width = 0;
-            glGetTexLevelParameteriv( GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
-            if ( width == s )
+		    mgc = new MyGraphicsContext(true);
+		    _supportsQuadBufferStereo = mgc->valid();
+	    }
+	    else
+	    {
+		    mgc = NULL;
+		    _supportsQuadBufferStereo = false;
+	    }
+	    if(!_supportsQuadBufferStereo)
+	    {
+		    // delete the old context
+		    if(mgc)
+			    delete mgc;
+		    // second try to create a new graphics context without quad buffer stereo
+		    mgc = new MyGraphicsContext(false);
+	    }
+
+        if ( mgc->valid() )
+        {
+            osg::GraphicsContext* gc = mgc->gc();
+            unsigned int id = gc->getState()->getContextID();
+            const osg::GL2Extensions* GL2 = osg::GL2Extensions::Get( id, true );
+            _vendor = std::string( reinterpret_cast<const char*>(glGetString(GL_VENDOR)) );
+            _renderer = std::string( reinterpret_cast<const char*>(glGetString(GL_RENDERER)) );
+            _version = std::string( reinterpret_cast<const char*>(glGetString(GL_VERSION)) );
+            glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
+            glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &_maxGPUTextureUnits );
+            glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
+            glGetIntegerv( GL_DEPTH_BITS, &_depthBits );
+
+            // Use the texture-proxy method to determine the maximum texture size 
+            glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );
+            for( int s = _maxTextureSize; s > 2; s >>= 1 )
             {
-                _maxTextureSize = s;
-                break;
+                glTexImage2D( GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, s, s, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0L );
+                GLint width = 0;
+                glGetTexLevelParameteriv( GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
+                if ( width == s )
+                {
+                    _maxTextureSize = s;
+                    break;
+                }
             }
-        }
-#endif
-        OE_INFO << LC << "  Max texture size = " << _maxTextureSize << std::endl;
+            glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
+            _supportsGLSL = GL2->isGlslSupported();
 
-        glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
-        OE_INFO << LC << "  Max lights = " << _maxLights << std::endl;
+            if ( _supportsGLSL )
+            {
+                _GLSLversion = GL2->getLanguageVersion();
+            }
+            _supportsTextureArrays = 
+                _supportsGLSL &&
+                osg::getGLVersionNumber() >= 2.0 && // hopefully this will detect Intel cards
+                osg::isGLExtensionSupported( id, "GL_EXT_texture_array" );
+            _supportsTexture3D = osg::isGLExtensionSupported( id, "GL_EXT_texture3D" );
+            _supportsMultiTexture = 
+                osg::getGLVersionNumber() >= 1.3 ||
+                osg::isGLExtensionSupported( id, "GL_ARB_multitexture") ||
+                osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
+            _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
+            _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
+            _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
 
-        _supportsGLSL = GL2->isGlslSupported();
-        OE_INFO << LC << "  GLSL = " << SAYBOOL(_supportsGLSL) << std::endl;
+            // ATI workarounds:
+            bool isATI = _vendor.find("ATI ") == 0;
 
-        if ( _supportsGLSL )
-        {
-            _GLSLversion = GL2->getLanguageVersion();
-            OE_INFO << LC << "  GLSL Version = " << _GLSLversion << std::endl;
-        }
-
-        _supportsTextureArrays = 
-            _supportsGLSL &&
-            osg::getGLVersionNumber() >= 2.0 && // hopefully this will detect Intel cards
-            osg::isGLExtensionSupported( id, "GL_EXT_texture_array" );
-        OE_INFO << LC << "  Texture arrays = " << SAYBOOL(_supportsTextureArrays) << std::endl;
-
-        _supportsTexture3D = osg::isGLExtensionSupported( id, "GL_EXT_texture3D" );
-        OE_INFO << LC << "  3D textures = " << SAYBOOL(_supportsTexture3D) << std::endl;
-
-        _supportsMultiTexture = 
-            osg::getGLVersionNumber() >= 1.3 ||
-            osg::isGLExtensionSupported( id, "GL_ARB_multitexture") ||
-            osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
-        OE_INFO << LC << "  Multitexturing = " << SAYBOOL(_supportsMultiTexture) << std::endl;
-
-        _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
-        OE_INFO << LC << "  Stencil wrapping = " << SAYBOOL(_supportsStencilWrap) << std::endl;
-
-        _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
-        OE_INFO << LC << "  2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
-
-        _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
-        OE_INFO << LC << "  depth-packed stencil = " << SAYBOOL(_supportsDepthPackedStencilBuffer) << std::endl;
-
-		OE_INFO << LC << "  Supports quad buffer stereo = " << SAYBOOL(_supportsQuadBufferStereo) << std::endl;
-
-        //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
-        //OE_INFO << LC << "  texture2DLod = " << SAYBOOL(_supportsTexture2DLod) << std::endl;
-
-        // ATI workarounds:
-        bool isATI = _vendor.find("ATI ") == 0;
-
-        _supportsMipmappedTextureUpdates = isATI && enableATIworkarounds ? false : true;
-        OE_INFO << LC << "  Mipmapped texture updates = " << SAYBOOL(_supportsMipmappedTextureUpdates) << std::endl;
+            _supportsMipmappedTextureUpdates = isATI && enableATIworkarounds ? false : true;
 
 #if 0
-        // Intel workarounds:
-        bool isIntel = 
-            _vendor.find("Intel ")   != std::string::npos ||
-            _vendor.find("Intel(R)") != std::string::npos ||
-            _vendor.compare("Intel") == 0;
+            // Intel workarounds:
+            bool isIntel = 
+                _vendor.find("Intel ")   != std::string::npos ||
+                _vendor.find("Intel(R)") != std::string::npos ||
+                _vendor.compare("Intel") == 0;
 #endif
 
-        _maxFastTextureSize = _maxTextureSize;
+            _maxFastTextureSize = _maxTextureSize;
+        }
+        // delete the final object of the graphics context
+        delete mgc;
 
-        OE_INFO << LC << "  Max Fast Texture Size = " << _maxFastTextureSize << std::endl;
+        writeCache();
     }
 
-    // delete the final object of the graphics context
-	delete mgc;
+    OE_INFO << LC << "Detected hardware capabilities:" << std::endl;
+
+    OE_INFO << LC << "  Vendor = " << _vendor << std::endl;
+
+    OE_INFO << LC << "  Renderer = " << _renderer << std::endl;
+
+    OE_INFO << LC << "  Version = " << _version << std::endl;
+
+    OE_INFO << LC << "  Max FFP texture units = " << _maxFFPTextureUnits << std::endl;
+
+    OE_INFO << LC << "  Max GPU texture units = " << _maxGPUTextureUnits << std::endl;
+
+    OE_INFO << LC << "  Max GPU texture coordinate sets = " << _maxGPUTextureCoordSets << std::endl;
+
+    OE_INFO << LC << "  Depth buffer bits = " << _depthBits << std::endl;
+
+    OE_INFO << LC << "  Max texture size = " << _maxTextureSize << std::endl;
+
+    OE_INFO << LC << "  Max lights = " << _maxLights << std::endl;
+
+    OE_INFO << LC << "  GLSL = " << SAYBOOL(_supportsGLSL) << std::endl;
+
+    if ( _supportsGLSL )
+    {
+        OE_INFO << LC << "  GLSL Version = " << _GLSLversion << std::endl;
+    }
+
+    OE_INFO << LC << "  Texture arrays = " << SAYBOOL(_supportsTextureArrays) << std::endl;
+
+    OE_INFO << LC << "  3D textures = " << SAYBOOL(_supportsTexture3D) << std::endl;
+
+    OE_INFO << LC << "  Multitexturing = " << SAYBOOL(_supportsMultiTexture) << std::endl;
+
+    OE_INFO << LC << "  Stencil wrapping = " << SAYBOOL(_supportsStencilWrap) << std::endl;
+
+    OE_INFO << LC << "  2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
+
+    OE_INFO << LC << "  depth-packed stencil = " << SAYBOOL(_supportsDepthPackedStencilBuffer) << std::endl;
+
+    OE_INFO << LC << "  Supports quad buffer stereo = " << SAYBOOL(_supportsQuadBufferStereo) << std::endl;
+
+    //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
+    //OE_INFO << LC << "  texture2DLod = " << SAYBOOL(_supportsTexture2DLod) << std::endl;
+    OE_INFO << LC << "  Mipmapped texture updates = " << SAYBOOL(_supportsMipmappedTextureUpdates) << std::endl;
+
+    OE_INFO << LC << "  Max Fast Texture Size = " << _maxFastTextureSize << std::endl;
 }
+
+static const std::string & osgearth_capabilities_cache_file()
+{
+    static std::string s_capabilitiesCacheFile;
+    if(s_capabilitiesCacheFile.empty())
+    {
+#ifdef _WIN32
+        char tmp[512];
+        if(GetTempPathA(sizeof(tmp)/sizeof(tmp[0]), tmp))
+        {
+            strcat(tmp, "\\_osgearth_capabilities_cache");
+            s_capabilitiesCacheFile = tmp;
+        }
+#else
+        s_capabilitiesCacheFile = "/tmp/_osgearth_capabilities_cache";
+#endif
+    }
+    return s_capabilitiesCacheFile;
+}
+
+bool Capabilities::readCache()
+{
+    bool ret;
+    const std::string & cache_file = osgearth_capabilities_cache_file();
+    XmlDocument * doc = XmlDocument::load(cache_file);
+    if(doc)
+    {
+        OE_INFO << LC << "Read cached capabilities from " << cache_file << std::endl;
+
+        Config docConf = doc->getConfig();
+        Config conf;
+        if ( docConf.hasChild( "capabilities" ) )
+            conf = docConf.child( "capabilities" );
+
+        conf.getIfSet("maxffptextureunits", _maxFFPTextureUnits );
+        conf.getIfSet("maxgputextureunits", _maxGPUTextureUnits );
+        conf.getIfSet("maxgputexturecoordsets", _maxGPUTextureCoordSets );
+        conf.getIfSet("maxtexturesize", _maxTextureSize );
+        conf.getIfSet("maxfasttexturesize", _maxFastTextureSize );
+        conf.getIfSet("maxlights", _maxLights );
+        conf.getIfSet("depthbits", _depthBits );
+        conf.getIfSet("supportsglsl", _supportsGLSL );
+        conf.getIfSet("glslversion", _GLSLversion );
+        conf.getIfSet("supportstexturearrays", _supportsTextureArrays );
+        conf.getIfSet("supportstexture3d", _supportsTexture3D );
+        conf.getIfSet("supportsmultitexture", _supportsMultiTexture );
+        conf.getIfSet("supportsstencilwrap", _supportsStencilWrap );
+        conf.getIfSet("supportstwosidedstencil", _supportsTwoSidedStencil );
+        conf.getIfSet("supportstexture2dlod", _supportsTexture2DLod );
+        conf.getIfSet("supportsmipmappedtextureupdates", _supportsMipmappedTextureUpdates );
+        conf.getIfSet("supportsdepthpackedstencilbuffer", _supportsDepthPackedStencilBuffer );
+        conf.getIfSet("supportsquadbufferstereo", _supportsQuadBufferStereo );
+        conf.getIfSet("vendor", _vendor );
+        conf.getIfSet("renderer", _renderer );
+        conf.getIfSet("version", _version );
+
+        ret = true;
+    }
+    else
+    {
+        OE_INFO << LC << "Capabilities cache " << cache_file << " is invalid" << std::endl;
+        ret = false;
+    }
+    return ret;
+}
+
+bool Capabilities::writeCache()
+{
+    bool ret;
+    Config conf("capabilities");
+    conf.update("maxffptextureunits", _maxFFPTextureUnits );
+    conf.update("maxgputextureunits", _maxGPUTextureUnits );
+    conf.update("maxgputexturecoordsets", _maxGPUTextureCoordSets );
+    conf.update("maxtexturesize", _maxTextureSize );
+    conf.update("maxfasttexturesize", _maxFastTextureSize );
+    conf.update("maxlights", _maxLights );
+    conf.update("depthbits", _depthBits );
+    conf.update("supportsglsl", _supportsGLSL );
+    conf.update("glslversion", _GLSLversion );
+    conf.update("supportstexturearrays", _supportsTextureArrays );
+    conf.update("supportstexture3d", _supportsTexture3D );
+    conf.update("supportsmultitexture", _supportsMultiTexture );
+    conf.update("supportsstencilwrap", _supportsStencilWrap );
+    conf.update("supportstwosidedstencil", _supportsTwoSidedStencil );
+    conf.update("supportstexture2dlod", _supportsTexture2DLod );
+    conf.update("supportsmipmappedtextureupdates", _supportsMipmappedTextureUpdates );
+    conf.update("supportsdepthpackedstencilbuffer", _supportsDepthPackedStencilBuffer );
+    conf.update("supportsquadbufferstereo", _supportsQuadBufferStereo );
+    conf.update("vendor", _vendor );
+    conf.update("renderer", _renderer );
+    conf.update("version", _version );
+
+    const std::string & cache_file = osgearth_capabilities_cache_file();
+    std::ofstream out( cache_file.c_str());
+    if ( ret = out.is_open() )
+    {
+        OE_INFO << LC << "Write detected capabilities to " << cache_file << std::endl;
+
+        // dump that Config out as XML.
+        osg::ref_ptr<XmlDocument> xml = new XmlDocument( conf );
+        xml->store( out );
+    }
+    return ret;
+}
+
+

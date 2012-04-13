@@ -1965,8 +1965,6 @@ EarthManipulator::handleMovementAction( const ActionType& type, double dx, doubl
     case ACTION_EARTH_DRAG:
         drag( dx, dy, view );
         break;
-	default:
-		break;
     }
 }
 

@@ -211,7 +211,8 @@ GeometryCompiler::compile(FeatureList&          workingSet,
                 point = s_defaultPointSymbol.get(); break;
             case Geometry::TYPE_POLYGON:
                 polygon = s_defaultPolygonSymbol.get(); break;
-            default: break;
+            case Geometry::TYPE_UNKNOWN: break;
+            case Geometry::TYPE_MULTI: break;
             }
         }
     }

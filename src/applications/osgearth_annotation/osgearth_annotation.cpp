@@ -47,7 +47,7 @@
 #include <osgGA/EventVisitor>
 #include <osgDB/WriteFile>
 
-#include <osgEarth/Pickers>
+//#include <osgEarth/Pickers>
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
@@ -287,7 +287,7 @@ main(int argc, char** argv)
         annoGroup->addChild( ellipse );
         editorGroup->addChild( new EllipseNodeEditor( ellipse ) );
     }
-
+/*
     {
         // A rectangle around San Diego
         Style rectStyle;
@@ -303,7 +303,7 @@ main(int argc, char** argv)
 
         editorGroup->addChild( new RectangleNodeEditor( rect ) );
     }
-
+*/
     
 
     //--------------------------------------------------------------------

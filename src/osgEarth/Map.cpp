@@ -54,8 +54,9 @@ MapCallback::onMapModelChanged( const MapModelChange& change )
         onElevationLayerMoved( change.getElevationLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
     case MapModelChange::MOVE_IMAGE_LAYER:
         onImageLayerMoved( change.getImageLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
-		case MapModelChange::MOVE_MODEL_LAYER:
-				onModelLayerMoved( change.getModelLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
+	case MapModelChange::MOVE_MODEL_LAYER:
+		onModelLayerMoved( change.getModelLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
+    case MapModelChange::UNSPECIFIED: break;
     default: break;
     }
 }

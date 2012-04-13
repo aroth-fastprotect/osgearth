@@ -204,8 +204,8 @@ struct OgrUtils
             case osgEarth::Symbology::Geometry::TYPE_RING:
                 requestedType = wkbLinearRing;
                 break;            
-			default:
-				break;
+            case Geometry::TYPE_UNKNOWN: break;
+            case Geometry::TYPE_MULTI: break;
             }
         }
 

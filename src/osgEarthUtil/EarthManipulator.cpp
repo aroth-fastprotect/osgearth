@@ -400,9 +400,10 @@ _last_action      ( ACTION_NULL )
 EarthManipulator::EarthManipulator( const EarthManipulator& rhs ) :
 osgGA::CameraManipulator( rhs ),
 _last_action            ( ACTION_NULL ),
-_frame_count            ( 0 )
+_frame_count            ( 0 ),
+_settings               ( new Settings(*rhs.getSettings()) )
 {
-    //nop
+    reinitialize();
 }
 
 
@@ -2461,7 +2462,7 @@ EarthManipulator::drag(double dx, double dy, osg::View* theView)
         const osg::Vec3d endDrag = calcTangentPoint(
             zero, earthOrigin, radiusEquator, winpt);
         worldEndDrag = endDrag * viewMatInv;
-        OE_INFO << "tangent: " << worldEndDrag << "\n";
+        //OE_INFO << "tangent: " << worldEndDrag << "\n";
     }
 
 #if 0

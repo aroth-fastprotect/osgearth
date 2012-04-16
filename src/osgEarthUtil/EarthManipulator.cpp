@@ -400,9 +400,10 @@ _last_action      ( ACTION_NULL )
 EarthManipulator::EarthManipulator( const EarthManipulator& rhs ) :
 osgGA::CameraManipulator( rhs ),
 _last_action            ( ACTION_NULL ),
-_frame_count            ( 0 )
+_frame_count            ( 0 ),
+_settings               ( new Settings(*rhs.getSettings()) )
 {
-    //nop
+    reinitialize();
 }
 
 
@@ -2083,7 +2084,7 @@ EarthManipulator::handleKeyboardAction( const Action& action, double duration )
     case DIR_RIGHT: dx = -1; break;
     case DIR_UP:    dy = -1; break;
     case DIR_DOWN:  dy =  1; break;
-	default: break;
+    default: break;
     }
 
     dx *= _settings->getKeyboardSensitivity();
@@ -2107,7 +2108,7 @@ EarthManipulator::handleScrollAction( const Action& action, double duration )
     case DIR_RIGHT: dx = -1; break;
     case DIR_UP:    dy = -1; break;
     case DIR_DOWN:  dy =  1; break;
-	default: break;
+    default: break;
     }
 
     dx *= scrollFactor * _settings->getScrollSensitivity();
@@ -2461,7 +2462,7 @@ EarthManipulator::drag(double dx, double dy, osg::View* theView)
         const osg::Vec3d endDrag = calcTangentPoint(
             zero, earthOrigin, radiusEquator, winpt);
         worldEndDrag = endDrag * viewMatInv;
-        OE_INFO << "tangent: " << worldEndDrag << "\n";
+        //OE_INFO << "tangent: " << worldEndDrag << "\n";
     }
 
 #if 0

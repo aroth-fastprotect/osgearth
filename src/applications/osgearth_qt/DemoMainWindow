@@ -42,21 +42,24 @@ class DemoMainWindow : public QMainWindow
 	public:
 
     DemoMainWindow(osgEarth::QtGui::DataManager* manager, osgEarth::MapNode* mapNode, osg::Group* annotationRoot)
-      : _manager(manager), _mapNode(mapNode), _annoRoot(annotationRoot), _layerAdded(false) { initUi(); }
-
-    void setViewerWidget(osgEarth::QtGui::ViewerWidget* viewer)
+        : _manager(manager), _mapNode(mapNode), _annoRoot(annotationRoot), _layerAdded(false), _viewerWidget(0L), _compositeViewerWidget(0L)
     {
-      setCentralWidget(viewer);
-      _viewer = viewer;
-
-      _views.clear();
-      _views.push_back(_viewer);
+        initUi(); 
     }
 
-    void setViewerWidget(osgEarth::QtGui::CompositeViewerWidget* viewer, const osgEarth::QtGui::ViewVector& views)
+    void setViewerWidget(osgEarth::QtGui::ViewerWidget* viewerWidget)
     {
-      setCentralWidget(viewer);
-      _compositeViewer = viewer;
+        setCentralWidget(viewerWidget);
+        _viewerWidget = viewerWidget;
+
+      _views.clear();
+        _viewerWidget->getViews( _views );
+    }
+
+    void setViewerWidget(osgEarth::QtGui::CompositeViewerWidget* viewerWidget, const osgEarth::QtGui::ViewVector& views)
+    {
+        setCentralWidget(viewerWidget);
+        _compositeViewerWidget = viewerWidget;
 
       _views.clear();
       _views.insert(_views.end(), views.begin(), views.end());
@@ -113,16 +116,16 @@ class DemoMainWindow : public QMainWindow
 
      void closeEvent(QCloseEvent *event)
      {
-       if (_viewer.valid())
+        if (_viewerWidget)
        {
-         _viewer->setSceneData(0);
-         _viewer->frame();
-         _viewer->setDone(true);
+            //_viewerWidget->getViewer()->setSceneData(0);
+            //_viewerWidget->getViewer()->frame();
+            _viewerWidget->getViewer()->setDone(true);
        }
 
-       if (_compositeViewer.valid())
+        if (_compositeViewerWidget)
        {
-         _compositeViewer->setDone(true);
+            _compositeViewerWidget/*->getViewer()*/->setDone(true);
        }
 
        event->accept();
@@ -142,12 +145,12 @@ class DemoMainWindow : public QMainWindow
 		void createActions()
     {
       _addRemoveLayerAction = new QAction(tr("&Add Layer"), this);
-	    _addRemoveLayerAction->setStatusTip(tr("Add an image layer"));
+        _addRemoveLayerAction->setToolTip(tr("Add an image layer"));
 	    connect(_addRemoveLayerAction, SIGNAL(triggered()), this, SLOT(addRemoveLayer()));
       _addRemoveLayerAction->setDisabled(!_manager.valid());
     	
-	    _addAnnotationAction = new QAction(/*QIcon(":/resources/images/open.png"),*/ tr("&Add Annotation"), this);
-      _addAnnotationAction->setStatusTip(tr("Add an annotation"));
+        _addAnnotationAction = new QAction(/*QIcon(":/images/open.png"),*/ tr("&Add Annotation"), this);
+        _addAnnotationAction->setToolTip(tr("Add an annotation"));
       connect(_addAnnotationAction, SIGNAL(triggered()), this, SLOT(addAnnotation()));
       _addAnnotationAction->setDisabled(!_manager.valid() || !_mapNode.valid() || !_annoRoot.valid());
     }
@@ -165,8 +168,10 @@ class DemoMainWindow : public QMainWindow
     osg::ref_ptr<osgEarth::MapNode> _mapNode;
     osg::ref_ptr<osg::Group> _annoRoot;
     osg::ref_ptr<osgEarth::ImageLayer> _testLayer;
-    osg::ref_ptr<osgEarth::QtGui::ViewerWidget> _viewer;
-    osg::ref_ptr<osgEarth::QtGui::CompositeViewerWidget> _compositeViewer;
+    osgEarth::QtGui::ViewerWidget* _viewerWidget;
+    osgEarth::QtGui::CompositeViewerWidget* _compositeViewerWidget;
+    //osg::ref_ptr<osgEarth::QtGui::ViewerWidget> _viewerWidget;
+    //osg::ref_ptr<osgEarth::QtGui::CompositeViewerWidget> _compositeViewerWidget;
     osgEarth::QtGui::ViewVector _views;
     bool _layerAdded;
 		QAction *_addRemoveLayerAction;

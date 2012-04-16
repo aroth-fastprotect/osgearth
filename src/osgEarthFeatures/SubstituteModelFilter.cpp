@@ -36,12 +36,6 @@ using namespace osgEarth;
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
-//------------------------------------------------------------------------
-
-namespace
-{
-    static osg::Node* s_defaultModel =0L;
-}
 
 //------------------------------------------------------------------------
 

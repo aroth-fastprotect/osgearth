@@ -43,15 +43,15 @@ using namespace osgEarth::Annotation;
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
-
 FeatureNode::FeatureNode(MapNode* mapNode, 
                          Feature* feature, 
                          bool     draped,
                          const GeometryCompilerOptions& options ) :
 AnnotationNode( mapNode ),
 _feature( feature ),
+_options( options ),
 _draped ( draped ),
-_options( options )
+_attachPoint(NULL)
 {
     init();
 }

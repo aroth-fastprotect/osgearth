@@ -91,7 +91,7 @@ struct osgEarthStringReaderWriter##SUFFIX : public osgDB::ReaderWriter \
 }
 
 STRING_READER_WRITER_SHIM( XML, "xml", "osgEarth XML shim" );
-REGISTER_OSGPLUGIN( xml, osgEarthStringReaderWriterXML );
+REGISTER_OSGPLUGIN( xml, osgEarthStringReaderWriterXML )
 
 STRING_READER_WRITER_SHIM( JSON, "json", "osgEarth JSON shim" );
-REGISTER_OSGPLUGIN( json, osgEarthStringReaderWriterJSON );
+REGISTER_OSGPLUGIN( json, osgEarthStringReaderWriterJSON )

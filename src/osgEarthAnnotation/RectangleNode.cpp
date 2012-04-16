@@ -40,10 +40,10 @@ RectangleNode::RectangleNode(
             const Style&      style,
             bool              draped ) :
 LocalizedNode( mapNode, position, false ),
-_width( width ),
-_height( height ),
 _style( style ),
-_draped( draped )
+_draped( draped ),
+_width( width ),
+_height( height )
 {       
     rebuild();
 }

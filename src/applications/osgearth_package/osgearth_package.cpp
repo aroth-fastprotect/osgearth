@@ -161,7 +161,7 @@ makeTMS( osg::ArgumentParser& args )
     packager.setVerbose( verbose );
     packager.setOverwrite( overwrite );
 
-    if ( maxLevel != ~0 )
+    if ( maxLevel != ~0u )
         packager.setMaxLevel( maxLevel );
 
     if ( bounds.isValid() )

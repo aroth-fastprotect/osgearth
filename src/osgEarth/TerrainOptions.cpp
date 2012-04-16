@@ -102,8 +102,8 @@ _lodTransitionTimeSeconds( 0.5f ),
 _enableMipmapping( true ),
 _clusterCulling( true ),
 _enableBlending( false ),
-_minFilter( osg::Texture::LINEAR_MIPMAP_LINEAR ),
-_magFilter( osg::Texture::LINEAR)
+_magFilter( osg::Texture::LINEAR),
+_minFilter( osg::Texture::LINEAR_MIPMAP_LINEAR )
 {
     fromConfig( _conf );
 }

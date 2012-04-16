@@ -370,7 +370,8 @@ bool Capabilities::writeCache()
 
     const std::string & cache_file = osgearth_capabilities_cache_file();
     std::ofstream out( cache_file.c_str());
-    if ( ret = out.is_open() )
+    ret = out.is_open();
+    if ( ret )
     {
         OE_INFO << LC << "Write detected capabilities to " << cache_file << std::endl;
 

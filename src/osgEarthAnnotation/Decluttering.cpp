@@ -160,7 +160,7 @@ struct /*internal*/ DeclutterSort : public osgUtil::RenderBin::SortCallback
      *          default sorter (sort by distance-to-camera).
      */
     DeclutterSort( DeclutterContext* context, DeclutterSortFunctor* f = 0L )
-        : _context(context), _customSortFunctor(f)
+        : _customSortFunctor(f), _context(context)
     {
         //nop
     }
@@ -314,12 +314,12 @@ struct /*internal*/ DeclutterSort : public osgUtil::RenderBin::SortCallback
                 {
                     DrawableInfo& info = local._memory[drawable];
 
-                    bool fullyIn = true;
+                    //bool fullyIn = true;
 
                     // scale in until at full scale:
                     if ( info._lastScale != 1.0f )
                     {
-                        fullyIn = false;
+                        //fullyIn = false;
                         info._lastScale += elapsedSeconds / std::max(*options.inAnimationTime(), 0.001f);
                         if ( info._lastScale > 1.0f )
                             info._lastScale = 1.0f;
@@ -331,7 +331,7 @@ struct /*internal*/ DeclutterSort : public osgUtil::RenderBin::SortCallback
                     // fade in until at full alpha:
                     if ( info._lastAlpha != 1.0f )
                     {
-                        fullyIn = false;
+                        //fullyIn = false;
                         info._lastAlpha += elapsedSeconds / std::max(*options.inAnimationTime(), 0.001f);
                         if ( info._lastAlpha > 1.0f )
                             info._lastAlpha = 1.0f;

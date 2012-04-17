@@ -37,8 +37,8 @@ LocalGeometryNode::LocalGeometryNode(MapNode*     mapNode,
                                      const Style& style,
                                      bool         draped ) :
 LocalizedNode( mapNode ),
-_geom        ( geom ),
-_draped      ( draped )
+_draped      ( draped ),
+_geom        ( geom )
 {
     _style = style;
     init();

@@ -27,9 +27,9 @@ _fill                 ( Fill( 1, 1, 1, 1 ) ),
 _halo                 ( Stroke( 0.3, 0.3, 0.3, 1) ),
 _size                 ( 16.0f ),
 _removeDuplicateLabels( false ),
-_alignment            ( ALIGN_BASE_LINE ),
 _provider             ( "annotation" ),
-_encoding             ( ENCODING_ASCII )
+_encoding             ( ENCODING_ASCII ),
+_alignment            ( ALIGN_BASE_LINE )
 {
     mergeConfig(conf);
 }

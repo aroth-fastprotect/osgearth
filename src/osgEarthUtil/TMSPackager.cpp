@@ -31,11 +31,12 @@ using namespace osgEarth;
 
 
 TMSPackager::TMSPackager(const Profile* outProfile) :
-_outProfile  ( outProfile ),
-_maxLevel    ( 5 ),
 _verbose     ( false ),
+_abortOnError( true ),
 _overwrite   ( false ),
-_abortOnError( true )
+_maxLevel    ( 5 ),
+_extents     (),
+_outProfile  ( outProfile )
 {
     //nop
 }

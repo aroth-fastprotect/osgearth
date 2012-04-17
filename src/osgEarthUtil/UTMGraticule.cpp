@@ -144,7 +144,7 @@ UTMGraticule::init()
         line->stroke()->width() = 1.0;
         line->tessellation() = 20;
 
-        AltitudeSymbol* alt = _options->primaryStyle()->getOrCreate<AltitudeSymbol>();
+        //AltitudeSymbol* alt = _options->primaryStyle()->getOrCreate<AltitudeSymbol>();
         //alt->verticalOffset() = NumericExpression(4900.0);
 
         TextSymbol* text = _options->primaryStyle()->getOrCreate<TextSymbol>();

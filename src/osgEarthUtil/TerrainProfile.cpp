@@ -87,9 +87,11 @@ TerrainProfile::getElevationRanges(double &min, double &max ) const
 
 /***************************************************/
 TerrainProfileCalculator::TerrainProfileCalculator(MapNode* mapNode, const GeoPoint& start, const GeoPoint& end):
-_mapNode( mapNode ),
 _start( start),
-_end( end )
+_end( end ),
+_profile(),
+_mapNode( mapNode ),
+_changedCallbacks()
 {        
     _mapNode->getTerrain()->addTerrainCallback( this );        
     recompute();

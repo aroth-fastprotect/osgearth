@@ -31,6 +31,7 @@ using namespace osgEarth::Annotation;
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
+
 CircleNode::CircleNode(MapNode*           mapNode,
                        const GeoPoint&    position,
                        const Linear&      radius,

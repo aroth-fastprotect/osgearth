@@ -43,6 +43,7 @@ using namespace osgEarth::Annotation;
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
+
 FeatureNode::FeatureNode(MapNode* mapNode, 
                          Feature* feature, 
                          bool     draped,

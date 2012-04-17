@@ -28,6 +28,7 @@ using namespace osgEarth::Annotation;
 using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
+
 EllipseNode::EllipseNode(MapNode*          mapNode,
                          const GeoPoint&   position,
                          const Linear&     radiusMajor,

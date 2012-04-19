@@ -528,6 +528,10 @@ namespace
 
             // set the new VBO.
             geom.setVertexArray( data._verts );
+            if ( geom.getVertexArray()->getVertexBufferObject() && data._verts->getVertexBufferObject() )
+            {
+                data._verts->getVertexBufferObject()->setUsage( geom.getVertexArray()->getVertexBufferObject()->getUsage() );
+            }
 
             if ( data._colors )
                 geom.setColorArray( data._colors );
@@ -717,6 +721,10 @@ namespace
 
             // set the new VBO.
             geom.setVertexArray( data._verts.get() );
+            if ( geom.getVertexArray()->getVertexBufferObject() && data._verts->getVertexBufferObject() )
+            {
+                data._verts->getVertexBufferObject()->setUsage( geom.getVertexArray()->getVertexBufferObject()->getUsage() );
+            }
 
             if ( data._colors.valid() )
                 geom.setColorArray( data._colors.get() );

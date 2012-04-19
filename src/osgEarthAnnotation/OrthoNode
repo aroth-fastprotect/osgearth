@@ -68,6 +68,8 @@ namespace osgEarth { namespace Annotation
             const SpatialReference* mapSRS, 
             const GeoPoint&         position );
 
+        virtual ~OrthoNode() { }
+
         /**
          * Attaches a child node to the transforms. Use this instead of addChild.
          */
@@ -106,6 +108,8 @@ namespace osgEarth { namespace Annotation
     public: // osg::Node
 
         virtual void traverse( osg::NodeVisitor& nv );
+
+        virtual osg::BoundingSphere computeBound() const;
 
     protected:
         const SpatialReference* getMapSRS() { return _mapSRS.get(); }

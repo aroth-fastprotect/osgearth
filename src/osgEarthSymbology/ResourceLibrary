@@ -40,16 +40,6 @@ namespace osgEarth { namespace Symbology
     {
     public:
         /**
-         * Attempts to create and load a resource library from an XML
-         * resource catalog residing at the specified URL.
-         */         
-        //static ResourceLibrary* create( const URI& uri, const osgDB::Options* dbOptions );
-
-        /** URI from which the lib was loaded */
-        //const URIContext& getSourceContext() const { return _sourceContext; }
-
-    public:
-        /**
          * Creates a new resource library with a source URI. The library
          * will populate upon first use..
          */

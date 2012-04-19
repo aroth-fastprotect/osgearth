@@ -81,11 +81,6 @@ namespace osgEarth
 
         void detach();
 
-        // ArrayUniform( osg::Uniform::Type type, const std::string& name, int size );
-
-        /** creates an array uniform helper from an existing stateset */
-        //ArrayUniform( osg::StateSet* from, const std::string& name );
-
         void setElement( unsigned index, int value );
         void setElement( unsigned index, unsigned value );
         void setElement( unsigned index, bool value );

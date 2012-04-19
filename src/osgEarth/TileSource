@@ -326,7 +326,6 @@ namespace osgEarth
 		 */
 		virtual osg::Image* createImage( 
             const TileKey&        key, 
-            //const osgDB::Options* options,
             ProgressCallback*     progress ) = 0;
 
         /**
@@ -335,7 +334,6 @@ namespace osgEarth
          */
         virtual osg::HeightField* createHeightField( 
             const TileKey&        key, 
-            //const osgDB::Options* dbOptions,
             ProgressCallback*     progress );
 
 		/**

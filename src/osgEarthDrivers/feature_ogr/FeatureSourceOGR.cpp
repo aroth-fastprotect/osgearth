@@ -374,29 +374,10 @@ public:
                     case OFTString:
                         OGR_F_SetFieldString( feature_handle, field_index, a->second.getString().c_str() );
                         break;
-					default: 
-						break;
+                    default:break;
                     }
                 }
             }
-
-            //    std::string value = feature->getAttr( name );
-            //    if (!value.empty())
-            //    {
-            //        switch( OGR_Fld_GetType( field_handle_ref ) )
-            //        {
-            //        case OFTInteger:
-            //            OGR_F_SetFieldInteger( feature_handle, field_index, as<int>(value, 0) );
-            //            break;
-            //        case OFTReal:
-            //            OGR_F_SetFieldDouble( feature_handle, field_index, as<double>(value, 0.0) );
-            //            break;
-            //        case OFTString:
-            //            OGR_F_SetFieldString( feature_handle, field_index, value.c_str() );
-            //            break;                    
-            //        }
-            //    }
-            //}
 
             // assign the geometry:
             OGRFeatureDefnH def = ::OGR_L_GetLayerDefn( _layerHandle );

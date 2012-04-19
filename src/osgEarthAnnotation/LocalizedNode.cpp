@@ -167,6 +167,9 @@ LocalizedNode::updateTransforms( const GeoPoint& p, osg::Node* patch )
         }
     }
 
+
+    dirtyBound();
+
     return true;
 }
 

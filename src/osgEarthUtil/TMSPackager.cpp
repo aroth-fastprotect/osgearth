@@ -136,10 +136,17 @@ TMSPackager::packageImageTile(ImageLayer*          layer,
             out_maxLevel = key.getLevelOfDetail();
         }
 
+        // see if subdivision should continue.
+        unsigned lod = key.getLevelOfDetail();
+        const ImageLayerOptions& options = layer->getImageLayerOptions();
+
+        bool subdivide =
+            (options.minLevel().isSet() && lod < *options.minLevel()) ||
+            (tileOK && lod+1 < _maxLevel) ||
+            (tileOK && (!options.maxLevel().isSet() || lod+1 < *options.maxLevel()));
+
         // subdivide if necessary:
-        if ((key.getLevelOfDetail() + 1 < _maxLevel) &&
-            (!layer->getImageLayerOptions().maxLevel().isSet() ||
-            key.getLevelOfDetail() + 1 < *layer->getImageLayerOptions().maxLevel()))
+        if ( subdivide )
         {
             for( unsigned q=0; q<4; ++q )
             {
@@ -222,10 +229,17 @@ TMSPackager::packageElevationTile(ElevationLayer*      layer,
             out_maxLevel = key.getLevelOfDetail();
         }
 
-        // subdivide as necessary
-        if ((key.getLevelOfDetail() + 1 < _maxLevel) &&
-            (!layer->getElevationLayerOptions().maxLevel().isSet() ||
-             key.getLevelOfDetail() + 1 < *layer->getElevationLayerOptions().maxLevel()))
+        // see if subdivision should continue.
+        unsigned lod = key.getLevelOfDetail();
+        const ElevationLayerOptions& options = layer->getElevationLayerOptions();
+
+        bool subdivide =
+            (options.minLevel().isSet() && lod < *options.minLevel()) ||
+            (tileOK && lod+1 < _maxLevel) ||
+            (tileOK && (!options.maxLevel().isSet() || lod+1 < *options.maxLevel()));
+
+        // subdivide if necessary:
+        if ( subdivide )
         {
             for( unsigned q=0; q<4; ++q )
             {
@@ -277,6 +291,17 @@ TMSPackager::package(ImageLayer*        layer,
     if ( extension.empty() && testImage.valid() )
     {
         extension = toLower( osgDB::getFileExtension( testImage.getImage()->getFileName() ) );
+        if ( extension.empty() )
+        {
+            if ( ImageUtils::hasAlphaChannel(testImage.getImage()) )
+            {
+                extension = "png";
+            }
+            else
+            {
+                extension = "jpg";
+            }
+        }
     }
 
     // compute a mime type
@@ -287,8 +312,9 @@ TMSPackager::package(ImageLayer*        layer,
         mimeType = "image/jpeg";
     else if ( extension == "tif" || extension == "tiff" )
         mimeType = "image/tiff";
-    else
-        return Result( Stringify() << "Unable to determine mime-type for extension \"" << extension << "\"" );
+    else {
+        OE_WARN << LC << "Unable to determine mime-type for extension \"" << extension << "\"" << std::endl;
+    }
 
     if ( _verbose )
     {

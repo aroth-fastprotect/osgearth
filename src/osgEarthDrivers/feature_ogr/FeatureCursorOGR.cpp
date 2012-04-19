@@ -43,7 +43,6 @@ _nextHandleToQueue( 0L ),
 _profile( profile ),
 _filters( filters )
 {
-    //_resultSetHandle = _layerHandle;
     {
         OGR_SCOPED_LOCK;
 

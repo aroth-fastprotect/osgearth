@@ -49,20 +49,6 @@ namespace osgEarth
      */
     class OSGEARTH_EXPORT ElevationQuery
     {
-#if 0
-    public:
-        /** Technique for elevation data sampling - see setTechnique */
-        enum Technique
-        {
-            /** Intersect with triangulated geometry - using the highest resolution
-                data available from the Map source layers */
-            TECHNIQUE_GEOMETRIC,
-
-            /** Sample height from the parametric heightfield directly (bilinear) */
-            TECHNIQUE_PARAMETRIC
-        };
-#endif
-
     public:
         /**
          * Constructs a new elevation manager. If you are not using a MapNode,
@@ -153,9 +139,7 @@ namespace osgEarth
         int       _tileSize;
         unsigned  _maxDataLevel;
         int       _maxLevelOverride;
-        //Technique _technique;        
 
-        //typedef LRUCache< TileKey, osg::ref_ptr<osgTerrain::TerrainTile> > TileCache;
         typedef LRUCache< TileKey, osg::ref_ptr<osg::HeightField> > TileCache;
         TileCache _tileCache;
 

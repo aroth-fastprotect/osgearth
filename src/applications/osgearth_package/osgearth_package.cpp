@@ -55,14 +55,15 @@ usage( const std::string& msg = "" )
         << std::endl
         << "USAGE: osgearth_package <earth_file>" << std::endl
         << std::endl
-        << "         --tms                             : make a TMS repo\n"
-        << "            <earth_file>                   : earth file defining layers to export (requied)\n"
-        << "            --out <path>                   : root output folder of the TMS repo (required)\n"
-        << "            [--bounds xmin ymin xmax ymax] : bounds to package (in map coordinates; default=entire map)\n"
-        << "            [--max-level <num>]            : max LOD level for tiles (all layers; default=5)\n"
-        << "            [--overwrite]                  : overwrite existing tiles\n"
-        << "            [--out-earth <earthfile>]      : export an earth file referencing the new repo\n"
-        << "            [--ext <extension>]            : overrides the image file extension (e.g. jpg)\n"
+        << "         --tms                              : make a TMS repo\n"
+        << "            <earth_file>                    : earth file defining layers to export (requied)\n"
+        << "            --out <path>                    : root output folder of the TMS repo (required)\n"
+        << "            [--bounds xmin ymin xmax ymax]* : bounds to package (in map coordinates; default=entire map)\n"
+        << "            [--max-level <num>]             : max LOD level for tiles (all layers; default=5)\n"
+        << "            [--out-earth <earthfile>]       : export an earth file referencing the new repo\n"
+        << "            [--ext <extension>]             : overrides the image file extension (e.g. jpg)\n"
+        << "            [--overwrite]                   : overwrite existing tiles\n"
+        << "            [--keep-empties]                : writes out fully transparent image tiles (normally discarded)\n"
 #if 0
         << std::endl
         << "         --tfs                   : make a TFS repo" << std::endl
@@ -134,7 +135,7 @@ makeTMS( osg::ArgumentParser& args )
     args.read("--out-earth", outEarth);
 
     std::vector< Bounds > bounds;
-    // restrict packaging to user-specified bounds.
+    // restrict packaging to user-specified bounds.    
     double xmin=DBL_MAX, ymin=DBL_MAX, xmax=DBL_MIN, ymax=DBL_MIN;
     while (args.read("--bounds", xmin, ymin, xmax, ymax ))
     {        
@@ -146,6 +147,9 @@ makeTMS( osg::ArgumentParser& args )
     // max level to which to generate
     unsigned maxLevel = ~0;
     args.read( "--max-level", maxLevel );
+
+    // whether to keep 'empty' tiles
+    bool keepEmpties = args.read("--keep-empties");    
 
     // load up the map
     osg::ref_ptr<MapNode> mapNode = MapNode::load( args );
@@ -164,8 +168,9 @@ makeTMS( osg::ArgumentParser& args )
 
     packager.setVerbose( verbose );
     packager.setOverwrite( overwrite );
+    packager.setKeepEmptyImageTiles( keepEmpties );
 
-    if ( maxLevel != ~0u )
+    if ( maxLevel != ~0 )
         packager.setMaxLevel( maxLevel );
 
     if (bounds.size() > 0)

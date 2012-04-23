@@ -276,9 +276,9 @@ ImageUtils::mix(osg::Image* dest, const osg::Image* src, float a)
     PixelVisitor<MixImage> mixer;
     mixer._a = osg::clampBetween( a, 0.0f, 1.0f );
     mixer._srcHasAlpha = src->getPixelSizeInBits() == 32;
-    mixer._destHasAlpha = src->getPixelSizeInBits() == 32;
+    mixer._destHasAlpha = src->getPixelSizeInBits() == 32;    
 
-    mixer.accept( src, dest );
+    mixer.accept( src, dest );  
 
     return true;
 }
@@ -389,6 +389,25 @@ ImageUtils::createEmptyImage()
     unsigned char *data = image->data(0,0);
     memset(data, 0, 4);
     return image;
+}
+
+bool
+ImageUtils::isEmptyImage(const osg::Image* image, float alphaThreshold)
+{
+    if ( !hasAlphaChannel(image) )
+        return false;
+
+    PixelReader read(image);
+    for(unsigned t=0; t<image->t(); ++t) 
+    {
+        for(unsigned s=0; s<image->s(); ++s)
+        {
+            osg::Vec4 color = read(s, t);
+            if ( color.a() > alphaThreshold )
+                return false;
+        }
+    }
+    return true;    
 }
 
 bool

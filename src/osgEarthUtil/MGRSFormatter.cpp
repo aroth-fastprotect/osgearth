@@ -184,7 +184,7 @@ MGRSFormatter::transform( const GeoPoint& input, MGRSCoord& out ) const
 
         // figure out the UTM zone:
         zone = (unsigned)floor((lonDeg+180.0)/6.0);   // [0..59]
-        bool north = latDeg >= 0.0;
+        //bool north = latDeg >= 0.0;
 
         // convert the input coordinates to UTM:
         // yes, always use +north so we get Y relative to equator

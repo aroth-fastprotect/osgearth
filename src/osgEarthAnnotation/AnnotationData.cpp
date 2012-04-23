@@ -22,15 +22,19 @@
 using namespace osgEarth::Annotation;
 
 AnnotationData::AnnotationData() :
-_viewpoint( 0L ),
-_priority ( 0.0f )
+_name       (),
+_description(),
+_priority   ( 0.0f ),
+_viewpoint  ( 0L )
 {
     //nop
 }
 
 AnnotationData::AnnotationData(const Config& conf) :
-_viewpoint( 0L ),
-_priority ( 0.0f )
+_name       (),
+_description(),
+_priority   ( 0.0f ),
+_viewpoint  ( 0L )
 {
     mergeConfig(conf);
 }

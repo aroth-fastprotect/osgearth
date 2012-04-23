@@ -37,8 +37,8 @@ _cacheOnly           ( false ),
 _enableLighting      ( true ),
 _overlayVertexWarping( false ),
 _overlayBlending     ( true ),
-_overlayMipMapping   ( false ),
 _overlayTextureSize  ( 4096 ),
+_overlayMipMapping   ( false ),
 _terrainOptions      ( 0L )
 {
     mergeConfig( conf );

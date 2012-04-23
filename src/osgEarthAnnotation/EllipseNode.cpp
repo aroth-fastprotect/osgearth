@@ -38,11 +38,11 @@ EllipseNode::EllipseNode(MapNode*          mapNode,
                          bool              draped,
                          unsigned          numSegments) :
 LocalizedNode( mapNode, position ),
-_radiusMajor( radiusMajor ),
-_radiusMinor( radiusMinor ),
-_rotationAngle( rotationAngle ),
 _style(style ),
 _draped( draped ),
+_rotationAngle( rotationAngle ),
+_radiusMajor( radiusMajor ),
+_radiusMinor( radiusMinor ),
 _numSegments( numSegments )
 {
     rebuild();

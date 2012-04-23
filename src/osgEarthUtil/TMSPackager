@@ -90,7 +90,7 @@ namespace osgEarth { namespace Util
          */
         struct Result {
             Result() : ok(true) { }
-            Result(const std::string& m) : message(m), ok(false) { }
+            Result(const std::string& m) : ok(false), message(m) { }
             operator bool() const { return ok; }
             bool ok;
             std::string message;

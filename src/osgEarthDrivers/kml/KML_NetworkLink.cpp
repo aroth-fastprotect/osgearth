@@ -35,7 +35,7 @@ KML_NetworkLink::build( const Config& conf, KMLContext& cx )
     std::string href = KMLUtils::parseLink(conf);
 
     // "open" determines whether to load it immediately
-    bool open = conf.value<bool>("open", false);
+    //bool open = conf.value<bool>("open", false);
 
     // if it's region-bound, parse it as a paged LOD:
     const Config& regionConf = conf.child("region");

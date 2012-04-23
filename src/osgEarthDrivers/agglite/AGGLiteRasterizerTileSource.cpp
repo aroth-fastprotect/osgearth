@@ -237,9 +237,9 @@ public:
         cropPoly->push_back( osg::Vec3d( cropExtent.xMax(), cropExtent.yMax(), 0 ));
         cropPoly->push_back( osg::Vec3d( cropExtent.xMin(), cropExtent.yMax(), 0 ));
 
-        double lineWidth = 1.0;
-        if ( masterLine )
-            lineWidth = (double)masterLine->stroke()->width().value();
+        //double lineWidth = 1.0;
+        //if ( masterLine )
+        //    lineWidth = (double)masterLine->stroke()->width().value();
 
         osg::Vec4 color = osg::Vec4(1, 1, 1, 1);
         if ( masterLine )

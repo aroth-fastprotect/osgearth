@@ -32,6 +32,10 @@
 
 #include <osgEarthDrivers/kml/KML>
 
+#include <osgGA/StateSetManipulator>
+#include <osgViewer/ViewerEventHandlers>
+#include <osgDB/FileNameUtils>
+
 #define KML_PUSHPIN_URL "http://demo.pelicanmapping.com/icons/pushpin_yellow.png"
 
 #define VP_DURATION 4.5 // time to fly to a viewpoint
@@ -361,15 +365,25 @@ AnnotationGraphControlFactory::create(osg::Node*       graph,
 //------------------------------------------------------------------------
 
 #undef  LC
-#define LC "[ExampleMapNodeHelper] "
+#define LC "[MapNodeHelper] "
 
 osg::Group*
-ExampleMapNodeHelper::load(osg::ArgumentParser& args,
-                           osgViewer::View*     view,
-                           Control*             userControl ) const
+MapNodeHelper::load(osg::ArgumentParser& args,
+                    osgViewer::View*     view,
+                    Control*             userControl ) const
 {
     // read in the Earth file:
-    osg::Node* node = osgDB::readNodeFiles( args );
+    osg::Node* node = 0L;
+    for( int i=0; i<args.argc(); ++i )
+    {
+        if ( osgDB::getLowerCaseFileExtension(args[i]) == "earth" )
+        {
+            node = osgDB::readNodeFile( args[i] );
+            args.remove(i);
+            break;
+        }
+    }
+
     if ( !node )
     {
         OE_WARN << LC << "Unable to load an earth file from the command line." << std::endl;
@@ -391,20 +405,24 @@ ExampleMapNodeHelper::load(osg::ArgumentParser& args,
 
     // a root node to hold everything:
     osg::Group* root = new osg::Group();
-
     root->addChild( mapNode.get() );
 
+    // configures the viewer with some stock goodies
+    configureView( view );
+
+    // parses common cmdline arguments.
     parse( mapNode.get(), args, view, root, userControl );
+
     return root;
 }
 
 
 void
-ExampleMapNodeHelper::parse(MapNode*             mapNode,
-                            osg::ArgumentParser& args,
-                            osgViewer::View*     view,
-                            osg::Group*          root,
-                            Control*             userControl ) const
+MapNodeHelper::parse(MapNode*             mapNode,
+                     osg::ArgumentParser& args,
+                     osgViewer::View*     view,
+                     osg::Group*          root,
+                     Control*             userControl ) const
 {
     if ( !root )
         root = mapNode;
@@ -558,8 +576,24 @@ ExampleMapNodeHelper::parse(MapNode*             mapNode,
 }
 
 
+void
+MapNodeHelper::configureView( osgViewer::View* view ) const
+{
+    // add some stock OSG handlers:
+    view->addEventHandler(new osgViewer::StatsHandler());
+    view->addEventHandler(new osgViewer::WindowSizeHandler());
+    view->addEventHandler(new osgViewer::ThreadingHandler());
+    view->addEventHandler(new osgViewer::LODScaleHandler());
+    view->addEventHandler(new osgGA::StateSetManipulator(view->getCamera()->getOrCreateStateSet()));
+
+    // osgEarth benefits from pre-compilation of GL objects in the pager. In newer versions of
+    // OSG, this activates OSG's IncrementalCompileOpeartion in order to avoid frame breaks.
+    view->getDatabasePager()->setDoPreCompile( true );
+}
+
+
 std::string
-ExampleMapNodeHelper::usage() const
+MapNodeHelper::usage() const
 {
     return Stringify()
         << "    --sky                : add a sky model\n"

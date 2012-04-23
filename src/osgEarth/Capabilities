@@ -99,6 +99,9 @@ namespace osgEarth
     protected:
         Capabilities();
 
+        /** dtor */
+        virtual ~Capabilities() { }
+
     private:
         bool        readCache();
         bool        writeCache();

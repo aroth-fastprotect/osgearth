@@ -197,9 +197,9 @@ MapNode::init()
 
     // establish global driver options. These are OSG reader-writer options that
     // will make their way to any read* calls down the pipe
-    const osgDB::ReaderWriter::Options* global_options = _map->getGlobalOptions();
-    osg::ref_ptr<osgDB::ReaderWriter::Options> local_options = global_options ? 
-        new osgDB::ReaderWriter::Options( *global_options ) :
+    const osgDB::Options* global_options = _map->getGlobalOptions();
+    osg::ref_ptr<osgDB::Options> local_options = global_options ? 
+        Registry::instance()->cloneOrCreateOptions( global_options ) :
         NULL;
 
     if ( local_options.valid() )
@@ -212,9 +212,6 @@ MapNode::init()
 
     // TODO: not sure why we call this here
     _map->setGlobalOptions( local_options.get() );
-
-    // overlays:
-    _pendingOverlayAutoSetTextureUnit = true;
 
     // load and attach the terrain engine, but don't initialize it until we need it
     const TerrainOptions& terrainOptions = _mapNodeOptions.getTerrainOptions();

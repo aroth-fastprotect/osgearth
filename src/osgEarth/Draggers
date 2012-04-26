@@ -110,6 +110,7 @@ namespace osgEarth
 
         void updateColor();
 
+        osg::Geode* _geode;
         osg::MatrixTransform* _scaler;
         osg::ShapeDrawable* _shapeDrawable;
         osg::Vec4f _pickColor;

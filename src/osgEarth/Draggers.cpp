@@ -204,16 +204,16 @@ _size( 5.0f )
 {
     //Build the handle
     osg::Sphere* shape = new osg::Sphere(osg::Vec3(0,0,0), 1.0f);   
-    osg::Geode* geode = new osg::Geode();
     _shapeDrawable = new osg::ShapeDrawable( shape );    
-    geode->addDrawable( _shapeDrawable );          
+    _geode = new osg::Geode();
+    _geode->addDrawable( _shapeDrawable );          
 
-    geode->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
-    geode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
+    _geode->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
+    _geode->getOrCreateStateSet()->setMode(GL_LIGHTING, osg::StateAttribute::OFF);
 
     _scaler = new osg::MatrixTransform;
     _scaler->setMatrix( osg::Matrixd::scale( _size, _size, _size ));
-    _scaler->addChild( geode );
+    _scaler->addChild( _geode );
 
     osg::AutoTransform* at = new osg::AutoTransform;
     at->setAutoScaleToScreen( true );

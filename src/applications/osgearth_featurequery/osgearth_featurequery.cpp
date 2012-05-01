@@ -18,13 +18,33 @@
 */
 
 #include <osg/Notify>
+#include <osgGA/StateSetManipulator>
+#include <osgGA/GUIEventHandler>
 #include <osgViewer/Viewer>
+#include <osgViewer/ViewerEventHandlers>
+#include <osgEarth/MapNode>
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/ExampleResources>
+#include <osgEarthUtil/Controls>
+#include <osgEarthUtil/FeatureQueryTool>
 
-#define LC "[viewer] "
+#define LC "[feature_query] "
 
 using namespace osgEarth::Util;
+using namespace osgEarth::Util::Controls;
+
+//------------------------------------------------------------------------
+// creaes a simple user interface for the manip demo
+Control*
+createUI()
+{
+    VBox* vbox = new VBox();
+    vbox->setVertAlign( Control::ALIGN_TOP );
+    vbox->setHorizAlign( Control::ALIGN_LEFT );
+    vbox->addControl( new LabelControl("Feature Query Demo", Color::Yellow) );
+    vbox->addControl( new LabelControl("Click on a feature to see its attributes.") );
+    return vbox;
+} 
 
 //------------------------------------------------------------------------
 
@@ -35,18 +55,18 @@ main(int argc, char** argv)
     if ( arguments.read("--stencil") )
         osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
 
-    // create a viewer:
+    // a basic OSG viewer
     osgViewer::Viewer viewer(arguments);
 
-    // install our default manipulator (do this before calling load)
+    // install our default manipulator (do this before using MapNodeHelper)
     viewer.setCameraManipulator( new EarthManipulator() );
 
     // load an earth file, and support all or our example command-line options
     // and earth file <external> tags
-    osg::Node* node = MapNodeHelper().load( arguments, &viewer );
-    if ( node )
+    osg::Group* root = MapNodeHelper().load( arguments, &viewer, createUI() );
+    if ( root )
     {
-        viewer.setSceneData( node );
+        viewer.setSceneData( root );
 
         // configure the near/far so we don't clip things that are up close
         viewer.getCamera()->setNearFarRatio(0.00002);
@@ -54,6 +74,25 @@ main(int argc, char** argv)
         // osgEarth benefits from pre-compilation of GL objects in the pager. In newer versions of
         // OSG, this activates OSG's IncrementalCompileOpeartion in order to avoid frame breaks.
         viewer.getDatabasePager()->setDoPreCompile( true );
+
+        // add some stock OSG handlers:
+        viewer.addEventHandler(new osgViewer::StatsHandler());
+        viewer.addEventHandler(new osgViewer::WindowSizeHandler());
+        viewer.addEventHandler(new osgViewer::ThreadingHandler());
+        viewer.addEventHandler(new osgViewer::LODScaleHandler());
+        viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));
+
+        MapNode* mapNode = MapNode::findMapNode( root );
+        if ( mapNode )
+        {
+            FeatureQueryTool* tool = new FeatureQueryTool( mapNode );
+            viewer.addEventHandler( tool );
+
+            VBox* readout = ControlCanvas::get(&viewer)->addControl( new VBox() );
+            readout->setHorizAlign( Control::ALIGN_RIGHT );
+            readout->setBackColor( Color(Color::Black,0.8) );
+            tool->addCallback( new FeatureReadoutCallback(readout) );
+        }
 
         return viewer.run();
     }

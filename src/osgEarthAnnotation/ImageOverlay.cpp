@@ -20,6 +20,7 @@
 #include <osgEarthSymbology/MeshSubdivider>
 #include <osgEarthFeatures/MeshClamper>
 #include <osgEarthFeatures/Feature>
+#include <osgEarth/MapNode>
 #include <osgEarth/NodeUtils>
 #include <osgEarth/DrapeableNode>
 #include <osg/Geode>
@@ -297,7 +298,7 @@ ImageOverlay::setBoundsAndRotation(const osgEarth::Bounds& b, const Angular& rot
         // there must be a better way, but my internet is down so i can't look it up with now..
 
         osg::ref_ptr<const SpatialReference> srs = SpatialReference::create("wgs84");
-        osg::ref_ptr<const SpatialReference> utm = srs->createUTMFromLongitude( c.x() );
+        osg::ref_ptr<const SpatialReference> utm = srs->createUTMFromLonLat( c.x(), c.y() );
 
         osg::Vec3d ll_utm, ul_utm, ur_utm, lr_utm, c_utm;
         

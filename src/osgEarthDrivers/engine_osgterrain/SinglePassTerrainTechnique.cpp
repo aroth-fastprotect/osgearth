@@ -429,7 +429,7 @@ SinglePassTerrainTechnique::createGeoImage( const CustomColorLayer& colorLayer,
             layerLocator = layerLocator->getGeographicFromGeocentric();
 
         const GeoExtent& imageExtent = layerLocator->getDataExtent();
-        image = GeoImage( colorLayer.getImage(), imageExtent ); //const_cast<osg::Image*>(colorLayer.getImage()), imageExtent );
+        image = GeoImage( colorLayer.getImage(), imageExtent );
         return true;
     }
     return false;
@@ -1961,13 +1961,13 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
 
   
 
-    MeshConsolidator::run( *surface );
+    MeshConsolidator::convertToTriangles( *surface );
 
     if ( skirt )
-        MeshConsolidator::run( *skirt );
+        MeshConsolidator::convertToTriangles( *skirt );
 
     for (MaskRecordVector::iterator mr = masks.begin(); mr != masks.end(); ++mr)
-        MeshConsolidator::run( *((*mr)._geom) );
+        MeshConsolidator::convertToTriangles( *((*mr)._geom) );
     
    
     if (osgDB::Registry::instance()->getBuildKdTreesHint()==osgDB::ReaderWriter::Options::BUILD_KDTREES &&

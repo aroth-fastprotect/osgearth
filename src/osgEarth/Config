@@ -501,7 +501,6 @@ namespace osgEarth
     public:
         DriverConfigOptions( const ConfigOptions& rhs =ConfigOptions() )
             : ConfigOptions( rhs ) { fromConfig( _conf ); }
-        virtual ~DriverConfigOptions() { }
 
         /** dtor */
         virtual ~DriverConfigOptions() { }

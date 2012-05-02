@@ -170,7 +170,7 @@ makeTMS( osg::ArgumentParser& args )
     packager.setOverwrite( overwrite );
     packager.setKeepEmptyImageTiles( keepEmpties );
 
-    if ( maxLevel != ~0 )
+    if ( maxLevel != ~0u )
         packager.setMaxLevel( maxLevel );
 
     if (bounds.size() > 0)

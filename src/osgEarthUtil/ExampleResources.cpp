@@ -22,6 +22,7 @@
 #include <osgEarthUtil/LatLongFormatter>
 #include <osgEarthUtil/MGRSFormatter>
 #include <osgEarthUtil/MouseCoordsTool>
+#include <osgEarthUtil/AutoClipPlaneHandler>
 
 #include <osgEarthAnnotation/AnnotationData>
 #include <osgEarthAnnotation/AnnotationRegistry>
@@ -398,7 +399,8 @@ MapNodeHelper::load(osg::ArgumentParser& args,
     }
 
     // warn about not having an earth manip
-    if ( 0L == dynamic_cast<EarthManipulator*>(view->getCameraManipulator()) )
+    EarthManipulator* manip = dynamic_cast<EarthManipulator*>(view->getCameraManipulator());
+    if ( manip == 0L )
     {
         OE_WARN << LC << "Helper used before installing an EarthManipulator" << std::endl;
     }
@@ -431,11 +433,12 @@ MapNodeHelper::parse(MapNode*             mapNode,
 
     bool useSky        = args.read("--sky");
     bool useOcean      = args.read("--ocean");
-
     bool useMGRS       = args.read("--mgrs");
     bool useDMS        = args.read("--dms");
     bool useDD         = args.read("--dd");
     bool useCoords     = args.read("--coords") || useMGRS || useDMS || useDD;
+    bool useOrtho      = args.read("--ortho");
+    bool useAutoClip   = args.read("--autoclip");
 
     std::string kmlFile;
     args.read( "--kml", kmlFile );
@@ -572,6 +575,22 @@ MapNodeHelper::parse(MapNode*             mapNode,
         canvas->addControl( readout );
     }
 
+    // Configure for an ortho camera:
+    if ( useOrtho )
+    {
+        EarthManipulator* manip = dynamic_cast<EarthManipulator*>(view->getCameraManipulator());
+        if ( manip )
+        {
+            manip->getSettings()->setCameraProjection( EarthManipulator::PROJ_ORTHOGRAPHIC );
+        }
+    }
+
+    // Install an auto clip plane clamper
+    if ( useAutoClip )
+    {
+        view->getCamera()->addCullCallback( new AutoClipPlaneCullCallback(mapNode) );
+    }
+
     root->addChild( canvas );
 }
 
@@ -602,5 +621,7 @@ MapNodeHelper::usage() const
         << "    --coords             : display map coords under mouse\n"
         << "    --dms                : dispay deg/min/sec coords under mouse\n"
         << "    --dd                 : display decimal degrees coords under mouse\n"
-        << "    --mgrs               : show MGRS coords under mouse\n";
+        << "    --mgrs               : show MGRS coords under mouse\n"
+        << "    --ortho              : use an orthographic camera\n"
+        << "    --autoclip           : installs an auto-clip plane callback\n";
 }

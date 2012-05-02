@@ -17,9 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Notify>
-#include <OpenThreads/Thread>
-#include <OpenThreads/Mutex>
-#include <OpenThreads/Atomic>
 
 using namespace osgEarth;
 
@@ -43,7 +40,8 @@ using namespace osgEarth;
 #include <sstream>
 #include <iostream>
 #include <fstream>
-#include <ctype.h>
+#include <cctype>
+#include <iomanip>
 
 using namespace std;
 
@@ -166,25 +164,25 @@ osgEarth::initNotifyLevel()
 	g_NullStream = &s_NullStream;
 	g_NotifyStream = &s_NotifyStream;
 
-	// g_NotifyLevel
-	// =============
+    // g_NotifyLevel
+    // =============
 
     osgearth_g_NotifyLevel = osg::NOTICE; // Default value
 
-	char* OSGNOTIFYLEVEL=getenv("OSGEARTH_NOTIFY_LEVEL");
-	if (!OSGNOTIFYLEVEL) OSGNOTIFYLEVEL=getenv("OSGEARTHNOTIFYLEVEL");
-	if(OSGNOTIFYLEVEL)
-	{
+    char* OSGNOTIFYLEVEL=getenv("OSGEARTH_NOTIFY_LEVEL");
+    if (!OSGNOTIFYLEVEL) OSGNOTIFYLEVEL=getenv("OSGEARTHNOTIFYLEVEL");
+    if(OSGNOTIFYLEVEL)
+    {
 
-		std::string stringOSGNOTIFYLEVEL(OSGNOTIFYLEVEL);
+        std::string stringOSGNOTIFYLEVEL(OSGNOTIFYLEVEL);
 
-		// Convert to upper case
-		for(std::string::iterator i=stringOSGNOTIFYLEVEL.begin();
-			i!=stringOSGNOTIFYLEVEL.end();
-			++i)
-		{
-			*i=toupper(*i);
-		}
+        // Convert to upper case
+        for(std::string::iterator i=stringOSGNOTIFYLEVEL.begin();
+            i!=stringOSGNOTIFYLEVEL.end();
+            ++i)
+        {
+            *i=toupper(*i);
+        }
 
         if(stringOSGNOTIFYLEVEL.find("ALWAYS")!=std::string::npos)          osgearth_g_NotifyLevel=osg::ALWAYS;
         else if(stringOSGNOTIFYLEVEL.find("FATAL")!=std::string::npos)      osgearth_g_NotifyLevel=osg::FATAL;
@@ -194,9 +192,9 @@ osgEarth::initNotifyLevel()
         else if(stringOSGNOTIFYLEVEL.find("DEBUG_FP")!=std::string::npos)   osgearth_g_NotifyLevel=osg::DEBUG_FP;
         else if(stringOSGNOTIFYLEVEL.find("DEBUG")!=std::string::npos)      osgearth_g_NotifyLevel=osg::DEBUG_INFO;
         else if(stringOSGNOTIFYLEVEL.find("INFO")!=std::string::npos)       osgearth_g_NotifyLevel=osg::INFO;
-		else std::cout << "Warning: invalid OSG_NOTIFY_LEVEL set ("<<stringOSGNOTIFYLEVEL<<")"<<std::endl;
-
-	}
+        else std::cout << "Warning: invalid OSG_NOTIFY_LEVEL set ("<<stringOSGNOTIFYLEVEL<<")"<<std::endl;
+ 
+    }
 
 	// Setup standard notify handler
 	osgEarth::NotifyStreamBuffer *buffer = dynamic_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
@@ -205,7 +203,7 @@ osgEarth::initNotifyLevel()
 
 	s_osgEarthNeedNotifyInit = false;
 
-	return true;
+    return true;
 
 }
 
@@ -243,4 +241,3 @@ std::ostream& osgEarth::notify(const osg::NotifySeverity severity)
 	}
 	return *g_NullStream;
 }
-

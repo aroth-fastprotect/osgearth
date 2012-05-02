@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 #include <osgEarthUtil/FeatureQueryTool>
 #include <osgEarth/Pickers>
 #include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osgViewer/View>
 #include <osg/Depth>
 
@@ -184,7 +185,7 @@ FeatureHighlightCallback::onHit( FeatureSourceIndexNode* index, FeatureID fid, c
         osg::Group* group = new osg::Group();
         osg::Geode* geode = 0L;
 
-        OE_NOTICE << "Slices = " << drawSet.slices().size() << std::endl;
+        OE_DEBUG << "Slices = " << drawSet.slices().size() << std::endl;
 
         for( FeatureDrawSet::DrawableSlices::iterator d = drawSet.slices().begin(); d != drawSet.slices().end(); ++d )
         {

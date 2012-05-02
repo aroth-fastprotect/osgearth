@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,6 +18,7 @@
  */
 #include <osgEarth/ShaderUtils>
 #include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osgUtil/CullVisitor>
 #include <list>
 
@@ -60,9 +61,9 @@ namespace
 
 UpdateLightingUniformsHelper::UpdateLightingUniformsHelper( bool useUpdateTrav ) :
 _lightingEnabled( true ),
-_dirty( true ),
-_applied( false ),
-_useUpdateTrav( useUpdateTrav )
+_dirty          ( true ),
+_applied        ( false ),
+_useUpdateTrav  ( useUpdateTrav )
 {
     _maxLights = Registry::instance()->getCapabilities().getMaxLights();
 

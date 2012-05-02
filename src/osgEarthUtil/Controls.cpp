@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -2470,6 +2470,9 @@ ControlCanvas::init( osgViewer::View* view, bool registerCanvas )
     ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS, 0, 1, false ) );
     ss->setRenderBinMode( osg::StateSet::USE_RENDERBIN_DETAILS );
     ss->setBinName( OSGEARTH_CONTROLS_BIN );
+
+    // keeps the control bin shaders from "leaking out" into the scene graph :/
+    ss->setAttributeAndModes( new osg::Program(), osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
 
     _controlNodeBin = new ControlNodeBin();
     this->addChild( _controlNodeBin->getControlGroup() );

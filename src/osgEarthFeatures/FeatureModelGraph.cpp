@@ -1,6 +1,6 @@
 /* --*-c++-*-- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -356,21 +356,12 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
         {
             // see if there are any more levels. If so, build some pagedlods to bring the
             // next level in.
-            //FeatureLevel nextLevel(0, maxRange/2.0);
 
             osg::ref_ptr<osg::Group> group = new osg::Group();
 
             // calculate the LOD of the next level:
             if ( lod+1 != ~0u )
             {
-                //if ( geometry == 0L )
-                //{
-                //    OE_WARN << LC << "OK...geometry is null, LOD is = " << lod 
-                //        << ", firstLOD = " << _source->getFeatureProfile()->getFirstLevel()
-                //        << ", maxLOD = " << _source->getFeatureProfile()->getMaxLevel()
-                //        << std::endl;
-                //}
-
                 // only build sub-pagedlods if we are expecting subtiles at some point:
                 if ( geometry != 0L || (int)lod < featureProfile->getFirstLevel() )
                 {
@@ -378,10 +369,6 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
                     buildSubTilePagedLODs( lod, tileX, tileY, &mapf, group.get() );
                     group->addChild( geometry );
                 }
-
-                //// slap the geometry in there afterwards, if there is any
-                //if ( geometry )
-                //    group->addChild( geometry );
 
                 result = group.release();
             }   

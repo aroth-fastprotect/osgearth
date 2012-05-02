@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -111,7 +111,7 @@ public:
                     osg::Timer_t start = osg::Timer::instance()->tick();
                     engineNode->getTerrain()->notifyTileAdded(key, node.get());
                     osg::Timer_t end = osg::Timer::instance()->tick();
-                    OE_DEBUG << "Took " << osg::Timer::instance()->delta_m(start, end) << "ms to fire terrain callbacks" << std::endl;
+                    //OE_DEBUG << "Took " << osg::Timer::instance()->delta_m(start, end) << "ms to fire terrain callbacks" << std::endl;
                 }
 
                 return ReadResult( node.get(), ReadResult::FILE_LOADED );

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -137,6 +137,7 @@ _altMode( ALTMODE_ABSOLUTE )
     conf.getIfSet( "y", _p.y() );
     conf.getIfSet( "z", _p.z() );
     conf.getIfSet( "alt", _p.z() );
+    conf.getIfSet( "hat", _p.z() ); // height above terrain (relative)
 
     if ( !_srs.valid() )
         _srs = SpatialReference::create( conf.value("srs"), conf.value("vdatum") );
@@ -177,14 +178,22 @@ GeoPoint::getConfig() const
     {
         conf.set( "lat", _p.y() );
         conf.set( "long", _p.x() );
-        if ( _p.x() != 0.0 )
-            conf.set( "alt", _p.z() );
+        if ( _p.z() != 0.0 )
+        {
+            if ( _altMode == ALTMODE_ABSOLUTE )
+                conf.set( "alt", _p.z() );
+            else
+                conf.set( "hat", _p.z() );
+        }
     }
     else
     {
         conf.set( "x", _p.x() );
         conf.set( "y", _p.y() );
-        conf.set( "z", _p.z() );
+        if ( _altMode == ALTMODE_ABSOLUTE )
+            conf.set( "z", _p.z() );
+        else
+            conf.set( "hat", _p.z() );
     }
 
     if ( _srs.valid() )

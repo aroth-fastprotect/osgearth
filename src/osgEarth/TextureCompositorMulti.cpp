@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarth/ShaderUtils>
 #include <osgEarth/TileKey>
 #include <osgEarth/StringUtils>
+#include <osgEarth/Capabilities>
 #include <osg/Texture2D>
 #include <osg/TexEnv>
 #include <osg/TexEnvCombine>
@@ -391,6 +392,9 @@ TextureCompositorMultiTexture::updateMasterStateSet(osg::StateSet*       stateSe
 
     else
     {
+        // Forcably disable shaders
+        stateSet->setAttributeAndModes( new osg::Program(), osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
+
         // Validate against the maximum number of textures available in FFP mode.
         if ( maxUnits > Registry::instance()->getCapabilities().getMaxFFPTextureUnits() )
         {

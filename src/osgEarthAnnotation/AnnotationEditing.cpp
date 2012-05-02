@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -64,7 +64,7 @@ LocalizedNodeEditor::updateDraggers()
     GeoPoint pos = _node->getPosition();
     pos.makeAbsolute( _node->getMapNode()->getTerrain() );
 
-    _dragger->setPosition( pos, false ); //_node->getPosition(), false );
+    _dragger->setPosition( pos, false );
 }
 
 void

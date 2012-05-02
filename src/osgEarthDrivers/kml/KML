@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -33,7 +33,11 @@ namespace osgEarth { namespace Drivers {
     {
     public:
         /**
-         * Loads KML from a URI.
+         * Loads KML or KMZ from a URI.
+         *
+         * @param[in ] uri     URI from which to load the KML or KMZ
+         * @param[in ] mapNode MapNode to which to attach KML elements
+         * @param[in ] options Optional KML options
          */
         static osg::Node* load( const URI& uri, MapNode* mapNode, const KMLOptions& kmlOptions =KMLOptions() )
         {

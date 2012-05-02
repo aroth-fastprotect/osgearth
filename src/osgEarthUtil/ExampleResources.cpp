@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -387,8 +387,12 @@ MapNodeHelper::load(osg::ArgumentParser& args,
 
     if ( !node )
     {
-        OE_WARN << LC << "Unable to load an earth file from the command line." << std::endl;
-        return 0L;
+        node = osgDB::readNodeFile( "gdal_tiff.earth" );
+        if ( !node )
+        {
+            OE_WARN << LC << "Unable to load an earth file from the command line." << std::endl;
+            return 0L;
+        }
     }
 
     osg::ref_ptr<MapNode> mapNode = MapNode::findMapNode(node);
@@ -407,13 +411,14 @@ MapNodeHelper::load(osg::ArgumentParser& args,
 
     // a root node to hold everything:
     osg::Group* root = new osg::Group();
+    
     root->addChild( mapNode.get() );
-
-    // configures the viewer with some stock goodies
-    configureView( view );
 
     // parses common cmdline arguments.
     parse( mapNode.get(), args, view, root, userControl );
+
+    // configures the viewer with some stock goodies
+    configureView( view );
 
     return root;
 }

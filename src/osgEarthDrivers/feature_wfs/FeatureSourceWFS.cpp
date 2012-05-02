@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -148,7 +148,9 @@ public:
                         {
                             result = new FeatureProfile(featureType->getExtent());
 
-                            if (featureType->getTiled())
+                            bool disableTiling = _options.disableTiling().isSet() && *_options.disableTiling();
+
+                            if (featureType->getTiled() && !disableTiling)
                             {                        
                                 result->setTiled( true );
                                 result->setFirstLevel( featureType->getFirstLevel() );

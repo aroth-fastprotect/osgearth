@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -116,6 +116,8 @@ namespace osgEarth { namespace Annotation
 
     private:
         osg::observer_ptr<const SpatialReference> _mapSRS;
+        osg::Switch*                   _switch;
+        osg::Group*                    _oq;
         osg::AutoTransform*            _autoxform;
         osg::MatrixTransform*          _matxform;
         osg::Group*                    _attachPoint;

@@ -102,8 +102,8 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
         unsigned lod, x, y;
         sscanf( uri.c_str(), "%u.%d_%d_%d.%*s", (unsigned int*)&uid, (int*)&lod, (int*)&x, (int*)&y );
 
-        osg::ref_ptr<FeatureModelGraph> graph;
-        if ( getGraph(uid, graph) )
+        osg::ref_ptr<FeatureModelGraph> graph = getGraph(uid);
+        if ( graph.valid() )
             return ReadResult( graph->load( lod, x, y, uri ) );
         else
             return ReadResult::ERROR_IN_READING_FILE;
@@ -125,15 +125,11 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
         OE_TEST << LC << "UNregistered FMG " << uid << std::endl;
     }
 
-    static bool getGraph( UID uid, osg::ref_ptr<FeatureModelGraph> graph)
+    static FeatureModelGraph* getGraph( UID uid ) 
     {
-        bool ret;
         Threading::ScopedReadLock lock( _fmgMutex );
         std::map<UID, FeatureModelGraph*>::const_iterator i = _fmgRegistry.find( uid );
-        ret = (i != _fmgRegistry.end());
-        if(ret)
-            graph = i->second;
-        return ret;
+        return i != _fmgRegistry.end() ? i->second : 0L;
     }
 };
 
@@ -192,6 +188,13 @@ _pendingUpdate( false )
     // Calculate the usable extent (in both feature and map coordinates) and bounds.
     const Profile* mapProfile = session->getMapInfo().getProfile();
     const FeatureProfile* featureProfile = session->getFeatureSource()->getFeatureProfile();
+
+    // Bail out if the feature profile is bad
+    if ( !featureProfile || !featureProfile->getExtent().isValid() )
+    {
+        // warn or allow?
+        return;
+    }
 
     // the part of the feature extent that will fit on the map (in map coords):
     _usableMapExtent = mapProfile->clampAndTransformExtent( 

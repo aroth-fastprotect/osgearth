@@ -19,6 +19,7 @@
 
 #include <osgEarthAnnotation/OrthoNode>
 #include <osgEarthAnnotation/AnnotationUtils>
+#include <osgEarthAnnotation/AnnotationSettings>
 #include <osgEarthAnnotation/Decluttering>
 #include <osgEarthSymbology/Color>
 #include <osgEarth/ThreadingUtils>
@@ -95,7 +96,8 @@ OrthoNode::OrthoNode(MapNode*        mapNode,
 
 PositionedAnnotationNode( mapNode ),
 _mapSRS                 ( mapNode ? mapNode->getMapSRS() : 0L ),
-_horizonCulling         ( false )
+_horizonCulling         ( false ),
+_occlusionCulling       ( false )
 {
     init();
     if ( mapNode && mapNode->isGeocentric() )
@@ -110,7 +112,8 @@ OrthoNode::OrthoNode(MapNode*          mapNode,
 
 PositionedAnnotationNode( mapNode ),
 _mapSRS                 ( mapNode ? mapNode->getMapSRS() : 0L ),
-_horizonCulling         ( false )
+_horizonCulling         ( false ),
+_occlusionCulling       ( false )
 {
     init();
     if ( mapNode && mapNode->isGeocentric() )
@@ -123,8 +126,9 @@ _horizonCulling         ( false )
 OrthoNode::OrthoNode(const SpatialReference* mapSRS,
                      const GeoPoint&         position ) :
 
-_mapSRS        ( mapSRS ),
-_horizonCulling( false )
+_mapSRS          ( mapSRS ),
+_horizonCulling  ( false ),
+_occlusionCulling( false )
 {
     init();
     if ( _mapSRS.valid() && _mapSRS->isGeographic() && !_mapSRS->isPlateCarre() )
@@ -135,11 +139,15 @@ _horizonCulling( false )
 }
 
 OrthoNode::OrthoNode() :
-_mapSRS        ( 0L ),
-_horizonCulling( false )
+_mapSRS          ( 0L ),
+_horizonCulling  ( false ),
+_occlusionCulling( false )
 {
     init();
 }
+
+//#define TRY_OQ 1
+#undef TRY_OQ
 
 void
 OrthoNode::init()
@@ -147,9 +155,10 @@ OrthoNode::init()
     _switch = new osg::Switch();
 
     // install it, but deactivate it until we can get it to work.
-#if 0
+#ifdef TRY_OQ
     OrthoOQNode* oq = new OrthoOQNode("");
-    oq->setQueriesEnabled(false);
+    oq->setQueriesEnabled(true);
+    _oq = oq;
 #else
     _oq = new osg::Group();
 #endif
@@ -166,8 +175,9 @@ OrthoNode::init()
     _matxform = new osg::MatrixTransform();
     _switch->addChild( _matxform );
 
-    //oq->_xform = _matxform;
-    //_oq = oq;
+#ifdef TRY_OQ
+    oq->_xform = _matxform;
+#endif
 
     _switch->setSingleChildOn( 0 );
 
@@ -280,6 +290,7 @@ OrthoNode::updateTransforms( const GeoPoint& p, osg::Node* patch )
 {
     if ( _mapSRS.valid() )
     {
+        //OE_NOTICE << "updateTransforms" << std::endl;
         // make sure the point is absolute to terrain
         GeoPoint absPos(p);
         if ( !makeAbsolute(absPos, patch) )
@@ -295,10 +306,17 @@ OrthoNode::updateTransforms( const GeoPoint& p, osg::Node* patch )
         // update the xforms:
         _autoxform->setPosition( local2world.getTrans() );
         _matxform->setMatrix( local2world );
+        
+        osg::Vec3d world = local2world.getTrans();
+        if (_horizonCuller.valid())
+        {
+            _horizonCuller->_world = world;
+        }
 
-        CullNodeByHorizon* culler = dynamic_cast<CullNodeByHorizon*>(this->getCullCallback());
-        if ( culler )
-            culler->_world = local2world.getTrans();
+        if (_occlusionCuller.valid())
+        {                                
+            _occlusionCuller->setWorld( adjustOcclusionCullingPoint( world ));
+        } 
     }
     else
     {
@@ -330,6 +348,12 @@ OrthoNode::getLocalOffset() const
     return _localOffset;
 }
 
+bool
+OrthoNode::getHorizonCulling() const
+{
+    return _horizonCulling;
+}
+
 void
 OrthoNode::setHorizonCulling( bool value )
 {
@@ -340,11 +364,61 @@ OrthoNode::setHorizonCulling( bool value )
         if ( _horizonCulling )
         {
             osg::Vec3d world = _autoxform->getPosition();
-            this->setCullCallback( new CullNodeByHorizon(world, _mapSRS->getEllipsoid()) );
+
+            _horizonCuller = new CullNodeByHorizon(world, _mapSRS->getEllipsoid());
+            addCullCallback( _horizonCuller.get()  );
         }
         else
         {
-            this->removeCullCallback( this->getCullCallback() );
+            if (_horizonCuller.valid())
+            {
+                removeCullCallback( _horizonCuller.get() );
+                _horizonCuller = 0;
+            }
+        }
+    }
+}
+
+osg::Vec3d
+OrthoNode::adjustOcclusionCullingPoint( const osg::Vec3d& world )
+{
+    //Adjust the height by a little bit "up", we can't have the occlusion point sitting right on the ground
+    const osg::EllipsoidModel* em = _mapNode->getMapSRS()->getEllipsoid();
+    osg::Vec3d up = em ? em->computeLocalUpVector( world.x(), world.y(), world.z() ) : osg::Vec3d(0,0,1);                
+    osg::Vec3d adjust = up * 0.1;
+    return world + adjust;
+}
+
+bool
+OrthoNode::getOcclusionCulling() const
+{
+    return _occlusionCulling;
+}
+
+void
+OrthoNode::setOcclusionCulling( bool value )
+{
+    if (_occlusionCulling != value)
+    {
+        _occlusionCulling = value;
+
+        if ( _occlusionCulling )
+        {
+            osg::Vec3d world = _autoxform->getPosition();
+            _occlusionCuller = new OcclusionCullingCallback(adjustOcclusionCullingPoint(world), _mapNode.get());
+            _occlusionCuller->setMaxRange( AnnotationSettings::getOcclusionQueryMaxRange() );
+            addCullCallback( _occlusionCuller.get()  );
+        }
+        else
+        {
+            if (_occlusionCulling)
+            {
+                if (_occlusionCuller.valid())
+                {
+                    removeCullCallback( _occlusionCuller.get() );
+                    _occlusionCuller = 0;
+                }
+            }
         }
     }
 }

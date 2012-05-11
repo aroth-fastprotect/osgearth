@@ -24,9 +24,8 @@
 
 #define LC "[viewer] "
 
+using namespace osgEarth;
 using namespace osgEarth::Util;
-
-//------------------------------------------------------------------------
 
 int
 main(int argc, char** argv)
@@ -55,7 +54,7 @@ main(int argc, char** argv)
         // OSG, this activates OSG's IncrementalCompileOpeartion in order to avoid frame breaks.
         viewer.getDatabasePager()->setDoPreCompile( true );
 
-        return viewer.run();
+        viewer.run();
     }
     else
     {

@@ -40,10 +40,10 @@ RectangleNode::RectangleNode(
             const Style&      style,
             bool              draped ) :
 LocalizedNode( mapNode, position, false ),
-_style( style ),
-_draped( draped ),
-_width( width ),
-_height( height )
+_style       ( style ),
+_draped      ( draped )
+_width       ( width ),
+_height      ( height )
 {       
     rebuild();
 }
@@ -304,19 +304,19 @@ RectangleNode::getCorner( Corner corner ) const
 
     if (corner == CORNER_LOWER_LEFT)
     {
-        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(westLon), osg::RadiansToDegrees(southLat), 0);
+        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(westLon), osg::RadiansToDegrees(southLat), 0, ALTMODE_RELATIVE);
     }
     else if (corner == CORNER_LOWER_RIGHT)
     {
-        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(eastLon), osg::RadiansToDegrees(southLat), 0);
+        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(eastLon), osg::RadiansToDegrees(southLat), 0, ALTMODE_RELATIVE);
     }
     else if (corner == CORNER_UPPER_LEFT)
     {
-        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(westLon), osg::RadiansToDegrees(northLat), 0);
+        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(westLon), osg::RadiansToDegrees(northLat), 0, ALTMODE_RELATIVE);
     }
     else if (corner == CORNER_UPPER_RIGHT)
     {
-        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(eastLon), osg::RadiansToDegrees(northLat), 0);
+        return GeoPoint(center.getSRS(), osg::RadiansToDegrees(eastLon), osg::RadiansToDegrees(northLat), 0, ALTMODE_RELATIVE);
     }
     return GeoPoint();
 }
@@ -338,10 +338,14 @@ RectangleNode::rebuild()
     clearDecoration();
 
     //Remove all children from this node
-    removeChildren( 0, getNumChildren() );
+    //removeChildren( 0, getNumChildren() );
+    if ( getRoot()->getNumParents() == 0 )
+    {
+        this->addChild( getRoot() );
+    }
 
     //Remove all children from the attach point
-    getAttachPoint()->removeChildren( 0, getAttachPoint()->getNumChildren() );
+    getChildAttachPoint()->removeChildren( 0, getChildAttachPoint()->getNumChildren() );
 
     // construct a local-origin circle.
     GeometryFactory factory;    
@@ -353,19 +357,8 @@ RectangleNode::rebuild()
         osg::Node* node = compiler.compile( feature.get(), _style, FilterContext(0L) );
         if ( node )
         {
-            getAttachPoint()->addChild( node );
-
-            if ( _draped )
-            {
-                DrapeableNode* drapeable = new DrapeableNode( _mapNode.get(), true );
-                drapeable->addChild( getAttachPoint() );
-                this->addChild( drapeable );
-            }
-
-            else
-            {
-                this->addChild( getAttachPoint() );
-            }
+            getChildAttachPoint()->addChild( node );
+            getDrapeable()->setDraped( _draped );
         }
 
         applyStyle( _style, _draped );

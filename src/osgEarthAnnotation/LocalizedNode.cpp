@@ -56,6 +56,9 @@ _scale         ( 1.0f, 1.0f, 1.0f )
     {
         setHorizonCulling( true );
     }
+
+    _draper = new DrapeableNode( mapNode, false );
+    _draper->addChild( _xform.get() );
     
     setPosition( position );
 }
@@ -71,11 +74,11 @@ LocalizedNode::traverse( osg::NodeVisitor& nv )
     AnnotationNode::traverse( nv );
 }
 
-bool
-LocalizedNode::setPosition( const osg::Vec3d& position )
-{
-    return setPosition( GeoPoint(_mapSRS.get(), position) );
-}
+//bool
+//LocalizedNode::setPosition( const osg::Vec3d& position )
+//{
+//    return setPosition( GeoPoint(_mapSRS.get(), position, ALTMODE_ABSOLUTE) );
+//}
 
 bool
 LocalizedNode::setPosition( const GeoPoint& pos )

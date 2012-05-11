@@ -82,6 +82,7 @@ public:
                 buf << "REPACK " << name; 
                 std::string bufStr;
                 bufStr = buf.str();
+                OE_DEBUG << LC << "SQL: " << bufStr << std::endl;
                 OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
             }
             _layerHandle = 0L;
@@ -204,6 +205,7 @@ public:
                         buf << "CREATE SPATIAL INDEX ON " << name; 
 					    std::string bufStr;
 					    bufStr = buf.str();
+                        OE_DEBUG << LC << "SQL: " << bufStr << std::endl;
                         OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
                     }
 

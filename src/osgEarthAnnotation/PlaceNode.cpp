@@ -118,7 +118,18 @@ PlaceNode::init()
                 break;
             }
         }
-        osg::Geometry* imageGeom = AnnotationUtils::createImageGeometry( _image.get(), offset );
+
+        // Apply a rotation to the marker if requested:
+        double heading = 0.0;
+        if ( marker && marker->orientation().isSet() )
+        {
+            //Just get the heading
+            heading = osg::DegreesToRadians(marker->orientation().value().x());
+        }
+
+        //We must actually rotate the geometry itself and not use a MatrixTransform b/c the 
+        //decluttering doesn't respect Transforms above the drawable.
+        osg::Geometry* imageGeom = AnnotationUtils::createImageGeometry( _image.get(), offset, 0, heading );
         if ( imageGeom )
             _geode->addDrawable( imageGeom );
 
@@ -147,6 +158,7 @@ PlaceNode::init()
     applyStyle( _style );
 }
 
+#if 0 // TODO
 void
 PlaceNode::setIconImage( osg::Image* image )
 {
@@ -156,6 +168,7 @@ PlaceNode::setIconImage( osg::Image* image )
         return;
     }
 }
+#endif
 
 void
 PlaceNode::setText( const std::string& text )
@@ -180,6 +193,7 @@ PlaceNode::setText( const std::string& text )
     }
 }
 
+#if 0 // TODO
 void
 PlaceNode::setStyle( const Style& style )
 {
@@ -189,6 +203,7 @@ PlaceNode::setStyle( const Style& style )
         return;
     }
 }
+#endif
 
 void
 PlaceNode::setAnnotationData( AnnotationData* data )

@@ -30,7 +30,7 @@ Symbol     ( conf ),
 _placement ( PLACEMENT_CENTROID ),
 _density   ( 25.0f ),
 _randomSeed( 0 ),
-_alignment( ALIGN_CENTER_BOTTOM )
+_alignment ( ALIGN_CENTER_BOTTOM )
 {
     mergeConfig( conf );
 }
@@ -51,17 +51,17 @@ MarkerSymbol::getConfig() const
     conf.addIfSet( "random_seed", _randomSeed );
     conf.addIfSet( "is_model", _isModelHint );
 
-	conf.addIfSet( "alignment", "left_top",                _alignment, ALIGN_LEFT_TOP );
-	conf.addIfSet( "alignment", "left_center",             _alignment, ALIGN_LEFT_CENTER );
-	conf.addIfSet( "alignment", "left_bottom",             _alignment, ALIGN_LEFT_BOTTOM );
-	conf.addIfSet( "alignment", "center_top",              _alignment, ALIGN_CENTER_TOP );
-	conf.addIfSet( "alignment", "center_center",           _alignment, ALIGN_CENTER_CENTER );
-	conf.addIfSet( "alignment", "center_bottom",           _alignment, ALIGN_CENTER_BOTTOM );
-	conf.addIfSet( "alignment", "right_top",               _alignment, ALIGN_RIGHT_TOP );
-	conf.addIfSet( "alignment", "right_center",            _alignment, ALIGN_RIGHT_CENTER );
-	conf.addIfSet( "alignment", "right_bottom",            _alignment, ALIGN_RIGHT_BOTTOM );
+    conf.addIfSet( "alignment", "left_top",                _alignment, ALIGN_LEFT_TOP );
+    conf.addIfSet( "alignment", "left_center",             _alignment, ALIGN_LEFT_CENTER );
+    conf.addIfSet( "alignment", "left_bottom",             _alignment, ALIGN_LEFT_BOTTOM );
+    conf.addIfSet( "alignment", "center_top",              _alignment, ALIGN_CENTER_TOP );
+    conf.addIfSet( "alignment", "center_center",           _alignment, ALIGN_CENTER_CENTER );
+    conf.addIfSet( "alignment", "center_bottom",           _alignment, ALIGN_CENTER_BOTTOM );
+    conf.addIfSet( "alignment", "right_top",               _alignment, ALIGN_RIGHT_TOP );
+    conf.addIfSet( "alignment", "right_center",            _alignment, ALIGN_RIGHT_CENTER );
+    conf.addIfSet( "alignment", "right_bottom",            _alignment, ALIGN_RIGHT_BOTTOM );
 
-	conf.addNonSerializable( "MarkerSymbol::image", _image.get() );
+    conf.addNonSerializable( "MarkerSymbol::image", _image.get() );
     conf.addNonSerializable( "MarkerSymbol::node", _node.get() );
     return conf;
 }
@@ -80,15 +80,15 @@ MarkerSymbol::mergeConfig( const Config& conf )
     conf.getIfSet( "orientation", _orientation);
     conf.getIfSet( "is_model", _isModelHint );
 
-	conf.getIfSet( "alignment", "left_top",                _alignment, ALIGN_LEFT_TOP );
-	conf.getIfSet( "alignment", "left_center",             _alignment, ALIGN_LEFT_CENTER );
-	conf.getIfSet( "alignment", "left_bottom",             _alignment, ALIGN_LEFT_BOTTOM );
-	conf.getIfSet( "alignment", "center_top",              _alignment, ALIGN_CENTER_TOP );
-	conf.getIfSet( "alignment", "center_center",           _alignment, ALIGN_CENTER_CENTER );
-	conf.getIfSet( "alignment", "center_bottom",           _alignment, ALIGN_CENTER_BOTTOM );
-	conf.getIfSet( "alignment", "right_top",               _alignment, ALIGN_RIGHT_TOP );
-	conf.getIfSet( "alignment", "right_center",            _alignment, ALIGN_RIGHT_CENTER );
-	conf.getIfSet( "alignment", "right_bottom",            _alignment, ALIGN_RIGHT_BOTTOM );
+    conf.getIfSet( "alignment", "left_top",                _alignment, ALIGN_LEFT_TOP );
+    conf.getIfSet( "alignment", "left_center",             _alignment, ALIGN_LEFT_CENTER );
+    conf.getIfSet( "alignment", "left_bottom",             _alignment, ALIGN_LEFT_BOTTOM );
+    conf.getIfSet( "alignment", "center_top",              _alignment, ALIGN_CENTER_TOP );
+    conf.getIfSet( "alignment", "center_center",           _alignment, ALIGN_CENTER_CENTER );
+    conf.getIfSet( "alignment", "center_bottom",           _alignment, ALIGN_CENTER_BOTTOM );
+    conf.getIfSet( "alignment", "right_top",               _alignment, ALIGN_RIGHT_TOP );
+    conf.getIfSet( "alignment", "right_center",            _alignment, ALIGN_RIGHT_CENTER );
+    conf.getIfSet( "alignment", "right_bottom",            _alignment, ALIGN_RIGHT_BOTTOM );
 
     _image = conf.getNonSerializable<osg::Image>( "MarkerSymbol::image" );
     _node = conf.getNonSerializable<osg::Node>( "MarkerSymbol::node" );
@@ -106,7 +106,7 @@ MarkerSymbol::getImage( unsigned maxSize ) const
             osg::ref_ptr<osgDB::Options> dbOptions = Registry::instance()->cloneOrCreateOptions();
             dbOptions->setObjectCacheHint( osgDB::Options::CACHE_IMAGES );
             _image = URI(_url->eval(), _url->uriContext()).getImage( dbOptions.get() );
-            if ( _image.valid() && (maxSize < _image->s() || maxSize < _image->t()) )
+            if ( _image.valid() && (maxSize < (unsigned int)_image->s() || maxSize < (unsigned int)_image->t()) )
             {
                 unsigned new_s, new_t;
 

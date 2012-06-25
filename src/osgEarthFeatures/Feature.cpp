@@ -18,6 +18,8 @@
  */
 #include <osgEarthFeatures/Feature>
 #include <osgEarth/StringUtils>
+#include <osgEarthFeatures/GeometryUtils>
+#include <osgEarth/JsonUtils>
 #include <algorithm>
 
 using namespace osgEarth;
@@ -481,4 +483,77 @@ Feature::getWorldBoundingPolytope() const
         }
     }
     return _cachedBoundingPolytope;
+}
+
+std::string
+Feature::getGeoJSON()
+{
+    std::string geometry = GeometryUtils::geometryToGeoJSON( getGeometry() );
+
+    Json::Value root(Json::objectValue);
+    root["type"] = "Feature";
+    root["id"] = (unsigned int)getFID(); //TODO:  Update JSON to use unsigned longs
+    
+    Json::Reader reader;
+    Json::Value geometryValue( Json::objectValue );
+    if ( reader.parse( geometry, geometryValue ) )
+    {
+        root["geometry"] = geometryValue;
+    }
+
+    //Write out all the properties         
+    Json::Value props(Json::objectValue);    
+    if (getAttrs().size() > 0)
+    {
+
+        for (AttributeTable::const_iterator itr = getAttrs().begin(); itr != getAttrs().end(); ++itr)
+            props[itr->first] = itr->second.getString();
+    } 
+
+    root["properties"] = props;
+    return Json::FastWriter().write( root );
+    //return Json::StyledWriter().write( root );
+}
+
+std::string Feature::featuresToGeoJSON( FeatureList& features)
+{
+    std::stringstream buf;
+
+    buf << "{\"type\": \"FeatureCollection\", \"features\": [";
+
+    FeatureList::iterator last = features.end();
+    last--;
+
+    for (FeatureList::iterator i = features.begin(); i != features.end(); i++)
+    {
+        buf << i->get()->getGeoJSON();
+        if (i != last)
+        {
+            buf << ",";
+        }
+    }
+
+    buf << "]}";
+
+    return buf.str();
+
+}
+
+void Feature::transform( const SpatialReference* srs )
+{
+    if (!getGeometry())
+    {
+        return;
+    }
+
+    if (getSRS()->isEquivalentTo( srs )) return;
+
+    // iterate over the feature geometry.
+    GeometryIterator iter( getGeometry() );
+    while( iter.hasMore() )
+    {
+        Geometry* geom = iter.next();
+        getSRS()->transform( geom->asVector(), srs );
+    }
+    setSRS( srs );
 }

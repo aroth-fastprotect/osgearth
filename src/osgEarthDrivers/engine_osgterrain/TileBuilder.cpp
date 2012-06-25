@@ -58,17 +58,43 @@ struct BuildColorLayer
         bool autoFallback = _key.getLevelOfDetail() <= 1;
 
         TileKey imageKey( _key );
-        while( !geoImage.valid() && imageKey.valid() && _layer->isKeyValid(imageKey) )
-        {
-            if ( useMercatorFastPath )
-                geoImage = _layer->createImageInNativeProfile( imageKey, 0L, autoFallback );
-            else
-                geoImage = _layer->createImage( imageKey, 0L, autoFallback );
+        TileSource* tileSource = _layer->getTileSource();
 
-            if ( !geoImage.valid() )
+        //Only try to get data from the source if it actually intersects the key extent
+        bool hasDataInExtent = true;
+        if (tileSource)
+        {
+            GeoExtent ext = _key.getExtent();
+            if (!_layer->getProfile()->getSRS()->isEquivalentTo( ext.getSRS()))
             {
-                imageKey = imageKey.createParentKey();
-                isFallbackData = true;
+                ext = _layer->getProfile()->clampAndTransformExtent( ext );
+            }
+            hasDataInExtent = tileSource->hasDataInExtent( ext );
+        }        
+        
+        if (hasDataInExtent)
+        {
+            while( !geoImage.valid() && imageKey.valid() && _layer->isKeyValid(imageKey) )
+            {
+                if ( useMercatorFastPath )
+                {
+                    bool mercFallbackData = false;
+                    geoImage = _layer->createImageInNativeProfile( imageKey, 0L, autoFallback, mercFallbackData );
+                    if ( geoImage.valid() && mercFallbackData )
+                    {
+                        isFallbackData = true;
+                    }
+                }
+                else
+                {
+                    geoImage = _layer->createImage( imageKey, 0L, autoFallback );
+                }
+
+                if ( !geoImage.valid() )
+                {
+                    imageKey = imageKey.createParentKey();
+                    isFallbackData = true;
+                }
             }
         }
 
@@ -88,6 +114,17 @@ struct BuildColorLayer
             else
                 locator = GeoLocator::createForExtent(geoImage.getExtent(), *_mapInfo);
         }
+
+        bool isStreaming = _opt->loadingPolicy()->mode() == LoadingPolicy::MODE_PREEMPTIVE || _opt->loadingPolicy()->mode() == LoadingPolicy::MODE_SEQUENTIAL;
+
+        if (geoImage.getImage() && isStreaming)
+        {
+            // protected against multi threaded access. This is a requirement in sequential/preemptive mode, 
+            // for example. This used to be in TextureCompositorTexArray::prepareImage.
+            // TODO: review whether this affects performance.    
+            geoImage.getImage()->setDataVariance( osg::Object::DYNAMIC );
+        }
+
         // add the color layer to the repo.
         _repo->add( CustomColorLayer(
             _layer,

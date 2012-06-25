@@ -165,9 +165,12 @@ Profile::create(const std::string& srsInitString,
                 unsigned int numTilesWideAtLod0,
                 unsigned int numTilesHighAtLod0)
 {
-    const Profile* named = osgEarth::Registry::instance()->getNamedProfile( srsInitString );
-    if ( named )
-        return const_cast<Profile*>( named );
+    if ( vsrsInitString.empty() && numTilesWideAtLod0 == 0 && numTilesHighAtLod0 == 0 )
+    {
+        const Profile* named = osgEarth::Registry::instance()->getNamedProfile( srsInitString );
+        if ( named )
+            return const_cast<Profile*>( named );
+    }
 
     osg::ref_ptr<const SpatialReference> srs = SpatialReference::create( srsInitString, vsrsInitString );
 
@@ -184,15 +187,15 @@ Profile::create(const std::string& srsInitString,
         osg::Vec3d point(180.0, 0.0, 0.0);
         srs->getGeographicSRS()->transform(point, srs.get(), point);
         double e = point.x();
-        //GDAL_SCOPED_LOCK;
-        //double e, dummy;
-        //srs->getGeographicSRS()->transform2D( 180.0, 0.0, srs.get(), e, dummy );
         return Profile::create( srs.get(), -e, -e, e, e, numTilesWideAtLod0, numTilesHighAtLod0 );
+    }
+    else if ( srs.valid() )
+    {
+        OE_WARN << LC << "Failed to create profile; you must provide extents with a projected SRS." << std::endl;
     }
     else
     {
-        OE_WARN << LC << "Failed to create profile; SRS spec requires addition information: \"" << srsInitString << 
-            std::endl;
+        OE_WARN << LC << "Failed to create profile; unrecognized SRS: \"" << srsInitString << "\"" << std::endl;
     }
 
     return NULL;
@@ -370,15 +373,13 @@ Profile::toProfileOptions() const
     return op;
 }
 
-void
-Profile::overrideSRS( const SpatialReference* srs )
+Profile*
+Profile::overrideSRS( const SpatialReference* srs ) const
 {
-    _extent = GeoExtent(
+    return new Profile(
         srs,
-        _extent.xMin(),
-        _extent.yMin(),
-        _extent.xMax(),
-        _extent.yMax() );
+        _extent.xMin(), _extent.yMin(), _extent.xMax(), _extent.yMax(),
+        _numTilesWideAtLod0, _numTilesHighAtLod0 );
 }
 
 void
@@ -591,6 +592,13 @@ Profile::addIntersectingTiles(const GeoExtent& key_ext, std::vector<TileKey>& ou
 
     unsigned int numWide, numHigh;
     getNumTiles(destLOD, numWide, numHigh);
+
+    // bail out if the tiles are out of bounds.
+    if ( tileMinX >= (int)numWide || tileMinY >= (int)numHigh ||
+         tileMaxX < 0 || tileMaxY < 0 )
+    {
+        return;
+    }
 
     tileMinX = osg::clampBetween(tileMinX, 0, (int)numWide-1);
     tileMaxX = osg::clampBetween(tileMaxX, 0, (int)numWide-1);

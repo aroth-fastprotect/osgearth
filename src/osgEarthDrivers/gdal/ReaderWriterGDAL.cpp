@@ -625,7 +625,7 @@ public:
     {             
         GDAL_SCOPED_LOCK;
 
-        if (_warpedDS != _srcDS)
+        if (_warpedDS && (_warpedDS != _srcDS))
         {
             GDALClose( _warpedDS );
         }
@@ -648,23 +648,9 @@ public:
             return;
         }
 
+
+
         URI uri = _options.url().value();
-
-#if 0 //OBE
-        //Find the full path to the URL
-        //If we have a relative path and the map file contains a server address, just concat the server path and the _url together
-
-        if (osgEarth::isRelativePath(uri.full()) && osgDB::containsServerAddress(referenceURI))
-        {
-            uri = URI(osgDB::getFilePath(referenceURI) + std::string("/") + uri.full());
-        }
-
-        //If the path doesn't contain a server address, get the full path to the file.
-        if (!osgDB::containsServerAddress(uri.full()))
-        {
-            uri = URI(uri.full(), referenceURI);
-        }
-#endif
 
         StringTokenizer izer( ";" );
         StringVector exts;
@@ -735,9 +721,27 @@ public:
             }
         }
 
+
+        //Get the "warp profile", which is the profile that this dataset should take on by creating a warping VRT.  This is
+        //useful when you want to use multiple images of different projections in a composite image.
+        osg::ref_ptr< const Profile > warpProfile;
+        if (_options.warpProfile().isSet())
+        {
+            warpProfile = Profile::create( _options.warpProfile().value() );
+        }
+
+        if (warpProfile.valid())
+        {
+            OE_NOTICE << "Created warp profile " << warpProfile->toString() <<  std::endl;
+        }
+
+
+
+
         //Create a spatial reference for the source.
-        const char* srcProj = _srcDS->GetProjectionRef();
-        if ( srcProj != 0L && overrideProfile != 0L )
+        std::string srcProj = _srcDS->GetProjectionRef();
+        //const char* srcProj = _srcDS->GetProjectionRef();
+        if ( !srcProj.empty() && overrideProfile != 0L )
         {
             OE_WARN << LC << "WARNING, overriding profile of a source that already defines its own SRS (" 
                 << this->getName() << ")" << std::endl;
@@ -748,7 +752,7 @@ public:
         {
             src_srs = overrideProfile->getSRS();
         }
-        else if ( srcProj )
+        else if ( !srcProj.empty() )
         {
             src_srs = SpatialReference::create( srcProj );
         }
@@ -779,10 +783,16 @@ public:
         bool isRotated = _geotransform[2] != 0.0 || _geotransform[4];
         if (hasGCP) OE_DEBUG << LC << uri.full() << " has GCP georeferencing" << std::endl;
         if (isRotated) OE_DEBUG << LC << uri.full() << " is rotated " << std::endl;
-        bool requiresReprojection = hasGCP || isRotated;        
+        bool requiresReprojection = hasGCP || isRotated;
 
         const Profile* profile = NULL;
 
+        if (warpProfile)
+        {
+            profile = warpProfile;
+        }
+
+        //If we have an override profile, just take it.
         if ( overrideProfile )
         {
             profile = overrideProfile;
@@ -818,7 +828,7 @@ public:
                     NULL);
             }
             else
-            {                
+            {                                
                 _warpedDS = (GDALDataset*)GDALAutoCreateWarpedVRT(
                     _srcDS,
                     src_srs->getWKT().c_str(),

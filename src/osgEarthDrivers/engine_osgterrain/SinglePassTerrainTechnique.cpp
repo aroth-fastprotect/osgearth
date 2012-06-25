@@ -95,7 +95,7 @@ _pendingGeometryUpdate( false ),
 _optimizeTriangleOrientation( rhs._optimizeTriangleOrientation ),
 _texCompositor( rhs._texCompositor.get() ),
 _frontGeodeInstalled( rhs._frontGeodeInstalled ),
-_parentTile( rhs._parentTile )
+_clearDataAfterCompile( rhs._clearDataAfterCompile )
 {
     //NOP
 }
@@ -134,6 +134,11 @@ SinglePassTerrainTechnique::init()
 {
     compile( TileUpdate(TileUpdate::UPDATE_ALL), 0L );
     applyTileUpdates();
+
+    if (_clearDataAfterCompile)
+    {        
+        _tile->clear();
+    }
 }
 
 void

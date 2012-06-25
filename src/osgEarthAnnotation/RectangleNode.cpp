@@ -41,7 +41,7 @@ RectangleNode::RectangleNode(
             bool              draped ) :
 LocalizedNode( mapNode, position, false ),
 _style       ( style ),
-_draped      ( draped )
+_draped      ( draped ),
 _width       ( width ),
 _height      ( height )
 {       

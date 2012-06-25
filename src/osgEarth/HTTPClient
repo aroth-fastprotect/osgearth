@@ -205,7 +205,7 @@ namespace osgEarth
 
         /** Sets up proxy info to use in all HTTP requests.
             TODO: This should probably move into the Registry */
-        static void setProxySettings( const ProxySettings &proxySettings );
+		static void setProxySettings( const optional<ProxySettings> &proxySettings );
 
         /** Gets up proxy info to use in all HTTP requests.
             TODO: This should probably move into the Registry */

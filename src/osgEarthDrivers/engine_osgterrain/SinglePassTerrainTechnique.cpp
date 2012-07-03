@@ -72,13 +72,13 @@ CustomTerrainTechnique(),
 _debug( false ),
 _compileMutex(Mutex::MUTEX_RECURSIVE),
 _verticalScaleOverride(1.0f),
-_atomicCallOnce(0),
 _initCount(0),
 _pendingFullUpdate( false ),
 _pendingGeometryUpdate(false),
 _optimizeTriangleOrientation(true),
 _texCompositor( compositor ),
-_frontGeodeInstalled( false )
+_frontGeodeInstalled( false ),
+_atomicCallOnce(0)
 {
     this->setThreadSafeRefUnref(true);
 }
@@ -88,14 +88,14 @@ CustomTerrainTechnique( rhs, copyop ),
 _debug( rhs._debug ),
 _compileMutex(Mutex::MUTEX_RECURSIVE),
 _verticalScaleOverride( rhs._verticalScaleOverride ),
-_atomicCallOnce( 0 ),
 _initCount( 0 ),
 _pendingFullUpdate( false ),
 _pendingGeometryUpdate( false ),
+_clearDataAfterCompile( rhs._clearDataAfterCompile ),
 _optimizeTriangleOrientation( rhs._optimizeTriangleOrientation ),
 _texCompositor( rhs._texCompositor.get() ),
 _frontGeodeInstalled( rhs._frontGeodeInstalled ),
-_clearDataAfterCompile( rhs._clearDataAfterCompile )
+_atomicCallOnce( 0 )
 {
     //NOP
 }

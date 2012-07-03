@@ -288,8 +288,6 @@ namespace osgEarth { namespace QtGui
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
-      osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
-
       if ( ea.getEventType() == osgGA::GUIEventAdapter::PUSH  && _mouseDown == -1)
       {
         _mouseDown = ea.getButton();
@@ -411,11 +409,10 @@ namespace osgEarth { namespace QtGui
   };
 
   //---------------------------------------------------------------------------
-
   struct AddEllipseMouseHandler : public osgGA::GUIEventHandler
   {
     AddEllipseMouseHandler(AddEllipseDialog* dialog, osgEarth::MapNode* mapNode, osg::Group* root)
-      : _dialog(dialog), _mapNode(mapNode), _root(root), _mouseDown(false), _capturing(true), _rotationAngle(0, osgEarth::Units::DEGREES)
+      : _dialog(dialog), _mapNode(mapNode), _root(root), _rotationAngle(0, osgEarth::Units::DEGREES), _capturing(true), _mouseDown(false)
     {
       //Define a style for the ellipse outline
       _ellipseStyle.getOrCreate<LineSymbol>()->stroke()->color() = Color(Color::White, 0.75);
@@ -433,8 +430,6 @@ namespace osgEarth { namespace QtGui
     {
       if (!_capturing)
         return false;
-
-      osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
 
       if (ea.getEventType() == osgGA::GUIEventAdapter::PUSH && ea.getButton() == osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON)
       {

@@ -67,7 +67,7 @@ namespace osgEarth { namespace Symbology
 
             ALIGN_RIGHT_TOP,
             ALIGN_RIGHT_CENTER,
-            ALIGN_RIGHT_BOTTOM,
+            ALIGN_RIGHT_BOTTOM
         };
 
     public:

@@ -45,9 +45,13 @@
 #include <osgEarthUtil/ExampleResources>
 #include <osgEarthUtil/ShadowUtils>
 #include <osgEarth/NodeUtils>
+#include <osgEarth/MapNode>
+#include <osgEarth/TerrainEngineNode>
+#include <osgEarthDrivers/engine_osgterrain/OSGTerrainOptions>
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
+using namespace osgEarth::Drivers;
 
 int main(int argc, char** argv)
 {
@@ -81,23 +85,17 @@ int main(int argc, char** argv)
     osgShadow::ShadowSettings* settings = new osgShadow::ShadowSettings;
     shadowedScene->setShadowSettings(settings);
 
-    while( arguments.read("--debugHUD") ) settings->setDebugDraw( true );
     if (arguments.read("--persp")) settings->setShadowMapProjectionHint(osgShadow::ShadowSettings::PERSPECTIVE_SHADOW_MAP);
     if (arguments.read("--ortho")) settings->setShadowMapProjectionHint(osgShadow::ShadowSettings::ORTHOGRAPHIC_SHADOW_MAP);
 
-    unsigned int unit=1;
-    if (arguments.read("--unit",unit)) settings->setBaseShadowTextureUnit(unit);
-    
     double n=0.0;
     if (arguments.read("-n",n)) settings->setMinimumShadowMapNearFarRatio(n);
-
 
     unsigned int numShadowMaps;
     if (arguments.read("--num-sm",numShadowMaps)) settings->setNumShadowMapsPerLight(numShadowMaps);
 
     if (arguments.read("--parallel-split") || arguments.read("--ps") ) settings->setMultipleShadowMapHint(osgShadow::ShadowSettings::PARALLEL_SPLIT);
     if (arguments.read("--cascaded")) settings->setMultipleShadowMapHint(osgShadow::ShadowSettings::CASCADED);
-
 
     int mapres = 1024;
     while (arguments.read("--mapres", mapres))
@@ -110,6 +108,7 @@ int main(int argc, char** argv)
     osg::ref_ptr<osg::Group> model = MapNodeHelper().load(arguments, &viewer);
 
     SkyNode* skyNode = findTopMostNodeOfType< SkyNode > ( model.get() );
+    MapNode* mapNode = findTopMostNodeOfType< MapNode > ( model.get() );
 
     if (!model.valid())
     {
@@ -124,6 +123,18 @@ int main(int argc, char** argv)
         OE_NOTICE << "Please run with options --sky to enable the SkyNode" << std::endl;
         exit(1);
     }
+
+    //Disable skirts from casting shadows
+    const OSGTerrainOptions* opt = dynamic_cast<const OSGTerrainOptions*>(&mapNode->getTerrainEngine()->getTerrainOptions());
+    if (opt)
+    {        
+        //Set the skirts to NOT cast shadows or you will see artifacts close to the ground
+        if (opt->skirtNodeMask().isSet())
+        {
+            shadowedScene->setCastsShadowTraversalMask(  ~opt->skirtNodeMask().value() );            
+        }
+    }    
+
 
     ShadowUtils::setUpShadows(shadowedScene, model);
 

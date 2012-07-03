@@ -129,8 +129,6 @@ namespace osgEarth { namespace Util
         //override
         virtual osg::BoundingSphere computeBound() const;
 
-    protected:
-
         /** Sets the sun's position as a unit vector. */
         void setSunPosition( const osg::Vec3& pos, osg::View* view =0L );
 
@@ -140,6 +138,7 @@ namespace osgEarth { namespace Util
         /** Sets the sun's position as a latitude and longitude. */         
         void setSunPosition( double lat_degrees, double lon_degrees, osg::View* view =0L );        
 
+    protected:
 
         struct StarData
         {

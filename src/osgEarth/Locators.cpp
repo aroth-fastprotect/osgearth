@@ -22,12 +22,6 @@
 #include <osgEarth/Map>
 #include <osg/Notify>
 
-#ifdef __GNUC__
-#define LIKELY_UNUSED_FUNCTION __attribute__ ((unused))
-#else
-#define LIKELY_UNUSED_FUNCTION
-#endif
-
 using namespace osgEarth;
 
 GeoLocator::GeoLocator() :

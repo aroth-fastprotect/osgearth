@@ -409,6 +409,7 @@ namespace osgEarth { namespace QtGui
   };
 
   //---------------------------------------------------------------------------
+
   struct AddEllipseMouseHandler : public osgGA::GUIEventHandler
   {
     AddEllipseMouseHandler(AddEllipseDialog* dialog, osgEarth::MapNode* mapNode, osg::Group* root)

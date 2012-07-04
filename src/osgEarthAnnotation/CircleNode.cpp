@@ -42,8 +42,8 @@ CircleNode::CircleNode(MapNode*           mapNode,
 LocalizedNode( mapNode, position, false ),
 _style       ( style ),
 _draped      ( draped ),
-_numSegments( numSegments ),
-_radius( radius )
+_numSegments ( numSegments ),
+_radius      ( radius )
 {
     rebuild();
 }

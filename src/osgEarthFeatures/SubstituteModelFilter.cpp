@@ -167,9 +167,8 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
                     osg::MatrixTransform* xform = new osg::MatrixTransform();
                     xform->setMatrix( mat );
-
+                    xform->setDataVariance( osg::Object::STATIC );
                     xform->addChild( model.get() );
-
                     attachPoint->addChild( xform );
 
                     if ( context.featureIndex() )

@@ -50,9 +50,9 @@ FeatureNode::FeatureNode(MapNode* mapNode,
                          const GeometryCompilerOptions& options ) :
 AnnotationNode( mapNode ),
 _feature      ( feature ),
-_options( options ),
+_options      ( options ),
 _draped       ( draped ),
-_attachPoint(NULL)
+_attachPoint  (NULL)
 {
     init();
 }

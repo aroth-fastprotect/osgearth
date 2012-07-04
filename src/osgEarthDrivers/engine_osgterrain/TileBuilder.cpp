@@ -65,7 +65,7 @@ struct BuildColorLayer
         if (tileSource)
         {
             GeoExtent ext = _key.getExtent();
-            if (!_layer->getProfile()->getSRS()->isEquivalentTo( ext.getSRS()))
+            if (_layer->getProfile() && !_layer->getProfile()->getSRS()->isEquivalentTo( ext.getSRS()))
             {
                 ext = _layer->getProfile()->clampAndTransformExtent( ext );
             }

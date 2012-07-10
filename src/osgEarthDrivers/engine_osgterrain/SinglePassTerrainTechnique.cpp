@@ -78,9 +78,10 @@ _pendingGeometryUpdate(false),
 _optimizeTriangleOrientation(true),
 _texCompositor( compositor ),
 _frontGeodeInstalled( false ),
-_atomicCallOnce(0)
+_atomicCallOnce(0),
+_clearDataAfterCompile( true )
 {
-    this->setThreadSafeRefUnref(true);
+    setThreadSafeRefUnref(true);
 }
 
 SinglePassTerrainTechnique::SinglePassTerrainTechnique(const SinglePassTerrainTechnique& rhs, const osg::CopyOp& copyop):

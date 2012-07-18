@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -35,6 +35,19 @@ Config::setReferrer( const std::string& referrer )
     for( ConfigSet::iterator i = _children.begin(); i != _children.end(); i++ )
     { 
         i->setReferrer( osgEarth::getFullPath(_referrer, i->_referrer) );
+    }
+}
+
+void
+Config::inheritReferrer( const std::string& referrer )
+{
+    if ( _referrer.empty() || !osgEarth::isRelativePath(referrer) )
+    {
+        setReferrer( referrer );
+    }
+    else if ( !referrer.empty() )
+    {
+        setReferrer( osgDB::concatPaths(_referrer, referrer) );
     }
 }
 
@@ -74,6 +87,11 @@ Config::mutable_child( const std::string& childName )
 void
 Config::merge( const Config& rhs ) 
 {
+    // remove any matching keys first; this will allow the addition of multi-key values
+    for( ConfigSet::const_iterator c = rhs._children.begin(); c != rhs._children.end(); ++c )
+        remove( c->key() );
+
+    // add in the new values.
     for( ConfigSet::const_iterator c = rhs._children.begin(); c != rhs._children.end(); ++c )
         add( *c );
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -88,9 +88,19 @@ GeoPoint GeoPoint::INVALID;
 
 GeoPoint::GeoPoint(const SpatialReference* srs,
                    double x,
+                   double y ) :
+_srs    ( srs ),
+_p      ( x, y, 0.0 ),
+_altMode( ALTMODE_RELATIVE )
+{
+    //nop
+}
+
+GeoPoint::GeoPoint(const SpatialReference* srs,
+                   double x,
                    double y,
                    double z,
-                   const AltitudeModeEnum& altMode) :
+                   const AltitudeMode& altMode) :
 _srs    ( srs ),
 _p      ( x, y, z ),
 _altMode( altMode )
@@ -100,7 +110,7 @@ _altMode( altMode )
 
 GeoPoint::GeoPoint(const SpatialReference* srs,
                    const osg::Vec3d&       xyz,
-                   const AltitudeModeEnum& altMode) :
+                   const AltitudeMode&     altMode) :
 _srs(srs),
 _p  (xyz),
 _altMode( altMode )
@@ -124,19 +134,20 @@ _altMode( rhs._altMode )
 
 GeoPoint::GeoPoint() :
 _srs    ( 0L ),
-_altMode( AltitudeMode::ABSOLUTE )
+_altMode( ALTMODE_ABSOLUTE )
 {
     //nop
 }
 
 GeoPoint::GeoPoint(const Config& conf, const SpatialReference* srs) :
 _srs    ( srs ),
-_altMode( AltitudeMode::ABSOLUTE )
+_altMode( ALTMODE_ABSOLUTE )
 {
     conf.getIfSet( "x", _p.x() );
     conf.getIfSet( "y", _p.y() );
     conf.getIfSet( "z", _p.z() );
     conf.getIfSet( "alt", _p.z() );
+    conf.getIfSet( "hat", _p.z() ); // height above terrain (relative)
 
     if ( !_srs.valid() )
         _srs = SpatialReference::create( conf.value("srs"), conf.value("vdatum") );
@@ -156,16 +167,16 @@ _altMode( AltitudeMode::ABSOLUTE )
 
     if ( conf.hasValue("mode") )
     {
-        conf.getIfSet( "mode", "relative",            _altMode, AltitudeMode::RELATIVE_TO_TERRAIN );
-        conf.getIfSet( "mode", "relative_to_terrain", _altMode, AltitudeMode::RELATIVE_TO_TERRAIN );
-        conf.getIfSet( "mode", "absolute",            _altMode, AltitudeMode::ABSOLUTE );
+        conf.getIfSet( "mode", "relative",            _altMode, ALTMODE_RELATIVE );
+        conf.getIfSet( "mode", "relative_to_terrain", _altMode, ALTMODE_RELATIVE );
+        conf.getIfSet( "mode", "absolute",            _altMode, ALTMODE_ABSOLUTE );
     }
     else
     {
         if ( conf.hasValue("alt") || conf.hasValue("z") )
-            _altMode = AltitudeMode::ABSOLUTE;
+            _altMode = ALTMODE_ABSOLUTE;
         else
-            _altMode = AltitudeMode::RELATIVE_TO_TERRAIN;
+            _altMode = ALTMODE_RELATIVE;
     }
 }
 
@@ -177,14 +188,22 @@ GeoPoint::getConfig() const
     {
         conf.set( "lat", _p.y() );
         conf.set( "long", _p.x() );
-        if ( _p.x() != 0.0 )
-            conf.set( "alt", _p.z() );
+        if ( _p.z() != 0.0 )
+        {
+            if ( _altMode == ALTMODE_ABSOLUTE )
+                conf.set( "alt", _p.z() );
+            else
+                conf.set( "hat", _p.z() );
+        }
     }
     else
     {
         conf.set( "x", _p.x() );
         conf.set( "y", _p.y() );
-        conf.set( "z", _p.z() );
+        if ( _altMode == ALTMODE_ABSOLUTE )
+            conf.set( "z", _p.z() );
+        else
+            conf.set( "hat", _p.z() );
     }
 
     if ( _srs.valid() )
@@ -200,7 +219,7 @@ GeoPoint::getConfig() const
 void
 GeoPoint::set(const SpatialReference* srs,
               const osg::Vec3d&       xyz,
-              const AltitudeModeEnum& altMode)
+              const AltitudeMode&     altMode)
 {
     _srs = srs;
     _p   = xyz;
@@ -212,7 +231,7 @@ GeoPoint::set(const SpatialReference* srs,
               double                  x,
               double                  y,
               double                  z,
-              const AltitudeModeEnum& altMode)
+              const AltitudeMode&     altMode)
 {
     _srs = srs;
     _p.set(x, y, z);
@@ -226,8 +245,8 @@ GeoPoint::operator == (const GeoPoint& rhs) const
         isValid() == rhs.isValid() &&
         _p        == rhs._p        &&
         _altMode  == rhs._altMode  &&
-        ((_altMode == AltitudeMode::ABSOLUTE && _srs->isEquivalentTo(rhs._srs.get())) ||
-         (_altMode == AltitudeMode::RELATIVE_TO_TERRAIN && _srs->isHorizEquivalentTo(rhs._srs.get())));
+        ((_altMode == ALTMODE_ABSOLUTE && _srs->isEquivalentTo(rhs._srs.get())) ||
+         (_altMode == ALTMODE_RELATIVE && _srs->isHorizEquivalentTo(rhs._srs.get())));
 }
 
 GeoPoint
@@ -236,17 +255,17 @@ GeoPoint::transform(const SpatialReference* outSRS) const
     if ( isValid() && outSRS )
     {
         osg::Vec3d out;
-        if ( _altMode == AltitudeMode::ABSOLUTE )
+        if ( _altMode == ALTMODE_ABSOLUTE )
         {
             if ( _srs->transform(_p, outSRS, out) )
-                return GeoPoint(outSRS, out, AltitudeMode::ABSOLUTE);
+                return GeoPoint(outSRS, out, ALTMODE_ABSOLUTE);
         }
-        else // if ( _altMode == AltitudeMode::RELATIVE_TO_TERRAIN )
+        else // if ( _altMode == ALTMODE_RELATIVE )
         {
             if ( _srs->transform2D(_p.x(), _p.y(), outSRS, out.x(), out.y()) )
             {
                 out.z() = _p.z();
-                return GeoPoint(outSRS, out, AltitudeMode::RELATIVE_TO_TERRAIN);
+                return GeoPoint(outSRS, out, ALTMODE_RELATIVE);
             }
         }
     }
@@ -254,7 +273,7 @@ GeoPoint::transform(const SpatialReference* outSRS) const
 }
 
 bool
-GeoPoint::transformZ(const AltitudeModeEnum& altMode, const Terrain* terrain ) 
+GeoPoint::transformZ(const AltitudeMode& altMode, const TerrainHeightProvider* terrain ) 
 {
     double z;
     if ( transformZ(altMode, terrain, z) )
@@ -267,7 +286,7 @@ GeoPoint::transformZ(const AltitudeModeEnum& altMode, const Terrain* terrain )
 }
 
 bool
-GeoPoint::transformZ(const AltitudeModeEnum& altMode, const Terrain* terrain, double& out_z ) const
+GeoPoint::transformZ(const AltitudeMode& altMode, const TerrainHeightProvider* terrain, double& out_z ) const
 {
     if ( !isValid() ) return false;
     
@@ -288,11 +307,11 @@ GeoPoint::transformZ(const AltitudeModeEnum& altMode, const Terrain* terrain, do
     }
 
     // convert the Z value as appropriate.
-    if ( altMode == AltitudeMode::RELATIVE_TO_TERRAIN )
+    if ( altMode == ALTMODE_RELATIVE )
     {
         out_z = z() - out_hamsl;
     }
-    else // if ( altMode == AltitudeMode::ABSOLUTE )
+    else // if ( altMode == ALTMODE_ABSOLUTE )
     {
         out_z = z() + out_hamsl;
     }
@@ -319,13 +338,35 @@ bool
 GeoPoint::toWorld( osg::Vec3d& out_world ) const
 {
     if ( !isValid() ) return false;
-    if ( _altMode != AltitudeMode::ABSOLUTE )
+    if ( _altMode != ALTMODE_ABSOLUTE )
     {
         OE_WARN << LC << "ILLEGAL: called GeoPoint::toWorld with AltitudeMode = RELATIVE_TO_TERRAIN" << std::endl;
         return false;
     }
     return _srs->transformToWorld( _p, out_world );
 }
+
+bool
+GeoPoint::toWorld( osg::Vec3d& out_world, const TerrainHeightProvider* terrain ) const
+{
+    if ( !isValid() ) return false;
+    if ( _altMode == ALTMODE_ABSOLUTE )
+    {
+        return _srs->transformToWorld( _p, out_world );
+    }
+    else if ( terrain != 0L )
+    {
+        GeoPoint absPoint = *this;
+        absPoint.makeAbsolute( terrain );
+        return absPoint.toWorld( out_world );
+    }
+    else
+    {
+        OE_WARN << LC << "ILLEGAL: called GeoPoint::toWorld with AltitudeMode = RELATIVE_TO_TERRAIN" << std::endl;
+        return false;
+    }
+}
+
 
 bool
 GeoPoint::fromWorld(const SpatialReference* srs, const osg::Vec3d& world)
@@ -335,7 +376,7 @@ GeoPoint::fromWorld(const SpatialReference* srs, const osg::Vec3d& world)
         osg::Vec3d p;
         if ( srs->transformFromWorld(world, p) )
         {
-            set( srs, p, AltitudeMode::ABSOLUTE );
+            set( srs, p, ALTMODE_ABSOLUTE );
             return true;
         }
     }
@@ -346,7 +387,7 @@ bool
 GeoPoint::createLocalToWorld( osg::Matrixd& out_l2w ) const
 {
     if ( !isValid() ) return false;
-    if ( _altMode != AltitudeMode::ABSOLUTE )
+    if ( _altMode != ALTMODE_ABSOLUTE )
     {
         OE_WARN << LC << "ILLEGAL: called GeoPoint::createLocal2World with AltitudeMode = RELATIVE_TO_TERRAIN" << std::endl;
         return false;
@@ -358,7 +399,7 @@ bool
 GeoPoint::createWorldToLocal( osg::Matrixd& out_w2l ) const
 {
     if ( !isValid() ) return false;
-    if ( _altMode != AltitudeMode::ABSOLUTE )
+    if ( _altMode != ALTMODE_ABSOLUTE )
     {
         OE_WARN << LC << "ILLEGAL: called GeoPoint::createLocal2World with AltitudeMode = RELATIVE_TO_TERRAIN" << std::endl;
         return false;
@@ -886,7 +927,14 @@ GeoExtent::toString() const
     else
         buf << std::setprecision(12) << "SW=" << west() << "," << south() << " NE=" << east() << "," << north();
 
-    buf << ", SRS=" << _srs->getName();
+    if (_srs.valid() == true)
+    {
+        buf << ", SRS=" << _srs->getName();
+    }
+    else
+    {
+        buf << ", SRS=NULL";
+    }
 
     std::string bufStr;
     bufStr = buf.str();
@@ -1218,11 +1266,14 @@ manualReproject(const osg::Image* image, const GeoExtent& src_extent, const GeoE
     const bool isSrcContiguous = src_extent.getSRS()->isContiguous();
 
     osg::Image *result = new osg::Image();
-    result->allocateImage(width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE);
-    //Initialize the image to be completely transparent
+    //result->allocateImage(width, height, 1, GL_RGBA, GL_UNSIGNED_BYTE);
+    result->allocateImage(width, height, 1, image->getPixelFormat(), GL_UNSIGNED_BYTE);
+
+    //Initialize the image to be completely transparent/black
     memset(result->data(), 0, result->getImageSizeInBytes());
 
-    ImageUtils::PixelReader ra(result);
+    //ImageUtils::PixelReader ra(result);
+    ImageUtils::PixelWriter writer(result);
     const double dx = dest_extent.width() / (double)width;
     const double dy = dest_extent.height() / (double)height;
 
@@ -1361,13 +1412,17 @@ manualReproject(const osg::Image* image, const GeoExtent& src_extent, const GeoE
                     }
                 }
             }
-               
+
+            writer(color, c, r);
+
+#if 0
             unsigned char* rgba = const_cast<unsigned char*>(ra.data(c,r,0));
 
             rgba[0] = (unsigned char)(color.r() * 255);
             rgba[1] = (unsigned char)(color.g() * 255);
             rgba[2] = (unsigned char)(color.b() * 255);
             rgba[3] = (unsigned char)(color.a() * 255);
+#endif
 
             pixel++;            
         }

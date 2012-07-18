@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarth/ShaderUtils>
 #include <osgEarth/TileKey>
 #include <osgEarth/StringUtils>
+#include <osgEarth/Capabilities>
 #include <osg/Texture2D>
 #include <osg/TexEnv>
 #include <osg/TexEnvCombine>
@@ -38,7 +39,7 @@ namespace
 {
     static std::string makeSamplerName(int slot)
     {
-        return Stringify() << "tex" << slot;
+        return Stringify() << "osgearth_tex" << slot;
     }
 
     static osg::Shader*
@@ -123,6 +124,13 @@ namespace
             }
         }
 
+        // install the color filter chain prototypes:
+        for( int i=0; i<maxSlots && i <(int)slots.size(); ++i )
+        {
+            buf << "void osgearth_runColorFilters_" << i << "(in int slot, inout vec4 color);\n";
+        }
+
+        // the main texturing function:
         buf << "void osgearth_frag_applyTexturing( inout vec4 color ) \n"
             << "{ \n"
             << "    vec3 color3 = color.rgb; \n"
@@ -173,8 +181,13 @@ namespace
                 buf << "            texel = texture2D(" << makeSamplerName(slot) << ", gl_TexCoord["<< slot <<"].st); \n";
             }
             
-            buf << "            float opacity =  texel.a * osgearth_ImageLayerOpacity[" << i << "];\n"
-                << "            color3 = mix(color3, texel.rgb, opacity * atten_max * atten_min); \n"
+            buf 
+                // color filter:
+                << "            osgearth_runColorFilters_" << i << "(" << slot << ", texel); \n"
+
+                // adjust for opacity
+                << "            float opacity =  texel.a * osgearth_ImageLayerOpacity[" << i << "];\n"                
+                << "            color3 = mix(color3, texel.rgb, opacity * atten_max * atten_min); \n"               
                 << "            if (opacity > maxOpacity) {\n"
                 << "              maxOpacity = opacity;\n"
                 << "            }\n"                
@@ -182,9 +195,8 @@ namespace
                 << "    } \n";
         }
         
-            buf << "    color = vec4(color3, maxOpacity);\n"
-                << "} \n";
-
+        buf << "    color = vec4(color3, maxOpacity);\n"
+            << "} \n";
 
 
         std::string str;
@@ -211,6 +223,7 @@ namespace
         if ( !tex )
         {
             tex = new osg::Texture2D();
+            tex->setUnRefImageDataAfterApply( true );
 
             // configure the mipmapping
 
@@ -384,13 +397,16 @@ TextureCompositorMultiTexture::updateMasterStateSet(osg::StateSet*       stateSe
         }
         else
         {
-            vp->removeShader( "osgearth_frag_applyTexturing", osg::Shader::FRAGMENT );
-            vp->removeShader( "osgearth_vert_setupTexturing", osg::Shader::VERTEX );
+            vp->removeShader( "osgearth_frag_applyTexturing" );
+            vp->removeShader( "osgearth_vert_setupTexturing" );
         }
     }
 
     else
     {
+        // Forcably disable shaders
+        stateSet->setAttributeAndModes( new osg::Program(), osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
+
         // Validate against the maximum number of textures available in FFP mode.
         if ( maxUnits > Registry::instance()->getCapabilities().getMaxFFPTextureUnits() )
         {

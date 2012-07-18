@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -60,6 +60,9 @@ namespace osgEarth
 
         /** Copy constructor. */
         URIContext( const URIContext& rhs ) : _referrer(rhs._referrer) { }
+
+        /** dtor */
+        virtual ~URIContext() { }
 
         /** Serializes this context to an Options structure. This is useful when passing context information
             to an osgDB::ReaderWriter that takes a stream as input -- the stream is anonymous, therefore this
@@ -140,6 +143,9 @@ namespace osgEarth
          * Constructs a new URI from a string.
          */
         URI( const char* location );
+
+        /** dtor */
+        virtual ~URI() { }
 
     public:
 
@@ -249,7 +255,9 @@ namespace osgEarth
     template <> inline
     void Config::addIfSet<URI>( const std::string& key, const optional<URI>& opt ) {
         if ( opt.isSet() ) {
-            add( Config(key, opt->base()) );
+            Config conf(key, opt->base());
+            conf.setReferrer(opt->context().referrer());
+            add( conf );
         }
     }
 
@@ -257,14 +265,16 @@ namespace osgEarth
     void Config::updateIfSet<URI>( const std::string& key, const optional<URI>& opt ) {
         if ( opt.isSet() ) {
             remove(key);
-            add( Config(key, opt->base()) );
+            Config conf(key, opt->base());
+            conf.setReferrer(opt->context().referrer());
+            add( conf );
         }
     }
 
     template<> inline
     bool Config::getIfSet<URI>( const std::string& key, optional<URI>& output ) const {
-        if ( hasValue( key ) ) {
-            output = URI( value(key), _referrer );
+        if ( hasValue(key) ) {
+            output = URI( value(key), referrer(key) );
             return true;
         }
         else

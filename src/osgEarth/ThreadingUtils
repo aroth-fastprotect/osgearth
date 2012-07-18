@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -271,11 +271,11 @@ namespace osgEarth { namespace Threading
         }
 
     private:
-        int _readerCount;
+        int    _readerCount;
         Mutex  _lockWriterMutex;
         Mutex  _readerCountMutex;
-        Event _noWriterEvent;
-        Event _noReadersEvent;
+        Event  _noWriterEvent;
+        Event  _noReadersEvent;
     };
 
 
@@ -311,10 +311,10 @@ namespace osgEarth { namespace Threading
             ScopedMutexLock lock(_mutex);
             return _data[getCurrentThreadId()];
         }
-        const T& get() const {
-            ScopedMutexLock lock(_mutex);
-            return _data[getCurrentThreadId()];
-        }
+        //const T& get() const {
+        //    ScopedMutexLock lock(_mutex);
+        //    return _data[getCurrentThreadId()];
+        //}
     private:
         std::map<unsigned,T> _data;
         Mutex                _mutex;
@@ -338,8 +338,8 @@ namespace osgEarth { namespace Threading
                 if ( i != _data.end() )
                     return i->second;
                 else
-            return _data[k];
-        }
+                    return _data[k];
+            }
         }
 
         void remove(KEY k)
@@ -349,8 +349,8 @@ namespace osgEarth { namespace Threading
         }
 
     private:
-        std::map<KEY,DATA>                   _data;
-        osgEarth::Threading::ReadWriteMutex  _mutex;
+        std::map<KEY,DATA>                  _data;
+        osgEarth::Threading::ReadWriteMutex _mutex;
     };
 
     /** Template for thread safe per-object data storage */
@@ -360,7 +360,7 @@ namespace osgEarth { namespace Threading
         DATA* get(KEY k)
         {
             osgEarth::Threading::ScopedReadLock lock(_mutex);
-            typename std::map<KEY,osg::ref_ptr<DATA> >::const_iterator i = _data.find(k);
+            typename std::map<KEY,osg::ref_ptr<DATA > >::const_iterator i = _data.find(k);
             if ( i != _data.end() )
                 return i->second.get();
 

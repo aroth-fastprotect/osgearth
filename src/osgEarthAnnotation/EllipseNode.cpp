@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -138,10 +138,14 @@ EllipseNode::rebuild()
     clearDecoration();
 
     //Remove all children from this node
-    removeChildren( 0, getNumChildren() );
+    //removeChildren( 0, getNumChildren() );
+    if ( getRoot()->getNumParents() == 0 )
+    {
+        this->addChild( getRoot() );
+    }
 
     //Remove all children from the attach point
-    getAttachPoint()->removeChildren( 0, getAttachPoint()->getNumChildren() );
+    getChildAttachPoint()->removeChildren( 0, getChildAttachPoint()->getNumChildren() );
 
     // construct a local-origin ellipse.
     GeometryFactory factory;
@@ -153,19 +157,8 @@ EllipseNode::rebuild()
         osg::Node* node = compiler.compile( feature.get(), _style, FilterContext(0L) );
         if ( node )
         {
-            getAttachPoint()->addChild( node );
-
-            if ( _draped )
-            {
-                DrapeableNode* drapeable = new DrapeableNode( _mapNode.get() );
-                drapeable->addChild( getAttachPoint() );
-                this->addChild( drapeable );
-            }
-
-            else
-            {
-                this->addChild( getAttachPoint() );
-            }
+            getChildAttachPoint()->addChild( node );
+            getDrapeable()->setDraped( _draped );
         }
 
         applyStyle( _style, _draped );
@@ -194,10 +187,10 @@ _numSegments ( 0 )
     conf.getIfSet   ( "draped", _draped );
     conf.getIfSet   ( "num_segments", _numSegments );
 
+    rebuild();
+
     if ( conf.hasChild("position") )
         setPosition( GeoPoint(conf.child("position")) );
-
-    rebuild();
 }
 
 Config

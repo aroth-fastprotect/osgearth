@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -54,8 +54,8 @@ MapCallback::onMapModelChanged( const MapModelChange& change )
         onElevationLayerMoved( change.getElevationLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
     case MapModelChange::MOVE_IMAGE_LAYER:
         onImageLayerMoved( change.getImageLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
-	case MapModelChange::MOVE_MODEL_LAYER:
-		onModelLayerMoved( change.getModelLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
+    case MapModelChange::MOVE_MODEL_LAYER:
+            onModelLayerMoved( change.getModelLayer(), change.getFirstIndex(), change.getSecondIndex() ); break;
     case MapModelChange::UNSPECIFIED: break;
     default: break;
     }
@@ -329,7 +329,7 @@ Map::getCache() const
             const_cast<Map*>(this)->setCache( cache );
         }
     }
-	return _cache.get();
+    return _cache.get();
 }
 
 void
@@ -383,14 +383,14 @@ Map::addImageLayer( ImageLayer* layer )
     unsigned int index = -1;
     if ( layer )
     {
-	    // Set the DB options for the map from the layer
+        // Set the DB options for the map from the layer
         layer->setDBOptions( _dbOptions.get() );
 
         // propagate the cache to the layer:
         if (_mapOptions.cachePolicy().isSet())
-		{
+        {
             layer->overrideCachePolicy( _mapOptions.cachePolicy().value() );
-		}
+        }
 
         // propagate the cache to the layer:
         layer->setCache( this->getCache() );
@@ -417,8 +417,8 @@ Map::addImageLayer( ImageLayer* layer )
         {
             i->get()->onMapModelChanged( MapModelChange(
                 MapModelChange::ADD_IMAGE_LAYER, newRevision, layer, index) );
-        }	
-    }	
+        }   
+    }   
 }
 
 
@@ -463,8 +463,8 @@ Map::insertImageLayer( ImageLayer* layer, unsigned int index )
         {
             i->get()->onMapModelChanged( MapModelChange(
                 MapModelChange::ADD_IMAGE_LAYER, newRevision, layer, index) );
-        }	
-    }	
+        }   
+    }   
 }
 
 void
@@ -474,17 +474,17 @@ Map::addElevationLayer( ElevationLayer* layer )
     unsigned int index = -1;
     if ( layer )
     {
-	    //Set options for the map from the layer
-		layer->setDBOptions( _dbOptions.get() );
+        //Set options for the map from the layer
+        layer->setDBOptions( _dbOptions.get() );
 
         //propagate the cache to the layer:
         if ( _mapOptions.cachePolicy().isSet() )
         {
             layer->overrideCachePolicy( *_mapOptions.cachePolicy() );
-		}
+        }
 
-		//Set the Cache for the MapLayer to our cache.
-		layer->setCache( this->getCache() );
+        //Set the Cache for the MapLayer to our cache.
+        layer->setCache( this->getCache() );
         
         // Tell the layer the map profile, if possible:
         if ( _profile.valid() )
@@ -506,8 +506,8 @@ Map::addElevationLayer( ElevationLayer* layer )
         {
             i->get()->onMapModelChanged( MapModelChange(
                 MapModelChange::ADD_ELEVATION_LAYER, newRevision, layer, index) );
-        }	
-    }	
+        }   
+    }   
 }
 
 void 
@@ -852,7 +852,7 @@ Map::removeTerrainMaskLayer( MaskLayer* layer )
         {
             i->get()->onMapModelChanged( MapModelChange(
                 MapModelChange::REMOVE_MASK_LAYER, newRevision, layerRef.get()) );
-        }	
+        }   
     }
 }
 
@@ -929,6 +929,15 @@ Map::calculateProfile()
             }
         }
 
+        // convert the profile to Plate Carre if necessary.
+        if (_profile.valid() &&
+            _profile->getSRS()->isGeographic() && 
+            getMapOptions().coordSysType() == MapOptions::CSTYPE_PROJECTED )
+        {
+            OE_INFO << LC << "Projected display with geographic SRS; activating Plate Carre mode" << std::endl;
+            _profile = _profile->overrideSRS( _profile->getSRS()->createPlateCarreGeographicSRS() );
+        }
+
         // finally, fire an event if the profile has been set.
         if ( _profile.valid() )
         {
@@ -976,15 +985,6 @@ Map::calculateProfile()
         {
             _profileNoVDatum = _profile;
         }
-
-        // finally, if the map is flat but the SRS is geographic, mark it as "plate carre"
-        if (_profile->getSRS()->isGeographic() && 
-            getMapOptions().coordSysType() == MapOptions::CSTYPE_PROJECTED)
-        {
-            OE_INFO << LC << "Projected display with geographic SRS; activating Plate Carre mode" << std::endl;
-            const_cast<Profile*>(_profile.get())->overrideSRS(
-                _profile->getSRS()->createPlateCarreGeographicSRS() );
-        }
     }
 }
 
@@ -1013,7 +1013,7 @@ namespace
         bool hfInitialized = false;
 
         //Get a HeightField for each of the enabled layers
-	    GeoHeightFieldVector heightFields;
+        GeoHeightFieldVector heightFields;
 
         if ( out_isFallback )
         {
@@ -1101,23 +1101,23 @@ namespace
             }
         }
 
-	    else
-	    {
-		    //If we have multiple heightfields, we need to composite them together.
-		    unsigned int width = 0;
-		    unsigned int height = 0;
+        else
+        {
+            //If we have multiple heightfields, we need to composite them together.
+            unsigned int width = 0;
+            unsigned int height = 0;
 
-		    for (GeoHeightFieldVector::const_iterator i = heightFields.begin(); i < heightFields.end(); ++i)
-		    {
-			    if (i->getHeightField()->getNumColumns() > width) 
+            for (GeoHeightFieldVector::const_iterator i = heightFields.begin(); i < heightFields.end(); ++i)
+            {
+                if (i->getHeightField()->getNumColumns() > width) 
                     width = i->getHeightField()->getNumColumns();
-			    if (i->getHeightField()->getNumRows() > height) 
+                if (i->getHeightField()->getNumRows() > height) 
                     height = i->getHeightField()->getNumRows();
-		    }
-		    out_result = new osg::HeightField();
-		    out_result->allocate( width, height );
+            }
+            out_result = new osg::HeightField();
+            out_result->allocate( width, height );
 
-		    //Go ahead and set up the heightfield so we don't have to worry about it later
+            //Go ahead and set up the heightfield so we don't have to worry about it later
             double minx, miny, maxx, maxy;
             key.getExtent().getBounds(minx, miny, maxx, maxy);
             double dx = (maxx - minx)/(double)(out_result->getNumColumns()-1);
@@ -1125,7 +1125,7 @@ namespace
 
             const SpatialReference* keySRS = keyToUse.getProfile()->getSRS();
             
-		    //Create the new heightfield by sampling all of them.
+            //Create the new heightfield by sampling all of them.
             for (unsigned int c = 0; c < width; ++c)
             {
                 double x = minx + (dx * (double)c);
@@ -1188,12 +1188,12 @@ namespace
                     out_result->setHeight(c, r, elevation);
                 }
             }
-	    }
+        }
 
         // Replace any NoData areas with the reference value. This is zero for HAE datums,
         // and some geoid height for orthometric datums.
-	    if (out_result.valid())
-	    {
+        if (out_result.valid())
+        {
             const Geoid*         geoid = 0L;
             const VerticalDatum* vdatum = key.getProfile()->getSRS()->getVerticalDatum();
 
@@ -1208,26 +1208,26 @@ namespace
                 NO_DATA_VALUE,
                 geoid );
 
-		    //ReplaceInvalidDataOperator o;
-		    //o.setValidDataOperator(new osgTerrain::NoDataValue(NO_DATA_VALUE));
-		    //o( out_result.get() );
-	    }
+            //ReplaceInvalidDataOperator o;
+            //o.setValidDataOperator(new osgTerrain::NoDataValue(NO_DATA_VALUE));
+            //o( out_result.get() );
+        }
 
-	    //Initialize the HF values for osgTerrain
-	    if (out_result.valid() && !hfInitialized )
-	    {	
-		    //Go ahead and set up the heightfield so we don't have to worry about it later
-		    double minx, miny, maxx, maxy;
-		    key.getExtent().getBounds(minx, miny, maxx, maxy);
-		    out_result->setOrigin( osg::Vec3d( minx, miny, 0.0 ) );
-		    double dx = (maxx - minx)/(double)(out_result->getNumColumns()-1);
-		    double dy = (maxy - miny)/(double)(out_result->getNumRows()-1);
-		    out_result->setXInterval( dx );
-		    out_result->setYInterval( dy );
-		    out_result->setBorderWidth( 0 );
-	    }
+        //Initialize the HF values for osgTerrain
+        if (out_result.valid() && !hfInitialized )
+        {   
+            //Go ahead and set up the heightfield so we don't have to worry about it later
+            double minx, miny, maxx, maxy;
+            key.getExtent().getBounds(minx, miny, maxx, maxy);
+            out_result->setOrigin( osg::Vec3d( minx, miny, 0.0 ) );
+            double dx = (maxx - minx)/(double)(out_result->getNumColumns()-1);
+            double dy = (maxy - miny)/(double)(out_result->getNumRows()-1);
+            out_result->setXInterval( dx );
+            out_result->setYInterval( dy );
+            out_result->setBorderWidth( 0 );
+        }
 
-	    return out_result.valid();
+        return out_result.valid();
     }
 }
 
@@ -1308,51 +1308,25 @@ Map::sync( MapFrame& frame ) const
     return result;
 }
 
-bool
-Map::toMapPoint( const GeoPoint& input, GeoPoint& output ) const
-{
-    return MapInfo(this).toMapPoint(input, output);
-}
-
-bool
-Map::toWorldPoint( const GeoPoint& input, osg::Vec3d& output ) const
-{
-    return MapInfo(this).toWorldPoint(input, output);
-}
-
-bool
-Map::worldPointToMapPoint( const osg::Vec3d& input, GeoPoint& output ) const
-{
-    return MapInfo(this).worldPointToMapPoint(input, output);
-}
-
 //------------------------------------------------------------------------
 
-bool
-MapInfo::toMapPoint( const GeoPoint& input, GeoPoint& output ) const
-{
-    return input.isValid() ? input.transform(_profile->getSRS(), output) : false;
+MapInfo::MapInfo( const Map* map ) :
+_profile( map->getProfile() ),
+_isGeocentric( map->isGeocentric() ),
+_isCube( map->getMapOptions().coordSysType() == MapOptions::CSTYPE_GEOCENTRIC_CUBE ),
+_elevationInterpolation( *map->getMapOptions().elevationInterpolation())
+{ 
+    //nop
 }
 
-bool
-MapInfo::toWorldPoint( const GeoPoint& input, osg::Vec3d& output ) const
+MapInfo::MapInfo( const MapInfo& rhs ) :
+_profile( rhs._profile ),
+_isGeocentric( rhs._isGeocentric ),
+_isCube( rhs._isCube ),
+_elevationInterpolation( rhs._elevationInterpolation )
 {
-    if (!input.isValid()) return false;
-    //Transform the incoming point to the map's SRS
-    GeoPoint mapPoint;
-    toMapPoint(input, mapPoint );
-    return mapPoint.toWorld( output );
-}
-
-bool
-MapInfo::worldPointToMapPoint( const osg::Vec3d& input, GeoPoint& output ) const
-{
-    osg::Vec3d temp;
-    bool ok = _profile->getSRS()->transformFromWorld(input, temp);
-    if ( ok )
-        output.set(_profile->getSRS(), temp);
-    return ok;
-}
+    //nop
+}              
 
 //------------------------------------------------------------------------
 
@@ -1386,8 +1360,8 @@ MapFrame::sync()
 {
     if ( _map.valid() )
     {
-    	return _map->sync( *this );
-	}
+        return _map->sync( *this );
+    }
     else
     {
         _imageLayers.clear();

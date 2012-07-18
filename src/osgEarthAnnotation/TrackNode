@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -102,11 +102,13 @@ namespace osgEarth { namespace Annotation
          * @param image       Icon image to use
          * @param fieldSchema Schema for track label fields
          */
-        TrackNode(
-            MapNode*                    mapNode,
-            const osg::Vec3d&           positionInMapCoords,
-            osg::Image*                 image,
-            const TrackNodeFieldSchema& fieldSchema );
+        //TrackNode(
+        //    MapNode*                    mapNode,
+        //    const osg::Vec3d&           positionInMapCoords,
+        //    osg::Image*                 image,
+        //    const TrackNodeFieldSchema& fieldSchema );
+
+        virtual ~TrackNode() { }
 
         /** 
          * Sets the value of one of the field labels.

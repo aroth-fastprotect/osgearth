@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,10 +17,10 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthFeatures/ExtrudeGeometryFilter>
+#include <osgEarthFeatures/FeatureSourceIndexNode>
 #include <osgEarthSymbology/MeshSubdivider>
 #include <osgEarthSymbology/MeshConsolidator>
 #include <osgEarth/ECEF>
-#include <osg/ClusterCullingCallback>
 #include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/MatrixTransform>
@@ -33,6 +33,8 @@
 #include <osgEarth/Version>
 
 #define LC "[ExtrudeGeometryFilter] "
+
+#define USE_VBOS true
 
 using namespace osgEarth;
 using namespace osgEarth::Features;
@@ -91,7 +93,7 @@ ExtrudeGeometryFilter::reset( const FilterContext& context )
 {
     _cosWallAngleThresh = cos( _wallAngleThresh_deg );
     _geodes.clear();
-
+    
     if ( _styleDirty )
     {
         const StyleSheet* sheet = context.getSession() ? context.getSession()->styles() : 0L;
@@ -252,8 +254,8 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
     osg::Vec2Array* roofTexcoords = 0L;
     float           roofRotation  = 0.0f;
     Bounds          roofBounds;
-    float           sinR, cosR;
-    double          roofTexSpanX, roofTexSpanY;
+    float           sinR = 0.0f, cosR = 0.0f;
+    double          roofTexSpanX = 0.0, roofTexSpanY = 0.0;
     osg::ref_ptr<const SpatialReference> roofProjSRS;
 
     if ( roof )
@@ -293,7 +295,7 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
             if ( srs && srs->isGeographic() )
             {
                 osg::Vec2d geogCenter = roofBounds.center2d();
-                roofProjSRS = srs->createUTMFromLongitude( Angular(geogCenter.x()) );
+                roofProjSRS = srs->createUTMFromLonLat( Angular(geogCenter.x()), Angular(geogCenter.y()) );
                 roofBounds.transform( srs, roofProjSRS.get() );
                 osg::ref_ptr<Geometry> projectedInput = input->clone();
                 srs->transform( projectedInput->asVector(), roofProjSRS.get() );
@@ -607,7 +609,11 @@ ExtrudeGeometryFilter::extrudeGeometry(const Geometry*         input,
 }
 
 void
-ExtrudeGeometryFilter::addDrawable( osg::Drawable* drawable, osg::StateSet* stateSet, const std::string& name )
+ExtrudeGeometryFilter::addDrawable(osg::Drawable*      drawable,
+                                   osg::StateSet*      stateSet,
+                                   const std::string&  name,
+                                   FeatureID           fid,
+                                   FeatureSourceIndex* index )
 {
     // find the geode for the active stateset, creating a new one if necessary. NULL is a 
     // valid key as well.
@@ -624,6 +630,11 @@ ExtrudeGeometryFilter::addDrawable( osg::Drawable* drawable, osg::StateSet* stat
     if ( !name.empty() )
     {
         drawable->setName( name );
+    }
+
+    if ( index )
+    {
+        index->tagPrimitiveSets( drawable, fid );
     }
 }
 
@@ -644,7 +655,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             Geometry* part = iter.next();
 
             osg::ref_ptr<osg::Geometry> walls = new osg::Geometry();
-            //walls->setUseVertexBufferObjects(true);
+            walls->setUseVertexBufferObjects(USE_VBOS);
             
             osg::ref_ptr<osg::Geometry> rooflines = 0L;
             osg::ref_ptr<osg::Geometry> baselines = 0L;
@@ -653,7 +664,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             if ( part->getType() == Geometry::TYPE_POLYGON )
             {
                 rooflines = new osg::Geometry();
-                //rooflines->setUseVertexBufferObjects(true);
+                rooflines->setUseVertexBufferObjects(USE_VBOS);
 
                 // prep the shapes by making sure all polys are open:
                 static_cast<Polygon*>(part)->open();
@@ -663,12 +674,14 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             if ( _outlineSymbol != 0L )
             {
                 outlines = new osg::Geometry();
+                outlines->setUseVertexBufferObjects(USE_VBOS);
             }
 
             // make a base cap if we're doing stencil volumes.
             if ( _makeStencilVolume )
             {
                 baselines = new osg::Geometry();
+                baselines->setUseVertexBufferObjects(USE_VBOS);
             }
 
             // calculate the extrusion height:
@@ -809,23 +822,24 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
                 if ( !_featureNameExpr.empty() )
                     name = input->eval( _featureNameExpr, &context );
 
-                //MeshConsolidator::run( *walls.get() );
-                addDrawable( walls.get(), wallStateSet, name );
+                FeatureSourceIndex* index = context.featureIndex();
+                FeatureID fid = input->getFID();
+
+                addDrawable( walls.get(), wallStateSet, name, fid, index );
 
                 if ( rooflines.valid() )
                 {
-                    //MeshConsolidator::run( *rooflines.get() );
-                    addDrawable( rooflines.get(), roofStateSet, name );
+                    addDrawable( rooflines.get(), roofStateSet, name, fid, index );
                 }
 
                 if ( baselines.valid() )
                 {
-                    addDrawable( baselines.get(), 0L, name );
+                    addDrawable( baselines.get(), 0L, name, fid, index );
                 }
 
                 if ( outlines.valid() )
                 {
-                    addDrawable( outlines.get(), 0L, name );
+                    addDrawable( outlines.get(), 0L, name, fid, index );
                 }
             }   
         }
@@ -912,14 +926,16 @@ ExtrudeGeometryFilter::push( FeatureList& input, FilterContext& context )
 
     OE_DEBUG << LC << "Sorted geometry into " << group->getNumChildren() << " groups" << std::endl;
 
-    //TODO
-    // running this after the MC reduces the primitive set count by a huge amount, but I
-    // have not figured out why yet.
+#if 0
+    // running this after the MC reduces the primitive set count by a huge amount;
+    // but, it actually increases draw time and overall frame time. So, bad. Also it 
+    // messes up our nice feature source index primitive set tagging.
     if ( _mergeGeometry == true )
     {
         osgUtil::Optimizer o;
         o.optimize( group, osgUtil::Optimizer::MERGE_GEOMETRY );
     }
+#endif
 
     return group;
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -146,8 +146,8 @@ XmlElement::getText() const
         }
     }
 
-	std::string builderStr;
-	builderStr = builder.str();
+ 	 std::string builderStr;
+	 builderStr = builder.str();
     std::string result = trim( builderStr );
     return result;
 }
@@ -280,85 +280,85 @@ namespace
         return map;
     }
 
-void processNode(XmlElement* parent, TiXmlNode* node)
-{
-    XmlElement* new_element = 0;
-    switch (node->Type())
+    void processNode(XmlElement* parent, TiXmlNode* node)
     {
-    case TiXmlNode::TINYXML_ELEMENT:
+        XmlElement* new_element = 0;
+        switch (node->Type())
         {
-            TiXmlElement* element = node->ToElement();
-            std::string tag = element->Value();
-            std::transform( tag.begin(), tag.end(), tag.begin(), tolower);
-
-            //Get all the attributes
-            XmlAttributes attrs;
-            TiXmlAttribute* attr = element->FirstAttribute();
-            while (attr)
+        case TiXmlNode::TINYXML_ELEMENT:
             {
-                std::string name  = attr->Name();
-                std::string value = attr->Value();
-                std::transform( name.begin(), name.end(), name.begin(), tolower);
-                attrs[name] = value;
-                attr = attr->Next();
+                TiXmlElement* element = node->ToElement();
+                std::string tag = element->Value();
+                std::transform( tag.begin(), tag.end(), tag.begin(), tolower);
+
+                //Get all the attributes
+                XmlAttributes attrs;
+                TiXmlAttribute* attr = element->FirstAttribute();
+                while (attr)
+                {
+                    std::string name  = attr->Name();
+                    std::string value = attr->Value();
+                    std::transform( name.begin(), name.end(), name.begin(), tolower);
+                    attrs[name] = value;
+                    attr = attr->Next();
+                }
+
+                //All the element to the stack
+                new_element = new XmlElement( tag, attrs );
+                parent->getChildren().push_back( new_element );
             }
-
-            //All the element to the stack
-            new_element = new XmlElement( tag, attrs );
-            parent->getChildren().push_back( new_element );
-        }
-        break;
-    case TiXmlNode::TINYXML_TEXT:
-        {
-            TiXmlText* text = node->ToText();
-            std::string data( text->Value());
-            parent->getChildren().push_back( new XmlText( data ) );
-        }
-        break;
-    }    
-
-    XmlElement* new_parent = new_element ? new_element : parent;
-    TiXmlNode* child;
-    for (child = node->FirstChild(); child != 0; child = child->NextSibling())
-    {    
-        processNode( new_parent, child );
-    }
-}
-
-void
-removeDocType(std::string &xmlStr)
-{
-    //TinyXML has an issue with parsing DTDs.  See http://www.grinninglizard.com/tinyxmldocs/index.html
-    //We need to remove any !DOCTYPE block that appears in the XML before parsing to avoid errors.
-    std::string::size_type startIndex = xmlStr.find("<!DOCTYPE");
-    if (startIndex == xmlStr.npos) return;
-
-    std::string::size_type endIndex = startIndex;
-    int numChildElements = 0;
-    //We've found the first index of the <!DOCTYPE, now find the index of the closing >
-    while (endIndex < xmlStr.size())
-    {
-        endIndex+=1;
-        if (xmlStr[endIndex] == '<')
-        {
-            numChildElements++;
-        }
-        else if (xmlStr[endIndex] == '>')
-        {
-            if (numChildElements == 0)
+            break;
+        case TiXmlNode::TINYXML_TEXT:
             {
-                break;
+                TiXmlText* text = node->ToText();
+                std::string data( text->Value());
+                parent->getChildren().push_back( new XmlText( data ) );
             }
-            else
-            {
-                numChildElements--;
-            }
+            break;
+        }    
+
+        XmlElement* new_parent = new_element ? new_element : parent;
+        TiXmlNode* child;
+        for (child = node->FirstChild(); child != 0; child = child->NextSibling())
+        {    
+            processNode( new_parent, child );
         }
     }
 
-    //Now, replace the <!DOCTYPE> element with whitespace
-    xmlStr.erase(startIndex, endIndex - startIndex + 1);
-}
+    void
+    removeDocType(std::string &xmlStr)
+    {
+        //TinyXML has an issue with parsing DTDs.  See http://www.grinninglizard.com/tinyxmldocs/index.html
+        //We need to remove any !DOCTYPE block that appears in the XML before parsing to avoid errors.
+        std::string::size_type startIndex = xmlStr.find("<!DOCTYPE");
+        if (startIndex == xmlStr.npos) return;
+
+        std::string::size_type endIndex = startIndex;
+        int numChildElements = 0;
+        //We've found the first index of the <!DOCTYPE, now find the index of the closing >
+        while (endIndex < xmlStr.size())
+        {
+            endIndex+=1;
+            if (xmlStr[endIndex] == '<')
+            {
+                numChildElements++;
+            }
+            else if (xmlStr[endIndex] == '>')
+            {
+                if (numChildElements == 0)
+                {
+                    break;
+                }
+                else
+                {
+                    numChildElements--;
+                }
+            }
+        }
+
+        //Now, replace the <!DOCTYPE> element with whitespace
+        xmlStr.erase(startIndex, endIndex - startIndex + 1);
+    }
 }
 
 

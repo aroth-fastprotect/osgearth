@@ -15,5 +15,5 @@ SET(TARGET_H   ElevationProxyImageLayer
 )
 
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthSymbology)
-
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/ocean_surface)
 SETUP_PLUGIN(osgearth_ocean_surface)

@@ -1,5 +1,5 @@
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -128,7 +128,8 @@ namespace
                   center += bs.center();
 
                 GeoPoint output;
-                _map->worldPointToMapPoint(center, output);
+                output.fromWorld( _map->getSRS(), center );
+                //_map->worldPointToMapPoint(center, output);
 
                 //TODO: make a better range calculation
                 return new SetViewpointAction(osgEarth::Viewpoint(output.vec3d(), 0.0, -90.0, bs.radius() * 4.0), views);
@@ -186,7 +187,8 @@ namespace
           osg::Vec3d center = _annotation->getBound().center();
 
           GeoPoint output;
-          _map->worldPointToMapPoint(center, output);
+          output.fromWorld( _map->getSRS(), center );
+          //_map->worldPointToMapPoint(center, output);
 
           return new SetViewpointAction(osgEarth::Viewpoint(output.vec3d(), 0.0, -90.0, 1e5), views);
         }
@@ -296,9 +298,9 @@ void MapCatalogWidget::initUi()
   _hideEmptyGroups = false;
   _updating = false;
 
-	_tree = new QTreeWidget();
-	_tree->setColumnCount(1);
-	_tree->setHeaderHidden(true);
+  _tree = new QTreeWidget();
+  _tree->setColumnCount(1);
+  _tree->setHeaderHidden(true);
   _tree->setSelectionMode(QAbstractItemView::ExtendedSelection);
   _tree->setObjectName("oeFrameContainer");
   connect(_tree, SIGNAL(itemDoubleClicked(QTreeWidgetItem*, int)), this, SLOT(onTreeItemDoubleClicked(QTreeWidgetItem*, int)));
@@ -312,10 +314,10 @@ void MapCatalogWidget::initUi()
   _masksItem = 0;
   _viewpointsItem = 0;
 
-	QVBoxLayout *layout = new QVBoxLayout;
-	layout->setSpacing(2);
-	layout->setContentsMargins(3, 0, 3, 3);
-	layout->addWidget(_tree);
+  QVBoxLayout *layout = new QVBoxLayout;
+  layout->setSpacing(2);
+  layout->setContentsMargins(3, 0, 3, 3);
+  layout->addWidget(_tree);
   setLayout(layout);
 
   refreshAll();
@@ -338,11 +340,11 @@ void MapCatalogWidget::onTreeItemDoubleClicked(QTreeWidgetItem* item, int col)
     return;
 
   ActionableTreeItem* actionable = dynamic_cast<ActionableTreeItem*>(item);
-	if (actionable)
-	{
-    Action* action = actionable->getDoubleClickAction(_views);
-    if (action)
-      _manager->doAction(this, action);
+  if (actionable)
+  {
+      Action* action = actionable->getDoubleClickAction(_views);
+      if (action)
+          _manager->doAction(this, action);
   }
 }
 
@@ -352,11 +354,11 @@ void MapCatalogWidget::onTreeItemChanged(QTreeWidgetItem* item, int col)
     return;
 
   ActionableTreeItem* actionable = dynamic_cast<ActionableTreeItem*>(item);
-	if (actionable)
-	{
+  if (actionable)
+  {
       Action* action = actionable->getCheckStateAction(_views);
-    if (action)
-      _manager->doAction(this, action);
+      if (action)
+          _manager->doAction(this, action);
   }
 }
 

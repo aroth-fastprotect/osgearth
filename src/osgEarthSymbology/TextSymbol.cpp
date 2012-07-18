@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -29,7 +29,8 @@ _size                 ( 16.0f ),
 _removeDuplicateLabels( false ),
 _provider             ( "annotation" ),
 _encoding             ( ENCODING_ASCII ),
-_alignment            ( ALIGN_BASE_LINE )
+_alignment            ( ALIGN_BASE_LINE ),
+_declutter            ( true )
 {
     mergeConfig(conf);
 }
@@ -91,6 +92,8 @@ TextSymbol::getConfig() const
     conf.addIfSet( "theme", _theme );
 #endif
 
+    conf.addIfSet( "declutter", _declutter );
+
     conf.addIfSet( "provider", _provider );
     if ( _pixelOffset.isSet() ) {
         conf.add( "pixel_offset_x", toString(_pixelOffset->x()) );
@@ -143,6 +146,8 @@ TextSymbol::mergeConfig( const Config& conf )
     conf.getIfSet( "line_placement", "centroid", _linePlacement, LINEPLACEMENT_CENTROID );
     conf.getIfSet( "theme", _theme );
 #endif
+
+    conf.getIfSet( "declutter", _declutter );
 
     conf.getIfSet( "provider", _provider );
     if ( conf.hasValue( "pixel_offset_x" ) )

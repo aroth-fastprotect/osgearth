@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -42,22 +42,22 @@ _image      ( image )
     init( fieldSchema );
 }
 
-TrackNode::TrackNode(MapNode*                    mapNode, 
-                     const osg::Vec3d&           positionInMapCoords,
-                     osg::Image*                 image,
-                     const TrackNodeFieldSchema& fieldSchema ) :
-
-OrthoNode   ( mapNode, GeoPoint(mapNode->getMapSRS(),positionInMapCoords) ),
-_image      ( image )
-{
-    init( fieldSchema );
-}
+//TrackNode::TrackNode(MapNode*                    mapNode, 
+//                     const osg::Vec3d&           positionInMapCoords,
+//                     osg::Image*                 image,
+//                     const TrackNodeFieldSchema& fieldSchema ) :
+//
+//OrthoNode   ( mapNode, GeoPoint(mapNode->getMapSRS(),positionInMapCoords) ),
+//_image      ( image )
+//{
+//    init( fieldSchema );
+//}
 
 void
 TrackNode::init( const TrackNodeFieldSchema& schema )
 {
     _geode = new osg::Geode();
-
+    
     if ( _image.valid() )
     {
         // apply the image icon.
@@ -99,7 +99,7 @@ TrackNode::init( const TrackNodeFieldSchema& schema )
             }
         }
     }
-    
+
     // ensure depth testing always passes, and disable depth buffer writes.
     osg::StateSet* stateSet = _geode->getOrCreateStateSet();
     stateSet->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), 1 );

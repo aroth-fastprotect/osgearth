@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -597,11 +597,16 @@ Decluttering::setEnabled( osg::StateSet* stateSet, bool enabled, int binNum )
             }
 
             stateSet->setRenderBinDetails( binNum, OSGEARTH_DECLUTTER_BIN );
+
+            // disable renderbin nesting b/c it is incompatible with decluttering for
+            // what should be obvious reasons
+            stateSet->setNestRenderBins( false );
         }
         else
         {
             stateSet->removeAttribute( osg::StateAttribute::PROGRAM );
             stateSet->setRenderBinToInherit();
+            stateSet->setNestRenderBins( true );
         }
     }
 }

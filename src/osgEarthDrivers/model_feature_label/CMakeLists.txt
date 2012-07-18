@@ -2,4 +2,5 @@ SET(TARGET_SRC FeatureLabelModelSource.cpp)
 SET(TARGET_PUBLIC_H FeatureLabelModelOptions)
 
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarthSymbology)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/model_feature_label)
 SETUP_PLUGIN(osgearth_model_feature_label)

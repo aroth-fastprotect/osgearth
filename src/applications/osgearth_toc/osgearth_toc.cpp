@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -47,6 +47,20 @@ struct MyMapListener : public MapCallback
     }
 };
 
+struct UpdateOperation : public osg::Operation
+{
+    UpdateOperation() : osg::Operation( "", true ) { }
+
+    void operator()(osg::Object*)
+    {
+        if ( s_updateRequired )
+        {
+            updateControlPanel();
+            s_updateRequired = false;
+        }
+    }
+};
+
 //------------------------------------------------------------------------
 
 int
@@ -90,20 +104,10 @@ main( int argc, char** argv )
     // install a proper manipulator
     viewer.setCameraManipulator( new osgEarth::Util::EarthManipulator() );
 
+    // install our control panel updater
+    viewer.addUpdateOperation( new UpdateOperation() );
 
-    while( !viewer.done() )
-    {
-        if ( viewer.getRunFrameScheme() == osgViewer::Viewer::CONTINUOUS || viewer.checkNeedToDoFrame() )
-        {
-            viewer.frame();
-        }
-
-        if ( s_updateRequired )
-        {
-            updateControlPanel();
-            s_updateRequired = false;
-        }
-    }
+    viewer.run();
 }
 
 //------------------------------------------------------------------------

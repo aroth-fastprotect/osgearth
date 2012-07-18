@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -57,6 +57,8 @@ namespace osgEarth { namespace Features
         /** Construct a new sub-model filter that will operate on the given style */
         SubstituteModelFilter( const Style& style =Style() );
 
+        virtual ~SubstituteModelFilter() { }
+
         /** Whether to cluster all the model instances into a single geode. Default is false. */
         void setClustering( bool value ) { _cluster = value; }
         bool getClustering() const { return _cluster; }
@@ -73,10 +75,10 @@ namespace osgEarth { namespace Features
         virtual osg::Node* push( FeatureList& input, FilterContext& context );
 
     protected:
-        Style                     _style;
-        bool                      _cluster;
-        bool                      _merge;
-        StringExpression          _featureNameExpr;
+        Style                         _style;
+        bool                          _cluster;
+        bool                          _merge;
+        StringExpression              _featureNameExpr;
         osg::ref_ptr<ResourceLibrary> _markerLib;
 
         typedef LRUCache<URI, osg::ref_ptr<MarkerResource> > MarkerCache;

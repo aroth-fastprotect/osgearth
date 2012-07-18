@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -28,7 +28,7 @@
 class V8Util
 {
 public:
-  typedef std::map<std::string, v8::Handle<v8::Value> > V8PropertyMap;
+  typedef std::map< std::string, v8::Handle<v8::Value> > V8PropertyMap;
 
   template<typename T>
   static v8::Handle<v8::Object> WrapObject(T* obj,  v8::Handle<v8::ObjectTemplate> templ)

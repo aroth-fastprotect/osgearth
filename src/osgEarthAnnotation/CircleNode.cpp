@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -40,8 +40,8 @@ CircleNode::CircleNode(MapNode*           mapNode,
                        unsigned           numSegments) :
 
 LocalizedNode( mapNode, position, false ),
-_style( style),
-_draped( draped ),
+_style       ( style ),
+_draped      ( draped ),
 _numSegments( numSegments ),
 _radius( radius )
 {
@@ -101,36 +101,27 @@ CircleNode::rebuild()
     clearDecoration();
 
     //Remove all children from this node
-    removeChildren( 0, getNumChildren() );
+    //removeChildren( 0, getNumChildren() );
+    if ( getRoot()->getNumParents() == 0 )
+    {
+        this->addChild( getRoot() );
+    }
 
     //Remove all children from the attach point
-    getAttachPoint()->removeChildren( 0, getAttachPoint()->getNumChildren() );
+    getChildAttachPoint()->removeChildren( 0, getChildAttachPoint()->getNumChildren() );
 
     // construct a local-origin circle.
     GeometryFactory factory;
     Geometry* geom = factory.createCircle(osg::Vec3d(0,0,0), _radius, _numSegments);
     if ( geom )
     {
-        //const SpatialReference* featureSRS = mapNode->getMapSRS()->createTangentPlaneSRS(position);
-
         GeometryCompiler compiler;
         osg::ref_ptr<Feature> feature = new Feature(geom, 0L); //todo: consider the SRS
         osg::Node* node = compiler.compile( feature.get(), _style, FilterContext(0L) );
         if ( node )
         {           
-            getAttachPoint()->addChild( node );
-
-            if ( _draped )
-            {
-                DrapeableNode* drapeable = new DrapeableNode( _mapNode.get(), true );
-                drapeable->addChild( getAttachPoint() );
-                this->addChild( drapeable );
-            }
-
-            else
-            {
-                this->addChild( getAttachPoint() );
-            }
+            getChildAttachPoint()->addChild( node );
+            getDrapeable()->setDraped( _draped );
         }
 
         applyStyle( _style, _draped );

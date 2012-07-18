@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -152,12 +152,16 @@ AnnotationNode::makeAbsolute( GeoPoint& mapPoint, osg::Node* patch ) const
         _altitude->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || 
         _altitude->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN) )
     {
-        mapPoint.altitudeMode() = AltitudeMode::RELATIVE_TO_TERRAIN;
-        mapPoint.z() = 0.0;
+        mapPoint.altitudeMode() = ALTMODE_RELATIVE;
+        //If we're clamping to the terrain
+        if (_altitude->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN)
+        {
+            mapPoint.z() = 0.0;
+        }
     }
 
     // if the point's already absolute and we're not clamping it, nop.
-    if ( mapPoint.altitudeMode() == AltitudeMode::ABSOLUTE )
+    if ( mapPoint.altitudeMode() == ALTMODE_ABSOLUTE )
     {
         return true;
     }
@@ -168,7 +172,7 @@ AnnotationNode::makeAbsolute( GeoPoint& mapPoint, osg::Node* patch ) const
     {
         // find the terrain height at the map point:
         double hamsl;
-        if (mapNode_safe->getTerrain()->getHeight(mapPoint.x(), mapPoint.y(), &hamsl, 0L, patch))
+        if (mapNode_safe->getTerrain()->getHeight(patch, mapPoint.getSRS(), mapPoint.x(), mapPoint.y(), &hamsl, 0L))
         {
             // apply any scale/offset in the symbology:
             if ( _altitude.valid() )
@@ -180,7 +184,7 @@ AnnotationNode::makeAbsolute( GeoPoint& mapPoint, osg::Node* patch ) const
             }
             mapPoint.z() += hamsl;
         }
-        mapPoint.altitudeMode() = AltitudeMode::ABSOLUTE;
+        mapPoint.altitudeMode() = ALTMODE_ABSOLUTE;
         return true;
     }
 
@@ -263,7 +267,7 @@ AnnotationNode::hasDecoration( const std::string& name ) const
 }
 
 osg::Group*
-AnnotationNode::getAttachPoint()
+AnnotationNode::getChildAttachPoint()
 {
     osg::Transform* t = osgEarth::findTopMostNodeOfType<osg::Transform>(this);
     return t ? (osg::Group*)t : (osg::Group*)this;
@@ -287,10 +291,10 @@ AnnotationNode::supportsAutoClamping( const Style& style ) const
 }
 
 void
-AnnotationNode::configureForAltitudeMode( const AltitudeModeEnum& mode )
+AnnotationNode::configureForAltitudeMode( const AltitudeMode& mode )
 {
     setAutoClamp(
-        mode == AltitudeMode::RELATIVE_TO_TERRAIN ||
+        mode == ALTMODE_RELATIVE ||
         (_altitude.valid() && _altitude->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN) );
 }
 

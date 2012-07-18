@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -40,6 +40,9 @@ namespace osgEarth { namespace Util
          * @param profile    Profile of packaged tile data (required)
          */
         TMSPackager( const Profile* outProfile );
+
+        /** dtor */
+        virtual ~TMSPackager() { }
 
         /**
          * Whether to dump out progress messages 
@@ -87,7 +90,7 @@ namespace osgEarth { namespace Util
          */
         struct Result {
             Result() : ok(true) { }
-            Result(const std::string& m) : message(m), ok(false) { }
+            Result(const std::string& m) : ok(false), message(m) { }
             operator bool() const { return ok; }
             bool ok;
             std::string message;

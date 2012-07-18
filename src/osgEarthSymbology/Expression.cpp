@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -26,7 +26,7 @@ using namespace osgEarth::Symbology;
 #define LC "[Expression] "
 
 NumericExpression::NumericExpression( const std::string& expr ) : 
-_src( expr ),
+_src  ( expr ),
 _value( 0.0 ),
 _dirty( true )
 {
@@ -34,9 +34,9 @@ _dirty( true )
 }
 
 NumericExpression::NumericExpression( const NumericExpression& rhs ) :
-_src( rhs._src ),
-_rpn( rhs._rpn ),
-_vars( rhs._vars ),
+_src  ( rhs._src ),
+_rpn  ( rhs._rpn ),
+_vars ( rhs._vars ),
 _value( rhs._value ),
 _dirty( rhs._dirty )
 {
@@ -328,6 +328,14 @@ _uriContext( rhs._uriContext )
     //nop
 }
 
+void
+StringExpression::set( const std::string& expr )
+{
+    _src = expr;
+    _dirty = true;
+    init();
+}
+
 StringExpression::StringExpression( const Config& conf )
 {
     mergeConfig( conf );
@@ -337,14 +345,17 @@ StringExpression::StringExpression( const Config& conf )
 void
 StringExpression::mergeConfig( const Config& conf )
 {
-    _src = conf.value();
-    _dirty = true;
+    _src        = conf.value();
+    _uriContext = conf.referrer();
+    _dirty      = true;
 }
 
 Config
 StringExpression::getConfig() const
 {
-    return Config( "string_expression", _src );
+    Config conf( "string_expression", _src );
+    conf.setReferrer( uriContext().referrer() );
+    return conf;
 }
 
 void

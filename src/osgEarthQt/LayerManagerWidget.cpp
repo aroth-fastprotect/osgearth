@@ -1,5 +1,5 @@
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -187,8 +187,8 @@ void LayerControlWidgetBase::initUi(bool hasContent)
 
   // create the primary vertical layout
   _primaryLayout = new QVBoxLayout;
-	_primaryLayout->setSpacing(0);
-	_primaryLayout->setContentsMargins(0, 0, 0, 0);
+  _primaryLayout->setSpacing(0);
+  _primaryLayout->setContentsMargins(0, 0, 0, 0);
   setLayout(_primaryLayout);
 
 
@@ -605,7 +605,8 @@ Action* ModelLayerControlWidget::getDoubleClickAction(const ViewVector& views)
           center += bs.center();
 
         GeoPoint output;
-        _map->worldPointToMapPoint(center, output);
+        output.fromWorld( _map->getSRS(), center );
+        //_map->worldPointToMapPoint(center, output);
 
         //TODO: make a better range calculation
         return new SetViewpointAction(osgEarth::Viewpoint(output.vec3d(), 0.0, -90.0, bs.radius() * 4.0), views);

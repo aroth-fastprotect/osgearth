@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 #include <osgEarthSymbology/StencilVolumeNode>
 #include <osgEarth/Registry>
 #include <osgEarth/NodeUtils>
+#include <osgEarth/Capabilities>
 #include <osg/Stencil>
 #include <osg/StencilTwoSided>
 #include <osg/Depth>
@@ -143,12 +144,12 @@ StencilVolumeNode::addVolumes( osg::Node* node, bool onNextUpdate )
         ADJUST_UPDATE_TRAV_COUNT( this, 1 );
     }
     else
-{
-    if ( _stencilGroup1 )
-        _stencilGroup1->addChild( node );
-    if ( _stencilGroup2 )
-        _stencilGroup2->addChild( node );
-}
+    {
+        if ( _stencilGroup1 )
+            _stencilGroup1->addChild( node );
+        if ( _stencilGroup2 )
+            _stencilGroup2->addChild( node );
+    }
 }
 
 void

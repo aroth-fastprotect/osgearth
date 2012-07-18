@@ -22,15 +22,12 @@ SET(TARGET_PUBLIC_H
     Feature
     FeatureCursor
     FeatureDisplayLayout
-    FeatureGeometryIndex
-    FeatureGridder
+    FeatureDrawSet
 	FeatureListSource
     FeatureModelGraph
     FeatureModelSource    
-    #FeatureNode
     FeatureSource
-	FeatureSourceNode
-	FeatureSourceMeshConsolidator
+    FeatureSourceIndexNode
     FeatureTileSource
     Filter
     FilterContext
@@ -66,15 +63,12 @@ SET(TARGET_SRC
     Feature.cpp
     FeatureCursor.cpp
     FeatureDisplayLayout.cpp
-    FeatureGeometryIndex.cpp
-    FeatureGridder.cpp
+    FeatureDrawSet.cpp
 	FeatureListSource.cpp
     FeatureModelGraph.cpp
     FeatureModelSource.cpp
-    #FeatureNode.cpp
     FeatureSource.cpp
-	FeatureSourceNode.cpp
-	FeatureSourceMeshConsolidator.cpp
+    FeatureSourceIndexNode.cpp
     FeatureTileSource.cpp
     Filter.cpp
     FilterContext.cpp

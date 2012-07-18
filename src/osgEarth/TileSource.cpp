@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -313,8 +313,8 @@ TileSource::createHeightField(const TileKey&        key,
 }
 
 osg::HeightField*
-TileSource::createHeightField( const TileKey& key,
-                               ProgressCallback* progress)
+TileSource::createHeightField(const TileKey&        key,
+                              ProgressCallback*     progress)
 {
     //osg::ref_ptr<osg::Image> image = createImage(key, dbOptions, progress);
     osg::ref_ptr<osg::Image> image = createImage(key, progress);
@@ -479,6 +479,16 @@ TileSourceFactory::create( const TileSourceOptions& options )
     if ( !result )
     {
         OE_WARN << "WARNING: Failed to load TileSource driver for \"" << driver << "\"" << std::endl;
+    }
+
+    // apply an Override Profile if provided.
+    if ( result && options.profile().isSet() )
+    {
+        const Profile* profile = Profile::create(*options.profile());
+        if ( profile )
+        {
+            result->setProfile( profile );
+        }
     }
 
     return result;

@@ -5,5 +5,6 @@ SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES})
 SET(TARGET_SRC ReaderWriterTileCache.cpp)
 
 SET(TARGET_PUBLIC_H TileCacheOptions)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/tilecache)
 
 SETUP_PLUGIN(osgearth_tilecache)

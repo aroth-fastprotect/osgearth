@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -46,11 +46,11 @@ public:
     void initialize(const osgDB::Options* dbOptions,
                     const Profile*        overrideProfile )
     {
-        setProfile( Profile::create( "world-mercator", "", 2, 2 ) );
+        setProfile( Profile::create( "spherical-mercator", "", 2, 2 ) );
     }
 
-    osg::Image* createImage( const TileKey& key,
-                             ProgressCallback* progress )
+    osg::Image* createImage(const TileKey&        key,
+                            ProgressCallback*     progress )
     {
         //Return NULL if we are given a non global-mercator key
         //Not applicable
@@ -95,12 +95,12 @@ public:
 		base = buf.str();
 
         OE_DEBUG << key.str() << "=" << base << std::endl;
-        
+
         return URI(base).readImage( 0L, CachePolicy::NO_CACHE ).releaseImage();
     }
 
-    osg::HeightField* createHeightField( const TileKey& key,
-                                         ProgressCallback* progress)
+    osg::HeightField* createHeightField(const TileKey&        key,
+                                        ProgressCallback*     progress )
     {
         //NI
         OE_WARN << "[Yahoo] Driver does not support heightfields" << std::endl;

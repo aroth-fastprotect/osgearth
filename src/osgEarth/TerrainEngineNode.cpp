@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -102,6 +102,14 @@ TerrainEngineNode::ImageLayerController::onOpacityChanged( ImageLayer* layer )
 
     _engine->dirty();
 }
+
+void
+TerrainEngineNode::ImageLayerController::onColorFiltersChanged( ImageLayer* layer )
+{
+    _engine->updateTextureCombining();
+    _engine->dirty();
+}
+
 
 
 //------------------------------------------------------------------------
@@ -280,7 +288,7 @@ TerrainEngineNode::onMapModelChanged( const MapModelChange& change )
     // compositor is up to date with the map model. (After post-initialization,
     // this happens in the subclass...something that probably needs to change
     // since this is unclear)
-    else if ( _texCompositor.valid() )
+    else if ( _texCompositor.valid() && change.getImageLayer() )
     {
         _texCompositor->applyMapModelChange( change );
     }
@@ -353,6 +361,11 @@ TerrainEngineNode::validateTerrainOptions( TerrainOptions& options )
     }
 }
 
+namespace
+{
+    Threading::Mutex s_opqlock;
+}
+
 void
 TerrainEngineNode::traverse( osg::NodeVisitor& nv )
 {
@@ -361,7 +374,6 @@ TerrainEngineNode::traverse( osg::NodeVisitor& nv )
         // see if we need to set up the Terrain object with an update ops queue.
         if ( !_terrainInterface->_updateOperationQueue.valid() )
         {
-            static Threading::Mutex s_opqlock;
             Threading::ScopedMutexLock lock(s_opqlock);
             if ( !_terrainInterface->_updateOperationQueue.valid() ) // double check pattern
             {

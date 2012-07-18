@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -148,7 +148,9 @@ public:
                         {
                             result = new FeatureProfile(featureType->getExtent());
 
-                            if (featureType->getTiled())
+                            bool disableTiling = _options.disableTiling().isSet() && *_options.disableTiling();
+
+                            if (featureType->getTiled() && !disableTiling)
                             {                        
                                 result->setTiled( true );
                                 result->setFirstLevel( featureType->getFirstLevel() );
@@ -217,10 +219,10 @@ public:
             {
                 if ( feat_handle )
                 {
-                    Feature* f = OgrUtils::createFeature( feat_handle, srs );
-                    if ( f ) 
+                    osg::ref_ptr<Feature> f = OgrUtils::createFeature( feat_handle, srs );
+                    if ( f.valid() && !isBlacklisted(f->getFID()) )
                     {
-                        features.push_back( f );
+                        features.push_back( f.release() );
                     }
                     OGR_F_Destroy( feat_handle );
                 }
@@ -340,6 +342,23 @@ public:
         if ( dataOK )
         {
             OE_DEBUG << LC << "Read " << features.size() << " features" << std::endl;
+        }
+
+        //If we have any filters, process them here before the cursor is created
+        if (!_options.filters().empty())
+        {
+            // preprocess the features using the filter list:
+            if ( features.size() > 0 )
+            {
+                FilterContext cx;
+                cx.profile() = getFeatureProfile();
+
+                for( FeatureFilterList::const_iterator i = _options.filters().begin(); i != _options.filters().end(); ++i )
+                {
+                    FeatureFilter* filter = i->get();
+                    cx = filter->push( features, cx );
+                }
+            }
         }
 
         //result = new FeatureListCursor(features);

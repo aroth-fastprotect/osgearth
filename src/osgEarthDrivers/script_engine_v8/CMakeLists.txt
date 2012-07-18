@@ -14,5 +14,6 @@ SET(TARGET_PUBLIC_H
 )
 LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthFeatures osgEarthSymbology)
 LIST(APPEND TARGET_LIBRARIES_VARS V8_LIBRARY)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/script_engine_v8)
 
 SETUP_PLUGIN(osgearth_scriptengine_javascript)

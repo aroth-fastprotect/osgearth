@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -35,6 +35,7 @@ using namespace osgEarth::ShaderComp;
 namespace
 {
     /** A hack for OSG 2.8.x to get access to the state attribute vector. */
+    /** TODO: no longer needed in OSG 3+ ?? */
     class StateHack : public osg::State 
     {
     public:        
@@ -62,6 +63,7 @@ namespace
 #define MERGE_SHADERS 0
 #define NOTIFICATION_MESSAGES 0
 
+
 VirtualProgram::VirtualProgram( unsigned int mask ) : 
 _mask( mask ) 
 {
@@ -69,50 +71,45 @@ _mask( mask )
     this->setDataVariance( osg::Object::DYNAMIC );
 }
 
+
 VirtualProgram::VirtualProgram(const VirtualProgram& rhs, const osg::CopyOp& copyop ) :
 osg::Program( rhs, copyop ),
-_shaderMap( rhs._shaderMap ),
-_mask( rhs._mask ),
-_functions( rhs._functions )
+_shaderMap  ( rhs._shaderMap ),
+_mask       ( rhs._mask ),
+_functions  ( rhs._functions )
 {
     //nop
 }
 
-osg::Shader*
-VirtualProgram::getShader( const std::string& shaderSemantic, osg::Shader::Type type )
-{
-    ShaderMap::key_type key( shaderSemantic, type );
-    return _shaderMap[ key ].get();
-}
 
 osg::Shader*
-VirtualProgram::setShader( const std::string& shaderSemantic, osg::Shader * shader )
+VirtualProgram::getShader( const std::string& shaderID ) const
 {
-    if( shader->getType() == osg::Shader::UNDEFINED ) 
+    ShaderMap::const_iterator i = _shaderMap.find(shaderID);
+    return i != _shaderMap.end() ? i->second.first.get() : 0L;
+}
+
+
+osg::Shader*
+VirtualProgram::setShader(const std::string&                 shaderID,
+                          osg::Shader*                       shader,
+                          osg::StateAttribute::OverrideValue ov)
+{
+    if ( !shader || shader->getType() ==  osg::Shader::UNDEFINED ) 
         return NULL;
 
-    ShaderMap::key_type key( shaderSemantic, shader->getType() );
+    shader->setName( shaderID );
+    _shaderMap[shaderID] = ShaderEntry(shader, ov);
 
-    osg::ref_ptr< osg::Shader >  shaderNew     = shader;
-    osg::ref_ptr< osg::Shader >& shaderCurrent = _shaderMap[ key ];
-
-    shaderNew->setName( shaderSemantic );
-
-    if( shaderCurrent != shaderNew )
-    {
-       shaderCurrent = shaderNew;
-    }
-
-    //OE_NOTICE << shader->getShaderSource() << std::endl;
-
-    return shaderCurrent.get();
+    return shader;
 }
+
 
 void
 VirtualProgram::setFunction(const std::string& functionName,
                             const std::string& shaderSource,
-                            FunctionLocation location,
-                            float priority)
+                            FunctionLocation   location,
+                            float              priority)
 {
     Threading::ScopedMutexLock lock( _functionsMutex );
 
@@ -120,26 +117,155 @@ VirtualProgram::setFunction(const std::string& functionName,
     ofm.insert( std::pair<float,std::string>( priority, functionName ) );
     osg::Shader::Type type = (int)location <= (int)LOCATION_VERTEX_POST_LIGHTING ?
         osg::Shader::VERTEX : osg::Shader::FRAGMENT;
-    setShader( functionName, new osg::Shader( type, shaderSource ) );
+
+    setShader( functionName, new osg::Shader(type, shaderSource) );
 }
 
 void
-VirtualProgram::removeShader( const std::string& shaderSemantic, osg::Shader::Type type )
+VirtualProgram::removeShader( const std::string& shaderID )
 {
-    _shaderMap.erase( ShaderMap::key_type( shaderSemantic, type ) );
+    _shaderMap.erase( shaderID );
 }
 
-static unsigned s_applies = 0;
-static int      s_framenum = 0;
+
+//static unsigned s_applies = 0;
+//static int      s_framenum = 0;
+
+
+/**
+* Adds a new shader entry to the accumulated shader map, respecting the
+* override policy of both the existing entry (if there is one) and the 
+* new entry.
+*/
+void 
+VirtualProgram::addToAccumulatedMap(ShaderMap&         accumShaderMap,
+                                    const std::string& shaderID,
+                                    const ShaderEntry& newEntry) const
+{
+    const osg::StateAttribute::OverrideValue& ov = newEntry.second;
+
+    // see if we're trying to disable a previous entry:
+    if ((ov & osg::StateAttribute::ON) == 0 ) //TODO: check for higher override
+    {
+        // yes? remove it!
+        accumShaderMap.erase( shaderID );
+    }
+
+    else
+    {
+        // see if there's a higher-up entry with the same ID:
+        ShaderEntry& accumEntry = accumShaderMap[ shaderID ]; 
+
+        // make sure we can add the new one:
+        if ((accumEntry.first.get() == 0L ) ||                           // empty slot, fill it
+            ((ov & osg::StateAttribute::PROTECTED) != 0) ||              // new entry is protected
+            ((accumEntry.second & osg::StateAttribute::OVERRIDE) == 0) ) // old entry does NOT override
+        {
+            accumEntry = newEntry;
+        }
+    }
+}
+
+
+osg::Program*
+VirtualProgram::buildProgram( osg::State& state, ShaderMap& accumShaderMap )
+{
+    // build a new set of accumulated functions, to support the creation of main()
+    refreshAccumulatedFunctions( state );
+
+    // No matching program in the cache; make it.
+    ShaderFactory* sf = osgEarth::Registry::instance()->getShaderFactory();
+
+    osg::Shader* old_vert_main = getShader( "osgearth_vert_main" );
+    osg::ref_ptr<osg::Shader> vert_main = sf->createVertexShaderMain( _accumulatedFunctions );
+    setShader( "osgearth_vert_main", vert_main.get() );
+    addToAccumulatedMap( accumShaderMap, "osgearth_vert_main", ShaderEntry(vert_main.get(), osg::StateAttribute::ON) );
+
+    osg::Shader* old_frag_main = getShader( "osgearth_frag_main" );
+    osg::ref_ptr<osg::Shader> frag_main = sf->createFragmentShaderMain( _accumulatedFunctions );
+    setShader( "osgearth_frag_main", frag_main );
+    addToAccumulatedMap( accumShaderMap, "osgearth_frag_main", ShaderEntry(frag_main.get(), osg::StateAttribute::ON) );
+
+    // rebuild the shader list now that we've changed the shader map.
+    ShaderVector vec;
+    for( ShaderMap::iterator i = accumShaderMap.begin(); i != accumShaderMap.end(); ++i )
+    {
+        vec.push_back( i->second.first.get() );
+    }
+
+    // Create a new program and add all our shaders.
+    osg::Program* program = new osg::Program();
+    program->setName(getName());
+    for( ShaderVector::iterator i = vec.begin(); i != vec.end(); ++i )
+    {
+        program->addShader( i->get() );
+    }
+
+    // Since we replaced the "mains", we have to go through the cache and update all its
+    // entries to point at the new mains instead of the old ones.
+    if ( old_vert_main || old_frag_main )
+    {
+        ProgramMap newProgramCache;
+
+        for( ProgramMap::iterator m = _programCache.begin(); m != _programCache.end(); ++m )
+        {
+            const ShaderVector& original = m->first;
+
+            // build a new cache key:
+            ShaderVector newKey;
+
+            for( ShaderVector::const_iterator i = original.begin(); i != original.end(); ++i )
+            {
+                if ( i->get() == old_vert_main )
+                    newKey.push_back( vert_main.get() );
+                else if ( i->get() == old_frag_main )
+                    newKey.push_back( frag_main.get() );
+                else
+                    newKey.push_back( i->get() );
+            }
+
+            osg::Program* p = m->second.get();
+            for( unsigned n = 0; n < p->getNumShaders(); --n )
+            {
+                osg::Shader* s = p->getShader(n);
+                if ( s == old_vert_main )
+                {
+                    p->removeShader( s );
+                    p->addShader( vert_main.get() );
+                    --n;
+                }
+                else if ( s == old_frag_main )
+                {
+                    p->removeShader( s );
+                    p->addShader( frag_main.get() );
+                    --n;
+                }
+            }
+
+            newProgramCache[newKey] = p;
+        }
+
+        _programCache = newProgramCache;
+    }
+
+    // finally, put own new program in the cache.
+    _programCache[ vec ] = program;
+
+    return program;
+}
+
 
 void
 VirtualProgram::apply( osg::State & state ) const
 {
     if( _shaderMap.empty() ) // Virtual Program works as normal Program
+    {
         return Program::apply( state );
+    }
 
     // first, find and collect all the VirtualProgram attributes:
-    ShaderMap shaderMap;
+    ShaderMap accumShaderMap;
+
     const StateHack::AttributeVec* av = StateHack::GetAttributeVec( state, this );
     if ( av )
     {
@@ -151,90 +277,61 @@ VirtualProgram::apply( osg::State & state ) const
             {
                 for( ShaderMap::const_iterator i = vp->_shaderMap.begin(); i != vp->_shaderMap.end(); ++i )
                 {
-                    shaderMap[ i->first ] = i->second;
+                    addToAccumulatedMap( accumShaderMap, i->first, i->second );
+                    //accumShaderMap[ i->first ] = i->second;
                 }
             }
         }
     }
 
-    // next add the local shader components to the map:
+    // next add the local shader components to the map, respecting the override values:
     for( ShaderMap::const_iterator i = _shaderMap.begin(); i != _shaderMap.end(); ++i )
-        shaderMap[ i->first ] = i->second;
+    {
+        addToAccumulatedMap( accumShaderMap, i->first, i->second );
+    }
 
-    if( shaderMap.size() )
+
+    if ( accumShaderMap.size() )
     {
         // next, assemble a list of the shaders in the map so we can compare it:
-        ShaderList sl;
-        for( ShaderMap::iterator i = shaderMap.begin(); i != shaderMap.end(); ++i )
-            sl.push_back( i->second );
+        ShaderVector vec;
+        vec.reserve( accumShaderMap.size() );
+        for( ShaderMap::iterator i = accumShaderMap.begin(); i != accumShaderMap.end(); ++i )
+        {
+            ShaderEntry& entry = i->second;
+            vec.push_back( entry.first.get() );
+        }
 
         // see if there's already a program associated with this list:
         osg::Program* program = 0L;
-        ProgramMap::iterator p = _programMap.find( sl );
-        if ( p != _programMap.end() )
+
+        // look up the program:
         {
-            program = p->second.get();
+            Threading::ScopedReadLock shared( _programCacheMutex );
+
+            ProgramMap::const_iterator p = _programCache.find( vec );
+            if ( p != _programCache.end() )
+            {
+                program = p->second.get();
+            }
         }
-        else
+
+        // if not found, lock and build it:
+        if ( !program )
         {
-            ShaderFactory* sf = osgEarth::Registry::instance()->getShaderFactory();
+            Threading::ScopedWriteLock exclusive( _programCacheMutex );
 
-            // build a new set of accumulated functions, to support the creation of main()
-            const_cast<VirtualProgram*>(this)->refreshAccumulatedFunctions( state );
-                
-            osg::Shader* vert_main = sf->createVertexShaderMain( _accumulatedFunctions );
-            const_cast<VirtualProgram*>(this)->setShader( "osgearth_vert_main", vert_main );
-            shaderMap[ ShaderSemantic("osgearth_vert_main", osg::Shader::VERTEX) ] = vert_main;
-
-            osg::Shader* frag_main = sf->createFragmentShaderMain( _accumulatedFunctions );
-            const_cast<VirtualProgram*>(this)->setShader( "osgearth_frag_main", frag_main );
-            shaderMap[ ShaderSemantic("osgearth_frag_main", osg::Shader::FRAGMENT) ] = frag_main;
-            
-            // rebuild the shader list now that we've changed the shader map.
-            sl.clear();
-            for( ShaderMap::iterator i = shaderMap.begin(); i != shaderMap.end(); ++i )
-                sl.push_back( i->second );
-
-            // Create a new program and add all our shaders.
-            program = new osg::Program();
-
-#if !MERGE_SHADERS
-            for( ShaderList::iterator i = sl.begin(); i != sl.end(); ++i )
+            // look again in case of contention:
+            ProgramMap::const_iterator p = _programCache.find( vec );
+            if ( p != _programCache.end() )
             {
-                program->addShader( i->get() );
+                program = p->second.get();
             }
-#else
-            std::string strFragment;
-            std::string strVertex;
-            std::string strGeometry;
-            
-            for( ShaderList::iterator i = sl.begin(); i != sl.end(); ++i )
+            else
             {
-                if( i->get()->getType() == osg::Shader::FRAGMENT )
-                    strFragment += i->get()->getShaderSource();
-                else if ( i->get()->getType() == osg::Shader::VERTEX )
-                    strVertex += i->get()->getShaderSource();
-                else if ( i->get()->getType() == osg::Shader::GEOMETRY )
-                    strGeometry += i->get()->getShaderSource();
+                VirtualProgram* nc = const_cast<VirtualProgram*>(this);
+                program = nc->buildProgram( state, accumShaderMap );
             }
-
-            if( strFragment.length() > 0 )
-            {
-                program->addShader( new osg::Shader( osg::Shader::FRAGMENT, strFragment ) );
-            }
-
-            if( strVertex.length() > 0  )
-            {
-                program->addShader( new osg::Shader( osg::Shader::VERTEX, strVertex ) );
-            }
-
-            if( strGeometry.length() > 0  )
-            {
-                program->addShader( new osg::Shader( osg::Shader::GEOMETRY, strGeometry ) );
-            }
-#endif
-            // finally, cache the program so we only regenerate it when it changes.
-            _programMap[ sl ] = program;
         }
 
         // finally, apply the program attribute.
@@ -259,7 +356,8 @@ VirtualProgram::refreshAccumulatedFunctions( const osg::State& state )
     // This method searches the state's attribute stack and accumulates all 
     // the user functions (including those in this program).
 
-    Threading::ScopedMutexLock lock( _functionsMutex );
+    // mutex no longer required since this method is called safely
+    //Threading::ScopedMutexLock lock( _functionsMutex );
 
     _accumulatedFunctions.clear();
 
@@ -441,7 +539,8 @@ ShaderFactory::createDefaultTextureVertexShader( int numTexCoordSets ) const
         << "void osgearth_vert_setupTexturing() \n"
         << "{ \n";
 
-    //TODO: gl_TexCoord et.al. are depcrecated so we should replace them ...
+    //TODO: gl_TexCoord et.al. are depcrecated so we should replace them;
+    // this approach also only support up to 8 texture coord units
     for(int i=0; i<numTexCoordSets; ++i )
     {
         buf << "    gl_TexCoord["<< i <<"] = gl_MultiTexCoord"<< i << "; \n";
@@ -534,6 +633,39 @@ ShaderFactory::createDefaultLightingFragmentShader() const
 
     return new osg::Shader( osg::Shader::FRAGMENT, s_PerVertexLighting_FragmentShaderSource );
 }
+
+
+osg::Shader*
+ShaderFactory::createColorFilterChainFragmentShader( const std::string& function, const ColorFilterChain& chain ) const
+{
+    std::stringstream buf;
+    buf << "#version 110 \n";
+
+    // write out the shader function prototypes:
+    for( ColorFilterChain::const_iterator i = chain.begin(); i != chain.end(); ++i )
+    {
+        ColorFilter* filter = i->get();
+        buf << "void " << filter->getEntryPointFunctionName() << "(in int slot, inout vec4 color);\n";
+    }
+
+    // write out the main function:
+    buf << "void " << function << "(in int slot, inout vec4 color) \n"
+        << "{ \n";
+
+    // write out the function calls. if there are none, it's a NOP.
+    for( ColorFilterChain::const_iterator i = chain.begin(); i != chain.end(); ++i )
+    {
+        ColorFilter* filter = i->get();
+        buf << "    " << filter->getEntryPointFunctionName() << "(slot, color);\n";
+    }
+        
+    buf << "} \n";
+
+    std::string bufstr;
+    bufstr = buf.str();
+    return new osg::Shader(osg::Shader::FRAGMENT, bufstr);
+}
+
 
 //--------------------------------------------------------------------------
 

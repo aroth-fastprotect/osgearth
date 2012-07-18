@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,7 +21,6 @@
 #define OSGEARTH_TILE_GRID_PROFILE_H 1
 
 #include <osgEarth/Common>
-#include <osgEarth/Bounds>
 #include <osgEarth/Config>
 #include <osgEarth/GeoData>
 #include <osgEarth/SpatialReference>
@@ -39,6 +38,9 @@ namespace osgEarth
     public:
         ProfileOptions( const ConfigOptions& options =ConfigOptions() );
         ProfileOptions( const std::string& namedProfile );
+
+        /** dtor */
+        virtual ~ProfileOptions() { }
 
         /** Returns true if this configuration is well-defined and usable */
         bool defined() const;
@@ -262,7 +264,10 @@ namespace osgEarth
 
     public:
 
-        void overrideSRS( const SpatialReference* srs );
+        /**
+         * Makes a clone of this profile but replaces the SRS with a custom one.
+         */
+        Profile* overrideSRS( const SpatialReference* srs ) const;
 
     protected:       
 
@@ -278,6 +283,9 @@ namespace osgEarth
             double geoxmin, double geoymin, double geoxmax, double geoymax,
             unsigned int x_tiles_at_lod0 =0,
             unsigned int y_tiles_at_lod0 =0 );
+
+        /** dtor */
+        virtual ~Profile() { }
         
 
         virtual void addIntersectingTiles(

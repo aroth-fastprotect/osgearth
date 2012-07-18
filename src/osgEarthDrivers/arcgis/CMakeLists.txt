@@ -13,5 +13,6 @@ SET(TARGET_H
 SET(TARGET_PUBLIC_H 
 	ArcGISOptions
 )
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/arcgis)
 
 SETUP_PLUGIN(osgearth_arcgis)

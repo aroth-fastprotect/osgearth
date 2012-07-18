@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -26,6 +26,17 @@ using namespace osgEarth;
 using namespace OpenThreads;
 
 /****************************************************************/
+
+
+ModelSourceOptions::ModelSourceOptions( const ConfigOptions& options ) :
+DriverConfigOptions( options ),
+_minRange          ( 0.0f ),
+_maxRange          ( FLT_MAX ),
+_renderOrder       ( 11 ),
+_depthTestEnabled  ( true )
+{ 
+    fromConfig(_conf);
+}
 
 void
 ModelSourceOptions::fromConfig( const Config& conf )

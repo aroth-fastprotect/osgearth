@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -51,13 +51,12 @@ namespace osgEarth { namespace Annotation
             const Style&       style =Style() );
 
         /**
-         * Constructs a new place node.
+         * Constructs a new place node. You can specify an icon marker by
+         * adding a MarkerSymbol to the Style.
          */
         PlaceNode(
             MapNode*           mapNode,
-            double             x,
-            double             y,
-            osg::Image*        iconImage,
+            const GeoPoint&    position,
             const std::string& labelText,
             const Style&       style =Style() );
 
@@ -68,10 +67,11 @@ namespace osgEarth { namespace Annotation
             MapNode*      mapNode,
             const Config& conf);
 
+        virtual ~PlaceNode() { }
+
         /**
          * Image to use for the icon
          */
-        void setIconImage( osg::Image* image );
         osg::Image* getIconImage() const { return _image.get(); }
 
         /**
@@ -83,7 +83,6 @@ namespace osgEarth { namespace Annotation
         /**
          * Style (for text)
          */
-        void setStyle( const Style& style );
         const Style& getStyle() const { return _style; }
 
 

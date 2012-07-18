@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgViewer/ViewerEventHandlers>
 #include <osgUtil/LineSegmentIntersector>
 #include <osgEarth/MapNode>
+#include <osgEarth/TerrainEngineNode>
 #include <osgEarth/ElevationQuery>
 #include <osgEarth/StringUtils>
 #include <osgEarth/Terrain>
@@ -66,7 +67,7 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
         {
             // convert to map coords:
             GeoPoint mapPoint;
-            _map->worldPointToMapPoint(world, mapPoint);
+            mapPoint.fromWorld( _terrain->getSRS(), world );
 
             // do an elevation query:
             double query_resolution = 0.1; // 1/10th of a degree

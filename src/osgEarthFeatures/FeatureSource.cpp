@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -31,7 +31,7 @@ using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 using namespace OpenThreads;
 
-FeatureSourceOptions::FeatureSourceOptions( const ConfigOptions& options ) :
+FeatureSourceOptions::FeatureSourceOptions(const ConfigOptions& options) :
 DriverConfigOptions( options )
 {
     fromConfig( _conf );
@@ -42,9 +42,9 @@ FeatureSourceOptions::fromConfig( const Config& conf )
 {
     unsigned numResamples = 0;
 
-    conf.getIfSet( "open_write", _openWrite );
-    conf.getIfSet   ( "name",       _name );
-    conf.getObjIfSet( "profile",    _profile );
+    conf.getIfSet   ( "open_write",   _openWrite );
+    conf.getIfSet   ( "name",         _name );
+    conf.getObjIfSet( "profile",      _profile );
     conf.getObjIfSet( "cache_policy", _cachePolicy );
 
     const ConfigSet& children = conf.children();
@@ -100,9 +100,9 @@ FeatureSourceOptions::getConfig() const
 {
     Config conf = DriverConfigOptions::getConfig();
 
-    conf.updateIfSet( "open_write", _openWrite );
-    conf.updateIfSet   ( "name",       _name );
-    conf.updateObjIfSet( "profile",    _profile );
+    conf.updateIfSet   ( "open_write",   _openWrite );
+    conf.updateIfSet   ( "name",         _name );
+    conf.updateObjIfSet( "profile",      _profile );
     conf.updateObjIfSet( "cache_policy", _cachePolicy );
 
     //TODO: make each of these filters Configurable.
@@ -178,6 +178,34 @@ FeatureSource::getSchema() const
 {
     static FeatureSchema s_emptySchema;
     return s_emptySchema;
+}
+
+void
+FeatureSource::addToBlacklist( FeatureID fid )
+{
+    Threading::ScopedWriteLock exclusive( _blacklistMutex );
+    _blacklist.insert( fid );
+}
+
+void
+FeatureSource::removeFromBlacklist( FeatureID fid )
+{
+    Threading::ScopedWriteLock exclusive( _blacklistMutex );
+    _blacklist.erase( fid );
+}
+
+void
+FeatureSource::clearBlacklist()
+{
+    Threading::ScopedWriteLock exclusive( _blacklistMutex );
+    _blacklist.clear();
+}
+
+bool
+FeatureSource::isBlacklisted( FeatureID fid ) const
+{
+    Threading::ScopedReadLock shared( const_cast<FeatureSource*>(this)->_blacklistMutex );
+    return _blacklist.find( fid ) != _blacklist.end();
 }
 
 //------------------------------------------------------------------------

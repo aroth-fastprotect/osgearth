@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -60,6 +60,15 @@ namespace osgEarth
         /** the GLSL version */
         float getGLSLVersion() const { return _GLSLversion; }
 
+        /** the GPU vendor */
+        const std::string& getVendor() const { return _vendor;}
+
+        /** the GPU renderer */
+        const std::string& getRenderer() const { return _renderer;}
+
+        /** the GPU driver version */
+        const std::string& getVersion() const { return _version;}
+
         /** whether the GPU supports texture arrays */
         bool supportsTextureArrays() const { return _supportsTextureArrays; }
 
@@ -87,17 +96,11 @@ namespace osgEarth
 		/** whether the GPU supports OpenGL Quad buffer stereo */
 		bool supportsQuadBufferStereo() const { return _supportsQuadBufferStereo; }
 
-        /** the vendor of the OpenGL implementation */
-		const std::string & vendor() const { return _vendor; }
-		
-        /** the renderer information */
-		const std::string & renderer() const { return _renderer; }
-		
-        /** the version of the OpenGL implementation */
-		const std::string & version() const { return _version; }
-
     protected:
         Capabilities();
+
+        /** dtor */
+        virtual ~Capabilities() { }
 
     private:
         bool        readCache();
@@ -122,6 +125,7 @@ namespace osgEarth
         bool _supportsMipmappedTextureUpdates;
         bool _supportsDepthPackedStencilBuffer;
 		bool _supportsQuadBufferStereo;
+        bool _supportsOcclusionQuery;
         std::string _vendor;
         std::string _renderer;
         std::string _version;

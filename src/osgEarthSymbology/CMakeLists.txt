@@ -35,6 +35,8 @@ SET(TARGET_PUBLIC_H
     Skins
 	StencilVolumeNode
     Style
+    StyleSelector
+    StyleSheet
     SLD
     Symbol
     Tags
@@ -65,6 +67,8 @@ SET(TARGET_SRC
     Skins.cpp
     StencilVolumeNode.cpp
     Style.cpp
+    StyleSelector.cpp
+    StyleSheet.cpp
     SLD.cpp
     Symbol.cpp
     TextSymbol.cpp

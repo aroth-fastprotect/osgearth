@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -627,10 +627,10 @@ namespace
 }
 
 LabelControl::LabelControl(const std::string& text,
-                           float fontSize,
-                           const osg::Vec4f& foreColor):
-_text(text),
-_fontSize(fontSize),
+                           float              fontSize,
+                           const osg::Vec4f&  foreColor):
+_text    ( text ),
+_fontSize( fontSize ),
 _encoding( osgText::String::ENCODING_UNDEFINED )
 {    
     setFont( Registry::instance()->getDefaultFont() );    
@@ -652,7 +652,7 @@ _encoding( osgText::String::ENCODING_UNDEFINED )
 
 LabelControl::LabelControl(Control*           valueControl,
                            float              fontSize,
-                           const osg::Vec4f& foreColor):
+                           const osg::Vec4f&  foreColor):
 _fontSize( fontSize ),
 _encoding( osgText::String::ENCODING_UNDEFINED )
 {
@@ -673,7 +673,7 @@ _encoding( osgText::String::ENCODING_UNDEFINED )
     setFont( Registry::instance()->getDefaultFont() );   
     setForeColor( foreColor );
     setBackColor( osg::Vec4f(0,0,0,0) );
-    
+
     if ( valueControl )
         valueControl->addEventHandler( new ValueLabelHandler(this), true );
 }
@@ -1987,7 +1987,17 @@ namespace osgEarth { namespace Util { namespace Controls
                         ControlContext cx;
                         cx._view = aa.asView();
                         cx._vp = new osg::Viewport( 0, 0, vp->width(), vp->height() );
-                        cx._viewContextID = aa.asView()->getCamera()->getGraphicsContext()->getState()->getContextID();
+                        
+                        osg::View* view = aa.asView();
+                        osg::GraphicsContext* gc = view->getCamera()->getGraphicsContext();
+                        if ( !gc && view->getNumSlaves() > 0 )
+                            gc = view->getSlave(0)._camera->getGraphicsContext();
+
+                        if ( gc )
+                            cx._viewContextID = gc->getState()->getContextID();
+                        else
+                            cx._viewContextID = ~0u;
+
                         _cs->setControlContext( cx );
 
                         _width  = (int)vp->width();
@@ -2460,6 +2470,9 @@ ControlCanvas::init( osgViewer::View* view, bool registerCanvas )
     ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS, 0, 1, false ) );
     ss->setRenderBinMode( osg::StateSet::USE_RENDERBIN_DETAILS );
     ss->setBinName( OSGEARTH_CONTROLS_BIN );
+
+    // keeps the control bin shaders from "leaking out" into the scene graph :/
+    ss->setAttributeAndModes( new osg::Program(), osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
 
     _controlNodeBin = new ControlNodeBin();
     this->addChild( _controlNodeBin->getControlGroup() );

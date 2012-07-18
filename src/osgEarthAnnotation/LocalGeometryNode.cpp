@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -56,17 +56,10 @@ _draped      ( draped )
 
     if ( content )
     {
-        getTransform()->addChild( content );
-        if ( draped )
-        {
-            DrapeableNode* dn = new DrapeableNode(mapNode);
-            dn->addChild( getTransform() );
-            this->addChild( dn );
-        }
-        else
-        {
-            this->addChild( getTransform() );
-        }
+        getChildAttachPoint()->addChild( content );
+        getDrapeable()->setDraped( _draped );
+
+        this->addChild( getRoot() );
 
         // this will activate the clamping logic
         applyStyle( style, draped );
@@ -87,17 +80,9 @@ LocalGeometryNode::init()
         osg::Node* node = compiler.compile( feature.get(), cx );
         if ( node )
         {
-            getTransform()->addChild( node );
-            if ( _draped && _mapNode.valid() )
-            {
-                DrapeableNode* dn = new DrapeableNode(_mapNode.get());
-                dn->addChild( getTransform() );
-                this->addChild( dn );
-            }
-            else
-            {
-                this->addChild( getTransform() );
-            }
+            getChildAttachPoint()->addChild( node );
+            getDrapeable()->setDraped( _draped );
+            this->addChild( getRoot() );
 
             // prep for clamping
             applyStyle( *_style, _draped );

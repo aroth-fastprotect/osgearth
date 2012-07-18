@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,8 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osgEarth/Cube>
 #include <osgEarth/ShaderComposition>
+#include <osgEarth/TaskService>
+#include <osgEarth/IOTypes>
+#include <osgEarth/ColorFilter>
 #include <osgEarthDrivers/cache_filesystem/FileSystemCache>
 #include <osg/Notify>
 #include <osg/Version>
@@ -32,11 +36,11 @@ using namespace osgEarth;
 using namespace osgEarth::Drivers;
 using namespace OpenThreads;
 
-#define STR_GLOBAL_GEODETIC "global-geodetic"
-#define STR_GLOBAL_MERCATOR "global-mercator"
+#define STR_GLOBAL_GEODETIC    "global-geodetic"
+#define STR_GLOBAL_MERCATOR    "global-mercator"
 #define STR_SPHERICAL_MERCATOR "spherical-mercator"
-#define STR_CUBE            "cube"
-#define STR_LOCAL           "local"
+#define STR_CUBE               "cube"
+#define STR_LOCAL              "local"
 
 #define LC "[Registry] "
 
@@ -59,22 +63,16 @@ _defaultFont     ( 0L )
     _taskServiceManager = new TaskServiceManager();
 
     // activate KMZ support
+    osgDB::Registry::instance()->addArchiveExtension  ( "kmz" );    
     osgDB::Registry::instance()->addFileExtensionAlias( "kmz", "kml" );
-    osgDB::Registry::instance()->addArchiveExtension( "kmz" );    
 
-#if OSG_MIN_VERSION_REQUIRED(3,0,0)
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kml+xml", "kml" );
-    osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kmz", "kmz" );
-    //osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/xml",                             "xml" );
-    //osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/json",                     "json" );
-    //osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/json",                            "json" );
-    //osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/x-json",                          "json" );
+    osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kmz",     "kmz" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/plain",                           "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/xml",                             "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/json",                     "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/json",                            "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/x-json",                          "osgb" );
-#endif
     
     // pre-load OSG's ZIP plugin so that we can use it in URIs
     std::string zipLib = osgDB::Registry::instance()->createLibraryNameForExtension( "zip" );
@@ -413,6 +411,18 @@ Registry::setShaderFactory( ShaderFactory* lib )
 {
     if ( lib != 0L && lib != _shaderLib.get() )
         _shaderLib = lib;
+}
+        
+void
+Registry::setURIReadCallback( URIReadCallback* callback ) 
+{ 
+    _uriReadCallback = callback;
+}
+
+URIReadCallback*
+Registry::getURIReadCallback() const
+{
+    return _uriReadCallback.get(); 
 }
 
 void

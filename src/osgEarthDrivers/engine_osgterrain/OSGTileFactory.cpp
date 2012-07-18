@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -526,8 +526,7 @@ OSGTileFactory::createPopulatedTile(const MapFrame&  mapf,
                                     bool             wrapInPagedLOD, 
                                     bool             fallback, 
                                     bool&            validData )
-{
-    OE_NOTICE << "createPopulatedtile" << std::endl;
+{    
     const MapInfo& mapInfo = mapf.getMapInfo();
     bool isPlateCarre = !mapInfo.isGeocentric() && mapInfo.isGeographicSRS();
 
@@ -738,12 +737,12 @@ OSGTileFactory::createPopulatedTile(const MapFrame&  mapf,
     //data with elevation variations and you can run out of memory b/c the elevation change is greater than the actual size of the tile so you end up
     //inifinitely subdividing (or at least until you run out of data or memory)
     double minRange = bs.radius() * _terrainOptions.minTileRangeFactor().value();
-#else
+#else        
     //double origMinRange = bs.radius() * _options.minTileRangeFactor().value();        
     //Compute the min range based on the 2D size of the tile
     GeoExtent extent = tile->getKey().getExtent();        
-    GeoPoint lowerLeft(extent.getSRS(), extent.xMin(), extent.yMin());
-    GeoPoint upperRight(extent.getSRS(), extent.xMax(), extent.yMax());
+    GeoPoint lowerLeft(extent.getSRS(), extent.xMin(), extent.yMin(), 0.0, ALTMODE_ABSOLUTE);
+    GeoPoint upperRight(extent.getSRS(), extent.xMax(), extent.yMax(), 0.0, ALTMODE_ABSOLUTE);
     osg::Vec3d ll, ur;
     lowerLeft.toWorld( ll );
     upperRight.toWorld( ur );

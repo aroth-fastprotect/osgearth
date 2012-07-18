@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -40,7 +40,7 @@ class OSGTerrainEngineNode : public TerrainEngineNode
 public:
     OSGTerrainEngineNode();
     META_Node(osgEarth,OSGTerrainEngineNode);
-    ~OSGTerrainEngineNode();
+    virtual ~OSGTerrainEngineNode();
 
 public:
     osg::Node* createNode(const TileKey& key);
@@ -81,9 +81,13 @@ public:
         friend class OSGTerrainEngineNode;
     };
 
+protected:
+	virtual void onVerticalScaleChanged();
+
 private:
     void init();
     void syncMapModel();
+    void installTerrainTechnique();
 
     /**
      * Reloads all the tiles in the terrain due to a data model change

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -187,6 +187,8 @@ static short s_actionOptionTypes[] = { 1, 1, 0, 0, 1, 1 }; // 0=bool, 1=double
 //------------------------------------------------------------------------
 
 EarthManipulator::Settings::Settings() :
+osg::Referenced         (),
+Revisioned              (),
 _single_axis_rotation   ( false ),
 _lock_azim_while_panning( true ),
 _mouse_sens             ( 1.0 ),
@@ -202,12 +204,16 @@ _tether_mode            ( TETHER_CENTER ),
 _arc_viewpoints         ( true ),
 _auto_vp_duration       ( false ),
 _min_vp_duration_s      ( 3.0 ),
-_max_vp_duration_s      ( 8.0 )
+_max_vp_duration_s      ( 8.0 ),
+_camProjType            ( PROJ_PERSPECTIVE ),
+_camFrustOffsets        ( 0, 0 )
 {
     //NOP
 }
 
 EarthManipulator::Settings::Settings( const EarthManipulator::Settings& rhs ) :
+osg::Referenced( rhs ),
+Revisioned     ( rhs ),
 _bindings( rhs._bindings ),
 _single_axis_rotation( rhs._single_axis_rotation ),
 _lock_azim_while_panning( rhs._lock_azim_while_panning ),
@@ -224,7 +230,9 @@ _tether_mode( rhs._tether_mode ),
 _arc_viewpoints( rhs._arc_viewpoints ),
 _auto_vp_duration( rhs._auto_vp_duration ),
 _min_vp_duration_s( rhs._min_vp_duration_s ),
-_max_vp_duration_s( rhs._max_vp_duration_s )
+_max_vp_duration_s( rhs._max_vp_duration_s ),
+_camProjType( rhs._camProjType ),
+_camFrustOffsets( rhs._camFrustOffsets )
 {
     //NOP
 }
@@ -276,9 +284,8 @@ EarthManipulator::Settings::bind( const InputSpec& spec, const Action& action )
     expandSpec( spec, specs );
     for( InputSpecs::const_iterator i = specs.begin(); i != specs.end(); i++ )
     {
-        _bindings[*i] = action; //ActionBinding(*i, action);
+        _bindings[*i] = action;
     }
-        //_bindings.push_back( ActionBinding( *i, action ) );
 }
 
 void
@@ -339,10 +346,6 @@ EarthManipulator::Settings::getAction(int event_type, int input_mask, int modkey
     InputSpec spec( event_type, input_mask, modkey_mask & ~osgGA::GUIEventAdapter::MODKEY_NUM_LOCK & ~osgGA::GUIEventAdapter::MODKEY_CAPS_LOCK);
     ActionBindings::const_iterator i = _bindings.find(spec);
     return i != _bindings.end() ? i->second : NullAction;
-    //for( ActionBindings::const_iterator i = _bindings.begin(); i != _bindings.end(); i++ )
-    //    if ( i->first == spec )
-    //        return i->second;
-    //return NullAction;
 }
 
 void
@@ -350,6 +353,7 @@ EarthManipulator::Settings::setMinMaxPitch( double min_pitch, double max_pitch )
 {
     _min_pitch = osg::clampBetween( min_pitch, -89.9, 89.0 );
     _max_pitch = osg::clampBetween( max_pitch, min_pitch, 89.0 );
+    dirty();
 }
 
 void
@@ -357,6 +361,7 @@ EarthManipulator::Settings::setMaxOffset(double max_x_offset, double max_y_offse
 {
 	_max_x_offset = max_x_offset;
 	_max_y_offset = max_y_offset;
+    dirty();
 }
 
 void
@@ -364,18 +369,21 @@ EarthManipulator::Settings::setMinMaxDistance( double min_distance, double max_d
 {
 	_min_distance = min_distance;
 	_max_distance = max_distance;
+    dirty();
 }
 
 void
 EarthManipulator::Settings::setArcViewpointTransitions( bool value )
 {
     _arc_viewpoints = value;
+    dirty();
 }
 
 void
 EarthManipulator::Settings::setAutoViewpointDurationEnabled( bool value )
 {
     _auto_vp_duration = value;
+    dirty();
 }
 
 void
@@ -383,6 +391,21 @@ EarthManipulator::Settings::setAutoViewpointDurationLimits( double minSeconds, d
 {
     _min_vp_duration_s = osg::clampAbove( minSeconds, 0.0 );
     _max_vp_duration_s = osg::clampAbove( maxSeconds, _min_vp_duration_s );
+    dirty();
+}
+
+void
+EarthManipulator::Settings::setCameraProjection(const EarthManipulator::CameraProjection& value)
+{
+    _camProjType = value;
+    dirty();
+}
+
+void
+EarthManipulator::Settings::setCameraFrustumOffsets( const osg::Vec2s& value )
+{
+    _camFrustOffsets = value;
+    dirty();
 }
 
 /************************************************************************/
@@ -512,6 +535,8 @@ EarthManipulator::reinitialize()
     _has_pending_viewpoint = false;
     _lastPointOnEarth.set(0.0, 0.0, 0.0);
     _arc_height = 0.0;
+    _vfov = 30.0;
+    _tanHalfVFOV = tan(0.5*osg::DegreesToRadians(_vfov));
 }
 
 bool
@@ -538,17 +563,6 @@ EarthManipulator::established()
 
         // find a CSN node - if there is one, we want to attach the manip to that
         _csn = findRelativeNodeOfType<osg::CoordinateSystemNode>( safeNode.get(), 0x01 );
-        
-#if 0
-        // check the kids, then the parents.
-        // the traversal mask is set to 0x01 so that we can "hide" a CSN from this manipulator
-        // by clearing bit 0 of its node mask.
-        osg::ref_ptr<osg::CoordinateSystemNode> csn = 
-            osgEarth::findTopMostNodeOfType<osg::CoordinateSystemNode>( safeNode.get(), 0x01 );
-
-        if ( !csn.valid() )
-            csn = osgEarth::findFirstParentOfType<osg::CoordinateSystemNode>( safeNode.get(), 0x01 );
-#endif
 
         if ( _csn.valid() )
         {
@@ -568,9 +582,8 @@ EarthManipulator::established()
 
                     _has_pending_viewpoint = false;
                 }
-
                 //If we have a CoordinateSystemNode and it has an ellipsoid model
-                if ( _csn->getEllipsoidModel() )
+                else if ( _csn->getEllipsoidModel() )
                 {
                     setHomeViewpoint( 
                         Viewpoint(osg::Vec3d(-90,0,0), 0, -89,
@@ -640,6 +653,8 @@ EarthManipulator::setNode(osg::Node* node)
     {
         _node = node;
         _csn = 0L;
+        _viewCamera = 0L;
+
 #ifdef USE_OBSERVER_NODE_PATH
         _csnObserverPath.clearNodePath();
 #endif
@@ -1031,6 +1046,7 @@ EarthManipulator::setTetherNode( osg::Node* node )
     _tether_node = node;
 }
 
+
 osg::Node*
 EarthManipulator::getTetherNode() const
 {
@@ -1116,6 +1132,7 @@ EarthManipulator::resetMouse( osgGA::GUIActionAdapter& aa )
     _lastPointOnEarth.set(0.0, 0.0, 0.0);
 }
 
+
 // this method will automatically install or uninstall the camera post-update callback 
 // depending on whether there's a tether node.
 //
@@ -1152,7 +1169,88 @@ EarthManipulator::updateCamera( osg::Camera* eventCamera )
         _viewCamera->removeUpdateCallback( _cameraUpdateCB.get() );
         _cameraUpdateCB = 0L;
     }
+
+    // check whether a settings change requires an update:
+    bool settingsChanged = _settings->outOfSyncWith(_viewCameraSettingsMonitor);
+
+    // update the projection matrix if necessary
+    osg::Viewport* vp = _viewCamera->getViewport();
+    if ( vp )
+    {
+        const osg::Matrixd& proj = _viewCamera->getProjectionMatrix();
+        bool isOrtho = ( proj(3,3) == 1. ) && ( proj(2,3) == 0. ) && ( proj(1,3) == 0. ) && ( proj(0,3) == 0.);
+        CameraProjection type = _settings->getCameraProjection();
+
+        if ( type == PROJ_PERSPECTIVE )
+        {
+            if ( isOrtho || settingsChanged )
+            {
+                // need to switch from ortho to perspective
+                if ( isOrtho )
+                    OE_INFO << LC << "Switching to PERSPECTIVE" << std::endl;
+
+                const osg::Vec2s& p = _settings->getCameraFrustumOffsets();
+                double px = 2.0*(((vp->width()/2)+p.x())/vp->width())-1.0;
+                double py = 2.0*(((vp->height()/2)+p.y())/vp->height())-1.0;
+
+                osg::Matrix projMatrix;
+                projMatrix.makePerspective(_vfov, vp->width()/vp->height(), 1.0f, 10000.0f);
+                projMatrix.postMult( osg::Matrix::translate(px, py, 0.0) );
+
+                _viewCamera->setProjectionMatrix( projMatrix );
+
+                if ( _savedCNFMode.isSet() )
+                {
+                    _viewCamera->setComputeNearFarMode( *_savedCNFMode );
+                    _savedCNFMode.unset();
+                }
+            }
+        }
+        else if ( type == PROJ_ORTHOGRAPHIC )
+        {
+            if ( !isOrtho )
+            {
+                // need to switch from perspective to ortho, so cache the VFOV of the perspective
+                // camera -- we'll need it in ortho mode to create a proper frustum.
+                OE_INFO << LC << "Switching to ORTHO" << std::endl;
+
+                double ar, zn, zf; // not used
+                _viewCamera->getProjectionMatrixAsPerspective(_vfov, ar, zn, zf);
+                _tanHalfVFOV = tan(0.5*(double)osg::DegreesToRadians(_vfov));
+                _savedCNFMode = _viewCamera->getComputeNearFarMode();
+                _viewCamera->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
+            }
+            
+            double pitch;
+            getLocalEulerAngles(0L, &pitch);
+
+            // need to update the ortho projection matrix to reflect the camera distance.
+            double ar = vp->width()/vp->height();
+            double y = _distance * _tanHalfVFOV;
+            double x = y * ar;
+            double f = std::max(x,y);
+            double znear = -f * 5.0;
+            double zfar  =  f * (5.0 + 10.0 * sin(pitch+osg::PI_2));
+
+            // assemble the projection matrix:
+            osg::Matrixd orthoMatrix;
+
+            // apply the offsets:
+            double px = 0.0, py = 0.0;
+            const osg::Vec2s& p = _settings->getCameraFrustumOffsets();
+            if ( p.x() != 0 || p.y() != 0 )
+            {
+                px = (2.0*x*(double)-p.x()) / (double)vp->width();
+                py = (2.0*y*(double)-p.y()) / (double)vp->height();
+            }
+
+            _viewCamera->setProjectionMatrixAsOrtho( px-x, px+x, py-y, py+y, znear, zfar );
+        }
+    }
+
+    _settings->sync( _viewCameraSettingsMonitor );
 }
+
 
 bool
 EarthManipulator::handle(const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa)

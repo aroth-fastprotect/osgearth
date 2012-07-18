@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -81,6 +81,9 @@ namespace osgEarth
     public:
         TileSourceOptions( const ConfigOptions& options =ConfigOptions() );
 
+        /** dtor */
+        virtual ~TileSourceOptions() { }
+
     public:
         virtual Config getConfig() const;
 
@@ -90,11 +93,11 @@ namespace osgEarth
     private:
         void fromConfig( const Config& conf );
 
-        optional<int> _tileSize;
-        optional<float> _noDataValue, _noDataMinValue, _noDataMaxValue;
+        optional<int>            _tileSize;
+        optional<float>          _noDataValue, _noDataMinValue, _noDataMaxValue;
         optional<ProfileOptions> _profileOptions;
-        optional<std::string> _blacklistFilename;
-        optional<int> _L2CacheSize;
+        optional<std::string>    _blacklistFilename;
+        optional<int>            _L2CacheSize;
     };
 
     typedef std::vector<TileSourceOptions> TileSourceOptionsVector;
@@ -109,6 +112,9 @@ namespace osgEarth
          *Creates a new TileBlacklist
          */
         TileBlacklist();
+
+        /** dtor */
+        virtual ~TileBlacklist() { }
 
         /**
          *Adds the given tile to the blacklist
@@ -325,7 +331,7 @@ namespace osgEarth
          * The returned object is new and is the responsibility of the caller.
 		 */
 		virtual osg::Image* createImage( 
-            const TileKey&        key, 
+            const TileKey&        key,
             ProgressCallback*     progress ) = 0;
 
         /**
@@ -333,7 +339,7 @@ namespace osgEarth
          * The returned object is new and is the responsibility of the caller.
          */
         virtual osg::HeightField* createHeightField( 
-            const TileKey&        key, 
+            const TileKey&        key,
             ProgressCallback*     progress );
 
 		/**

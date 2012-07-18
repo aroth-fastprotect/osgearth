@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -62,20 +62,6 @@ _geode   ( 0L )
     init();
 }
 
-LabelNode::LabelNode(MapNode*            mapNode,
-                     double              x,
-                     double              y,
-                     const std::string&  text,
-                     const Style&        style ) :
-
-OrthoNode( mapNode, GeoPoint(mapNode->getMapSRS(), x, y, 0) ),
-_text    ( text ),
-_geode   ( 0L ),
-_style   ( style )
-{
-    init();
-}
-
 LabelNode::LabelNode(const SpatialReference* mapSRS,
                      const GeoPoint&         position,
                      const std::string&      text,
@@ -99,15 +85,6 @@ _style   ( style )
     init();
 }
 
-LabelNode::LabelNode(MapNode*          mapNode,
-                     const TextSymbol* symbol ) :
-OrthoNode( mapNode, GeoPoint(mapNode->getMapSRS()) ),
-_geode   ( 0L )
-{
-    _style.add( const_cast<TextSymbol*>(symbol) );
-    init();
-}
-
 void
 LabelNode::init()
 {
@@ -120,6 +97,10 @@ LabelNode::init()
 
     osg::StateSet* stateSet = _geode->getOrCreateStateSet();
     stateSet->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), 1 );
+
+    //osg::Group* oq = new OrthoOQNode("OrthoNode");
+    //oq->addChild( _geode );
+    //getAttachPoint()->addChild( oq );
 
     getAttachPoint()->addChild( _geode );
 

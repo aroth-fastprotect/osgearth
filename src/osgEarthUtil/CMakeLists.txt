@@ -12,30 +12,39 @@ SET(TARGET_PUBLIC_H
 	ClampCallback
 	EarthManipulator
 	ElevationManager
+    ExampleResources
 	Export
+    FeatureManipTool
+    FeatureQueryTool
     Formatter
     GeodeticGraticule
     LatLongFormatter
 	LineOfSight
+    LinearLineOfSight
 	MeasureTool
     MGRSFormatter
 	MGRSGraticule
 	MouseCoordsTool
-    #NearFarGroup	
 	ObjectPlacer
 	ObjectLocator
-    #OceanSurfaceNode
-    Pickers
+    PolyhedralLineOfSight
+    RadialLineOfSight
 	SkyNode
 	SpatialData
 	StarData
 	TerrainProfile
+    TFS
+    TFSPackager
     TMS
     TMSPackager
     UTMGraticule
 	WFS
 	WMS
 )
+IF(NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "3.1.0")
+    SET(TARGET_PUBLIC_H ${TARGET_PUBLIC_H}
+        ShadowUtils)
+ENDIF()
 
 SET(TARGET_SRC
 	AnnotationEvents.cpp
@@ -44,26 +53,52 @@ SET(TARGET_SRC
     Controls.cpp
 	EarthManipulator.cpp
 	ElevationManager.cpp
+    ExampleResources.cpp
+    FeatureManipTool.cpp
+    FeatureQueryTool.cpp
     GeodeticGraticule.cpp
     LatLongFormatter.cpp
-	LineOfSight.cpp
+    LinearLineOfSight.cpp
 	MeasureTool.cpp
     MGRSFormatter.cpp
 	MGRSGraticule.cpp
 	MouseCoordsTool.cpp
-    #NearFarGroup.cpp
 	ObjectPlacer.cpp
     ObjectLocator.cpp
-    #OceanSurfaceNode.cpp
-    Pickers.cpp
+    PolyhedralLineOfSight.cpp
+    RadialLineOfSight.cpp
     SpatialData.cpp
     SkyNode.cpp
 	TerrainProfile.cpp
+    TFS.cpp
+    TFSPackager.cpp
     TMS.cpp
     TMSPackager.cpp
     UTMGraticule.cpp
 	WFS.cpp
     WMS.cpp
+)
+IF(NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "3.1.0")
+    SET(TARGET_SRC ${TARGET_SRC} 
+        ShadowUtils.cpp)
+ENDIF()
+
+LIST(APPEND TARGET_PUBLIC_H
+    BrightnessContrastColorFilter
+    CMYKColorFilter
+    GammaColorFilter
+    HSLColorFilter
+    RGBColorFilter
+    ChromaKeyColorFilter
+)
+
+LIST(APPEND TARGET_SRC
+    BrightnessContrastColorFilter.cpp
+    CMYKColorFilter.cpp
+    GammaColorFilter.cpp
+    HSLColorFilter.cpp
+    RGBColorFilter.cpp
+    ChromaKeyColorFilter.cpp
 )
 
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})
@@ -84,6 +119,7 @@ SET(TARGET_ADDED_LIBRARIES
 	osgText
 	osgGA
 	osgManipulator
+	osgShadow
     OpenThreads
     )
 

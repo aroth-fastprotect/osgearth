@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -82,6 +82,7 @@ public:
                 buf << "REPACK " << name; 
                 std::string bufStr;
                 bufStr = buf.str();
+                OE_DEBUG << LC << "SQL: " << bufStr << std::endl;
                 OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
             }
             _layerHandle = 0L;
@@ -204,6 +205,7 @@ public:
                         buf << "CREATE SPATIAL INDEX ON " << name; 
 					    std::string bufStr;
 					    bufStr = buf.str();
+                        OE_DEBUG << LC << "SQL: " << bufStr << std::endl;
                         OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
                     }
 
@@ -291,6 +293,7 @@ public:
                 return new FeatureCursorOGR( 
                     dsHandle,
                     layerHandle, 
+                    this,
                     getFeatureProfile(),
                     query, 
                     _options.filters() );
@@ -323,13 +326,18 @@ public:
     virtual Feature* getFeature( FeatureID fid )
     {
         Feature* result = NULL;
-        OGRFeatureH handle = OGR_L_GetFeature( _layerHandle, fid);
-        if (handle)
+
+        if ( !isBlacklisted(fid) )
         {
-            const FeatureProfile* p = getFeatureProfile();
-            const SpatialReference* srs = p ? p->getSRS() : 0L;
-            result = OgrUtils::createFeature( handle, srs );
-            OGR_F_Destroy( handle );
+            OGR_SCOPED_LOCK;
+            OGRFeatureH handle = OGR_L_GetFeature( _layerHandle, fid);
+            if (handle)
+            {
+                const FeatureProfile* p = getFeatureProfile();
+                const SpatialReference* srs = p ? p->getSRS() : 0L;
+                result = OgrUtils::createFeature( handle, srs );
+                OGR_F_Destroy( handle );
+            }
         }
         return result;
     }

@@ -6,6 +6,7 @@ ENDIF(DYNAMIC_OSGEARTH)
 
 SET(TARGET_PUBLIC_H
 	AnnotationSettings
+    AnnotationEditing
     AnnotationData
     AnnotationNode
     AnnotationRegistry
@@ -20,8 +21,10 @@ SET(TARGET_PUBLIC_H
     LocalGeometryNode
     HighlightDecoration
     ImageOverlay
+    ImageOverlayEditor
     LabelNode
     LocalizedNode
+    ModelNode
     OrthoNode
     PlaceNode
 	RectangleNode
@@ -30,6 +33,7 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
+	AnnotationEditing.cpp
 	AnnotationSettings.cpp
     AnnotationData.cpp
     AnnotationNode.cpp
@@ -43,22 +47,24 @@ SET(TARGET_SRC
     LocalGeometryNode.cpp
     HighlightDecoration.cpp
     ImageOverlay.cpp
+    ImageOverlayEditor.cpp
     LabelNode.cpp
     LocalizedNode.cpp
 	RectangleNode.cpp
+	ModelNode.cpp
     OrthoNode.cpp
     PlaceNode.cpp
     TrackNode.cpp
 )
 
 LIST(APPEND TARGET_PUBLIC_H
-    Draggers
+	AnnotationEditing
 	FeatureEditing
 	ImageOverlayEditor
 )
     
 LIST(APPEND TARGET_SRC
-    Draggers.cpp
+	AnnotationEditing.cpp
 	FeatureEditing.cpp
     ImageOverlayEditor.cpp
 )

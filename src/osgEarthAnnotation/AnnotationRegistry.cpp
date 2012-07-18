@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -64,8 +64,11 @@ namespace
 AnnotationRegistry*
 AnnotationRegistry::instance()
 {
+    // OK to be in the local scope since this gets called at static init time
+    // by the OSGEARTH_REGISTER_ANNOTATION macro
     static AnnotationRegistry* s_singleton =0L;
     static Threading::Mutex    s_singletonMutex;
+
     if ( !s_singleton )
     {
         Threading::ScopedMutexLock lock(s_singletonMutex);

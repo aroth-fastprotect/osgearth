@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -22,11 +22,8 @@
 
 #include <osgEarth/Common>
 #include <osgEarth/Profile>
-#include <osg/Referenced>
-#include <osg/Image>
-#include <osg/Shape>
+#include <osg/ref_ptr>
 #include <osg/Version>
-#include <osgDB/ReaderWriter>
 #include <osgTerrain/TerrainTile>
 #include <string>
 
@@ -62,6 +59,9 @@ namespace osgEarth
             const Profile* profile );
 
         TileKey( const TileKey& rhs );
+
+        /** dtor */
+        virtual ~TileKey() { }
 
         bool operator == (const TileKey& rhs) const {
             return valid() && rhs.valid() && _lod==rhs._lod && _x==rhs._x && _y==rhs._y;
@@ -159,7 +159,7 @@ namespace osgEarth
 
         unsigned int getTileX() const { return _x; }
         unsigned int getTileY() const { return _y; }
-
+        
 		static inline int getLOD(const osgTerrain::TileID& id)
 		{
 			//The name of the lod changed after OSG 2.6 from layer to level

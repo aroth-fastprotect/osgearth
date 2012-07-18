@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,8 +18,6 @@
  */
 #ifndef OSGEARTH_GEOCOMMON_H
 #define OSGEARTH_GEOCOMMON_H 1
-
-#undef ABSOLUTE // just in case
 
 namespace osgEarth
 {
@@ -50,15 +48,11 @@ namespace osgEarth
     /**
      * Indicates how to interpret a Z coordinate.
      */
-    namespace AltitudeMode
-    { 
-        enum Enum
-        {
-            ABSOLUTE,            // Z value is the absolute height above MSL/HAE.
-            RELATIVE_TO_TERRAIN  // Z value is the height above the terrain elevation.
-        };
-    }
-    typedef AltitudeMode::Enum AltitudeModeEnum;
+    enum AltitudeMode
+    {
+        ALTMODE_ABSOLUTE,  // Z value is the absolute height above MSL/HAE.
+        ALTMODE_RELATIVE   // Z value is the height above the terrain elevation.
+    };
 }
 
 #endif // OSGEARTH_GEODATA_H

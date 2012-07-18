@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -354,7 +354,7 @@ TMSPackager::package(ImageLayer*        layer,
     tileMap->setTitle( layer->getName() );
     tileMap->setVersion( "1.0.0" );
     tileMap->getFormat().setMimeType( mimeType );
-    tileMap->generateTileSets( std::max(23u, maxLevel+1) );
+    tileMap->generateTileSets( std::min(23u, maxLevel+1) );
 
     // write out the tilemap catalog:
     std::string tileMapFilename = osgDB::concatPaths(rootFolder, "tms.xml");
@@ -390,7 +390,11 @@ TMSPackager::package(ElevationLayer*    layer,
     }
 
     // fetch one tile to see what the tile size will be
-    GeoHeightField testHF = layer->createHeightField( rootKeys[0] );
+    GeoHeightField testHF;
+    for( std::vector<TileKey>::iterator i = rootKeys.begin(); i != rootKeys.end() && !testHF.valid(); ++i )
+    {
+        testHF = layer->createHeightField( *i );
+    }
     if ( !testHF.valid() )
         return Result( "Unable to determine heightfield size" );
 
@@ -413,7 +417,7 @@ TMSPackager::package(ElevationLayer*    layer,
     tileMap->setTitle( layer->getName() );
     tileMap->setVersion( "1.0.0" );
     tileMap->getFormat().setMimeType( mimeType );
-    tileMap->generateTileSets( std::max(23u, maxLevel+1) );
+    tileMap->generateTileSets( std::min(23u, maxLevel+1) );
 
     // write out the tilemap catalog:
     std::string tileMapFilename = osgDB::concatPaths(rootFolder, "tms.xml");

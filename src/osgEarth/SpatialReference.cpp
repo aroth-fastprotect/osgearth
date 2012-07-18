@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -78,8 +78,10 @@ namespace
     {
         for( unsigned i=0; i<points.size(); ++i )
         {
-            double xr = -osg::PI + ((points[i].x()-MERC_MINX)/MERC_WIDTH)*2.0*osg::PI;
-            double yr = -osg::PI + ((points[i].y()-MERC_MINY)/MERC_HEIGHT)*2.0*osg::PI;
+            double x = osg::clampBetween(points[i].x(), MERC_MINX, MERC_MAXX);
+            double y = osg::clampBetween(points[i].y(), MERC_MINY, MERC_MAXY);
+            double xr = -osg::PI + ((x-MERC_MINX)/MERC_WIDTH)*2.0*osg::PI;
+            double yr = -osg::PI + ((y-MERC_MINY)/MERC_HEIGHT)*2.0*osg::PI;
             points[i].x() = osg::RadiansToDegrees( xr );
             points[i].y() = osg::RadiansToDegrees( 2.0 * atan( exp(yr) ) - osg::PI_2 );
             // z doesn't change here.
@@ -92,14 +94,16 @@ namespace
     {
         for( unsigned i=0; i<points.size(); ++i )
         {
-            double xr = (osg::DegreesToRadians(points[i].x()) - (-osg::PI)) / (2.0*osg::PI);
-            double sinLat = sin(osg::DegreesToRadians(points[i].y()));
+            double lon = osg::clampBetween(points[i].x(), -180.0, 180.0);
+            double lat = osg::clampBetween(points[i].y(), -90.0, 90.0);
+            double xr = (osg::DegreesToRadians(lon) - (-osg::PI)) / (2.0*osg::PI);
+            double sinLat = sin(osg::DegreesToRadians(lat));
             double oneMinusSinLat = 1-sinLat;
             if ( oneMinusSinLat != 0.0 )
             {
                 double yr = ((0.5 * log( (1+sinLat)/oneMinusSinLat )) - (-osg::PI)) / (2.0*osg::PI);
-                points[i].x() = MERC_MINX + (xr * MERC_WIDTH);
-                points[i].y() = MERC_MINY + (yr * MERC_HEIGHT);
+                points[i].x() = osg::clampBetween(MERC_MINX + (xr * MERC_WIDTH), MERC_MINX, MERC_MAXX);
+                points[i].y() = osg::clampBetween(MERC_MINY + (yr * MERC_HEIGHT), MERC_MINY, MERC_MAXY);
                 // z doesn't change here.
             }
         }
@@ -239,6 +243,16 @@ SpatialReference::create( const Key& key, bool useCache )
             "WGS84" );
     }
 
+    // WGS84 Plate Carre:
+    else if (horiz == "plate-carre")
+    {
+        srs = createFromPROJ4(
+            "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs",
+            "WGS84" );
+
+        srs->_is_plate_carre = true;
+    }
+
     // custom srs for the unified cube
     else if ( horiz == "unified-cube" )
     {
@@ -257,9 +271,11 @@ SpatialReference::create( const Key& key, bool useCache )
     {
         srs = createFromWKT( horiz, horiz );
     }
-    else
+
+    // bail out if no SRS exists by this point
+    if ( srs == 0L )
     {
-        return NULL;
+        return 0L;
     }
 
     // next, resolve the vertical SRS:
@@ -655,13 +671,14 @@ SpatialReference::createTransMercFromLongitude( const Angular& lon ) const
 }
 
 const SpatialReference*
-SpatialReference::createUTMFromLongitude( const Angular& lon ) const
+SpatialReference::createUTMFromLonLat( const Angular& lon, const Angular& lat ) const
 {
     // note. UTM is up to 10% faster than TMERC for the same meridian.
     unsigned zone = 1 + (unsigned)floor((lon.as(Units::DEGREES)+180.0)/6.0);
     std::string datum = getDatumName();
     std::string horiz = Stringify()
         << "+proj=utm +zone=" << zone
+        << (lat.as(Units::DEGREES) < 0 ? " +south" : "")
         << " +datum=" << (!datum.empty() ? "wgs84" : datum);
     return create( horiz, getVertInitString() );
 }
@@ -682,7 +699,7 @@ SpatialReference::isMercator() const
     return _is_mercator;
 }
 
-bool 
+bool
 SpatialReference::isSphericalMercator() const
 {
     if ( !_initialized )
@@ -889,24 +906,24 @@ SpatialReference::transform(std::vector<osg::Vec3d>& points,
     // trivial equivalency:
     if ( isEquivalentTo(outputSRS) )
         return true;
-
+    
     bool success = false;
 
     // do the pre-transformation pass:
     preTransform( points );
-    
+
     // Spherical Mercator is a special case transformation, because we want to bypass
     // any normal horizontal datum conversion. In other words we ignore the ellipsoid
     // of the other SRS and just do a straight spherical conversion.
     if ( isGeographic() && outputSRS->isSphericalMercator() )
-    {
+    {        
         transformZ( points, outputSRS, true );
         success = geographicToSphericalMercator( points );
         return success;
     }
 
     else if ( isSphericalMercator() && outputSRS->isGeographic() )
-    {
+    {     
         success = sphericalMercatorToGeographic( points );
         transformZ( points, outputSRS, true );
         return success;
@@ -1248,6 +1265,8 @@ SpatialReference::transformExtentToMBR(const SpatialReference* to_srs,
     if ( !_initialized )
         const_cast<SpatialReference*>(this)->init();
 
+    //Original code that checks the 4 corners of the bounds and translates them
+#if 0
     // Transform all points and take the maximum bounding rectangle the resulting points
     std::vector<osg::Vec3d> v;
     v.push_back( osg::Vec3d(in_out_xmin, in_out_ymin, 0) ); // ll
@@ -1263,6 +1282,73 @@ SpatialReference::transformExtentToMBR(const SpatialReference* to_srs,
         in_out_ymax = std::max( v[1].y(), v[2].y() );
         return true;
     }
+#else
+    // Transform all points and take the maximum bounding rectangle the resulting points
+    std::vector<osg::Vec3d> v;
+
+    double height = in_out_ymax - in_out_ymin;
+    double width = in_out_xmax - in_out_xmin;
+    v.push_back( osg::Vec3d(in_out_xmin, in_out_ymin, 0) ); // ll    
+    v.push_back( osg::Vec3d(in_out_xmin, in_out_ymax, 0) ); // ul
+    v.push_back( osg::Vec3d(in_out_xmax, in_out_ymax, 0) ); // ur
+    v.push_back( osg::Vec3d(in_out_xmax, in_out_ymin, 0) ); // lr
+
+    //We also sample along the edges of the bounding box and include them in the 
+    //MBR computation in case you are dealing with a projection that will cause the edges
+    //of the bounding box to be expanded.  This was first noticed when dealing with converting
+    //Hotline Oblique Mercator to WGS84
+   
+    //Sample the edges
+    unsigned int numSamples = 5;    
+    double dWidth  = width / (numSamples - 1 );
+    double dHeight = height / (numSamples - 1 );
+    
+    //Left edge
+    for (unsigned int i = 0; i < numSamples; i++)
+    {
+        v.push_back( osg::Vec3d(in_out_xmin, in_out_ymin + dHeight * (double)i, 0) );
+    }
+
+    //Right edge
+    for (unsigned int i = 0; i < numSamples; i++)
+    {
+        v.push_back( osg::Vec3d(in_out_xmax, in_out_ymin + dHeight * (double)i, 0) );
+    }
+
+    //Top edge
+    for (unsigned int i = 0; i < numSamples; i++)
+    {
+        v.push_back( osg::Vec3d(in_out_xmin + dWidth * (double)i, in_out_ymax, 0) );
+    }
+
+    //Bottom edge
+    for (unsigned int i = 0; i < numSamples; i++)
+    {
+        v.push_back( osg::Vec3d(in_out_xmin + dWidth * (double)i, in_out_ymin, 0) );
+    }
+    
+    
+    
+    if ( transform(v, to_srs) )
+    {
+        in_out_xmin = DBL_MAX;
+        in_out_ymin = DBL_MAX;
+        in_out_xmax = -DBL_MAX;
+        in_out_ymax = -DBL_MAX;
+
+        for (unsigned int i = 0; i < v.size(); i++)
+        {
+            in_out_xmin = std::min( v[i].x(), in_out_xmin );
+            in_out_ymin = std::min( v[i].y(), in_out_ymin );
+            in_out_xmax = std::max( v[i].x(), in_out_xmax );
+            in_out_ymax = std::max( v[i].y(), in_out_ymax );
+        }
+
+        return true;
+    }
+
+   
+#endif
 
     return false;
 }

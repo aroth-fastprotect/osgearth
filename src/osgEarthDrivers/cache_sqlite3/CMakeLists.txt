@@ -12,11 +12,5 @@ SET(TARGET_PUBLIC_H
 SET(TARGET_SRC 
     Sqlite3Cache.cpp
 )
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/cache_sqlite3)
 SETUP_PLUGIN(osgearth_cache_sqlite3)
-
-
-# to install public driver includes:
-SET(LIB_NAME cache_sqlite3)
-SET(LIB_PUBLIC_HEADERS Sqlite3CacheOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

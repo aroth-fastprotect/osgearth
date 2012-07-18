@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -46,7 +46,7 @@ namespace osgEarth { namespace Annotation
     /**
      * Base class for all annotation node types.
      */
-    class OSGEARTHANNO_EXPORT AnnotationNode : public osg::Switch
+    class OSGEARTHANNO_EXPORT AnnotationNode : public osg::Group
     {
     public:
         META_AnnotationNode(osgEarthAnnotation, AnnotationNode);
@@ -66,7 +66,7 @@ namespace osgEarth { namespace Annotation
         /** 
          * Gets the attach point for children of this node
          */
-        virtual osg::Group* getAttachPoint();
+        virtual osg::Group* getChildAttachPoint();
 
         /**
          * Gets the MapNode that this AnnotationNode is attached to
@@ -128,7 +128,7 @@ namespace osgEarth { namespace Annotation
 
         bool supportsAutoClamping( const Style& style ) const;
         
-        void configureForAltitudeMode( const AltitudeModeEnum& mode );
+        void configureForAltitudeMode( const AltitudeMode& mode );
 
         // Apply general style information. You can pass "noClamp=true" as a hint
         // that no clamping logic is necessary
@@ -182,7 +182,7 @@ namespace osgEarth { namespace Annotation
          * Sets the map position of the node, in map coordinates.
          * Returns true upon success.
          */
-        virtual bool setPosition( const osg::Vec3d& pos ) =0;
+        //virtual bool setPosition( const osg::Vec3d& pos ) =0;
 
         /**
          * Gets the position (in map coordinates) of the node

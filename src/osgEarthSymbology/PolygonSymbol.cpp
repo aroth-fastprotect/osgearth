@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,7 +23,7 @@ using namespace osgEarth::Symbology;
 
 PolygonSymbol::PolygonSymbol( const Config& conf ) :
 Symbol( conf ),
-_fill( Fill() )
+_fill ( Fill() )
 {
     mergeConfig(conf);
 }

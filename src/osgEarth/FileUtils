@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -27,7 +27,7 @@ namespace osgEarth
     /**
      * Determines whether a given filename is a relative path
      */
-    extern OSGEARTH_EXPORT bool isRelativePath(const std::string &fileName);
+    extern OSGEARTH_EXPORT bool isRelativePath(const std::string& fileName);
 
     /**
      * Gets the full path of a file relative to a file
@@ -53,7 +53,7 @@ namespace osgEarth
     /**
      * Gets whether or not the given path contains a zip file within the path
      */
-    extern OSGEARTH_EXPORT bool isZipPath(const std::string &path);
+    extern OSGEARTH_EXPORT bool isZipPath(const std::string& path);
 
     /**
      * Gets the path to the temp directory

@@ -2,12 +2,13 @@ SET(TARGET_SRC
     FeatureSourceWFS.cpp    
 )
 
-SET(TARGET_H   
+SET(TARGET_PUBLIC_H   
     WFSFeatureOptions
 )
 
 INCLUDE_DIRECTORIES( ${GDAL_INCLUDE_DIR} )
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarthSymbology osgEarthUtil)
 SET(TARGET_LIBRARIES_VARS GDAL_LIBRARY)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/feature_wfs)
 SETUP_PLUGIN(osgearth_feature_wfs)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
+

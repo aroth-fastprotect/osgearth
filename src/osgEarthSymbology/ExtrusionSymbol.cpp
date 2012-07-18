@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,8 +23,8 @@ using namespace osgEarth::Symbology;
 
 ExtrusionSymbol::ExtrusionSymbol( const Config& conf ) :
 Symbol    ( conf ),
-_height( 10.0 ),
-_flatten( true ),
+_height   ( 10.0 ),
+_flatten  ( true ),
 _heightRef( HEIGHT_REFERENCE_Z )
 {
     if ( !conf.empty() )
@@ -36,11 +36,11 @@ ExtrusionSymbol::getConfig() const
 {
     Config conf = Symbol::getConfig();
     conf.key() = "extrusion";
-    conf.addIfSet( "height",            _height );
-    conf.addIfSet( "flatten",           _flatten );
+    conf.addIfSet   ( "height",            _height );
+    conf.addIfSet   ( "flatten",           _flatten );
     conf.addObjIfSet( "height_expression", _heightExpr );
-    conf.addIfSet( "height_reference", "z",   _heightRef, HEIGHT_REFERENCE_Z );
-    conf.addIfSet( "height_reference", "msl", _heightRef, HEIGHT_REFERENCE_MSL );
+    conf.addIfSet   ( "height_reference", "z",   _heightRef, HEIGHT_REFERENCE_Z );
+    conf.addIfSet   ( "height_reference", "msl", _heightRef, HEIGHT_REFERENCE_MSL );
     conf.addIfSet   ( "wall_style", _wallStyleName );
     conf.addIfSet   ( "roof_style", _roofStyleName );
     return conf;

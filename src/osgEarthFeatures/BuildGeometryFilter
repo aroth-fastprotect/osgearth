@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,7 +23,6 @@
 #include <osgEarthFeatures/Common>
 #include <osgEarthFeatures/Feature>
 #include <osgEarthFeatures/Filter>
-#include <osgEarthFeatures/FeatureSourceNode>
 #include <osgEarthSymbology/Style>
 #include <osgEarth/GeoMath>
 #include <osg/Geode>
@@ -40,6 +39,8 @@ namespace osgEarth { namespace Features
     {
     public:
         BuildGeometryFilter( const Style& style =Style() );
+
+        virtual ~BuildGeometryFilter() { }
 
         /** Pushes a list of features through the filter. */
         osg::Node* push( FeatureList& input, FilterContext& context );
@@ -80,15 +81,21 @@ namespace osgEarth { namespace Features
         optional<StringExpression>& featureName() { return _featureNameExpr; }
         const optional<StringExpression>& featureName() const { return _featureNameExpr; }
 
+        /**
+         * Whether or not to use vertex buffer objects
+         */
+        optional<bool>& useVertexBufferObjects() { return _useVertexBufferObjects;}
+        const optional<bool>& useVertexBufferObjects() const { return _useVertexBufferObjects;}
+
     protected:
         osg::ref_ptr<osg::Node> _result;
         osg::ref_ptr<osg::Geode> _geode;
-		osg::ref_ptr<FeatureSourceMultiNode> _featureNode;
         Style _style;
         optional<double> _maxAngle_deg;
         optional<GeoInterpolation> _geoInterp;
         optional<bool> _mergeGeometry;
         optional<StringExpression> _featureNameExpr;
+        optional<bool> _useVertexBufferObjects;
         bool _hasPoints;
         bool _hasLines;
         bool _hasPolygons;

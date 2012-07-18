@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -40,6 +40,7 @@ namespace
         float height = image->t();
 
         osg::Geometry* geometry = new osg::Geometry;
+        geometry->setUseVertexBufferObjects(true);
 
         osg::Vec3Array* verts = new osg::Vec3Array(4);
         (*verts)[0] = osg::Vec3(-width/2.0f, -height/2.0, 0.0f);

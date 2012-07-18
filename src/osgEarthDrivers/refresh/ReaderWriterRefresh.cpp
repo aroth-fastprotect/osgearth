@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -85,11 +85,10 @@ class RefreshImage : public osg::ImageStream
 public:
 
     RefreshImage(const std::string& filename, double time):
-          osg::ImageStream(),
-          _filename(filename),
+      _filename(filename),
           _time(time),
           _lastUpdateTime(0),
-          _loadImageOp()
+          osg::ImageStream()
       {                    
           osg::ref_ptr< osg::Image > image = osgDB::readImageFile( filename );
           if (image.valid()) copyImage( image.get() );
@@ -161,6 +160,7 @@ public:
       {                               
           updateImage();
           double time = osg::Timer::instance()->time_s();
+          osg::Timer_t ticks = osg::Timer::instance()->tick();          
           //If we've let enough time elapse and we're not waiting on an existing load image operation then add one to the queue
           if (!_loadImageOp.valid() && (time - _lastUpdateTime > _time))
           {

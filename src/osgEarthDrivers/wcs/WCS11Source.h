@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -36,7 +36,7 @@ class WCS11Source : public TileSource
 {
 public:
     WCS11Source( const TileSourceOptions& opt );
-    
+
 public: // TileSource interface
 
     void initialize(
@@ -50,7 +50,7 @@ public: // TileSource interface
     osg::HeightField* createHeightField(
         const TileKey&        key,
         ProgressCallback*     progress );
-
+    
     std::string getExtension() const;
 
 private:

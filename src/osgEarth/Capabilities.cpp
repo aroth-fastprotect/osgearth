@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -123,7 +123,8 @@ _supportsTwoSidedStencil( false ),
 _supportsTexture2DLod   ( false ),
 _supportsMipmappedTextureUpdates( false ),
 _supportsDepthPackedStencilBuffer( false ),
-_supportsQuadBufferStereo( false )
+_supportsQuadBufferStereo( false ),
+_supportsOcclusionQuery ( false )
 {
     // little hack to force the osgViewer library to link so we can create a graphics context
     osgViewerGetVersion();
@@ -207,6 +208,7 @@ _supportsQuadBufferStereo( false )
             _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
             _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
             _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
+        	_supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
 
             // ATI workarounds:
             bool isATI = _vendor.find("ATI ") == 0;
@@ -269,6 +271,8 @@ _supportsQuadBufferStereo( false )
     OE_INFO << LC << "  depth-packed stencil = " << SAYBOOL(_supportsDepthPackedStencilBuffer) << std::endl;
 
     OE_INFO << LC << "  Supports quad buffer stereo = " << SAYBOOL(_supportsQuadBufferStereo) << std::endl;
+
+    OE_INFO << LC << "  occulsion query = " << SAYBOOL(_supportsOcclusionQuery) << std::endl;
 
     //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
     //OE_INFO << LC << "  texture2DLod = " << SAYBOOL(_supportsTexture2DLod) << std::endl;

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -261,7 +261,8 @@ public:
               if ( _mapNode->getTerrain()->getWorldCoordsUnderMouse( aa.asView(), ea.getX(), ea.getY(), world ))
               {
                   GeoPoint mapPoint;
-                  _mapNode->getMap()->worldPointToMapPoint( world, mapPoint );
+                  mapPoint.fromWorld( _mapNode->getMapSRS(), world );
+                  //_mapNode->getMap()->worldPointToMapPoint( world, mapPoint );
 
                   if (!_startValid)
                   {
@@ -287,8 +288,8 @@ public:
       void compute()
       {
           //Tell the calculator about the new start/end points
-          _profileCalculator->setStartEnd( GeoPoint(_mapNode->getMapSRS(), _start.x(), _start.y(), 0),
-                                           GeoPoint(_mapNode->getMapSRS(), _end.x(), _end.y(), 0));
+          _profileCalculator->setStartEnd( GeoPoint(_mapNode->getMapSRS(), _start.x(), _start.y()),
+                                           GeoPoint(_mapNode->getMapSRS(), _end.x(), _end.y()) );
 
           if (_featureNode.valid())
           {
@@ -374,8 +375,8 @@ main(int argc, char** argv)
     root->addChild( hud );
 
     osg::ref_ptr< TerrainProfileCalculator > calculator = new TerrainProfileCalculator(mapNode, 
-        GeoPoint(mapNode->getMapSRS(), -124.0, 40.0, 0),
-        GeoPoint(mapNode->getMapSRS(), -75.1, 39.2, 0)
+        GeoPoint(mapNode->getMapSRS(), -124.0, 40.0),
+        GeoPoint(mapNode->getMapSRS(), -75.1, 39.2)
         );    
 
     osg::Group* profileNode = new TerrainProfileGraph( calculator.get(), graphWidth, graphHeight );

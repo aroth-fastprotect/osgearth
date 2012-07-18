@@ -6,13 +6,17 @@ ENDIF(DYNAMIC_OSGEARTH)
 
 # Header files that need moc'd
 SET(TARGET_PUBLIC_MOC_H
+	AnnotationDialogs
     AnnotationListWidget
+    AnnotationToolbar
     CollapsiblePairWidget
     DataManager
     LayerManagerWidget
     LOSControlWidget
     LOSCreationDialog
     MapCatalogWidget
+    TerrainProfileGraph
+    TerrainProfileWidget
 )
 
 # Qt resource files
@@ -29,21 +33,36 @@ SET(TARGET_UI
 SET(TARGET_PUBLIC_H
 #   header files go here
     Actions
+    AnnotationDialogs
+    AnnotationListWidget
+    AnnotationToolbar
+    CollapsiblePairWidget
     Common
-    CompositeViewerWidget
+    DataManager
     GuiActions
+    LayerManagerWidget
+    LOSControlWidget
+    LOSCreationDialog
+    MapCatalogWidget
+    MultiViewerWidget
+    TerrainProfileGraph
+    TerrainProfileWidget
     ViewerWidget
 )
 
 SET(TARGET_SRC
+	AnnotationDialogs.cpp
     AnnotationListWidget.cpp
+    AnnotationToolbar.cpp
     CollapsiblePairWidget.cpp
-    CompositeViewerWidget.cpp
     DataManager.cpp
     LayerManagerWidget.cpp
     LOSControlWidget.cpp
     LOSCreationDialog.cpp
     MapCatalogWidget.cpp
+    MultiViewerWidget.cpp
+    TerrainProfileGraph.cpp
+    TerrainProfileWidget.cpp
     ViewerWidget.cpp
 )
 
@@ -52,6 +71,8 @@ INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR} ${QT_INCLUDES} ${C
 SET(TARGET_ADDED_LIBRARIES
     osgEarth
     osgEarthAnnotation
+    osgEarthSymbology
+    osgEarthFeatures
     osgEarthUtil
     osg
     osgWidget

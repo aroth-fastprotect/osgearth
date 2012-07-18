@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -31,7 +31,7 @@
 
 namespace osgEarth
 {
-    class Terrain;
+    class TerrainHeightProvider;
 
     /**
      * A georeferenced 3D point.
@@ -39,23 +39,34 @@ namespace osgEarth
     class OSGEARTH_EXPORT GeoPoint
     {
     public:
+
         /**
          * Constructs a GeoPoint.
          */
         GeoPoint(
             const SpatialReference* srs,
-            double x = 0.0,
-            double y = 0.0,
-            double z = 0.0,
-            const AltitudeModeEnum& mode =AltitudeMode::ABSOLUTE );
+            double x,
+            double y,
+            double z,
+            const AltitudeMode& mode );
 
         /**
-         * Constructs a geopoint.
+         * Constructs a GeoPoint with X and Y coordinates. The Z defaults
+         * to zero with an ALTMODE_RELATIVE altitude mode (i.e., 0 meters
+         * above the terrain).
+         */
+        GeoPoint(
+            const SpatialReference* srs,
+            double x,
+            double y );
+
+        /**
+         * Constructs a GeoPoint from a vec3.
          */
         GeoPoint(
             const SpatialReference* srs,
             const osg::Vec3d&       xyz,
-            const AltitudeModeEnum& mode =AltitudeMode::ABSOLUTE );
+            const AltitudeMode&     mode );
 
         /**
          * Constructs a new GeoPoint by transforming an existing GeoPoint into
@@ -80,20 +91,23 @@ namespace osgEarth
          */
         GeoPoint( const Config& conf, const SpatialReference* srs =0L );
 
+        /** dtor */
+        virtual ~GeoPoint() { }
+
         /**
          * Sets the SRS and coords 
          */
         void set(
             const SpatialReference* srs,
             const osg::Vec3d&       xyz,
-            const AltitudeModeEnum& mode =AltitudeMode::ABSOLUTE );
+            const AltitudeMode&     mode );
 
         void set(
             const SpatialReference* srs,
-            double                  x    =0.0,
-            double                  y    =0.0,
-            double                  z    =0.0,
-            const AltitudeModeEnum& mode =AltitudeMode::ABSOLUTE );
+            double                  x,
+            double                  y,
+            double                  z,
+            const AltitudeMode&     mode );
 
         // component getter/setters
 
@@ -114,8 +128,8 @@ namespace osgEarth
 
         const SpatialReference* getSRS() const { return _srs.get(); }
 
-        AltitudeModeEnum& altitudeMode() { return _altMode; }
-        const AltitudeModeEnum& altitudeMode() const { return _altMode; }
+        AltitudeMode& altitudeMode() { return _altMode; }
+        const AltitudeMode& altitudeMode() const { return _altMode; }
 
         /**
          * Returns a copy of this geopoint transformed into another SRS.
@@ -130,22 +144,22 @@ namespace osgEarth
         /**
          * Transforms this geopoint's Z coordinate (in place)
          */
-        bool transformZ(const AltitudeModeEnum& altMode, const Terrain* );
+        bool transformZ(const AltitudeMode& altMode, const TerrainHeightProvider* t );
 
         /**
          * Transforms and returns the geopoints Z coordinate.
          */
-        bool transformZ(const AltitudeModeEnum& altMode, const Terrain*, double& out_z) const;
+        bool transformZ(const AltitudeMode& altMode, const TerrainHeightProvider* t, double& out_z) const;
 
         /**
          * Transforms this geopoint's Z to be absolute w.r.t. the vertical datum
          */
-        bool makeAbsolute(const Terrain* t) { return transformZ(AltitudeMode::ABSOLUTE, t); }
+        bool makeAbsolute(const TerrainHeightProvider* t) { return transformZ(ALTMODE_ABSOLUTE, t); }
 
         /**
          * Transforms this geopoint's Z to be terrain-relative.
          */
-        bool makeRelative(const Terrain* t) { return transformZ(AltitudeMode::RELATIVE_TO_TERRAIN, t); }
+        bool makeRelative(const TerrainHeightProvider* t) { return transformZ(ALTMODE_RELATIVE, t); }
 
         /**
          * Transforms this GeoPoint to geographic (lat/long) coords in place.
@@ -153,9 +167,19 @@ namespace osgEarth
         bool makeGeographic();
 
         /**
-         * Outputs world coordinates corresponding to this point
+         * Outputs world coordinates corresponding to this point. If the point
+         * is ALTMODE_RELATIVE, this will fail because there's no way to resolve
+         * the actual Z coordinate. Use the variant of toWorld that takes a
+         * Terrain* instead.
          */
         bool toWorld( osg::Vec3d& out_world ) const;
+
+        /**
+         * Outputs world coordinates corresponding to this point, passing in a Terrain
+         * object that will be used if the point needs to be converted to absolute
+         * altitude
+         */
+        bool toWorld( osg::Vec3d& out_world, const TerrainHeightProvider* terrain ) const;
 
         /**
          * Converts world coordinates into a geopoint
@@ -186,7 +210,7 @@ namespace osgEarth
     protected:
         osg::ref_ptr<const SpatialReference> _srs;
         osg::Vec3d       _p;
-        AltitudeModeEnum _altMode;
+        AltitudeMode _altMode;
     };
 
     /**
@@ -213,6 +237,9 @@ namespace osgEarth
 
         /** create from Bounds object */
         GeoExtent( const SpatialReference* srs, const Bounds& bounds );
+
+        /** dtor */
+        virtual ~GeoExtent() { }
 
         bool operator == ( const GeoExtent& rhs ) const;
         bool operator != ( const GeoExtent& rhs ) const;
@@ -360,6 +387,9 @@ namespace osgEarth
     public:
         DataExtent(const GeoExtent& extent, unsigned int minLevel, unsigned int maxLevel);
 
+        /** dtor */
+        virtual ~DataExtent() { }
+
         /** The minimum LOD of the extent */
         unsigned int getMinLevel() const;
 
@@ -387,6 +417,9 @@ namespace osgEarth
          * Constructs a new goereferenced image.
          */
         GeoImage( osg::Image* image, const GeoExtent& extent );
+
+        /** dtor */
+        virtual ~GeoImage() { }
 
         static GeoImage INVALID;
 
@@ -493,6 +526,9 @@ namespace osgEarth
             osg::HeightField* heightField,
             const GeoExtent&  extent );
 
+        /** dtor */
+        virtual ~GeoHeightField() { }
+
         static GeoHeightField INVALID;
 
         /**
@@ -553,7 +589,7 @@ namespace osgEarth
 
     protected:
         osg::ref_ptr<osg::HeightField> _heightField;
-        GeoExtent _extent;
+        GeoExtent                      _extent;
     };
 
 	typedef std::vector<GeoHeightField> GeoHeightFieldVector;

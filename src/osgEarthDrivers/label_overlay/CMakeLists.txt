@@ -1,4 +1,6 @@
 SET(TARGET_SRC OverlayLabelSource.cpp)
-#SET(TARGET_H OverlayLabelOptions)
+SET(TARGET_PUBLIC_H OverlayLabelSource)
+
 LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthFeatures osgEarthSymbology osgEarthUtil osgText)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/label_overlay)
 SETUP_PLUGIN(osgearth_label_overlay)

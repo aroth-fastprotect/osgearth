@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -121,6 +121,9 @@ namespace osgEarth
     {
     public:
         TerrainOptions( const ConfigOptions& options =ConfigOptions() );
+
+        /** dtor */
+        virtual ~TerrainOptions() { }
        
         /**
          * Sets or gets the scale factor for height-field values.
@@ -223,7 +226,7 @@ namespace osgEarth
          */
         optional<bool>& enableMipmapping() { return _enableMipmapping; }
         const optional<bool>& enableMipmapping() const { return _enableMipmapping; }
-   
+
         /**
          * The min filter to be applied to textures
          */
@@ -235,12 +238,21 @@ namespace osgEarth
          */
         optional<osg::Texture::FilterMode> magFilter() { return _magFilter;}
         const optional<osg::Texture::FilterMode> magFilter() const { return _magFilter;}
-
+            
         /**
          * Whether to enable blending
          */
         optional<bool>& enableBlending() { return _enableBlending; }
         const optional<bool>& enableBlending() const { return _enableBlending; }
+
+        /**
+         * Whether to enable the "fast path" for spherical Mercator image layers
+         * Default = true. If enabled, Mercator image tiles will be rendered on a
+         * geocentric map with no reprojection. The trade-off is higher texture
+         * memory usage and NPOT texture usage.
+         */
+        optional<bool>& enableMercatorFastPath() { return _mercatorFastPath; }
+        const optional<bool>& enableMercatorFastPath() const { return _mercatorFastPath; }
    
     public:
         virtual Config getConfig() const;
@@ -253,7 +265,7 @@ namespace osgEarth
 
     private:
         void fromConfig( const Config& conf );
-            
+                    
         optional<float> _verticalScale;
         optional<float> _heightFieldSampleRatio;
         optional<float> _minTileRangeFactor;
@@ -269,6 +281,7 @@ namespace osgEarth
         optional<bool>  _enableMipmapping;
         optional<bool> _clusterCulling;
         optional<bool> _enableBlending;
+        optional<bool> _mercatorFastPath;
         optional<osg::Texture::FilterMode> _magFilter;
         optional<osg::Texture::FilterMode> _minFilter;
         optional<ElevationInterpolation> _elevationInterpolation;

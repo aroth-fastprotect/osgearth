@@ -25,6 +25,7 @@ SET(TARGET_PUBLIC_H
     MeshManager
     AMRGeometry
 	)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_droam)
 
 SETUP_PLUGIN(osgearth_engine_droam)
 

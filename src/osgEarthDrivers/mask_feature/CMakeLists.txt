@@ -1,11 +1,5 @@
 SET(TARGET_SRC FeatureMaskSource.cpp)
-SET(TARGET_H FeatureMaskOptions)
+SET(TARGET_PUBLIC_H FeatureMaskOptions)
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarthSymbology)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/mask_feature)
 SETUP_PLUGIN(osgearth_mask_feature)
-
-
-# to install public driver includes:
-SET(LIB_NAME mask_feature)
-SET(LIB_PUBLIC_HEADERS FeatureMaskOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -90,7 +90,7 @@ public:
             << "/L" << std::hex << std::setw(2) << std::setfill('0') << level
             << "/R" << std::hex << std::setw(8) << std::setfill('0') << tile_y
             << "/C" << std::hex << std::setw(8) << std::setfill('0') << tile_x << "." << _format;
-
+        
         osg::ref_ptr<osg::Image> image;
 		std::string bufStr;
 		bufStr = buf.str();

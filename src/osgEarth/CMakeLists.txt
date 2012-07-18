@@ -22,6 +22,7 @@ SET(TARGET_PUBLIC_H
     CachePolicy
 	CacheSeed
 	Capabilities
+    ColorFilter
 	Common
 	CompositeTileSource
 	Config
@@ -30,22 +31,22 @@ SET(TARGET_PUBLIC_H
     CullingUtils
     DepthOffset
     DPLineSegmentIntersector
+    Draggers
     DrapeableNode
     ECEF
 	ElevationLayer
     ElevationQuery
 	Export
 	FileUtils
-	FindNode
 	GeoCommon
 	GeoData
     Geoid
 	GeoMath
 	HeightFieldUtils
 	HTTPClient
-	ImageToHeightFieldConverter
 	ImageLayer
 	ImageMosaic
+    ImageToHeightFieldConverter
 	ImageUtils
     IOTypes
 	JsonUtils
@@ -67,6 +68,7 @@ SET(TARGET_PUBLIC_H
 	Notify
 	optional
 	OverlayDecorator
+    Pickers
 	Profile
 	Progress
 	Random
@@ -85,7 +87,6 @@ SET(TARGET_PUBLIC_H
     TextureCompositor
     TextureCompositorMulti
     TextureCompositorTexArray
-    TileFactory
 	TileKey
 	TileSource
 	ThreadingUtils
@@ -102,6 +103,7 @@ SET(TARGET_H
     tinystr.h
     tinyxml.h 
 	)
+	
 LIST(APPEND TARGET_SRC
     tinystr.cpp
     tinyxml.cpp
@@ -115,11 +117,13 @@ LIST(APPEND TARGET_SRC
     CachePolicy.cpp
     CacheSeed.cpp
 	Capabilities.cpp
+    ColorFilter.cpp
     CompositeTileSource.cpp
     Config.cpp
     Cube.cpp
     CullingUtils.cpp
     DepthOffset.cpp
+	Draggers.cpp
     DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
     ECEF.cpp
@@ -154,6 +158,7 @@ LIST(APPEND TARGET_SRC
 	NodeUtils.cpp
 	Notify.cpp
 	OverlayDecorator.cpp
+	Pickers.cpp
     Profile.cpp
 	Progress.cpp
 	Random.cpp
@@ -171,7 +176,6 @@ LIST(APPEND TARGET_SRC
     TextureCompositor.cpp
     TextureCompositorMulti.cpp
     TextureCompositorTexArray.cpp
-    TileFactory.cpp
     TileKey.cpp
     TileSource.cpp
     ThreadingUtils.cpp

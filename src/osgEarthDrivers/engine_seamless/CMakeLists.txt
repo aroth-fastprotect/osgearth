@@ -29,5 +29,6 @@ SET(TARGET_PUBLIC_H
 
 INCLUDE_DIRECTORIES(${GDAL_INCLUDE_DIR})
 
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_seamless)
 # to install public driver includes:
 SETUP_PLUGIN(osgearth_engine_seamless)

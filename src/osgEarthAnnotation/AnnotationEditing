@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,7 +24,8 @@
 #include <osgEarthAnnotation/LocalizedNode>
 #include <osgEarthAnnotation/CircleNode>
 #include <osgEarthAnnotation/EllipseNode>
-#include <osgEarthAnnotation/Draggers>
+#include <osgEarthAnnotation/RectangleNode>
+#include <osgEarth/Draggers>
 #include <osgEarth/MapNode>
 
 namespace osgEarth { namespace Annotation {
@@ -42,13 +43,17 @@ namespace osgEarth { namespace Annotation {
          */
         LocalizedNodeEditor(LocalizedNode* localizedNode);    
         
-        ~LocalizedNodeEditor();    
+        virtual ~LocalizedNodeEditor();    
 
         virtual void updateDraggers();
 
+        Dragger* getPositionDragger() { return _dragger; }
+
+        void setPosition( const GeoPoint& pos );
+
     protected:
         osg::ref_ptr< LocalizedNode > _node;
-        IntersectingDragger* _dragger;
+        Dragger* _dragger;
     };
 
     class OSGEARTHANNO_EXPORT CircleNodeEditor : public LocalizedNodeEditor
@@ -61,15 +66,19 @@ namespace osgEarth { namespace Annotation {
          */
         CircleNodeEditor(CircleNode* circleNode);    
         
-        ~CircleNodeEditor();    
+        virtual ~CircleNodeEditor();    
 
         void computeBearing();
 
+        void setBearing( const Angle& value );
+
         virtual void updateDraggers();
+
+        Dragger* getRadiusDragger() { return _radiusDragger; }
 
         double _bearing;
 
-        IntersectingDragger* _radiusDragger;
+        Dragger* _radiusDragger;
     };
 
     class OSGEARTHANNO_EXPORT EllipseNodeEditor : public LocalizedNodeEditor
@@ -77,18 +86,39 @@ namespace osgEarth { namespace Annotation {
     public:
         /**
          * Create a new EllipseNodeEditor
-         * @param localizedNode
-         *        The LocalizedNode to edit
+         * @param ellipseNode
+         *        The EllipseNodeEditor to edit
          */
         EllipseNodeEditor(EllipseNode* ellipseNode);    
         
-        ~EllipseNodeEditor();    
+        virtual ~EllipseNodeEditor();    
 
         virtual void updateDraggers();
 
-        IntersectingDragger* _majorDragger;
-        IntersectingDragger* _minorDragger;
+        Dragger* _majorDragger;
+        Dragger* _minorDragger;
     };
+
+    class OSGEARTHANNO_EXPORT RectangleNodeEditor : public LocalizedNodeEditor
+    {
+    public:
+        /**
+         * Create a new RectangleNodeEditor
+         * @param rectangleNode
+         *        The RectangleNodeEditor to edit
+         */
+        RectangleNodeEditor(RectangleNode* rectangleNode);    
+        
+        virtual ~RectangleNodeEditor();    
+
+        virtual void updateDraggers();
+
+        Dragger* _llDragger;
+        Dragger* _lrDragger;
+        Dragger* _urDragger;
+        Dragger* _ulDragger;
+    };
+
 } } // namespace osgEarth::Annotation
 
 #endif // OSGEARTHANNO_FEATURE_EDITING_H

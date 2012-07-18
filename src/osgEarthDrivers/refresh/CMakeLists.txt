@@ -1,13 +1,8 @@
 SET(TARGET_SRC
   ReaderWriterRefresh.cpp
 )
-SET(TARGET_H
+SET(TARGET_PUBLIC_H
   RefreshOptions
 )
-
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/refresh)
 SETUP_PLUGIN(osgearth_refresh)
-
-# to install public driver includes:
-SET(LIB_NAME refresh)
-SET(LIB_PUBLIC_HEADERS RefreshOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -76,6 +76,9 @@ namespace osgEarth { namespace Drivers
             mergeConfig( _conf );
         }
 
+        /** dtor */
+        virtual ~OceanSurfaceOptions() { }
+
     public:
         Config getConfig() const {
             Config conf = ConfigOptions::newConfig();
@@ -131,6 +134,9 @@ namespace osgEarth { namespace Drivers
             if ( node )
                 this->addChild( node );
         }
+
+        /** dtor */
+        virtual ~OceanSurfaceNode() { }
 
         /**
          * Options controlling the look and behavior of the ocean

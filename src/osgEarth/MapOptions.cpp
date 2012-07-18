@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,9 +23,9 @@ using namespace osgEarth;
 void
 MapOptions::fromConfig( const Config& conf )
 {
-    conf.getIfSet( "name", _name );
-    conf.getObjIfSet( "profile", _profileOptions );
-    conf.getObjIfSet( "cache", _cacheOptions );
+    conf.getIfSet   ( "name",         _name );
+    conf.getObjIfSet( "profile",      _profileOptions );
+    conf.getObjIfSet( "cache",        _cacheOptions );  
     conf.getObjIfSet( "cache_policy", _cachePolicy );
 
     // legacy support:
@@ -53,9 +53,9 @@ MapOptions::getConfig() const
 {
     Config conf = ConfigOptions::newConfig();
 
-    conf.updateIfSet( "name", _name );
-    conf.updateObjIfSet( "profile", _profileOptions );
-    conf.updateObjIfSet( "cache", _cacheOptions );
+    conf.updateIfSet   ( "name",         _name );
+    conf.updateObjIfSet( "profile",      _profileOptions );
+    conf.updateObjIfSet( "cache",        _cacheOptions );
     conf.updateObjIfSet( "cache_policy", _cachePolicy );
 
     // all variations:

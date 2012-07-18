@@ -39,5 +39,5 @@ SET(TARGET_PUBLIC_H
     TileBuilder
     TransparentLayer
     )
-
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_osgterrain)
 SETUP_PLUGIN(osgearth_engine_osgterrain)

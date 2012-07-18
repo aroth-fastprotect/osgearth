@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -35,16 +35,16 @@ using namespace osgEarth::Annotation;
 
 
 MeasureToolHandler::MeasureToolHandler( osg::Group* group, osgEarth::MapNode* mapNode ):
-_geoInterpolation( GEOINTERP_GREAT_CIRCLE ),
+_geoInterpolation  (GEOINTERP_GREAT_CIRCLE),
 _lastPointTemporary(false),
-_gotFirstLocation(false),
-_finished(false),
-_mouseDown(false),
-_mouseButton( osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON),
-_group(group),
-_isPath( false ),
-_mapNode( mapNode ),
-_intersectionMask(0xffffffff)
+_gotFirstLocation  (false),
+_finished          (false),
+_mouseDown         (false),
+_mouseButton       (osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON),
+_group             (group),
+_isPath            (false),
+_mapNode           (mapNode),
+_intersectionMask  (0xffffffff)
 {
     if ( !mapNode || mapNode->getMapSRS()->isProjected() )
     {
@@ -213,7 +213,7 @@ bool MeasureToolHandler::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIAct
         if (_gotFirstLocation)
         {
             //_gotFirstLocation = false;
-            _finished = true;     
+            _finished = true;    
             aa.requestRedraw(); 
             return true;
         }

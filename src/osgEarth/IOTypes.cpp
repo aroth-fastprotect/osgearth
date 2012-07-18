@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -33,6 +33,13 @@ const std::string IOMetadata::CONTENT_TYPE = "Content-type";
 
 StringObject::StringObject() :
 osg::Object()
+{
+    //nop
+}
+
+//------------------------------------------------------------------------
+
+URIReadCallback::URIReadCallback()
 {
     //nop
 }

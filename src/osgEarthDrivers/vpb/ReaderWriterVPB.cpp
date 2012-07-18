@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -77,7 +77,7 @@ public:
 				TileKey::getLOD(terrainTile->getTileID())<<", "<<
                 terrainTile->getTileID().x<<", "<<
                 terrainTile->getTileID().y<<")"<<std::endl;
-           
+            
             _terrainTiles.push_back(terrainTile);
         }
         else
@@ -149,8 +149,8 @@ public:
         //_directory_structure( FLAT_TASK_DIRECTORIES ),
         _profile( osgEarth::Registry::instance()->getGlobalGeodeticProfile() ),
         _maxNumTilesInCache( in_options.terrainTileCacheSize().value() ),
-		_initialized( false )
-	{
+        _initialized( false )
+    {
 	}
 	
     void initialize( const osgDB::Options* dbOptions )
@@ -275,7 +275,7 @@ public:
         {
             OE_WARN<<"VPB: No data referenced "<<std::endl;
         }
-
+        
         _initialized = true;
     }
     
@@ -368,11 +368,11 @@ public:
             foundInBlacklist = _blacklistedFilenames.count(filename) == 1;
         }
         if ( foundInBlacklist )
-            {
+        {
             OE_DEBUG << LC << "file has been found in black list : "<<filename<<std::endl;
-                insertTile(tileID, 0);
+            insertTile(tileID, 0);
             return; //return 0;
-        }
+        }        
 
         osg::ref_ptr<osgDB::Options> localOptions = Registry::instance()->cloneOrCreateOptions();
         localOptions->setPluginData("osgearth_vpb Plugin",(void*)(1));
@@ -426,7 +426,7 @@ public:
             if ( ! HTTPClient::isRecoverable( r.code() ) )
             {
                 Threading::ScopedWriteLock exclusiveLock( _blacklistMutex );
-                _blacklistedFilenames.insert(filename);
+                _blacklistedFilenames.insert( filename );
             }
         }
         
@@ -507,7 +507,7 @@ public:
 
     bool _initialized;
     Threading::Mutex _initializeMutex;
-    
+
     osg::ref_ptr<const osgDB::Options> _dbOptions;
     
 };
@@ -528,17 +528,17 @@ public:
         _dbOptions = dbOptions;
 	    _vpbDatabase->initialize( dbOptions );
 
-		if ( overrideProfile)
-		{
-			setProfile( overrideProfile );
-		}
-		else
-		{
-			setProfile(_vpbDatabase->_profile.get());
-		}
+	    if ( overrideProfile)
+	    {
+		    setProfile( overrideProfile );
+	    }
+	    else
+	    {
+		    setProfile(_vpbDatabase->_profile.get());
+	    }
     }
     
-	osg::Image* createImage( const TileKey& key, ProgressCallback* progress)
+    osg::Image* createImage( const TileKey& key, ProgressCallback* progress)
 	{
 		osg::Image * ret = NULL;
 		//TODO:  Make VPB driver use progress callback
@@ -594,7 +594,7 @@ public:
 		return ret;
 	}
 
-    osg::HeightField* createHeightField( const TileKey& key,
+    osg::HeightField* createHeightField( const TileKey&        key,
                                          ProgressCallback*     progress )
     {
         osg::ref_ptr<osgTerrain::TerrainTile> tile;

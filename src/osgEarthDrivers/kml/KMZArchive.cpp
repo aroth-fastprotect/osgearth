@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -235,7 +235,7 @@ KMZArchive::readToBuffer( const std::string& fileInZip, std::ostream& iobuf ) co
         }
         if ( err > 0 )
         {
-            for( int i=0; i<err; ++i )
+            for( unsigned i=0; i<(unsigned)err; ++i )
             {
                 iobuf.put( *(((char*)_buf)+i) );
             }
@@ -279,7 +279,7 @@ KMZArchive::readImage(const std::string& filename, const osgDB::Options* options
             {
                 osg::ref_ptr<osgDB::Options> myOptions = Registry::instance()->cloneOrCreateOptions(options);
                 URIContext(*_archiveURI).add(filename).store( myOptions.get() );
-                return rw->readImage( iobuf, options );
+                return rw->readImage( iobuf, myOptions.get() );
             }
             else return ReadResult::ERROR_IN_READING_FILE;
         }
@@ -301,7 +301,7 @@ KMZArchive::readNode(const std::string& filename, const osgDB::Options* options)
             {
                 osg::ref_ptr<osgDB::Options> myOptions = Registry::instance()->cloneOrCreateOptions(options);
                 URIContext(*_archiveURI).add(filename).store( myOptions.get() );
-                return rw->readNode( iobuf, options );
+                return rw->readNode( iobuf, myOptions.get() );
             }
             else return ReadResult::ERROR_IN_READING_FILE;
         }

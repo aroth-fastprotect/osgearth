@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -113,6 +113,7 @@ namespace osgEarth
         void onMapInfoEstablished( const MapInfo& mapInfo ); // not virtual!
         void onMapModelChanged( const MapModelChange& change );
         void updateImageUniforms();
+        virtual void updateTextureCombining() { }
 
     private:
         
@@ -122,6 +123,7 @@ namespace osgEarth
 
             void onVisibleChanged( TerrainLayer* layer );
             void onOpacityChanged( ImageLayer* layer );
+            void onColorFiltersChanged( ImageLayer* layer );
 
             ArrayUniform _layerOpacityUniform;
             ArrayUniform _layerVisibleUniform;

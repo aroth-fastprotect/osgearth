@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -82,7 +82,7 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
     PointSymbol*     point     = 0L;
     TextSymbol*      text      = 0L;
     ExtrusionSymbol* extrusion = 0L;
-    MarkerSymbol*    marker     = 0L;
+    MarkerSymbol*    marker    = 0L;
     AltitudeSymbol*  altitude  = 0L;
     SkinSymbol*      skin      = 0L;
 
@@ -171,7 +171,7 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
             if (!text) text = sc.getOrCreateSymbol<TextSymbol>();
             if (value == "true") text->removeDuplicateLabels() = true;
             else if (value == "false") text->removeDuplicateLabels() = false;
-        }
+        } 
         else if ( match(key, "text-align") )
         {
             if (!text) text = sc.getOrCreate<TextSymbol>();
@@ -216,6 +216,11 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
 			else if (match(value, "ascii"))  text->encoding() = TextSymbol::ENCODING_ASCII;
 			else text->encoding() = TextSymbol::ENCODING_ASCII;
 		}
+        else if ( match(key, "text-declutter") )
+        {
+            if (!text) text = sc.getOrCreate<TextSymbol>();
+            text->declutter() = as<bool>(value, true);
+        }
 
         // ..... MarkerSymbol .....
 
@@ -253,6 +258,19 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
             if (!marker) marker = sc.getOrCreateSymbol<MarkerSymbol>();
             marker->scale() = NumericExpression(value);
         }
+        else if ( match(key, "marker-icon-align") )
+        {
+            if (!marker) marker = sc.getOrCreate<MarkerSymbol>();
+            if      ( match(value, "left-top") ) marker->alignment() = MarkerSymbol::ALIGN_LEFT_TOP;
+            else if ( match(value, "left-center") ) marker->alignment() = MarkerSymbol::ALIGN_LEFT_CENTER;
+            else if ( match(value, "left-bottom") ) marker->alignment() = MarkerSymbol::ALIGN_LEFT_BOTTOM;
+            else if ( match(value, "center-top")  ) marker->alignment() = MarkerSymbol::ALIGN_CENTER_TOP;
+            else if ( match(value, "center-center") ) marker->alignment() = MarkerSymbol::ALIGN_CENTER_CENTER;
+            else if ( match(value, "center-bottom") ) marker->alignment() = MarkerSymbol::ALIGN_CENTER_BOTTOM;
+            else if ( match(value, "right-top") ) marker->alignment() = MarkerSymbol::ALIGN_RIGHT_TOP;
+            else if ( match(value, "right-center") ) marker->alignment() = MarkerSymbol::ALIGN_RIGHT_CENTER;
+            else if ( match(value, "right-bottom") ) marker->alignment() = MarkerSymbol::ALIGN_RIGHT_BOTTOM;
+        }
 
         // ..... ExtrusionSymbol .....
                 
@@ -276,7 +294,7 @@ SLDReader::readStyleFromCSSParams( const Config& conf, Style& sc )
             if (!extrusion) extrusion = sc.getOrCreate<ExtrusionSymbol>();
             extrusion->roofStyleName() = value;
         }
-                
+
         // ..... AltitideSymbol .....
                 
         else if ( match(key, "altitude-clamping") )

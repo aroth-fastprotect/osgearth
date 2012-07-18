@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -145,8 +145,12 @@ void ViewerWidget::reconfigure( osgViewer::View* view )
     if ( camera->getGraphicsContext() != _gc.get() )
     {
         camera->setGraphicsContext( _gc.get() );
-        camera->setViewport(new osg::Viewport(0, 0, _gc->getTraits()->width, _gc->getTraits()->height));
-        camera->setProjectionMatrixAsPerspective(30.0f, static_cast<double>(_gc->getTraits()->width)/static_cast<double>(_gc->getTraits()->height), 1.0f, 10000.0f );
+        if ( !camera->getViewport() )
+        {
+            camera->setViewport(new osg::Viewport(0, 0, _gc->getTraits()->width, _gc->getTraits()->height));
+        }
+        camera->setProjectionMatrixAsPerspective(
+            30.0f, camera->getViewport()->width()/camera->getViewport()->height(), 1.0f, 10000.0f );
     }
 }
 

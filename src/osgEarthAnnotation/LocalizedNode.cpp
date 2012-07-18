@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2010 Pelican Mapping
+* Copyright 2008-2012 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -19,7 +19,7 @@
 
 #include <osgEarthAnnotation/LocalizedNode>
 #include <osgEarthAnnotation/Decluttering>
-#include <osgEarth/Utils>
+#include <osgEarth/CullingUtils>
 #include <osgEarth/MapNode>
 #include <osg/AutoTransform>
 #include <osg/MatrixTransform>
@@ -56,6 +56,9 @@ _scale         ( 1.0f, 1.0f, 1.0f )
     {
         setHorizonCulling( true );
     }
+
+    _draper = new DrapeableNode( mapNode, false );
+    _draper->addChild( _xform.get() );
     
     setPosition( position );
 }
@@ -71,11 +74,11 @@ LocalizedNode::traverse( osg::NodeVisitor& nv )
     AnnotationNode::traverse( nv );
 }
 
-bool
-LocalizedNode::setPosition( const osg::Vec3d& position )
-{
-    return setPosition( GeoPoint(_mapSRS.get(), position) );
-}
+//bool
+//LocalizedNode::setPosition( const osg::Vec3d& position )
+//{
+//    return setPosition( GeoPoint(_mapSRS.get(), position, ALTMODE_ABSOLUTE) );
+//}
 
 bool
 LocalizedNode::setPosition( const GeoPoint& pos )
@@ -166,7 +169,7 @@ LocalizedNode::updateTransforms( const GeoPoint& p, osg::Node* patch )
                 osg::Matrix::translate(absPos) );
         }
     }
-
+    
 
     dirtyBound();
 

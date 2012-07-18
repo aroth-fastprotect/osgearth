@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -51,8 +51,13 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
         style = cx._activeStyle;
     }
 
+    // parse the geometry. the placemark must have geometry to be valid. The 
+    // geometry parse may optionally specify an altitude mode as well.
+    KML_Geometry geometry;
+    geometry.build(conf, cx, style);
+
     // KML's default altitude mode is clampToGround.
-    AltitudeModeEnum altMode = AltitudeMode::RELATIVE_TO_TERRAIN;
+    AltitudeMode altMode = ALTMODE_RELATIVE;
 
     AltitudeSymbol* altSym = style.get<AltitudeSymbol>();
     if ( !altSym )
@@ -62,12 +67,8 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
     }
     else if ( !altSym->clamping().isSetTo(AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN) )
     {
-        altMode = AltitudeMode::ABSOLUTE;
+        altMode = ALTMODE_ABSOLUTE;
     }
-
-    // parse the geometry. the placemark must have geometry to be valid.
-    KML_Geometry geometry;
-    geometry.build(conf, cx, style);
     
     if ( geometry._geom.valid() && geometry._geom->getTotalPointCount() > 0 )
     {
@@ -83,24 +84,27 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
         osg::ref_ptr<osg::Image> markerImage;
         osg::ref_ptr<osg::Node>  markerModel;
 
-        MarkerSymbol* marker = style.get<MarkerSymbol>();    
+        MarkerSymbol* marker = style.get<MarkerSymbol>();
+
         if ( marker && marker->url().isSet() )
         {
-            markerURI = URI( marker->url()->eval(), marker->url()->uriContext() );
-            ReadResult result = marker->isModel() == true? markerURI.readNode() : markerURI.readImage();
-            markerImage = result.getImage();
-            markerModel = result.getNode();
+            if ( marker->isModel() == false )
+            {
+                markerImage = marker->getImage( *cx._options->iconMaxSize() );
+            }
+            else
+            {
+                markerURI = URI( marker->url()->eval(), marker->url()->uriContext() );
+                markerModel = markerURI.getNode();
 
-            // We can't leave the marker symbol in the style, or the GeometryCompiler will
-            // think we want to do Point-model substitution. So remove it. A bit of a hack
-            if ( marker )
-                style.removeSymbol(marker);
+                // We can't leave the marker symbol in the style, or the GeometryCompiler will
+                // think we want to do Point-model substitution. So remove it. A bit of a hack
+                if ( marker )
+                    style.removeSymbol(marker);
+            }
         }
 
-        std::string text = 
-            conf.hasValue("name") ? conf.value("name") :
-            conf.hasValue("description") ? conf.value("description") :
-            "Unnamed";  
+        std::string text = conf.hasValue("name") ? conf.value("name") : "";
 
         AnnotationNode* fNode = 0L;
         AnnotationNode* pNode = 0L;
@@ -154,7 +158,10 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
         if ( geometry._geom->getTotalPointCount() > 1 )
         {
             const ExtrusionSymbol* ex = style.get<ExtrusionSymbol>();
-            const AltitudeSymbol* alt = style.get<AltitudeSymbol>();        
+            const AltitudeSymbol* alt = style.get<AltitudeSymbol>();    
+
+            if ( style.get<MarkerSymbol>() )
+                style.removeSymbol(style.get<MarkerSymbol>());
 
             bool draped =
                 isPoly   && 

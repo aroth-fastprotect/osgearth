@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2010 Pelican Mapping
+ * Copyright 2008-2012 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -112,7 +112,7 @@ namespace
         "        vec4 texel = texture2D(tex1, texCoord1); \n"
         "        vec4 nearColor = vec4(mix(color.rgb, texel.rgb, texel.a), color.a); \n"
         "        color = mix(color, nearColor, rangeEffect); \n"
-        "   } \n"
+        "    } \n"
 
         // un-normalize the heightfield data
         "    float terrainHeight = (v_enorm * 65535.0) - 32768.0; \n"                  

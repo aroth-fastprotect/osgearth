@@ -32,7 +32,7 @@
 using namespace osgEarth;
 using namespace OpenThreads;
 
-#define LC "[ImageLayer] "
+#define LC "[ImageLayer] \"" << getName() << "\" "
 
 // TESTING
 //#undef  OE_DEBUG
@@ -164,10 +164,12 @@ ImageLayerTileProcessor::init(const ImageLayerOptions& options,
 
     if ( _options.noDataImageFilename().isSet() && !_options.noDataImageFilename()->empty() )
     {
-        _noDataImage = URI( *_options.noDataImageFilename() ).readImage(dbOptions).getImage();
+        URI noDataURI( *_options.noDataImageFilename() );
+        _noDataImage = noDataURI.getImage( dbOptions );
+        //_noDataImage = URI( *_options.noDataImageFilename() ).readImage(dbOptions).getImage();
         if ( !_noDataImage.valid() )
         {
-            OE_WARN << "Warning: Could not read nodata image from \"" << _options.noDataImageFilename().value() << "\"" << std::endl;
+            OE_WARN << "Failed to read nodata image from \"" << _options.noDataImageFilename().value() << "\"" << std::endl;
         }
     }
 }
@@ -241,7 +243,8 @@ _runtimeOptions( options )
 void
 ImageLayer::init()
 {
-    //NOP.
+    _emptyImage = ImageUtils::createEmptyImage();
+    //*((unsigned*)_emptyImage->data()) = 0x7F0000FF;
 }
 
 void
@@ -283,6 +286,20 @@ ImageLayer::setOpacity( float value )
 {
     _runtimeOptions.opacity() = osg::clampBetween( value, 0.0f, 1.0f );
     fireCallback( &ImageLayerCallback::onOpacityChanged );
+}
+
+void
+ImageLayer::setMinVisibleRange( float minVisibleRange )
+{
+    _runtimeOptions.minVisibleRange() = minVisibleRange;
+    fireCallback( &ImageLayerCallback::onVisibleRangeChanged );
+}
+
+void
+ImageLayer::setMaxVisibleRange( float maxVisibleRange )
+{
+    _runtimeOptions.maxVisibleRange() = maxVisibleRange;
+    fireCallback( &ImageLayerCallback::onVisibleRangeChanged );
 }
 
 void
@@ -344,7 +361,7 @@ ImageLayer::initPreCacheOp()
         getProfile()               &&
         _targetProfileHint->isEquivalentTo( getProfile() );
 
-    ImageLayerPreCacheOperation* op = new ImageLayerPreCacheOperation();    
+    ImageLayerPreCacheOperation* op = new ImageLayerPreCacheOperation();
     op->_processor.init( _runtimeOptions, _dbOptions.get(), layerInTargetProfile );
 
     _preCacheOp = op;
@@ -365,9 +382,6 @@ GeoImage
 ImageLayer::createImage( const TileKey& key, ProgressCallback* progress, bool forceFallback )
 {
     bool isFallback;
-
-    // "16/24846/18102"
-
     return createImageInKeyProfile( key, progress, forceFallback, isFallback);
 }
 
@@ -380,7 +394,7 @@ ImageLayer::createImageInNativeProfile( const TileKey& key, ProgressCallback* pr
     const Profile* nativeProfile = getProfile();
     if ( !nativeProfile )
     {
-        OE_WARN << LC << "Could not establish the profile for Layer \"" << getName() << "\"" << std::endl;
+        OE_WARN << LC << "Could not establish the profile" << std::endl;
         return GeoImage::INVALID;
     }
 
@@ -408,6 +422,13 @@ ImageLayer::createImageInNativeProfile( const TileKey& key, ProgressCallback* pr
                 mosaic.getImages().push_back( TileImage(image.getImage(), *k) );
                 if ( !isFallback )
                     foundAtLeastOneRealTile = true;
+            }
+            else
+            {
+                // if we get EVEN ONE invalid tile, we have to abort because there will be
+                // empty spots in the mosaic. (By "invalid" we mean a tile that could not
+                // even be resolved through the fallback procedure.)
+                return GeoImage::INVALID;
             }
         }
 
@@ -470,8 +491,27 @@ ImageLayer::createImageInKeyProfile( const TileKey& key, ProgressCallback* progr
         return GeoImage::INVALID;
     }
 
-    OE_DEBUG << LC << 
-        "Layer \"" << getName() << "\" create image for \"" << key.str() << "\", ext= "
+    // Check for a "Minumum level" setting on this layer. If we are before the
+    // min level, just return the empty image. Do not cache empties
+    if ( _runtimeOptions.minLevel().isSet() && key.getLOD() < _runtimeOptions.minLevel().value() )
+    {
+        return GeoImage( _emptyImage.get(), key.getExtent() );
+    }
+
+    // Check for a "Minimum resolution" setting on the layer. If we are before the
+    // min resolution, return the empty image. Do not cache empties.
+    if ( _runtimeOptions.minResolution().isSet() )
+    {
+        double keyres = key.getExtent().width() / getTileSize();
+        double keyresInLayerProfile = key.getProfile()->getSRS()->transformUnits(keyres, getProfile()->getSRS());
+
+        if ( keyresInLayerProfile > _runtimeOptions.minResolution().value() )
+        {
+            return GeoImage( _emptyImage.get(), key.getExtent() );
+        }
+    }
+
+    OE_DEBUG << LC << "create image for \"" << key.str() << "\", ext= "
         << key.getExtent().toString() << std::endl;
 
 
@@ -490,19 +530,18 @@ ImageLayer::createImageInKeyProfile( const TileKey& key, ProgressCallback* progr
     // case there is no layer profile)
     if ( !isCacheOnly() && !getProfile() )
     {
-        OE_WARN << LC << "Could not establish a valid profile for Layer \"" << getName() << "\"" << std::endl;
+        OE_WARN << LC << "Could not establish a valid profile" << std::endl;
         _runtimeOptions.enabled() = false;
         return GeoImage::INVALID;
     }
 
     // First, attempt to read from the cache. Since the cached data is stored in the
     // map profile, we can try this first.
-    if ( cacheBin && _runtimeOptions.cachePolicy()->isCacheReadable() )
+    if ( cacheBin && getCachePolicy().isCacheReadable() )
     {
         ReadResult r = cacheBin->readImage( key.str() );
         if ( r.succeeded() )
         {            
-            //OE_INFO << LC << getName() << " : " << key.str() << " cache hit" << std::endl;
             ImageUtils::normalizeImage( r.getImage() );
             return GeoImage( r.releaseImage(), key.getExtent() );
         }
@@ -529,9 +568,12 @@ ImageLayer::createImageInKeyProfile( const TileKey& key, ProgressCallback* progr
 
     // If we got a result, the cache is valid and we are caching in the map profile, write to the map cache.
     if (result.valid()  &&
-        !out_isFallback &&
+        //JB:  Removed the check to not write out fallback data.  If you have a low resolution base dataset (max lod 3) and a high resolution insert (max lod 22)
+        //     then the low res data needs to "fallback" from LOD 4 - 22 so you can display the high res inset.  If you don't cache these intermediate tiles then
+        //     performance can suffer generating all those fallback tiles, especially if you have to do reprojection or mosaicing.
+        //!out_isFallback &&
         cacheBin        && 
-        _runtimeOptions.cachePolicy()->isCacheWriteable() )
+        getCachePolicy().isCacheWriteable() )
     {
         if ( key.getExtent() != result.getExtent() )
         {
@@ -539,16 +581,16 @@ ImageLayer::createImageInKeyProfile( const TileKey& key, ProgressCallback* progr
         }
 
         cacheBin->write( key.str(), result.getImage() );
-        OE_DEBUG << LC << "WRITING " << key.str() << " to the cache." << std::endl;
+        //OE_INFO << LC << "WRITING " << key.str() << " to the cache." << std::endl;
     }
 
     if ( result.valid() )
     {
-        OE_DEBUG << LC << getName() << " : " << key.str() << " result OK" << std::endl;
+        OE_DEBUG << LC << key.str() << " result OK" << std::endl;
     }
     else
     {
-        OE_DEBUG << LC << getName() << " : " << key.str() << "result INVALID" << std::endl;
+        OE_DEBUG << LC << key.str() << "result INVALID" << std::endl;
     }
 
     return result;
@@ -582,7 +624,7 @@ ImageLayer::createImageFromTileSource(const TileKey&    key,
     // If the profiles are different, use a compositing method to assemble the tile.
     if ( !key.getProfile()->isEquivalentTo( getProfile() ) )
     {
-        return assembleImageFromTileSource( key, progress, true, out_isFallback ); //forceFallback, out_isFallback );
+        return assembleImageFromTileSource( key, progress, out_isFallback );
     }
 
     // Fail is the image is blacklisted.
@@ -643,7 +685,8 @@ ImageLayer::createImageFromTileSource(const TileKey&    key,
 
         if ( !result.valid() )
         {
-            result = ImageUtils::createEmptyImage();
+            result = 0L;
+            //result = _emptyImage.get();
             finalKey = key;
         }
     }
@@ -669,7 +712,6 @@ ImageLayer::createImageFromTileSource(const TileKey&    key,
 GeoImage
 ImageLayer::assembleImageFromTileSource(const TileKey&    key,
                                         ProgressCallback* progress,
-                                        bool              forceFallback,
                                         bool&             out_isFallback)
 {
     GeoImage mosaicedImage, result;
@@ -692,10 +734,6 @@ ImageLayer::assembleImageFromTileSource(const TileKey&    key,
     {
         double dst_minx, dst_miny, dst_maxx, dst_maxy;
         key.getExtent().getBounds(dst_minx, dst_miny, dst_maxx, dst_maxy);
-
-        //ImageMosaic mosaic;
-        //osg::ref_ptr<ImageMosaic> mi = new ImageMosaic();
-        //std::vector<TileKey> missingTiles;
 
         // if we find at least one "real" tile in the mosaic, then the whole result tile is
         // "real" (i.e. not a fallback tile)

@@ -24,6 +24,7 @@
 #include <osgEarth/GeoData>
 #include <osgEarth/Units>
 #include <osgEarthAnnotation/LocalizedNode>
+#include <osgEarth/Terrain>
 #include <osg/Geode>
 
 namespace osgEarth { namespace Util
@@ -44,11 +45,6 @@ namespace osgEarth { namespace Util
         PolyhedralLineOfSightNode( MapNode* mapNode );
 
         virtual ~PolyhedralLineOfSightNode();
-
-        /**
-         * Gets the LOS' map node
-         */
-        MapNode* getMapNode() { return _mapNode.get(); }
 
         /**
          * The maximum sampling range from the center point
@@ -84,6 +80,10 @@ namespace osgEarth { namespace Util
         
         virtual bool setPosition( const GeoPoint& pos );
 
+    public: // MapNodeObserver
+
+        virtual void setMapNode( MapNode* mapNode );
+
     public:
         // internal: called when the underlying terrain changes and resampling
         // is required
@@ -102,6 +102,8 @@ namespace osgEarth { namespace Util
         unsigned               _numCols;
         osg::Geode*            _geode;
         GeoExtent              _extent;
+
+        osg::ref_ptr< TerrainCallback > _terrainCallback;
 
         void dirty();
         void rebuildGeometry();

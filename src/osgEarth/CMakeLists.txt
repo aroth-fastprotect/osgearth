@@ -33,10 +33,13 @@ SET(TARGET_PUBLIC_H
     DPLineSegmentIntersector
     Draggers
     DrapeableNode
+    DrawInstanced
     ECEF
 	ElevationLayer
+    ElevationLOD
     ElevationQuery
 	Export
+    FadeEffect
 	FileUtils
 	GeoCommon
 	GeoData
@@ -56,6 +59,7 @@ SET(TARGET_PUBLIC_H
     LocalTangentPlane
 	Map
 	MapNode
+    MapNodeObserver
 	MapNodeOptions
 	MapOptions
 	MaskLayer
@@ -78,6 +82,7 @@ SET(TARGET_PUBLIC_H
     ShaderUtils
 	SparseTexture2DArray
 	SpatialReference
+    StateSetCache
 	StringUtils
 	TaskService
     Terrain
@@ -126,9 +131,12 @@ LIST(APPEND TARGET_SRC
 	Draggers.cpp
     DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
+    DrawInstanced.cpp
     ECEF.cpp
     ElevationLayer.cpp
+    ElevationLOD.cpp
     ElevationQuery.cpp
+    FadeEffect.cpp
     FileUtils.cpp
     GeoData.cpp
     Geoid.cpp
@@ -167,6 +175,7 @@ LIST(APPEND TARGET_SRC
     ShaderUtils.cpp
     SparseTexture2DArray.cpp
     SpatialReference.cpp
+    StateSetCache.cpp
     StringUtils.cpp
     TaskService.cpp
     Terrain.cpp

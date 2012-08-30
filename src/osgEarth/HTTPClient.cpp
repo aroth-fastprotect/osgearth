@@ -33,6 +33,9 @@
 
 #define LC "[HTTPClient] "
 
+//#define OE_TEST OE_NOTICE
+#define OE_TEST OE_NULL
+
 using namespace osgEarth;
 
 //----------------------------------------------------------------------------
@@ -68,6 +71,33 @@ ProxySettings::getConfig() const
     conf.add( "password", _password);
 
     return conf;
+}
+
+bool
+ProxySettings::fromOptions( const osgDB::Options* dbOptions, optional<ProxySettings>& out )
+{
+    if ( dbOptions )
+    {
+        std::string jsonString = dbOptions->getPluginStringData( "osgEarth::ProxySettings" );
+        if ( !jsonString.empty() )
+        {
+            Config conf;
+            conf.fromJSON( jsonString );
+            out = ProxySettings( conf );
+            return true;
+        }
+    }
+    return false;
+}
+
+void
+ProxySettings::apply( osgDB::Options* dbOptions ) const
+{
+    if ( dbOptions )
+    {
+        Config conf = getConfig();
+        dbOptions->setPluginStringData( "osgEarth::ProxySettings", conf.toJSON() );
+    }
 }
 
 /****************************************************************************/
@@ -279,8 +309,9 @@ HTTPClient::getClient()
 }
 
 HTTPClient::HTTPClient() :
-_initialized( false ),
-_curl_handle( 0L )
+_initialized    ( false ),
+_curl_handle    ( 0L ),
+_simResponseCode( -1L )
 {
     //nop
     //do no CURL calls here.
@@ -307,6 +338,14 @@ HTTPClient::initializeImpl()
     if (userAgentEnv)
     {
         userAgent = std::string(userAgentEnv);
+    }
+
+    //Check for a response-code simulation (for testing)
+    const char* simCode = getenv("OSGEARTH_SIMULATE_HTTP_RESPONSE_CODE");
+    if ( simCode )
+    {
+        _simResponseCode = osgEarth::as<long>(std::string(simCode), 404L);
+        OE_WARN << LC << "Simulating a network error with Response Code = " << _simResponseCode << std::endl;
     }
 
     OE_DEBUG << LC << "HTTPClient setting userAgent=" << userAgent << std::endl;
@@ -547,7 +586,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
 {
     initialize();
 
-    OE_DEBUG << LC << "doGet " << request.getURL() << std::endl;
+    OE_TEST << LC << "doGet " << request.getURL() << std::endl;
 
     const osgDB::AuthenticationMap* authenticationMap = (options && options->getAuthenticationMap()) ? 
             options->getAuthenticationMap() :
@@ -579,6 +618,15 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
 
     //Try to get the proxy settings from the local options that are passed in.
     readOptions( options, proxy_host, proxy_port );
+
+    optional< ProxySettings > proxySettings;
+    ProxySettings::fromOptions( options, proxySettings );
+    if (proxySettings.isSet())
+    {       
+        proxy_host = proxySettings.get().hostName();
+        proxy_port = toString<int>(proxySettings.get().port());
+        OE_DEBUG << "Read proxy settings from options " << proxy_host << " " << proxy_port << std::endl;
+    }
 
     //Try to get the proxy settings from the environment variable
     const char* proxyEnvAddress = getenv("OSG_CURL_PROXY");
@@ -620,6 +668,12 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
             curl_easy_setopt( _curl_handle, CURLOPT_PROXYUSERPWD, proxy_auth.c_str());
         }
     }
+    else
+    {
+        OE_DEBUG << "Removing proxy settings" << std::endl;
+        curl_easy_setopt( _curl_handle, CURLOPT_PROXY, 0 );
+    }
+
 
     const osgDB::AuthenticationDetails* details = authenticationMap ?
         authenticationMap->getAuthenticationDetails(request.getURL()) :
@@ -672,27 +726,38 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
         curl_easy_setopt(_curl_handle, CURLOPT_PROGRESSDATA, progressCallback.get());
     }
 
-    char errorBuf[CURL_ERROR_SIZE];
-    errorBuf[0] = 0;
-    curl_easy_setopt( _curl_handle, CURLOPT_ERRORBUFFER, (void*)errorBuf );
-
-    curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)&sp);
-    CURLcode res = curl_easy_perform( _curl_handle );
-    curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)0 );
-    curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSDATA, (void*)0);
-
-    //Disable peer certificate verification to allow us to access in https servers where the peer certificate cannot be verified.
-    curl_easy_setopt( _curl_handle, CURLOPT_SSL_VERIFYPEER, (void*)0 );
-
+    CURLcode res;
     long response_code = 0L;
-    if (!proxy_addr.empty())
+
+    if ( _simResponseCode < 0 )
     {
-        long connect_code = 0L;
-        curl_easy_getinfo( _curl_handle, CURLINFO_HTTP_CONNECTCODE, &connect_code );
-        OE_DEBUG << LC << "proxy connect code " << connect_code << std::endl;
+        char errorBuf[CURL_ERROR_SIZE];
+        errorBuf[0] = 0;
+        curl_easy_setopt( _curl_handle, CURLOPT_ERRORBUFFER, (void*)errorBuf );
+
+        curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)&sp);
+        res = curl_easy_perform( _curl_handle );
+        curl_easy_setopt( _curl_handle, CURLOPT_WRITEDATA, (void*)0 );
+        curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSDATA, (void*)0);
+
+        //Disable peer certificate verification to allow us to access in https servers where the peer certificate cannot be verified.
+        curl_easy_setopt( _curl_handle, CURLOPT_SSL_VERIFYPEER, (void*)0 );
+
+        if (!proxy_addr.empty())
+        {
+            long connect_code = 0L;
+            curl_easy_getinfo( _curl_handle, CURLINFO_HTTP_CONNECTCODE, &connect_code );
+            OE_DEBUG << LC << "proxy connect code " << connect_code << std::endl;
+        }
+        
+        curl_easy_getinfo( _curl_handle, CURLINFO_RESPONSE_CODE, &response_code );
     }
-    
-    curl_easy_getinfo( _curl_handle, CURLINFO_RESPONSE_CODE, &response_code );     
+    else
+    {
+        // simulate failure with a custom response code
+        response_code = _simResponseCode;
+        res = response_code == 408 ? CURLE_OPERATION_TIMEDOUT : CURLE_COULDNT_CONNECT;
+    }
 
     //OE_DEBUG << LC << "got response, code = " << response_code << std::endl;
 
@@ -788,7 +853,8 @@ HTTPClient::doDownload(const std::string &url, const std::string &filename)
     }
     else
     {
-        OE_WARN << LC << "Error downloading file " << filename << std::endl;
+        OE_WARN << LC << "Error downloading file " << filename
+            << " (" << response.getCode() << ")" << std::endl;
         return false;
     } 
 }

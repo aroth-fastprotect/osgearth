@@ -57,12 +57,13 @@ namespace
 
 //---------------------------------------------------------------------------
 
-Terrain::Terrain(osg::Node* graph, const Profile* mapProfile, bool geocentric) :
-_callbacks (),
+Terrain::Terrain(osg::Node* graph, const Profile* mapProfile, bool geocentric, const TerrainOptions& terrainOptions ) :
+_callbacks     (),
 _callbacksMutex(),
-_profile   ( mapProfile ),
-_graph     ( graph ),
-_geocentric( geocentric )
+_profile       ( mapProfile ),
+_graph         ( graph ),
+_geocentric    ( geocentric ),
+_terrainOptions( terrainOptions )
 {
     //nop
 }
@@ -102,8 +103,10 @@ Terrain::getHeight(osg::Node*              patch,
     }
 
     osgUtil::LineSegmentIntersector* lsi = new osgUtil::LineSegmentIntersector(start, end);
-    osgUtil::IntersectionVisitor iv( lsi );
     lsi->setIntersectionLimit(osgUtil::Intersector::LIMIT_ONE);
+
+    osgUtil::IntersectionVisitor iv( lsi );
+    iv.setTraversalMask( ~_terrainOptions.secondaryTraversalMask().value() );
 
     if ( patch )
         patch->accept( iv );
@@ -149,7 +152,10 @@ Terrain::getWorldCoordsUnderMouse(osg::View* view, float x, float y, osg::Vec3d&
     osg::NodePath path;
     path.push_back( _graph.get() );
 
-    if ( view2->computeIntersections( x, y, path, results ) )
+    // fine but computeIntersections won't travers a masked Drawable, a la quadtree.
+    unsigned mask = ~_terrainOptions.secondaryTraversalMask().value();
+
+    if ( view2->computeIntersections( x, y, path, results, mask ) )
     {
         // find the first hit under the mouse:
         osgUtil::LineSegmentIntersector::Intersection first = *(results.begin());
@@ -175,7 +181,10 @@ Terrain::getWorldCoordsUnderMouse(osg::View* view,
     osg::NodePath path;
     path.push_back( _graph.get() );
 
-    if ( view2->computeIntersections( x, y, path, results ) )
+    // fine but computeIntersections won't travers a masked Drawable, a la quadtree.
+    unsigned mask = ~_terrainOptions.secondaryTraversalMask().value();
+
+    if ( view2->computeIntersections( x, y, path, results, mask ) )
     {
         // find the first hit under the mouse:
         osgUtil::LineSegmentIntersector::Intersection first = *(results.begin());
@@ -193,17 +202,12 @@ Terrain::getWorldCoordsUnderMouse(osg::View* view,
 
 
 void
-Terrain::addTerrainCallback( TerrainCallback* cb, osg::Referenced* clientData )
+Terrain::addTerrainCallback( TerrainCallback* cb )
 {
     if ( cb )
-    {
-        CallbackRecord rec;
-        rec._callback = cb;
-        rec._clientData = clientData;
-        rec._hasClientData = clientData != 0L;
-
+    {        
         Threading::ScopedWriteLock exclusiveLock( _callbacksMutex );
-        _callbacks.push_back( rec );
+        _callbacks.push_back( cb );
     }
 }
 
@@ -213,28 +217,8 @@ Terrain::removeTerrainCallback( TerrainCallback* cb )
     Threading::ScopedWriteLock exclusiveLock( _callbacksMutex );
 
     for( CallbackList::iterator i = _callbacks.begin(); i != _callbacks.end(); )
-    {
-        CallbackRecord& rec = *i;
-        if ( rec._callback.get() == cb )
-        {
-            i = _callbacks.erase( i );
-        }
-        else
-        {
-            ++i;
-        }
-    }
-}
-
-void
-Terrain::removeTerrainCallbacksWithClientData( osg::Referenced* cd )
-{
-    Threading::ScopedWriteLock exclusiveLock( _callbacksMutex );
-
-    for( CallbackList::iterator i = _callbacks.begin(); i != _callbacks.end(); )
-    {
-        CallbackRecord& rec = *i;
-        if ( rec._hasClientData && rec._clientData.get() == cd )
+    {        
+        if ( i->get() == cb )
         {
             i = _callbacks.erase( i );
         }
@@ -265,28 +249,12 @@ Terrain::fireTileAdded( const TileKey& key, osg::Node* node )
     Threading::ScopedReadLock sharedLock( _callbacksMutex );
 
     for( CallbackList::iterator i = _callbacks.begin(); i != _callbacks.end(); )
-    {
-        CallbackRecord& rec = *i;
+    {       
+        TerrainCallbackContext context( this );
+        i->get()->onTileAdded( key, node, context );
 
-        bool keep = true;
-        osg::ref_ptr<osg::Referenced> clientData_safe = rec._clientData.get();
-
-        // if the client data has gone away, discard the callback.
-        if ( rec._hasClientData && !clientData_safe.valid() )
-        {
-            keep = false;
-        }
-        else
-        {
-            TerrainCallbackContext context( this, clientData_safe.get() );
-            rec._callback->onTileAdded( key, node, context );
-
-            // if the callback set the "remove" flag, discard the callback.
-            if ( context._remove )
-                keep = false;
-        }
-
-        if ( keep )
+        // if the callback set the "remove" flag, discard the callback.
+        if ( !context._remove )
             ++i;
         else
             i = _callbacks.erase( i );

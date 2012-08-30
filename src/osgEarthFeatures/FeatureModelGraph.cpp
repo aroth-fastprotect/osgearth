@@ -20,10 +20,17 @@
 #include <osgEarthFeatures/FeatureModelGraph>
 #include <osgEarthFeatures/CropFilter>
 #include <osgEarthFeatures/FeatureSourceIndexNode>
-#include <osgEarth/ThreadingUtils>
+#include <osgEarth/Capabilities>
 #include <osgEarth/CullingUtils>
-#include <osgEarth/NodeUtils>
+#include <osgEarth/ElevationLOD>
 #include <osgEarth/ElevationQuery>
+#include <osgEarth/FadeEffect>
+#include <osgEarth/NodeUtils>
+#include <osgEarth/Registry>
+#include <osgEarth/ShaderComposition>
+#include <osgEarth/ThreadingUtils>
+
+#include <osg/CullFace>
 #include <osg/PagedLOD>
 #include <osg/ProxyNode>
 #include <osgDB/FileNameUtils>
@@ -39,7 +46,8 @@ using namespace osgEarth::Symbology;
 
 #undef USE_PROXY_NODE_FOR_TESTING
 
-#define OE_TEST OE_NULL
+//#define OE_TEST OE_NULL
+#define OE_TEST OE_NOTICE
 
 //---------------------------------------------------------------------------
 
@@ -49,7 +57,8 @@ namespace
 {
     UID                               _uid         = 0;
     Threading::ReadWriteMutex         _fmgMutex;
-    std::map<UID, FeatureModelGraph*> _fmgRegistry;
+    typedef std::map<UID, osg::observer_ptr<FeatureModelGraph> > FMGRegistry;
+    FMGRegistry _fmgRegistry;
 
     static std::string s_makeURI( UID uid, unsigned lod, unsigned x, unsigned y ) 
     {
@@ -60,7 +69,13 @@ namespace
         return str;
     }
 
-    osg::Group* createPagedNode( const osg::BoundingSphered& bs, const std::string& uri, float minRange, float maxRange, float priOffset, float priScale )
+    osg::Group* createPagedNode(const osg::BoundingSphered& bs, 
+                                const std::string& uri, 
+                                float minRange, 
+                                float maxRange, 
+                                float priOffset, 
+                                float priScale,
+                                RefNodeOperationVector* postMergeOps)
     {
 #ifdef USE_PROXY_NODE_FOR_TESTING
         osg::ProxyNode* p = new osg::ProxyNode();
@@ -68,7 +83,8 @@ namespace
         p->setRadius( bs.radius() );
         p->setFileName( 0, uri );
 #else
-        osg::PagedLOD* p = new osg::PagedLOD();
+        PagedLODWithNodeOperations* p = new PagedLODWithNodeOperations(postMergeOps);
+        //osg::PagedLOD* p = new osg::PagedLOD();
         p->setCenter( bs.center() );
         //p->setRadius( bs.radius() );
         p->setRadius(std::max((float)bs.radius(),maxRange));
@@ -132,8 +148,8 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
     static FeatureModelGraph* getGraph( UID uid ) 
     {
         Threading::ScopedReadLock lock( _fmgMutex );
-        std::map<UID, FeatureModelGraph*>::const_iterator i = _fmgRegistry.find( uid );
-        return i != _fmgRegistry.end() ? i->second : 0L;
+        FMGRegistry::const_iterator i = _fmgRegistry.find( uid );
+        return i != _fmgRegistry.end() ? i->second.get() : 0L;
     }
 };
 
@@ -158,6 +174,17 @@ namespace
             fullExtent.xMin() + w * (double)(tileX+1),
             fullExtent.yMin() + h * (double)(tileY+1) );
     }
+
+
+    struct SetupFading : public NodeOperation
+    {
+        void operator()( osg::Node* node )
+        {
+            osg::Uniform* u = FadeEffect::createStartTimeUniform();
+            u->set( (float)osg::Timer::instance()->time_s() );
+            node->getOrCreateStateSet()->addUniform( u );
+        }
+    };
 }
 
 
@@ -174,6 +201,10 @@ _pendingUpdate( false )
 {
     _uid = osgEarthFeatureModelPseudoLoader::registerGraph( this );
 
+    // operations that get applied after a new node gets merged into the 
+    // scene graph by the pager.
+    _postMergeOperations = new RefNodeOperationVector();
+
     // install the stylesheet in the session if it doesn't already have one.
     if ( !session->styles() )
         session->setStyles( _options.styles().get() );
@@ -183,12 +214,6 @@ _pendingUpdate( false )
         OE_WARN << LC << "ILLEGAL: Session must have a feature source" << std::endl;
         return;
     }
-
-    // initialize lighting on the graph, if necessary.
-    osg::StateSet* stateSet = getOrCreateStateSet();
-
-    if ( _options.enableLighting().isSet() )
-        stateSet->setMode( GL_LIGHTING, *_options.enableLighting() ? 1 : 0 );
     
     // Calculate the usable extent (in both feature and map coordinates) and bounds.
     const Profile* mapProfile = session->getMapInfo().getProfile();
@@ -238,6 +263,29 @@ _pendingUpdate( false )
         }
     }
 
+    // install base shader mains.
+    if ( Registry::instance()->getCapabilities().supportsGLSL() )
+    {
+        installShaderMains();
+    }
+
+    // Set up the state set.
+    // backface culling is ON by default. By the way, this is most definitely
+    // necessary when shading with shadows.
+    osg::StateSet* stateSet = getOrCreateStateSet();
+    stateSet->setMode( GL_CULL_FACE, 1 );
+    stateSet->setMode( GL_BLEND, 1 );
+    if ( _options.enableLighting().isSet() )
+        stateSet->setMode( GL_LIGHTING, *_options.enableLighting() ? 1 : 0 );
+
+    // If the user requests fade-in, install a post-merge operation that will set the 
+    // proper fade time for paged nodes.
+    if ( _options.fadeInDuration().value() > 0.0f )
+    {
+        addPostMergeOperation( new SetupFading() );
+        OE_INFO << LC << "Added fading post-merge operation" << std::endl;
+    }
+
     ADJUST_EVENT_TRAV_COUNT( this, 1 );
 
     redraw();
@@ -249,9 +297,22 @@ FeatureModelGraph::~FeatureModelGraph()
 }
 
 void
+FeatureModelGraph::installShaderMains()
+{
+    osg::StateSet* ss = this->getOrCreateStateSet();
+}
+
+void
 FeatureModelGraph::dirty()
 {
     _dirty = true;
+}
+
+void
+FeatureModelGraph::addPostMergeOperation( NodeOperation* op )
+{
+    if ( op )
+        _postMergeOperations->push_back( op );
 }
 
 osg::BoundingSphered
@@ -259,8 +320,12 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
                                          const MapFrame*  mapf ) const
 {
     osg::Vec3d center, corner;
-    //double z = 0.0;
     GeoExtent workingExtent;
+
+    if ( !extent.isValid() )
+    {
+        return osg::BoundingSphered();
+    }
 
     if ( extent.getSRS()->isEquivalentTo( _usableMapExtent.getSRS() ) )
     {
@@ -297,7 +362,7 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
     return osg::BoundingSphered( center, (center-corner).length() );
 }
 
-void
+osg::Node*
 FeatureModelGraph::setupPaging()
 {
     // calculate the bounds of the full data extent:
@@ -331,7 +396,7 @@ FeatureModelGraph::setupPaging()
         //The tilesize factor must be at least 1.0 to avoid culling the tile when you are within it's bounding sphere. 
         tileSizeFactor = osg::maximum( tileSizeFactor, 1.0f);
         OE_DEBUG << LC << "Computed a tilesize factor of " << tileSizeFactor << " with max range setting of " <<  userMaxRange << std::endl;
-        _options.layout()->tileSizeFactor() = tileSizeFactor;
+        _options.layout()->tileSizeFactor() = tileSizeFactor * 1.5;
     }
    
 
@@ -348,9 +413,10 @@ FeatureModelGraph::setupPaging()
         0.0f, 
         maxRange, 
         *_options.layout()->priorityOffset(), 
-        *_options.layout()->priorityScale() );
+        *_options.layout()->priorityScale(),
+        _postMergeOperations.get() );
 
-    this->addChild( pagedNode );
+    return pagedNode;
 }
 
 
@@ -539,7 +605,8 @@ FeatureModelGraph::buildSubTilePagedLODs(unsigned        parentLOD,
                     uri, 
                     0.0f, maxRange, 
                     *_options.layout()->priorityOffset(), 
-                    *_options.layout()->priorityScale() );
+                    *_options.layout()->priorityScale(),
+                    _postMergeOperations.get() );
 
                 parent->addChild( pagedNode );
             }
@@ -602,34 +669,43 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
 
     else
     {
-        // attempt to glean the style from the feature source name:
-        const Style style = *_session->styles()->getStyle( 
-            *_session->getFeatureSource()->getFeatureSourceOptions().name() );
+        Style defaultStyle;
 
-        osg::Node* node = build( style, query, extent, index );
+        if ( _session->styles()->selectors().size() == 0 )
+        {
+            // attempt to glean the style from the feature source name:
+            defaultStyle = *_session->styles()->getStyle( 
+                *_session->getFeatureSource()->getFeatureSourceOptions().name() );
+        }
+
+        osg::Node* node = build( defaultStyle, query, extent, index );
         if ( node )
             group->addChild( node );
     }
 
     if ( group->getNumChildren() > 0 )
     {
+        
         // account for a min-range here. Do not address the max-range here; that happens
-        // above when generating paged LOD nodes, etc.
+        // above when generating paged LOD nodes, etc.        
         float minRange = level.minRange();
+
+        /*
         if ( _options.minRange().isSet() ) 
             minRange = std::max(minRange, *_options.minRange());
 
         if ( _options.layout().isSet() && _options.layout()->minRange().isSet() )
             minRange = std::max(minRange, *_options.layout()->minRange());
+            */
 
         if ( minRange > 0.0f )
         {
-            // minRange can't be less than the tile geometry's radius.  JB:  Why not?
-            //minRange = std::max(minRange, group->getBound().radius());
+            // minRange can't be less than the tile geometry's radius.
+            minRange = std::max(minRange, group->getBound().radius());
             osg::LOD* lod = new osg::LOD();
             lod->addChild( group.get(), minRange, FLT_MAX );
             group = lod;
-        }
+        }        
 
         if ( _session->getMapInfo().isGeocentric() && _options.clusterCulling() == true )
         {
@@ -796,6 +872,8 @@ FeatureModelGraph::buildStyleGroups(const StyleSelector* selector,
                                     FeatureSourceIndex*  index,
                                     osg::Group*          parent)
 {
+    OE_TEST << LC << "buildStyleGroups: " << selector->name() << std::endl;
+
     // if the selector uses an expression to select the style name, then we must perform the
     // query and then SORT the features into style groups.
     if ( selector->styleExpression().isSet() )
@@ -1016,36 +1094,53 @@ void
 FeatureModelGraph::redraw()
 {
     removeChildren( 0, getNumChildren() );
+
+    osg::Node* node = 0;
     // if there's a display schema in place, set up for quadtree paging.
     if ( _options.layout().isSet() || _useTiledSource )
     {
-        setupPaging();
+        node = setupPaging();
     }
     else
     {
         FeatureLevel defaultLevel( 0.0f, FLT_MAX );
         
         //Remove all current children
-        osg::Node* node = buildLevel( defaultLevel, GeoExtent::INVALID, 0 );
-        if ( node )
-        {
-            if ( _options.maxRange().isSet() )
-            {
-                osg::LOD* lod = dynamic_cast<osg::LOD*>(node);
-                if ( lod == NULL )
-                {
-                    osg::LOD* lod = new osg::LOD();
-                    lod->addChild( node, 0.0, *_options.maxRange() );
-                }
-                else if ( lod->getNumChildren() > 0 )
-                {
-                    lod->setRange(0, lod->getMinRange(0), *_options.maxRange());
-                }
-                node = lod;
-            }
-            addChild( node );
-        }
+        node = buildLevel( defaultLevel, GeoExtent::INVALID, 0 );
     }
+
+    float minRange = -FLT_MAX;
+    if ( _options.minRange().isSet() ) 
+        minRange = std::max(minRange, *_options.minRange());
+
+    if ( _options.layout().isSet() && _options.layout()->minRange().isSet() )
+        minRange = std::max(minRange, *_options.layout()->minRange());
+
+    float maxRange = FLT_MAX;
+    if ( _options.maxRange().isSet() ) 
+        maxRange = std::min(maxRange, *_options.maxRange());
+
+    if ( _options.layout().isSet() && _options.layout()->maxRange().isSet() )
+        maxRange = std::min(maxRange, *_options.layout()->maxRange());
+    
+    //If they've specified a min/max range, setup an LOD
+    if ( minRange != -FLT_MAX || maxRange != FLT_MAX )
+    {        
+        ElevationLOD *lod = new ElevationLOD(_session->getMapInfo().getSRS(), minRange, maxRange );
+        lod->addChild( node );
+        node = lod;
+    }
+
+    // If we want fading, install a fader.
+    if ( _options.fadeInDuration().value() > 0.0f )
+    {
+        FadeEffect* fader = new FadeEffect();
+        fader->setFadeDuration( *_options.fadeInDuration() );
+        fader->addChild( node );
+        node = fader;
+    }
+
+    addChild( node );
 
     _session->getFeatureSource()->sync( _revision );
     _dirty = false;

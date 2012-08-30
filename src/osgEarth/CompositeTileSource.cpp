@@ -19,6 +19,7 @@
 #include <osgEarth/CompositeTileSource>
 #include <osgEarth/ImageUtils>
 #include <osgEarth/StringUtils>
+#include <osgEarth/Registry>
 #include <osgDB/FileNameUtils>
 
 #define LC "[CompositeTileSource] "
@@ -88,7 +89,7 @@ namespace
         ImageInfo()
         {
             image = 0;
-            opacity = 0;
+            opacity = 1;
             dataInExtents = false;
         }
 
@@ -188,18 +189,22 @@ CompositeTileSource::createImage(const TileKey&    key,
             {
                 minLevel = i->_imageLayerOptions->minLevel().value();
             }
-            else if (i->_imageLayerOptions->minLevelResolution().isSet())
+            else if (i->_imageLayerOptions->minResolution().isSet())
             {
-                minLevel = source->getProfile()->getLevelOfDetailForHorizResolution( i->_imageLayerOptions->minLevelResolution().value(), source->getPixelsPerTile());            
+                minLevel = source->getProfile()->getLevelOfDetailForHorizResolution( 
+                    i->_imageLayerOptions->minResolution().value(), 
+                    source->getPixelsPerTile());
             }
 
             if (i->_imageLayerOptions->maxLevel().isSet())
             {
                 maxLevel = i->_imageLayerOptions->maxLevel().value();
             }
-            else if (i->_imageLayerOptions->maxLevelResolution().isSet())
+            else if (i->_imageLayerOptions->maxResolution().isSet())
             {
-                maxLevel = source->getProfile()->getLevelOfDetailForHorizResolution( i->_imageLayerOptions->maxLevelResolution().value(), source->getPixelsPerTile());            
+                maxLevel = source->getProfile()->getLevelOfDetailForHorizResolution( 
+                    i->_imageLayerOptions->maxResolution().value(), 
+                    source->getPixelsPerTile());
             }
 
             // check that this source is within the level bounds:
@@ -208,43 +213,39 @@ CompositeTileSource::createImage(const TileKey&    key,
             {
                 continue;
             }
-
-            if ( !source->getBlacklist()->contains( key.getTileId() ) )
-            {
+            
                 //Only try to get data if the source actually has data                
                 if (source->hasDataInExtent( key.getExtent() ) )
                 {
                     //We have data within these extents
                     imageInfo.dataInExtents = true;
 
-                    osg::ref_ptr< ImageLayerPreCacheOperation > preCacheOp;
-                    if ( i->_imageLayerOptions.isSet() )
-                    {
-                        preCacheOp = new ImageLayerPreCacheOperation();
-                        preCacheOp->_processor.init( i->_imageLayerOptions.value(), _dbOptions.get(), true );                        
-                    }
+                    if ( !source->getBlacklist()->contains( key.getTileId() ) )
+                    {                        
+                        osg::ref_ptr< ImageLayerPreCacheOperation > preCacheOp;
+                        if ( i->_imageLayerOptions.isSet() )
+                        {
+                            preCacheOp = new ImageLayerPreCacheOperation();
+                            preCacheOp->_processor.init( i->_imageLayerOptions.value(), _dbOptions.get(), true );                        
+                        }
 
-                    imageInfo.image = source->createImage( key, preCacheOp.get(), progress );
-                    imageInfo.opacity = 1.0f;
+                        imageInfo.image = source->createImage( key, preCacheOp.get(), progress );
+                        imageInfo.opacity = 1.0f;
 
-                    //If the image is not valid and the progress was not cancelled, blacklist
-                    if (!imageInfo.image.valid() && (!progress || !progress->isCanceled()))
-                    {
-                        //Add the tile to the blacklist
-                        OE_DEBUG << LC << "Adding tile " << key.str() << " to the blacklist" << std::endl;
-                        source->getBlacklist()->add( key.getTileId() );
+                        //If the image is not valid and the progress was not cancelled, blacklist
+                        if (!imageInfo.image.valid() && (!progress || !progress->isCanceled()))
+                        {
+                            //Add the tile to the blacklist
+                            OE_DEBUG << LC << "Adding tile " << key.str() << " to the blacklist" << std::endl;
+                            source->getBlacklist()->add( key.getTileId() );
+                        }
+                        imageInfo.opacity = i->_imageLayerOptions.isSet() ? i->_imageLayerOptions->opacity().value() : 1.0f;
                     }
-                    imageInfo.opacity = i->_imageLayerOptions.isSet() ? i->_imageLayerOptions->opacity().value() : 1.0f;
                 }
                 else
                 {
                     OE_DEBUG << LC << "Source has no data at " << key.str() << std::endl;
                 }
-            }
-            else
-            {
-                OE_DEBUG << LC << "Tile " << key.str() << " is blacklisted, not checking" << std::endl;
-            }
         }
 
         //Add the ImageInfo to the list
@@ -333,8 +334,10 @@ CompositeTileSource::createImage(const TileKey&    key,
         for (unsigned int i = 0; i < images.size(); i++)
         {
             ImageInfo& info = images[i];
-            if (info.image.valid()) return info.image.release();
+            if (info.image.valid())
+                return info.image.release();
         }
+        return 0L;
     }
     else
     {
@@ -397,12 +400,12 @@ CompositeTileSource::add( TileSource* ts, const ImageLayerOptions& options )
     }
 }
 
-void
-CompositeTileSource::initialize(const osgDB::Options* dbOptions, 
-                                const Profile*        overrideProfile )
+TileSource::Status
+CompositeTileSource::initialize(const osgDB::Options* dbOptions)
 {
-    _dbOptions = dbOptions;
-    osg::ref_ptr<const Profile> profile = overrideProfile;
+    _dbOptions = Registry::instance()->cloneOrCreateOptions(dbOptions);
+
+    osg::ref_ptr<const Profile> profile = getProfile();
 
     for(CompositeTileSourceOptions::ComponentVector::iterator i = _options._components.begin();
         i != _options._components.end(); )
@@ -430,34 +433,48 @@ CompositeTileSource::initialize(const osgDB::Options* dbOptions,
             TileSource* source = i->_tileSourceInstance.get();
             if ( source )
             {
-                osg::ref_ptr<const Profile> localOverrideProfile = overrideProfile;
+                osg::ref_ptr<const Profile> localOverrideProfile = profile.get();
 
                 const TileSourceOptions& opt = source->getOptions();
                 if ( opt.profile().isSet() )
+                {
                     localOverrideProfile = Profile::create( opt.profile().value() );
-
-                source->initialize( dbOptions, localOverrideProfile.get() );
-
-                if ( !profile.valid() )
-                {
-                    // assume the profile of the first source to be the overall profile.
-                    profile = source->getProfile();
+                    source->setProfile( localOverrideProfile.get() );
                 }
-                else if ( !profile->isEquivalentTo( source->getProfile() ) )
+
+                // initialize the component tile source:
+                TileSource::Status compStatus = source->startup( _dbOptions.get() );
+
+                if ( compStatus == TileSource::STATUS_OK )
                 {
-                    // if sub-sources have different profiles, print a warning because this is
-                    // not supported!
-                    OE_WARN << LC << "Components with differing profiles are not supported. " 
-                        << "Visual anomalies may result." << std::endl;
-                }
+                    if ( !profile.valid() )
+                    {
+                        // assume the profile of the first source to be the overall profile.
+                        profile = source->getProfile();
+                    }
+                    else if ( !profile->isEquivalentTo( source->getProfile() ) )
+                    {
+                        // if sub-sources have different profiles, print a warning because this is
+                        // not supported!
+                        OE_WARN << LC << "Components with differing profiles are not supported. " 
+                            << "Visual anomalies may result." << std::endl;
+                    }
                 
-                _dynamic = _dynamic || source->isDynamic();
+                    _dynamic = _dynamic || source->isDynamic();
 
-                // gather extents
-                const DataExtentList& extents = source->getDataExtents();
-                for( DataExtentList::const_iterator j = extents.begin(); j != extents.end(); ++j )
+                    // gather extents
+                    const DataExtentList& extents = source->getDataExtents();
+                    for( DataExtentList::const_iterator j = extents.begin(); j != extents.end(); ++j )
+                    {
+                        getDataExtents().push_back( *j );
+                    }
+                }
+
+                else
                 {
-                    getDataExtents().push_back( *j );
+                    // if even one of the components fails to initialize, the entire
+                    // composite tile source is invalid.
+                    return Status::Error("At least one component is invalid");
                 }
             }
         }
@@ -465,9 +482,11 @@ CompositeTileSource::initialize(const osgDB::Options* dbOptions,
         ++i;
     }
 
+    // set the new profile that was derived from the components
     setProfile( profile.get() );
 
     _initialized = true;
+    return STATUS_OK;
 }
 
 //------------------------------------------------------------------------

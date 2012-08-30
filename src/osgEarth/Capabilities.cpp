@@ -124,7 +124,10 @@ _supportsTexture2DLod   ( false ),
 _supportsMipmappedTextureUpdates( false ),
 _supportsDepthPackedStencilBuffer( false ),
 _supportsQuadBufferStereo( false ),
-_supportsOcclusionQuery ( false )
+_supportsOcclusionQuery ( false ),
+_supportsDrawInstanced  ( false ),
+_supportsUniformBufferObjects( false ),
+_maxUniformBlockSize    ( 0 )
 {
     // little hack to force the osgViewer library to link so we can create a graphics context
     osgViewerGetVersion();
@@ -207,6 +210,8 @@ _supportsOcclusionQuery ( false )
                 osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
             _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
             _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
+            _supportsDrawInstanced = osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
+            _supportsUniformBufferObjects = osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
             _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
         	_supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
 
@@ -224,6 +229,8 @@ _supportsOcclusionQuery ( false )
 #endif
 
             _maxFastTextureSize = _maxTextureSize;
+            glGetIntegerv( GL_MAX_UNIFORM_BLOCK_SIZE, &_maxUniformBlockSize );
+
         }
         // delete the final object of the graphics context
         delete mgc;
@@ -267,6 +274,12 @@ _supportsOcclusionQuery ( false )
     OE_INFO << LC << "  Stencil wrapping = " << SAYBOOL(_supportsStencilWrap) << std::endl;
 
     OE_INFO << LC << "  2-sided stencils = " << SAYBOOL(_supportsTwoSidedStencil) << std::endl;
+
+    OE_INFO << LC << "  draw instanced = " << SAYBOOL(_supportsDrawInstanced) << std::endl;
+
+    OE_INFO << LC << "  uniform buffer objects = " << SAYBOOL(_supportsUniformBufferObjects) << std::endl;
+
+    OE_INFO << LC << "  max uniform block size = " << _maxUniformBlockSize << std::endl;
 
     OE_INFO << LC << "  depth-packed stencil = " << SAYBOOL(_supportsDepthPackedStencilBuffer) << std::endl;
 
@@ -332,6 +345,9 @@ bool Capabilities::readCache()
         conf.getIfSet("supportsmipmappedtextureupdates", _supportsMipmappedTextureUpdates );
         conf.getIfSet("supportsdepthpackedstencilbuffer", _supportsDepthPackedStencilBuffer );
         conf.getIfSet("supportsquadbufferstereo", _supportsQuadBufferStereo );
+        conf.getIfSet("supportsocclusionquery", _supportsOcclusionQuery );
+        conf.getIfSet("supportsdrawinstanced", _supportsDrawInstanced );
+        conf.getIfSet("supportsuniformbufferobjects", _supportsUniformBufferObjects );
         conf.getIfSet("vendor", _vendor );
         conf.getIfSet("renderer", _renderer );
         conf.getIfSet("version", _version );
@@ -368,6 +384,9 @@ bool Capabilities::writeCache()
     conf.update("supportsmipmappedtextureupdates", _supportsMipmappedTextureUpdates );
     conf.update("supportsdepthpackedstencilbuffer", _supportsDepthPackedStencilBuffer );
     conf.update("supportsquadbufferstereo", _supportsQuadBufferStereo );
+    conf.update("supportsocclusionquery", _supportsOcclusionQuery );
+    conf.update("supportsdrawinstanced", _supportsDrawInstanced );
+    conf.update("supportsuniformbufferobjects", _supportsUniformBufferObjects );
     conf.update("vendor", _vendor );
     conf.update("renderer", _renderer );
     conf.update("version", _version );

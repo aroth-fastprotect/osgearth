@@ -24,6 +24,7 @@
 #include <osgEarthFeatures/FeatureModelSource>
 #include <osgEarthFeatures/Session>
 #include <osgEarthSymbology/Style>
+#include <osgEarth/NodeUtils>
 #include <osgEarth/ThreadingUtils>
 #include <osg/Node>
 #include <set>
@@ -77,6 +78,13 @@ namespace osgEarth { namespace Features
          */
         void dirty();
 
+        /**
+         * Adds an operation that will run on new nodes that are added by the
+         * paging system. Note, the operation only runs after the pager actually
+         * added the node to the live scene graph.
+         */
+        void addPostMergeOperation( NodeOperation* op );
+
 
     public: // osg::Node
 
@@ -86,7 +94,7 @@ namespace osgEarth { namespace Features
 
         virtual ~FeatureModelGraph();
 
-        void setupPaging();
+        osg::Node* setupPaging();
 
         osg::Group* buildLevel( 
             const FeatureLevel& level, 
@@ -134,6 +142,8 @@ namespace osgEarth { namespace Features
 
         void redraw();
 
+        void installShaderMains();
+
     private:
         FeatureModelSourceOptions        _options;
         osg::ref_ptr<FeatureNodeFactory> _factory;
@@ -150,6 +160,8 @@ namespace osgEarth { namespace Features
         bool                             _dirty;
         bool                             _pendingUpdate;
         std::vector<const FeatureLevel*> _lodmap;
+        
+        osg::ref_ptr<RefNodeOperationVector> _postMergeOperations;
     };
 
 } } // namespace osgEarth::Features

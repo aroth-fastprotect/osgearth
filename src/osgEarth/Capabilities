@@ -95,6 +95,18 @@ namespace osgEarth
 
 		/** whether the GPU supports OpenGL Quad buffer stereo */
 		bool supportsQuadBufferStereo() const { return _supportsQuadBufferStereo; }
+        /** whether the GPU supporst occlusion query */
+        bool supportsOcclusionQuery() const { return _supportsOcclusionQuery; }
+
+        /** whether the GPU supports DrawInstanced rendering */
+        bool supportsDrawInstanced() const { return _supportsDrawInstanced; }
+
+        /** whether the GPU supports Uniform Buffer Objects */
+        bool supportsUniformBufferObjects() const { return _supportsUniformBufferObjects; }
+
+        /** maximum size of a uniform buffer block, in bytes */
+        int getMaxUniformBlockSize() const { return _maxUniformBlockSize; }
+
 
     protected:
         Capabilities();
@@ -126,6 +138,9 @@ namespace osgEarth
         bool _supportsDepthPackedStencilBuffer;
 		bool _supportsQuadBufferStereo;
         bool _supportsOcclusionQuery;
+        bool _supportsDrawInstanced;
+        bool _supportsUniformBufferObjects;
+        int  _maxUniformBlockSize;
         std::string _vendor;
         std::string _renderer;
         std::string _version;

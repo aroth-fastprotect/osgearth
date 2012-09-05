@@ -180,7 +180,7 @@ main(int argc, char** argv)
     // A series of place nodes (an icon with a text label)
     {
         Style pin;
-        pin.getOrCreate<MarkerSymbol>()->url()->set( "../data/placemark32.png" );
+        pin.getOrCreate<IconSymbol>()->url()->setLiteral( "../data/placemark32.png" );
 
         labelGroup->addChild( new PlaceNode(mapNode, GeoPoint(geoSRS, -74.00, 40.71), "New York"      , pin));
         labelGroup->addChild( new PlaceNode(mapNode, GeoPoint(geoSRS, -77.04, 38.85), "Washington, DC", pin));
@@ -382,7 +382,6 @@ main(int argc, char** argv)
     viewer.setSceneData( root );
 
     viewer.getCamera()->addCullCallback( new AutoClipPlaneCullCallback(mapNode) );
-    viewer.getDatabasePager()->setDoPreCompile( true );
     viewer.addEventHandler(new osgViewer::StatsHandler());
     viewer.addEventHandler(new osgViewer::WindowSizeHandler());
     viewer.addEventHandler(new osgGA::StateSetManipulator(viewer.getCamera()->getOrCreateStateSet()));

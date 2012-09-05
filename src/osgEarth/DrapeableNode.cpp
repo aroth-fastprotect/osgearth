@@ -52,15 +52,17 @@ _newDraped( draped ),
 _overlayProxyContainer(),
 _mapNode  ( mapNode )
 {
+    // create a container group that will house the culler. This culler
+    // allows a draped node, which sits under the MapNode's OverlayDecorator,
+    // to "track" the traversal state of the DrapeableNode itself.
+    _overlayProxyContainer = new OverlayTraversalGroup();
+    _overlayProxyContainer->setCullCallback( new CullNodeByFrameNumber() );
+    _overlayProxyContainer->setStateSet( this->getOrCreateStateSet() ); // share the stateset
+
+    setMapNode( mapNode );
+
     if ( mapNode )
     {
-        // create a container group that will house the culler. This culler
-        // allows a draped node, which sits under the MapNode's OverlayDecorator,
-        // to "track" the traversal state of the DrapeableNode itself.
-        _overlayProxyContainer = new OverlayTraversalGroup();
-        _overlayProxyContainer->setCullCallback( new CullNodeByFrameNumber() );
-        _overlayProxyContainer->setStateSet( this->getOrCreateStateSet() ); // share the stateset
-
         // If draping is requested, set up to apply it on the first update traversal.
         // Can't apply it until then since we need safe access to the MapNode.
         setDraped( draped );
@@ -72,36 +74,61 @@ _mapNode  ( mapNode )
 }
 
 void
+DrapeableNode::setMapNode( MapNode* mapNode )
+{
+    MapNode* oldMapNode = getMapNode();
+
+    if ( oldMapNode != mapNode )
+    {
+        if ( oldMapNode && _draped && _overlayProxyContainer->getNumParents() > 0 )
+        {
+            oldMapNode->getOverlayGroup()->removeChild( _overlayProxyContainer.get() );
+            oldMapNode->updateOverlayGraph();
+        }
+
+        _mapNode = mapNode;
+
+        applyChanges();
+    }
+}
+
+void
 DrapeableNode::applyChanges()
 {
     _draped = _newDraped;
 
-    if ( _mapNode.valid() )
+    if ( getMapNode() )
     {
         if ( _draped && _overlayProxyContainer->getNumParents() == 0 )
         {
-            _mapNode->getOverlayGroup()->addChild( _overlayProxyContainer.get() );
-            _mapNode->updateOverlayGraph();
+            getMapNode()->getOverlayGroup()->addChild( _overlayProxyContainer.get() );
+            getMapNode()->updateOverlayGraph();
+            //Set a giant bounding sphere on this node so it always passes the view frustum test and will be included in the OverlayDecorator.
+            setComputeBoundingSphereCallback( new StaticBound( osg::BoundingSphere(osg::Vec3f(0,0,0), FLT_MAX)));
         }
         else if ( !_draped && _overlayProxyContainer->getNumParents() > 0 )
         {
-            _mapNode->getOverlayGroup()->removeChild( _overlayProxyContainer.get() );
-            _mapNode->updateOverlayGraph();
+            getMapNode()->getOverlayGroup()->removeChild( _overlayProxyContainer.get() );
+            getMapNode()->updateOverlayGraph();
+            //Remove the bounding sphere callback, it's just a regular node.
+            setComputeBoundingSphereCallback( 0L );
         }
+
+        dirtyBound();
     }
 }
 
 void
 DrapeableNode::setDraped( bool draped )
-{
-    if ( draped != _draped && _mapNode.valid() )
-    {
+{    
+    if ( draped != _draped && getMapNode() )
+    {        
         _newDraped = draped;
         if ( !_dirty )
         {
             _dirty = true;
             ADJUST_UPDATE_TRAV_COUNT( this, 1 );
-        }
+        }        
     }
 }
 
@@ -157,7 +184,10 @@ DrapeableNode::traverse( osg::NodeVisitor& nv )
                 // for a draped node, inform the proxy that we are visible. But do NOT traverse the
                 // child graph (since it will be traversed by the OverlayDecorator).
                 CullNodeByFrameNumber* cb = static_cast<CullNodeByFrameNumber*>(_overlayProxyContainer->getCullCallback());
-                cb->_frame = nv.getFrameStamp()->getFrameNumber();
+                if (cb)
+                {
+                    cb->_frame = nv.getFrameStamp()->getFrameNumber();
+                }
             }
             else
             {

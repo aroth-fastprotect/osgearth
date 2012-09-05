@@ -68,6 +68,13 @@ _engine( engine )
 }
 
 
+TextureCompositor*
+TerrainEngineNode::getTextureCompositor() const
+{
+    return _texCompositor.get();
+}
+
+
 // this handler adjusts the uniform set when a terrain layer's "enabed" state changes
 void
 TerrainEngineNode::ImageLayerController::onVisibleChanged( TerrainLayer* layer )
@@ -99,6 +106,25 @@ TerrainEngineNode::ImageLayerController::onOpacityChanged( ImageLayer* layer )
         _layerOpacityUniform.setElement( layerNum, layer->getOpacity() );
     else
         OE_WARN << LC << "Odd, onOpacityChanged did not find layer" << std::endl;
+
+    _engine->dirty();
+}
+
+void
+TerrainEngineNode::ImageLayerController::onVisibleRangeChanged( ImageLayer* layer )
+{
+    if ( !Registry::instance()->getCapabilities().supportsGLSL() )
+        return;
+
+    _mapf.sync();
+    int layerNum = _mapf.indexOf( layer );
+    if ( layerNum >= 0 )
+    {
+         _layerRangeUniform.setElement( (2*layerNum),   layer->getMinVisibleRange() );
+         _layerRangeUniform.setElement( (2*layerNum)+1, layer->getMaxVisibleRange() );
+    }        
+    else
+        OE_WARN << LC << "Odd, onVisibleRangeChanged did not find layer" << std::endl;
 
     _engine->dirty();
 }
@@ -158,7 +184,7 @@ TerrainEngineNode::preInitialize( const Map* map, const TerrainOptions& options 
     _map = map;
     
     // fire up a terrain utility interface
-    _terrainInterface = new Terrain( this, map->getProfile(), map->isGeocentric() );
+    _terrainInterface = new Terrain( this, map->getProfile(), map->isGeocentric(), options );
 
     // set up the CSN values   
     _map->getProfile()->getSRS()->populateCoordinateSystemNode( this );
@@ -195,6 +221,13 @@ TerrainEngineNode::preInitialize( const Map* map, const TerrainOptions& options 
     
     set->getOrCreateUniform( "osgearth_ImageLayerAttenuation", osg::Uniform::FLOAT )->set(
         *options.attentuationDistance() );
+
+    if ( options.enableMercatorFastPath().isSet() )
+    {
+        OE_INFO 
+            << LC << "Mercator fast path " 
+            << (options.enableMercatorFastPath()==true? "enabled" : "DISABLED") << std::endl;
+    }
 
     _initStage = INIT_PREINIT_COMPLETE;
 }
@@ -331,8 +364,8 @@ TerrainEngineNode::updateImageUniforms()
 
             _imageLayerController->_layerVisibleUniform.setElement( index, layer->getVisible() );
             _imageLayerController->_layerOpacityUniform.setElement( index, layer->getOpacity() );
-            _imageLayerController->_layerRangeUniform.setElement( (2*index), layer->getImageLayerOptions().minVisibleRange().value() );
-            _imageLayerController->_layerRangeUniform.setElement( (2*index)+1, layer->getImageLayerOptions().maxVisibleRange().value() );
+            _imageLayerController->_layerRangeUniform.setElement( (2*index), layer->getMinVisibleRange() );
+            _imageLayerController->_layerRangeUniform.setElement( (2*index)+1, layer->getMaxVisibleRange() );
         }
 
         // set the remainder of the layers to disabled 
@@ -391,7 +424,7 @@ TerrainEngineNode::traverse( osg::NodeVisitor& nv )
                         }
                         _terrainInterface->_updateOperationQueue = q;
                     }
-                }                        
+                }
             }
         }
 
@@ -427,7 +460,7 @@ TerrainEngineNode::traverse( osg::NodeVisitor& nv )
 //------------------------------------------------------------------------
 
 #undef LC
-#define LC "[TerrainEngineFactory] "
+#define LC "[TerrainEngineNodeFactory] "
 
 TerrainEngineNode*
 TerrainEngineNodeFactory::create( Map* map, const TerrainOptions& options )
@@ -436,7 +469,7 @@ TerrainEngineNodeFactory::create( Map* map, const TerrainOptions& options )
 
     std::string driver = options.getDriver();
     if ( driver.empty() )
-        driver = "osgterrain";
+        driver = Registry::instance()->getDefaultTerrainEngineDriverName();
 
     std::string driverExt = std::string( ".osgearth_engine_" ) + driver;
     result = dynamic_cast<TerrainEngineNode*>( osgDB::readObjectFile( driverExt ) );

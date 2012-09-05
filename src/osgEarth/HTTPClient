@@ -56,6 +56,9 @@ namespace osgEarth
         std::string& password() { return _password; }
         const std::string& password() const { return _password; }
 
+        void apply(osgDB::Options* dbOptions) const;
+        static bool fromOptions( const osgDB::Options* dbOptions, optional<ProxySettings>& out );
+
     public:
         virtual Config getConfig() const;
         virtual void mergeConfig( const Config& conf );
@@ -310,6 +313,7 @@ namespace osgEarth
         std::string _previousPassword;
         long        _previousHttpAuthentication;
         bool        _initialized;
+        long        _simResponseCode;
 
         void initialize() const;
         void initializeImpl();

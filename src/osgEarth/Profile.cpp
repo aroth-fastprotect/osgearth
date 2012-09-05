@@ -373,6 +373,7 @@ Profile::toProfileOptions() const
     return op;
 }
 
+
 Profile*
 Profile::overrideSRS( const SpatialReference* srs ) const
 {
@@ -512,7 +513,12 @@ Profile::clampAndTransformExtent( const GeoExtent& input, bool* out_clamped ) co
         input :
         input.transform( geo_srs );
 
+    // bail out on a bad transform:
     if ( !gcs_input.isValid() )
+        return GeoExtent::INVALID;
+
+    // bail out if the extent's do not intersect at all:
+    if ( !gcs_input.intersects(_latlong_extent, false) )
         return GeoExtent::INVALID;
 
     // clamp it to the profile's extents:
@@ -679,4 +685,64 @@ Profile::getIntersectingTiles(const GeoExtent& extent, std::vector<TileKey>& out
     {
         addIntersectingTiles( ext, out_intersectingKeys );
     }
+}
+
+unsigned int
+Profile::getEquivalentLOD( const Profile* profile, unsigned int lod ) const
+{    
+    //If the profiles are equivalent, just use the incoming lod
+    if (profile->isEquivalentTo( this ) ) 
+        return lod;
+
+    double rhsWidth, rhsHeight;
+    profile->getTileDimensions( lod, rhsWidth, rhsHeight );
+
+    double targetWidth = rhsWidth, targetHeight = rhsHeight;
+
+    if ( !profile->getSRS()->isHorizEquivalentTo(getSRS()) )
+    {
+        targetWidth = profile->getSRS()->transformUnits( rhsWidth, getSRS() );
+        targetHeight = profile->getSRS()->transformUnits( rhsHeight, getSRS() );
+    }
+
+
+
+
+
+#if 0
+    //Create a TileKey in the incoming Profile
+    TileKey key(lod, 0, 0, profile );
+
+    GeoExtent extent = key.getExtent();
+
+    if (!profile->getSRS()->isEquivalentTo( getSRS()))
+    {           
+        // localize the extents and clamp them to legal values
+        //extent = clampAndTransformExtent( extent );
+
+        //Transform the extent into the local SRS
+        extent = extent.transform( getSRS() );
+        if ( !extent.isValid() )
+            return 0;
+    }
+
+    double keyWidth = extent.width();
+    double keyHeight = extent.height();
+#endif
+    
+    int currLOD = 0;
+    int destLOD = currLOD;
+
+    //Find the LOD that most closely matches the area of the incoming key without going under.
+    while( true )
+    {
+        currLOD++;
+        double w, h;
+        getTileDimensions(currLOD, w, h);
+        if ( w < targetWidth || h < targetHeight ) break;
+        //double a = w * h;
+        //if (a < keyArea) break;
+        destLOD = currLOD;
+    }
+    return destLOD;
 }

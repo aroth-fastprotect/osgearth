@@ -119,6 +119,7 @@ namespace osgEarth
     struct ImageLayerCallback : public TerrainLayerCallback
     {
         virtual void onOpacityChanged( class ImageLayer* layer ) { }
+        virtual void onVisibleRangeChanged( class ImageLayer* layer ) {}
         virtual void onColorFiltersChanged( class ImageLayer* layer ) { }
         virtual ~ImageLayerCallback() { }
     };
@@ -224,6 +225,13 @@ namespace osgEarth
         void disableLODBlending();
         bool isLODBlendingEnabled() const { return *_runtimeOptions.lodBlending(); }
 
+        float getMinVisibleRange() const { return *_runtimeOptions.minVisibleRange();}
+        void setMinVisibleRange( float minVisibleRange );
+
+        float getMaxVisibleRange() const { return *_runtimeOptions.maxVisibleRange();}
+        void setMaxVisibleRange( float maxVisibleRange );
+
+
     public: // methods
 
         /**
@@ -254,23 +262,22 @@ namespace osgEarth
         // Fetches multiple images from the TileSource; mosaics/reprojects/crops as necessary, and
         // returns a single tile. This is called by createImageFromTileSource() if the key profile
         // doesn't match the layer profile.
-        GeoImage assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback, bool& out_isFallback);
+        GeoImage assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool& out_isFallback);
 
 
         virtual void initTileSource();
 
     protected:
-        ImageLayerOptions _runtimeOptions;
-
+        ImageLayerOptions                        _runtimeOptions;
         osg::ref_ptr<TileSource::ImageOperation> _preCacheOp;
+        osg::ref_ptr<osg::Image>                 _emptyImage;
+        ImageLayerCallbackList                   _callbacks;
 
-        void initPreCacheOp();
-
-        ImageLayerCallbackList _callbacks;
         virtual void fireCallback( TerrainLayerCallbackMethodPtr method );
         virtual void fireCallback( ImageLayerCallbackMethodPtr method );
 
         void init();
+        void initPreCacheOp();
     };
 
     typedef std::vector< osg::ref_ptr<ImageLayer> > ImageLayerVector;

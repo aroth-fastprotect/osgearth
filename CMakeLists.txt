@@ -78,8 +78,8 @@ ENDIF ()
 # check if STLport is required
 OPTION(USE_STLPORT "Set to ON to build OSGEARTH with stlport instead of the default STL library." OFF)
 IF(USE_STLPORT)
-	INCLUDE_DIRECTORIES(${STLPORT_DIR}/stlport)
-	LINK_DIRECTORIES(${STLPORT_DIR}/lib)
+	INCLUDE_DIRECTORIES(${STLPORT_INCLUDE_DIR})
+	LINK_DIRECTORIES(${STLPORT_LIB_DIR})
 ENDIF()
 
 # Okay, here's the problem: On some platforms, linking against OpenThreads

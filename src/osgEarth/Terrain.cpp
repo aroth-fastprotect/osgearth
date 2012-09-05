@@ -57,7 +57,7 @@ namespace
 
 //---------------------------------------------------------------------------
 
-Terrain::Terrain(osg::Node* graph, const Profile* mapProfile, bool geocentric) :
+Terrain::Terrain(osg::Node* graph, const Profile* mapProfile, bool geocentric, const TerrainOptions& terrainOptions ) :
 _callbacks     (),
 _callbacksMutex(),
 _profile       ( mapProfile ),

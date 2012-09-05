@@ -42,7 +42,7 @@ _exactCropping      ( false ),
 _enabled            ( true ),
 _visible            ( true ),
 _reprojectedTileSize( 256 ),
-_cachePolicy        ( CachePolicy::USAGE_DEFAULT )
+_cachePolicy        ( CachePolicy::DEFAULT )
 {
     setDefaults();
     fromConfig( _conf ); 

@@ -320,8 +320,8 @@ _dirty( true )
 StringExpression::StringExpression(const std::string& expr,
                                    const URIContext&  uriContext) :
 _src       ( expr ),
-_uriContext( uriContext ),
-_dirty     ( true )
+_dirty     ( true ),
+_uriContext( uriContext )
 {
     init();
 }

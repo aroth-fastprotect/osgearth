@@ -76,16 +76,14 @@ namespace
 LinearLineOfSightNode::LinearLineOfSightNode(osgEarth::MapNode *mapNode):
 LineOfSightNode(),
 _mapNode(mapNode),
-//_start(0,0,0),
-//_end(0,0,0),
-//_hit(0,0,0),
 _hasLOS( true ),
-_clearNeeded( false ),
+_displayMode( LineOfSight::MODE_SPLIT ),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
-_displayMode( LineOfSight::MODE_SPLIT ),
-//_startAltitudeMode( ALTMODE_ABSOLUTE ),
-//_endAltitudeMode( ALTMODE_ABSOLUTE ),
+//_hit(0,0,0),
+//_start(0,0,0),
+//_end(0,0,0),
+_clearNeeded( false ),
 _terrainOnly( false )
 {
     compute(getNode());
@@ -93,22 +91,19 @@ _terrainOnly( false )
     setNumChildrenRequiringUpdateTraversal( 1 );
 }
 
-
 LinearLineOfSightNode::LinearLineOfSightNode(osgEarth::MapNode* mapNode, 
                                              const GeoPoint&    start,
                                              const GeoPoint&    end ) :
 LineOfSightNode(),
 _mapNode(mapNode),
-_start(start),
-_end(end),
-//_hit(0,0,0),
 _hasLOS( true ),
-_clearNeeded( false ),
+_displayMode( LineOfSight::MODE_SPLIT ),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
-_displayMode( LineOfSight::MODE_SPLIT ),
-//_startAltitudeMode( ALTMODE_ABSOLUTE ),
-//_endAltitudeMode( ALTMODE_ABSOLUTE ),
+//_hit(0,0,0),
+_start(start),
+_end(end),
+_clearNeeded( false ),
 _terrainOnly( false )
 {
     compute(getNode());    

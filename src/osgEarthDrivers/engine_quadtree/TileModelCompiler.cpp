@@ -998,7 +998,7 @@ namespace
 
             if (orig_i < 0)
             {
-                if (skirtBreaks.back() != skirtVerts->size())
+                if (skirtBreaks.back() != (int)skirtVerts->size())
                     skirtBreaks.push_back(skirtVerts->size());
             }
             else
@@ -1041,7 +1041,7 @@ namespace
             int orig_i = d.indices[r*d.numCols+(d.numCols-1)];
             if (orig_i < 0)
             {
-                if (skirtBreaks.back() != skirtVerts->size())
+                if (skirtBreaks.back() != (int)skirtVerts->size())
                     skirtBreaks.push_back(skirtVerts->size());
             }
             else
@@ -1084,7 +1084,7 @@ namespace
             int orig_i = d.indices[(d.numRows-1)*d.numCols+c];
             if (orig_i < 0)
             {
-                if (skirtBreaks.back() != skirtVerts->size())
+                if (skirtBreaks.back() != (int)skirtVerts->size())
                     skirtBreaks.push_back(skirtVerts->size());
             }
             else
@@ -1127,7 +1127,7 @@ namespace
             int orig_i = d.indices[r*d.numCols];
             if (orig_i < 0)
             {
-                if (skirtBreaks.back() != skirtVerts->size())
+                if (skirtBreaks.back() != (int)skirtVerts->size())
                     skirtBreaks.push_back(skirtVerts->size());
             }
             else

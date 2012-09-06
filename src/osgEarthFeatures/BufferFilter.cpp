@@ -40,7 +40,7 @@ BufferFilter::isSupported()
     if ( !BufferFilter::isSupported() ) { \
         OE_NOTICE << "BufferFilter NOT SUPPORTED - please compile osgEarth with GEOS" << std::endl; }
 
-OSGEARTH_REGISTER_SIMPLE_FEATUREFILTER(buffer, BufferFilter );
+OSGEARTH_REGISTER_SIMPLE_FEATUREFILTER(buffer, BufferFilter )
 
 BufferFilter::BufferFilter() :
 _distance   ( 1.0 ),

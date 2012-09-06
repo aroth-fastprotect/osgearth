@@ -172,7 +172,7 @@ UTMGraticule::rebuild()
         line->stroke()->width() = 1.0;
         line->tessellation() = 20;
 
-        AltitudeSymbol* alt = _options->primaryStyle()->getOrCreate<AltitudeSymbol>();
+        //AltitudeSymbol* alt = _options->primaryStyle()->getOrCreate<AltitudeSymbol>();
 
         TextSymbol* text = _options->primaryStyle()->getOrCreate<TextSymbol>();
         text->fill()->color() = Color(Color::White, 0.3f);

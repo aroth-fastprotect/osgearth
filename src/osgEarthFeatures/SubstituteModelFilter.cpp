@@ -288,12 +288,13 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
 struct ClusterVisitor : public osg::NodeVisitor
 {
+    
     ClusterVisitor( const FeatureList& features, const InstanceSymbol* symbol, FeaturesToNodeFilter* f2n, FilterContext& cx )
-        : _features   ( features ),
-          _symbol     ( symbol ),
-          _f2n        ( f2n ),
+        : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
+          _features   ( features ),
           _cx         ( cx ),
-          osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN )
+          _symbol     ( symbol ),
+          _f2n        ( f2n )
     {
         _modelSymbol = dynamic_cast<const ModelSymbol*>( symbol );
         if ( _modelSymbol )

@@ -77,8 +77,8 @@ ExtrudeGeometryFilter::ExtrudeGeometryFilter() :
 _maxAngle_deg       ( 5.0 ),
 _mergeGeometry      ( true ),
 _wallAngleThresh_deg( 60.0 ),
-_styleDirty         ( true ),
-_makeStencilVolume  ( false )
+_makeStencilVolume  ( false ),
+_styleDirty         ( true )
 {
     //NOP
 }

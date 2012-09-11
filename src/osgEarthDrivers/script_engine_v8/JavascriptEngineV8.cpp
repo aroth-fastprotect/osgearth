@@ -304,7 +304,7 @@ JavascriptEngineV8::constructBoundsCallback(const v8::Arguments &args)
  
 	v8::HandleScope handle_scope;
  
-  osgEarth::Bounds* bounds;
+  osgEarth::Bounds* bounds = NULL;
   //if (args.Length() == 0)
   //  bounds = new osgEarth::Bounds();
   //else
@@ -325,7 +325,7 @@ JavascriptEngineV8::constructVec3dCallback(const v8::Arguments &args)
  
 	v8::HandleScope handle_scope;
 
-  osg::Vec3d* vec;
+  osg::Vec3d* vec = NULL;
   if (args.Length() == 0)
     vec = new osg::Vec3d();
   else if (args.Length() == 1 && args[0]->IsObject())
@@ -355,7 +355,7 @@ JavascriptEngineV8::constructGeoExtentCallback(const v8::Arguments &args)
  
 	v8::HandleScope handle_scope;
 
-  osgEarth::GeoExtent* extent;// = new osgEarth::GeoExtent(
+  osgEarth::GeoExtent* extent = NULL;// = new osgEarth::GeoExtent(
   //if (args.Length() == 0)
   //  extent = new osgEarth::GeoExtent();
   //else
@@ -412,7 +412,7 @@ JavascriptEngineV8::constructSpatialReferenceCallback(const v8::Arguments &args)
 
 	v8::HandleScope handle_scope;
  
-  osgEarth::SpatialReference* srs;
+  osgEarth::SpatialReference* srs = NULL;
   if (args.Length() == 1 && args[0]->IsString())
   {
     v8::String::Utf8Value utf8_value(args[0]->ToString());

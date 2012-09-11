@@ -38,7 +38,7 @@ KML_IconStyle::scan( const Config& conf, Style& style, KMLContext& cx )
         if ( conf.hasValue("heading") )
             icon->heading() = NumericExpression( conf.value("heading") );
 
-        float finalScale = *cx._options->iconBaseScale();
+        //float finalScale = *cx._options->iconBaseScale();
 
         if ( conf.hasValue("scale") )
             icon->scale() = NumericExpression( conf.value("scale") );

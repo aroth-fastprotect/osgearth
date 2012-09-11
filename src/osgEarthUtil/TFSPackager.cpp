@@ -114,14 +114,14 @@ class AddFeatureVisitor : public FeatureTileVisitor
 {
 public:
     AddFeatureVisitor( Feature* feature, int maxFeatures, int firstLevel, int maxLevel, CropFilter::Method cropMethod):
-      _feature( feature ),
-          _maxFeatures( maxFeatures ),      
-          _maxLevel( maxLevel ),
-          _firstLevel( firstLevel ),
-          _added(false),
-          _numAdded( 0 ),
           _levelAdded(-1),
-          _cropMethod( cropMethod )
+          _added(false),
+          _maxFeatures( maxFeatures ),      
+          _firstLevel( firstLevel ),
+          _maxLevel( maxLevel ),
+          _numAdded( 0 ),
+          _cropMethod( cropMethod ),
+          _feature( feature )
       {
 
       }
@@ -138,9 +138,9 @@ public:
               //If the node contains the feature, and it doesn't contain the max number of features add it.  If it's already full then 
               //split it.
               if (tile->getKey().getLevelOfDetail() >= (unsigned int)_firstLevel && 
-                  (tile->getFeatures().size() < (unsigned int)_maxFeatures || tile->getKey().getLevelOfDetail() == _maxLevel || tile->getKey().getLevelOfDetail() == _levelAdded))
+                  (tile->getFeatures().size() < (size_t)_maxFeatures || tile->getKey().getLevelOfDetail() == (unsigned int)_maxLevel || tile->getKey().getLevelOfDetail() == (unsigned int)_levelAdded))
               {
-                  if (_levelAdded < 0 || _levelAdded == tile->getKey().getLevelOfDetail())
+                  if (_levelAdded < 0 || (unsigned int)_levelAdded == tile->getKey().getLevelOfDetail())
                   {
                       osg::ref_ptr< Feature > clone = new Feature( *_feature, osg::CopyOp::DEEP_COPY_ALL );
                       FeatureList features;
@@ -200,8 +200,8 @@ class WriteFeaturesVisitor : public FeatureTileVisitor
 {
 public:
     WriteFeaturesVisitor(FeatureSource* features, const std::string& dest, CropFilter::Method cropMethod, const SpatialReference* srs):
-      _dest( dest ),
           _features( features ),
+          _dest( dest ),
           _cropMethod( cropMethod ),
           _srs( srs )
       {

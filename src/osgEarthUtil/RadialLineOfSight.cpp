@@ -116,16 +116,16 @@ namespace
 
 
 RadialLineOfSightNode::RadialLineOfSightNode( MapNode* mapNode):
-_mapNode( mapNode ),
 _numSpokes(20),
 _radius(500),
-//_center(0,0,0),
+_displayMode( LineOfSight::MODE_SPLIT ),
+_fill(false),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
 _outlineColor( 1.0f, 1.0f, 1.0f, 1.0f),
-_displayMode( LineOfSight::MODE_SPLIT ),
+//_center(0,0,0),
+_mapNode( mapNode ),
 //_altitudeMode( ALTMODE_ABSOLUTE ),
-_fill(false),
 _terrainOnly( false )
 {
     compute(getNode());
@@ -497,7 +497,7 @@ RadialLineOfSightNode::compute_fill(osg::Node* node, bool backgroundThread)
 
         //Get the next hit
         unsigned int nextIndex = i + 1;
-        if (nextIndex == _numSpokes) nextIndex = 0;
+        if (nextIndex == (unsigned int)_numSpokes) nextIndex = 0;
         DPLineSegmentIntersector* losNext = static_cast<DPLineSegmentIntersector*>(ivGroup->getIntersectors()[nextIndex].get());
         DPLineSegmentIntersector::Intersections& hitsNext = losNext->getIntersections();
 

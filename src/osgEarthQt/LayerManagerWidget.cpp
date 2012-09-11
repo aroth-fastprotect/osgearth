@@ -258,7 +258,7 @@ void LayerControlWidgetBase::mouseMoveEvent(QMouseEvent *event)
   QDrag *drag = new QDrag(this);
   drag->setMimeData(new LayerWidgetMimeData(this));
 
-  Qt::DropAction dropAction = drag->exec(Qt::MoveAction);
+  drag->exec(Qt::MoveAction);
 }
 
 void LayerControlWidgetBase::dragEnterEvent(QDragEnterEvent* event)

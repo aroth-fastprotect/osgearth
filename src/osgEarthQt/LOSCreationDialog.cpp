@@ -58,7 +58,7 @@ namespace
 }
 
 LOSCreationDialog::LOSCreationDialog(osgEarth::MapNode* mapNode, osg::Group* root, int losCount, osgEarth::QtGui::DataManager *manager, ViewVector* views)
-  : _mapNode(mapNode), _root(root), _manager(manager), _views(views), _activeButton(0L), _updatingUi(false), _updateAlt(true)
+  : _mapNode(mapNode), _root(root), _manager(manager), _updatingUi(false), _updateAlt(true), _views(views), _activeButton(0L)
 {
   if (_mapNode.valid())
     _map = _mapNode->getMap();
@@ -74,7 +74,7 @@ LOSCreationDialog::LOSCreationDialog(osgEarth::MapNode* mapNode, osg::Group* roo
 }
 
 LOSCreationDialog::LOSCreationDialog(osgEarth::MapNode* mapNode, osg::Group* root, osg::Group* losNode, const std::string& name, osgEarth::QtGui::DataManager *manager, ViewVector* views)
-  : _mapNode(mapNode), _root(root), _manager(manager), _views(views), _activeButton(0L), _updatingUi(false), _updateAlt(true)
+  : _mapNode(mapNode), _root(root), _manager(manager), _updatingUi(false), _updateAlt(true), _views(views), _activeButton(0L)
 {
   if (_mapNode.valid())
     _map = _mapNode->getMap();

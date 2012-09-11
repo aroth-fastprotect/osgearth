@@ -50,7 +50,7 @@ OceanSurfaceContainer::rebuild()
     if ( _parentMapNode.valid() )
     {
         const MapOptions&     parentMapOptions     = _parentMapNode->getMap()->getMapOptions();
-        const MapNodeOptions& parentMapNodeOptions = _parentMapNode->getMapNodeOptions();
+        //const MapNodeOptions& parentMapNodeOptions = _parentMapNode->getMapNodeOptions();
 
         // set up the map to "match" the parent map:
         MapOptions mo;

@@ -75,11 +75,11 @@ _verticalScaleOverride(1.0f),
 _initCount(0),
 _pendingFullUpdate( false ),
 _pendingGeometryUpdate(false),
+_clearDataAfterCompile( true ),
 _optimizeTriangleOrientation(true),
 _texCompositor( compositor ),
 _frontGeodeInstalled( false ),
-_atomicCallOnce(0),
-_clearDataAfterCompile( true )
+_atomicCallOnce(0)
 {
     setThreadSafeRefUnref(true);
 }

@@ -851,7 +851,7 @@ OSGTerrainEngineNode::installShaders()
 
     if ( _texCompositor.valid() && _texCompositor->usesShaderComposition() )
     {
-        const ShaderFactory* sf = Registry::instance()->getShaderFactory();
+        //const ShaderFactory* sf = Registry::instance()->getShaderFactory();
 
         int numLayers = osg::maximum( 1, (int)_update_mapf->imageLayers().size() );
         //int numLayers = osg::maximum( 0, (int)_update_mapf->imageLayers().size() );

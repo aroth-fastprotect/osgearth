@@ -49,8 +49,8 @@ class LoadImageOperation : public osg::Operation
 {
 public:
     LoadImageOperation(const std::string& filename):
-      _filename(filename),
-          _done(false)
+        _done(false),
+        _filename(filename)
       {
       }
 
@@ -83,10 +83,10 @@ class RefreshImage : public osg::ImageStream
 public:
 
     RefreshImage(const std::string& filename, double time):
+          osg::ImageStream(),
       _filename(filename),
           _time(time),
-          _lastUpdateTime(0),
-          osg::ImageStream()
+          _lastUpdateTime(0)
       {                    
           osg::ref_ptr< osg::Image > image = osgDB::readImageFile( filename );
           if (image.valid()) copyImage( image.get() );
@@ -158,7 +158,7 @@ public:
       {                               
           updateImage();
           double time = osg::Timer::instance()->time_s();
-          osg::Timer_t ticks = osg::Timer::instance()->tick();          
+
           //If we've let enough time elapse and we're not waiting on an existing load image operation then add one to the queue
           if (!_loadImageOp.valid() && (time - _lastUpdateTime > _time))
           {

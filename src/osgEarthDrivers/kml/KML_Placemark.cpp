@@ -86,7 +86,7 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
                 GeoPoint position(cx._srs.get(), geom->getBounds().center(), altMode);
 
                 bool isPoly = geom->getComponentType() == Geometry::TYPE_POLYGON;
-                bool isPoint = geom->getComponentType() == Geometry::TYPE_POINTSET;
+                //bool isPoint = geom->getComponentType() == Geometry::TYPE_POINTSET;
 
                 // check for symbols.
                 ModelSymbol*    model = style.get<ModelSymbol>();

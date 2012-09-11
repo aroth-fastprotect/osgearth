@@ -299,7 +299,7 @@ FeatureModelGraph::~FeatureModelGraph()
 void
 FeatureModelGraph::installShaderMains()
 {
-    osg::StateSet* ss = this->getOrCreateStateSet();
+    //osg::StateSet* ss = this->getOrCreateStateSet();
 }
 
 void

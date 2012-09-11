@@ -97,7 +97,7 @@ public:
             osg::ref_ptr<osgDB::Options> localOptions = 
                 Registry::instance()->cloneOrCreateOptions( dbOptions );
 
-            localOptions->getDatabasePathList().push_back( osgDB::getFilePath(_options.url()->full()) );
+            localOptions->getDatabasePathList().push_front( osgDB::getFilePath(_options.url()->full()) );
 
             result = _options.url()->getNode( localOptions.get(), progress );
         }

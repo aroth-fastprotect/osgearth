@@ -361,7 +361,7 @@ BuildGeometryFilter::buildPolygon(Geometry*               ring,
 
                 osgGeom->addPrimitiveSet( new osg::DrawArrays( mode, offset, hole->size() ) );
                 offset += hole->size();
-            }            
+            }
         }
     }
     osgGeom->setVertexArray( allPoints );

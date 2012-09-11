@@ -1137,7 +1137,7 @@ namespace
         //If any of the layers produced valid data then it's not considered a fallback
         if ( out_isFallback )
         {
-            *out_isFallback = (numFallbacks == heightFields.size());
+            *out_isFallback = (numFallbacks == (int)heightFields.size());
             //OE_NOTICE << "Num fallbacks=" << numFallbacks << " numHeightFields=" << heightFields.size() << " is fallback " << *out_isFallback << std::endl;
         }   
         

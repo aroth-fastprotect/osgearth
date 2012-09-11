@@ -258,7 +258,7 @@ void
 ObjectLocatorNode::setLocator( ObjectLocator* locator )
 {
     _locator = locator;
-    _matrixRevision = -1;    
+    _matrixRevision = -1;
 }
 
 

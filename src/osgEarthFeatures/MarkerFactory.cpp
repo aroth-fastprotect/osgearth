@@ -121,7 +121,7 @@ MarkerFactory::getOrCreateNode( const Feature* feature, const MarkerSymbol* symb
             }
         }
         else if ( symbol->url().isSet() && !symbol->url()->empty() )
-        {            
+        {
             StringExpression expr = symbol->url().get();
             std::string val = feature->eval( expr  );//symbol->url()->full();
             URI uri( val, expr.uriContext() );
@@ -133,7 +133,7 @@ MarkerFactory::getOrCreateNode( const Feature* feature, const MarkerSymbol* symb
             }
 
             if ( !result )
-            {                
+            {
                 result = createFromURI( uri );
             }
 

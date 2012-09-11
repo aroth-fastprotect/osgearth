@@ -84,7 +84,7 @@ public:
 
     RefreshImage(const std::string& filename, double time):
           osg::ImageStream(),
-      _filename(filename),
+          _filename(filename),
           _time(time),
           _lastUpdateTime(0)
       {                    

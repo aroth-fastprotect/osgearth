@@ -158,7 +158,7 @@ public:
       {                               
           updateImage();
           double time = osg::Timer::instance()->time_s();
-          osg::Timer_t ticks = osg::Timer::instance()->tick();          
+
           //If we've let enough time elapse and we're not waiting on an existing load image operation then add one to the queue
           if (!_loadImageOp.valid() && (time - _lastUpdateTime > _time))
           {

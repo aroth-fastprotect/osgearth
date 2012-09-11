@@ -24,6 +24,8 @@
 #include <osgEarth/ThreadingUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/ShaderComposition>
+#include <osgEarth/Capabilities>
+
 
 #include <osgText/Text>
 #include <osg/Depth>
@@ -260,6 +262,8 @@ AnnotationUtils::installAnnotationProgram( osg::StateSet* stateSet )
         {
             std::string vertSource =
                 "#version " GLSL_VERSION_STR "\n"
+                //NOTE: Tom commented this out; I commented it back in b/c that breaks things 
+                //( //not sure why but these arn't merging properly, osg earth color funcs decalre it anyhow for now)
                 "varying vec4 osg_FrontColor; \n"
                 "varying vec4 oeAnno_texCoord; \n"
                 "void oeAnno_vertColoring() \n"
@@ -270,6 +274,9 @@ AnnotationUtils::installAnnotationProgram( osg::StateSet* stateSet )
 
             std::string fragSource = Stringify() <<
                 "#version " << GLSL_VERSION_STR << "\n"
+#ifdef OSG_GLES2_AVAILABLE
+                "precision mediump float;\n"
+#endif
                 "uniform float " << UNIFORM_FADE()      << "; \n"
                 "uniform bool  " << UNIFORM_IS_TEXT()   << "; \n"
                 //"uniform bool  " << UNIFORM_HIGHLIGHT() << "; \n"
@@ -312,24 +319,29 @@ AnnotationUtils::installAnnotationProgram( osg::StateSet* stateSet )
             std::string vert_source = // Stringify() <<
                 "#version 110 \n"
                 "void main() { \n"
-                "    gl_FrontColor = gl_Color; \n"
-                "    gl_TexCoord[0] = gl_MultiTexCoord0; \n"
+                "    osg_FrontColor = gl_Color; \n"
+                "    osg_TexCoord[0] = gl_MultiTexCoord0; \n"
                 "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; \n"
                 "} \n";
 
             std::string frag_source = Stringify() <<
+#ifdef OSG_GLES2_AVAILABLE
+                "precision mediump float;\n"
+#endif
                 "uniform float     " << UNIFORM_FADE()      << "; \n"
                 "uniform bool      " << UNIFORM_IS_TEXT()   << "; \n"
                 "uniform bool      " << UNIFORM_HIGHLIGHT() << "; \n"
                 "uniform sampler2D tex0; \n"
+                "varying vec4 osg_TexCoord[" << Registry::instance()->getCapabilities().getMaxGPUTextureCoordSets() << "];\n"
+                "varying vec4 osg_FrontColor; \n"
                 "void main() { \n"
                 "    vec4 color; \n"
                 "    if (" << UNIFORM_IS_TEXT() << ") { \n"
-                "        float alpha = texture2D(tex0,gl_TexCoord[0].st).a; \n"
-                "        color = vec4( gl_Color.rgb, gl_Color.a * alpha * " << UNIFORM_FADE() << "); \n"
+                "        float alpha = texture2D(tex0,osg_TexCoord[0].st).a; \n"
+                "        color = vec4( osg_FrontColor.rgb, osg_FrontColor.a * alpha * " << UNIFORM_FADE() << "); \n"
                 "    } \n"
                 "    else { \n"
-                "        color = gl_Color * texture2D(tex0,gl_TexCoord[0].st) * vec4(1,1,1," << UNIFORM_FADE() << "); \n"
+                "        color = osg_FrontColor * texture2D(tex0,osg_TexCoord[0].st) * vec4(1,1,1," << UNIFORM_FADE() << "); \n"
                 "    } \n"
                 "    if (" << UNIFORM_HIGHLIGHT() << ") { \n"
                 "        color = vec4(color.r*1.5, color.g*0.5, color.b*0.25, color.a); \n"

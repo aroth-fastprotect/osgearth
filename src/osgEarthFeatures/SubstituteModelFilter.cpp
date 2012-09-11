@@ -130,7 +130,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
     NumericExpression scaleEx = *symbol->scale();
 
     const ModelSymbol* modelSymbol = dynamic_cast<const ModelSymbol*>(symbol);
-    const IconSymbol*  iconSymbol  = dynamic_cast<const IconSymbol*> (symbol);
+    //const IconSymbol*  iconSymbol  = dynamic_cast<const IconSymbol*> (symbol);
 
     NumericExpression headingEx;
     if ( modelSymbol )
@@ -288,7 +288,6 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
 struct ClusterVisitor : public osg::NodeVisitor
 {
-    
     ClusterVisitor( const FeatureList& features, const InstanceSymbol* symbol, FeaturesToNodeFilter* f2n, FilterContext& cx )
         : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
           _features   ( features ),

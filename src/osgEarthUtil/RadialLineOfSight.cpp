@@ -114,6 +114,7 @@ namespace
     };
 }
 
+
 RadialLineOfSightNode::RadialLineOfSightNode( MapNode* mapNode):
 _numSpokes(20),
 _radius(500),

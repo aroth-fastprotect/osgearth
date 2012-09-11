@@ -119,9 +119,9 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
 
             const Style& myStyle = input->style().isSet() ? *input->style() : _style;
 
-            bool  setLinePropsHere   = input->style().isSet(); // otherwise it will be set globally, we assume
-            float width              = 1.0f;
-            bool  hasPolyOutline     = false;
+            //bool  setLinePropsHere   = input->style().isSet(); // otherwise it will be set globally, we assume
+            //float width              = 1.0f;
+            //bool  hasPolyOutline     = false;
 
             const PointSymbol*   pointSymbol = myStyle.get<PointSymbol>();
             const LineSymbol*    lineSymbol  = myStyle.get<LineSymbol>();
@@ -340,7 +340,7 @@ BuildGeometryFilter::buildPolygon(Geometry*               ring,
     if ( !ring->isValid() )
         return;
 
-    int totalPoints = ring->getTotalPointCount();
+    //int totalPoints = ring->getTotalPointCount();
     osg::Vec3Array* allPoints = new osg::Vec3Array();
     transformAndLocalize( ring->asVector(), featureSRS, allPoints, mapSRS, _world2local, makeECEF );
 

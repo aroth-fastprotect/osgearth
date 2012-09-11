@@ -66,6 +66,7 @@ namespace
 }
 
 // --------------------------------------------------------------------------
+
 SinglePassTerrainTechnique::SinglePassTerrainTechnique( TextureCompositor* compositor ) :
 CustomTerrainTechnique(),
 _debug( false ),
@@ -1657,7 +1658,7 @@ SinglePassTerrainTechnique::createGeometry( const TileFrame& tilef )
     // populate primitive sets
     bool swapOrientation = !(_masterLocator->orientationOpenGL());
 
-    osg::ref_ptr<osg::DrawElementsUInt> elements = new osg::DrawElementsUInt(GL_TRIANGLES);
+    osg::ref_ptr<osg::DrawElementsUShort> elements = new osg::DrawElementsUShort(GL_TRIANGLES);
     elements->reserve((numRows-1) * (numColumns-1) * 6);
 
     surface->addPrimitiveSet(elements.get());

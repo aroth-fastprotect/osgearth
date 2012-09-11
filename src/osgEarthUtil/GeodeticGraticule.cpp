@@ -211,7 +211,7 @@ GeodeticGraticule::rebuild()
     if ( _options->levels().size() < 1 )
         return;
 
-    const GeodeticGraticuleOptions::Level& level0 = _options->levels()[0];
+    //const GeodeticGraticuleOptions::Level& level0 = _options->levels()[0];
 
     // build the top level cell grid.
     unsigned tilesX, tilesY;

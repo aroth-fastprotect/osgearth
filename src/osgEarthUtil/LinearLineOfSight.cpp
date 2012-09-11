@@ -91,6 +91,7 @@ _terrainOnly( false )
     setNumChildrenRequiringUpdateTraversal( 1 );
 }
 
+
 LinearLineOfSightNode::LinearLineOfSightNode(osgEarth::MapNode* mapNode, 
                                              const GeoPoint&    start,
                                              const GeoPoint&    end ) :

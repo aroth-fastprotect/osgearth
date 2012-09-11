@@ -35,6 +35,7 @@ _firstLevel(0),
 _srs( SpatialReference::create("EPSG:4326") )
 {
 }
+
 /************************************************/
 
 bool

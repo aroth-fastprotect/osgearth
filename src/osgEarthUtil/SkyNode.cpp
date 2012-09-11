@@ -193,27 +193,27 @@ namespace
     static const double JD2000 = 2451545.0;
 
 
-double sgCalcEccAnom(double M, double e)
-{
-    double eccAnom, E0, E1, diff;
-
-    double epsilon = osg::DegreesToRadians(0.001);
-    
-    eccAnom = M + e * sin(M) * (1.0 + e * cos (M));
-    // iterate to achieve a greater precision for larger eccentricities 
-    if (e > 0.05)
+    double sgCalcEccAnom(double M, double e)
     {
-        E0 = eccAnom;
-        do
+        double eccAnom, E0, E1, diff;
+
+        double epsilon = osg::DegreesToRadians(0.001);
+        
+        eccAnom = M + e * sin(M) * (1.0 + e * cos (M));
+        // iterate to achieve a greater precision for larger eccentricities 
+        if (e > 0.05)
         {
-             E1 = E0 - (E0 - e * sin(E0) - M) / (1 - e *cos(E0));
-             diff = fabs(E0 - E1);
-             E0 = E1;
-        } while (diff > epsilon );
-        return E0;
+            E0 = eccAnom;
+            do
+            {
+                 E1 = E0 - (E0 - e * sin(E0) - M) / (1 - e *cos(E0));
+                 diff = fabs(E0 - E1);
+                 E0 = E1;
+            } while (diff > epsilon );
+            return E0;
+        }
+        return eccAnom;
     }
-    return eccAnom;
-}
 
     //double getTimeScale( int year, int month, int date, double hoursUT )
     //{
@@ -605,23 +605,23 @@ namespace
         "   gl_FragColor.rgb = fMiePhase*vec3(.3,.3,.2); \n"
         "   gl_FragColor.a = sunAlpha*gl_FragColor.r; \n"
         "} \n";
-    
+
     static char s_moonVertexSource[] = 
         "uniform mat4 osg_ModelViewProjectionMatrix;"
-    "varying vec4 osg_TexCoord;\n"
-    "void main() \n"
-    "{ \n"
-    "    osg_TexCoord = gl_MultiTexCoord0; \n"
+        "varying vec4 osg_TexCoord;\n"
+        "void main() \n"
+        "{ \n"
+        "    osg_TexCoord = gl_MultiTexCoord0; \n"
         "    gl_Position = osg_ModelViewProjectionMatrix * gl_Vertex; \n"
-    "} \n";
-    
+        "} \n";
+
     static char s_moonFragmentSource[] =
-    "varying vec4 osg_TexCoord;\n"
+        "varying vec4 osg_TexCoord;\n"
         "uniform sampler2D moonTex;\n"
-    "void main( void ) \n"
-    "{ \n"
+        "void main( void ) \n"
+        "{ \n"
         "   gl_FragColor = texture2D(moonTex, osg_TexCoord.st);\n"
-    "} \n";
+        "} \n";
 }
 
 //---------------------------------------------------------------------------
@@ -714,7 +714,7 @@ osg::Vec3d
 DefaultEphemerisProvider::getMoonPosition( int year, int month, int date, double hoursUTC )
 {
     Moon moon;
-    return moon.getPosition( year, month, date, hoursUTC );        
+    return moon.getPosition( year, month, date, hoursUTC );
 }
 
 //---------------------------------------------------------------------------
@@ -1015,7 +1015,7 @@ SkyNode::getDateTime( int &year, int &month, int &date, double &hoursUTC, osg::V
     year = data._year;
     month = data._month;
     date = data._date;
-    hoursUTC = data._hoursUTC;        
+    hoursUTC = data._hoursUTC;
 }
 
 
@@ -1282,7 +1282,7 @@ SkyNode::makeSun()
         _sunDistance * _defaultPerViewData._lightPos.y(), 
         _sunDistance * _defaultPerViewData._lightPos.z() ) );
     _defaultPerViewData._sunXform->addChild( sun );
-    
+
     // A nested camera isolates the projection matrix calculations so the node won't 
     // affect the clip planes in the rest of the scene.
     osg::Camera* cam = new osg::Camera();
@@ -1319,7 +1319,7 @@ SkyNode::makeMoon()
     osg::StateSet* set = moon->getOrCreateStateSet();
     // configure the stateset
     set->setMode( GL_LIGHTING, osg::StateAttribute::ON );
-    set->setAttributeAndModes( new osg::CullFace( osg::CullFace::BACK ), osg::StateAttribute::ON);    
+    set->setAttributeAndModes( new osg::CullFace( osg::CullFace::BACK ), osg::StateAttribute::ON);
     set->setRenderBinDetails( BIN_MOON, "RenderBin" );
     set->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), osg::StateAttribute::ON );
     set->setAttributeAndModes( new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA), osg::StateAttribute::ON );
@@ -1368,7 +1368,7 @@ SkyNode::makeMoon()
     cam->setRenderOrder( osg::Camera::NESTED_RENDER );
     cam->setComputeNearFarMode( osg::CullSettings::COMPUTE_NEAR_FAR_USING_BOUNDING_VOLUMES );
     cam->addChild( moon );
-    
+
     _moon = cam;
 }
 

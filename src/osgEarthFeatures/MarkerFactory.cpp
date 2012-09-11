@@ -151,7 +151,7 @@ osg::Image*
 MarkerFactory::getOrCreateImage( const MarkerSymbol* symbol, bool useCache )
 {
     if ( symbol->getImage() )
-	{
+    {
         return symbol->getImage();
     }
     else if ( symbol->url().isSet() && !symbol->url()->empty() )

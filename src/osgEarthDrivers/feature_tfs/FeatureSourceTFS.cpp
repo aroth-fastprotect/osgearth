@@ -253,7 +253,7 @@ public:
         ReadResult r = uri.readString( _dbOptions.get() );
 
         const std::string& buffer = r.getString();
-        const Config&      meta   = r.metadata();
+        //const Config&      meta   = r.metadata();
 
         bool dataOK = false;
 

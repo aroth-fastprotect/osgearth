@@ -109,8 +109,8 @@ const osg::StateAttribute::Type VirtualProgram::SA_TYPE = osg::StateAttribute::P
 
 VirtualProgram::VirtualProgram( unsigned mask ) : 
 _mask              ( mask ),
-_inherit           ( true ),
-_useLightingShaders( true )
+_useLightingShaders( true ),
+_inherit           ( true )
 {
     // because we sometimes update/change the attribute's members from within the apply() method
     this->setDataVariance( osg::Object::DYNAMIC );
@@ -132,9 +132,9 @@ osg::StateAttribute( rhs, copyop ),
 //osg::Program( rhs, copyop ),
 _shaderMap         ( rhs._shaderMap ),
 _mask              ( rhs._mask ),
+_useLightingShaders( rhs._useLightingShaders ),
 _functions         ( rhs._functions ),
-_inherit           ( rhs._inherit ),
-_useLightingShaders( rhs._useLightingShaders )
+_inherit           ( rhs._inherit )
 {
     //nop
 }
@@ -1037,8 +1037,10 @@ ShaderFactory::createDefaultColoringFragmentShader( unsigned numTexImageUnits ) 
 osg::Shader*
 ShaderFactory::createDefaultLightingVertexShader() const
 {
+#ifdef OSG_GLES2_AVAILABLE
     int maxLights = Registry::instance()->getCapabilities().getMaxLights();
-    
+#endif
+
     std::stringstream buf;
     buf << "#version " << GLSL_VERSION_STR << "\n"
 #ifdef OSG_GLES2_AVAILABLE

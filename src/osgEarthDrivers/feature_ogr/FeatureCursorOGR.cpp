@@ -29,14 +29,12 @@
 using namespace osgEarth;
 using namespace osgEarth::Features;
 
-
 FeatureCursorOGR::FeatureCursorOGR(OGRDataSourceH           dsHandle,
                                    OGRLayerH                layerHandle,
                                    const FeatureSource*     source,
                                    const FeatureProfile*    profile,
                                    const Symbology::Query&  query,
                                    const FeatureFilterList& filters ) :
-_source           ( source ),
 _dsHandle         ( dsHandle ),
 _layerHandle      ( layerHandle ),
 _resultSetHandle  ( 0L ),
@@ -44,6 +42,7 @@ _spatialFilter    ( 0L ),
 _query            ( query ),
 _chunkSize        ( 500 ),
 _nextHandleToQueue( 0L ),
+_source           ( source ),
 _profile          ( profile ),
 _filters          ( filters )
 {

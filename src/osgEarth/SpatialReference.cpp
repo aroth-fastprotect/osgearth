@@ -360,6 +360,7 @@ _handle         ( handle ),
 _owns_handle    ( true ),
 _is_geographic  ( false ),
 _is_mercator    ( false ),
+_is_spherical_mercator( false ),
 _is_north_polar ( false ), 
 _is_south_polar ( false ),
 _is_cube        ( false ),
@@ -367,8 +368,7 @@ _is_contiguous  ( false ),
 _is_user_defined( false ),
 _is_ltp         ( false ),
 _is_plate_carre ( false ),
-_init_type      ( init_type ),
-_is_spherical_mercator( false )
+_init_type      ( init_type )
 {
     // nop
 }

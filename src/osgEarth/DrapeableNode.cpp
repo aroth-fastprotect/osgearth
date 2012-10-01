@@ -75,7 +75,7 @@ namespace
 
                     // first check the owner's traversal mask.
                     bool visible = true;
-                    for( unsigned k = 0; visible && k < ownerPath.size(); ++k )
+                    for( int k = 0; visible && k < (int)ownerPath.size(); ++k )
                     {
                         visible = nv.validNodeMask(*ownerPath[k]);
                     }
@@ -90,7 +90,7 @@ namespace
                             osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(&nv);
 
                             int pushes = 0;
-                            for( unsigned k = i+1; k < ownerPath.size(); ++k )
+                            for( int k = i+1; k < (int)ownerPath.size(); ++k )
                             {
                                 osg::Node* node = ownerPath[k];
                                 osg::StateSet* ss = node->getStateSet();

@@ -22,6 +22,8 @@
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/InstanceSymbol>
 #include <osgEarth/Registry>
+#include <osgEarth/ShaderGenerator>
+#include <osgEarth/VirtualProgram>
 
 #define LC "[ModelNode] "
 
@@ -78,6 +80,18 @@ ModelNode::init(const osgDB::Options* dbOptions)
 
             if ( node )
             {
+                // generate shader code for the loaded model:
+                ShaderGenerator gen;
+                node->accept( gen );
+
+                // need a top-level shader too:
+                VirtualProgram* vp = new VirtualProgram();
+                vp->installDefaultColoringAndLightingShaders();
+                this->getOrCreateStateSet()->setAttributeAndModes( vp, 1 );
+
+                node->addCullCallback( new UpdateLightingUniformsHelper() );
+
+                // attach to the transform:
                 getTransform()->addChild( node );
                 this->addChild( getTransform() );
 
@@ -94,8 +108,8 @@ ModelNode::init(const osgDB::Options* dbOptions)
                     double pitch   = sym->pitch().isSet()   ? sym->pitch()->eval()   : 0.0;
                     double roll    = sym->roll().isSet()    ? sym->roll()->eval()    : 0.0;
                     rot.makeRotate( 
-                        osg::DegreesToRadians(heading), osg::Vec3(1,0,0),
-                        osg::DegreesToRadians(pitch),   osg::Vec3(0,0,1),
+                        osg::DegreesToRadians(heading), osg::Vec3(0,0,1),
+                        osg::DegreesToRadians(pitch),   osg::Vec3(1,0,0),
                         osg::DegreesToRadians(roll),    osg::Vec3(0,1,0) );
                     this->setLocalRotation( rot.getRotate() );
                 }
@@ -124,7 +138,7 @@ OSGEARTH_REGISTER_ANNOTATION( model, osgEarth::Annotation::ModelNode );
 
 
 ModelNode::ModelNode(MapNode* mapNode, const Config& conf, const osgDB::Options* dbOptions) :
-LocalizedNode( mapNode )
+LocalizedNode( mapNode, conf )
 {
     conf.getObjIfSet( "style", _style );
 

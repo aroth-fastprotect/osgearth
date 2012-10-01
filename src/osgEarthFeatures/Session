@@ -25,6 +25,8 @@
 #include <osgEarthSymbology/StyleSheet>
 #include <osgEarth/StateSetCache>
 #include <osgEarth/ThreadingUtils>
+#include <osgEarth/MapInfo>
+#include <osgEarth/MapFrame>
 #include <osgEarth/Map>
 
 namespace osgEarth { namespace Features
@@ -71,6 +73,11 @@ namespace osgEarth { namespace Features
          * Gets the map information backing up this session.
          */
         const MapInfo& getMapInfo() const { return _mapInfo; }
+
+        /**
+         * Gets the map related to this session. Be carefull, this is held by an osg::observer_ptr and may be NULL
+         */
+        const Map* getMap() const { return _map.get(); }
 
         /** The style sheet governing this session. */
         void setStyles( StyleSheet* value );
@@ -147,7 +154,7 @@ namespace osgEarth { namespace Features
         /**
          * The cache for optimizing stateset sharing within a session
          */
-        StateSetCache& getStateSetCache() { return _stateSetCache; }
+        StateSetCache* getStateSetCache() { return _stateSetCache.get(); }
 
     public:
       ScriptEngine* getScriptEngine() const;
@@ -160,13 +167,12 @@ namespace osgEarth { namespace Features
 
         URIContext                         _uriContext;
         osg::observer_ptr<const Map>       _map;
-        //osg::ref_ptr<const Map>            _map;
         MapInfo                            _mapInfo;
         osg::ref_ptr<StyleSheet>           _styles;
         osg::ref_ptr<const osgDB::Options> _dbOptions;
         osg::ref_ptr<ScriptEngine>         _styleScriptEngine;
         osg::ref_ptr<FeatureSource>        _featureSource;
-        StateSetCache                      _stateSetCache;
+        osg::ref_ptr<StateSetCache>        _stateSetCache;
     };
 
 } }

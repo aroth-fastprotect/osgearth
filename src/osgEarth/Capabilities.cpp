@@ -210,6 +210,9 @@ _maxUniformBlockSize    ( 0 )
                 osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
             _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
             _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
+        	_supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" ) || 
+            	                                osg::isGLExtensionSupported( id, "GL_OES_packed_depth_stencil" );
+            
             _supportsDrawInstanced = osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
             _supportsUniformBufferObjects = osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
             _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
@@ -266,6 +269,8 @@ _maxUniformBlockSize    ( 0 )
     }
 
     OE_INFO << LC << "  Texture arrays = " << SAYBOOL(_supportsTextureArrays) << std::endl;
+
+    OE_INFO << LC << "  depth-packed stencil = " << SAYBOOL(_supportsDepthPackedStencilBuffer) << std::endl;
 
     OE_INFO << LC << "  3D textures = " << SAYBOOL(_supportsTexture3D) << std::endl;
 

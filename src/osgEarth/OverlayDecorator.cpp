@@ -17,10 +17,11 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 #include <osgEarth/OverlayDecorator>
+#include <osgEarth/MapInfo>
 #include <osgEarth/NodeUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/TextureCompositor>
-#include <osgEarth/ShaderComposition>
+#include <osgEarth/VirtualProgram>
 #include <osgEarth/Capabilities>
 #include <osg/Texture2D>
 #include <osg/TexEnv>
@@ -45,166 +46,6 @@ using namespace osgEarth;
 
 namespace
 {
-#if 0
-    /**
-     * Creates a polytope that minimally bounds a bounding sphere
-     * in world space.
-     */
-    void computeWorldBoundingPolytope(const osg::BoundingSphere&  bs, 
-                                      const SpatialReference*     srs,
-                                      bool                        geocentric,
-                                      osg::Polytope&              out_polytope)
-    {
-        out_polytope.clear();
-        const osg::EllipsoidModel* ellipsoid = srs->getEllipsoid();
-
-        // add planes for the four sides of the BS. Normals point inwards.
-        out_polytope.add( osg::Plane(osg::Vec3d( 1, 0,0), osg::Vec3d(-bs.radius(),0,0)) );
-        out_polytope.add( osg::Plane(osg::Vec3d(-1, 0,0), osg::Vec3d( bs.radius(),0,0)) );
-        out_polytope.add( osg::Plane(osg::Vec3d( 0, 1,0), osg::Vec3d(0, -bs.radius(),0)) );
-        out_polytope.add( osg::Plane(osg::Vec3d( 0,-1,0), osg::Vec3d(0,  bs.radius(),0)) );
-
-        // for a projected map, we're done. For a geocentric one, add a bottom cap.
-        if ( geocentric )
-        {
-            // add a bottom cap, unless the bounds are sufficiently large.
-            double minRad = std::min(ellipsoid->getRadiusPolar(), ellipsoid->getRadiusEquator());
-            double maxRad = std::max(ellipsoid->getRadiusPolar(), ellipsoid->getRadiusEquator());
-            double zeroOffset = bs.center().length();
-            if ( zeroOffset > minRad * 0.1 )
-            {
-                out_polytope.add( osg::Plane(osg::Vec3d(0,0,1), osg::Vec3d(0,0,-maxRad+zeroOffset)) );
-            }
-        }
-
-        // transform the clipping planes ito world space localized about the center point
-        GeoPoint refPoint;
-        refPoint.fromWorld( srs, bs.center() );
-        osg::Matrix local2world;
-        refPoint.createLocalToWorld( local2world );
-
-        out_polytope.transform( local2world );
-    }
-
-
-    /**
-     * Tests whether a "cohesive" point set intersects a polytope. This differs from
-     * Polytope::contains(verts); that function tests each point individually, whereas
-     * this method tests the point set as a whole (i.e. as the border points of a solid --
-     * we are testing whether this solid intersects the polytope.)
-     */
-    bool pointSetIntersectsClippingPolytope(const std::vector<osg::Vec3>& points, osg::Polytope& pt)
-    {
-        osg::Polytope::PlaneList& planes = pt.getPlaneList();
-        for( osg::Polytope::PlaneList::iterator plane = planes.begin(); plane != planes.end(); ++plane )
-        {
-            unsigned outsides = 0;
-            for( std::vector<osg::Vec3>::const_iterator point = points.begin(); point != points.end(); ++point )
-            {
-                bool outside = plane->distance( *point ) < 0.0f;
-                if ( outside ) outsides++;
-                else break;
-            }
-            if ( outsides == points.size() ) 
-                return false;
-        }
-        return true;
-    }
-
-
-    /**
-     * Visitor that computes a bounding sphere for the geometry that intersects
-     * a frustum polyhedron. Since this is used to project geometry on to the 
-     * terrain surface, it has to account for geometry that is not clamped --
-     * so instead of using the normal bounding sphere it computes a world-space
-     * polytope for each geometry and interests that with the frustum.
-     */
-    struct ComputeBoundsWithinFrustum : public OverlayDecorator::InternalNodeVisitor
-    {
-        std::vector<osg::Vec3>  _frustumVerts;
-
-        ComputeBoundsWithinFrustum(const osgShadow::ConvexPolyhedron& frustumPH, 
-                                   const SpatialReference* srs,
-                                   bool                    geocentric,
-                                   osg::BoundingSphere&    out_bs)
-            : InternalNodeVisitor(),
-              _srs       ( srs ),
-              _geocentric( geocentric ),
-              _bs        ( out_bs )
-        {
-            frustumPH.getPolytope( _originalPT );
-
-            _polytopeStack.push( _originalPT );
-            _local2worldStack.push( osg::Matrix::identity() );
-            _world2localStack.push( osg::Matrix::identity() );
-
-            // extract the corner verts from the frustum polyhedron; we will use those to
-            // test for intersection.
-            std::vector<osg::Vec3d> temp;
-            temp.reserve( 8 );
-            frustumPH.getPoints( temp );
-            for( unsigned i=0; i<temp.size(); ++i )
-                _frustumVerts.push_back(temp[i]);
-        }
-
-        bool contains( const osg::BoundingSphere& bs )
-        {
-            osg::BoundingSphere worldBS( bs.center() * _local2worldStack.top(), bs.radius() );
-            osg::Polytope bsWorldPT;
-            computeWorldBoundingPolytope( worldBS, _srs, _geocentric, bsWorldPT );
-            return pointSetIntersectsClippingPolytope( _frustumVerts, bsWorldPT );
-        }
-
-        void apply( osg::Node& node )
-        {
-            const osg::BoundingSphere& bs = node.getBound();
-            if ( contains(bs) )
-            {
-                traverse( node );
-            }
-        }
-
-        void apply( osg::Geode& node )
-        {
-            const osg::BoundingSphere& bs = node.getBound();
-            if ( contains(bs) )
-            {
-                _bs.expandBy( osg::BoundingSphere(
-                    bs.center() * _local2worldStack.top(),
-                    bs.radius() ) );
-            }
-        }
-
-        void apply( osg::Transform& transform )
-        {
-            osg::Matrixd local2world;
-            transform.computeLocalToWorldMatrix( local2world, this );
-
-            _local2worldStack.push( local2world );
-
-            _polytopeStack.push( _originalPT );
-            _polytopeStack.top().transformProvidingInverse( local2world );
-
-            osg::Matrix world2local;
-            world2local.invert( local2world );
-            _world2localStack.push( world2local );
-
-            traverse(transform);
-
-            _local2worldStack.pop();
-            _polytopeStack.pop();
-        }
-
-        osg::BoundingSphere&      _bs;
-        const SpatialReference*   _srs;
-        bool                      _geocentric;
-        osg::Polytope             _originalPT;
-        std::stack<osg::Polytope> _polytopeStack;
-        std::stack<osg::Matrixd>  _local2worldStack, _world2localStack;
-    };
-#endif
-
-
     /**
      * This method takes a set of verts and finds the nearest and farthest distances from
      * the points to the camera. It does this calculation in the plane defined by the
@@ -274,7 +115,8 @@ _mipmapping      ( false ),
 _rttBlending     ( true ),
 _updatePending   ( false ),
 _dumpRequested   ( false ),
-_rttTraversalMask( ~0 )
+_rttTraversalMask( ~0 ),
+_maxHorizonDistance( DBL_MAX )
 {
     // nop
 }
@@ -322,14 +164,14 @@ OverlayDecorator::initializePerViewData( PerViewData& pvd )
     // create the projected texture:
     osg::Texture2D* projTexture = new osg::Texture2D();
     projTexture->setTextureSize( *_textureSize, *_textureSize );
-    projTexture->setInternalFormat( GL_RGBA8 );
+    projTexture->setInternalFormat( GL_RGBA );
     projTexture->setSourceFormat( GL_RGBA );
     projTexture->setSourceType( GL_UNSIGNED_BYTE );
     projTexture->setFilter( osg::Texture::MIN_FILTER, _mipmapping? osg::Texture::LINEAR_MIPMAP_LINEAR: osg::Texture::LINEAR );
     projTexture->setFilter( osg::Texture::MAG_FILTER, osg::Texture::LINEAR );
-    projTexture->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_BORDER );
-    projTexture->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_BORDER );
-    projTexture->setWrap( osg::Texture::WRAP_R, osg::Texture::CLAMP_TO_BORDER );
+    projTexture->setWrap( osg::Texture::WRAP_S, osg::Texture::CLAMP_TO_EDGE); //CLAMP_TO_BORDER );
+    projTexture->setWrap( osg::Texture::WRAP_T, osg::Texture::CLAMP_TO_EDGE );
+    projTexture->setWrap( osg::Texture::WRAP_R, osg::Texture::CLAMP_TO_EDGE );
     projTexture->setBorderColor( osg::Vec4(0,0,0,0) );
 
     // set up the RTT camera:
@@ -350,10 +192,15 @@ OverlayDecorator::initializePerViewData( PerViewData& pvd )
     // try a depth-packed buffer. failing that, try a normal one.. if the FBO doesn't support
     // that (which is doesn't on some GPUs like Intel), it will automatically fall back on 
     // a PBUFFER_RTT impl
-    if ( Registry::instance()->getCapabilities().supportsDepthPackedStencilBuffer() )
+    if ( Registry::instance()->getCapabilities().supportsDepthPackedStencilBuffer() ){
+#ifdef OSG_GLES2_AVAILABLE 
+        pvd._rttCamera->attach( osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, GL_DEPTH24_STENCIL8_EXT );
+#else
         pvd._rttCamera->attach( osg::Camera::PACKED_DEPTH_STENCIL_BUFFER, GL_DEPTH_STENCIL_EXT );
-    else
+#endif
+    }else{
         pvd._rttCamera->attach( osg::Camera::STENCIL_BUFFER, GL_STENCIL_INDEX );
+    }
 
     osg::StateSet* rttStateSet = pvd._rttCamera->getOrCreateStateSet();
 
@@ -759,9 +606,10 @@ OverlayDecorator::cull( osgUtil::CullVisitor* cv, OverlayDecorator::PerViewData&
     cv->setCalculatedFarPlane( osg::maximum(zSavedFar, zFar) );
 
     if ( _isGeocentric )
-    {
+    {        
         // in geocentric mode, clamp the far clip plane to the horizon.
         double maxDistance = (1.0 - haslWeight)  * horizonDistance  + haslWeight * hasl;
+        maxDistance = osg::clampBelow( maxDistance, _maxHorizonDistance );
         maxDistance *= 1.5;
         if (zFar - zNear >= maxDistance)
             zFar = zNear + maxDistance;
@@ -1031,4 +879,16 @@ OverlayDecorator::checkNeedsUpdate( OverlayDecorator::PerViewData& pvd )
         pvd._rttCamera->getViewMatrix()       != pvd._rttViewMatrix ||
         pvd._rttCamera->getProjectionMatrix() != pvd._rttProjMatrix ||
         (_overlayGraph.valid() && _overlayGraph->getNumChildrenRequiringUpdateTraversal() > 0);
+}
+
+
+double OverlayDecorator::getMaxHorizonDistance( ) const
+{
+    return _maxHorizonDistance;
+}
+
+void
+OverlayDecorator::setMaxHorizonDistance( double horizonDistance )
+{
+    _maxHorizonDistance = horizonDistance;
 }

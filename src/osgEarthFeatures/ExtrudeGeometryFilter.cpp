@@ -22,7 +22,9 @@
 #include <osgEarthSymbology/MeshConsolidator>
 #include <osgEarth/ECEF>
 #include <osgEarth/ImageUtils>
-#include <osgEarth/ShaderComposition>
+#include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
+#include <osgEarth/ShaderGenerator>
 #include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/MatrixTransform>
@@ -951,22 +953,16 @@ ExtrudeGeometryFilter::push( FeatureList& input, FilterContext& context )
             groupStateSet->setAttributeAndModes( new osg::LineWidth(*_outlineSymbol->stroke()->width()), 1 );
     }
 
-    // if we have textures, install a shader to draw them
-    if ( _wallSkinSymbol.valid() || _roofSkinSymbol.valid() )
+#if 0 // now called from GeometryCompiler
+
+    // generate shaders to draw the geometry.
+    if ( Registry::capabilities().supportsGLSL() )
     {
-        osg::StateSet* stateSet = group->getOrCreateStateSet();
-
-        VirtualProgram* vp = new VirtualProgram();
-        vp->setName("ExtrudeGeomFilter");
-        vp->installDefaultColoringShaders( 1 );
-        stateSet->setAttributeAndModes( vp, osg::StateAttribute::ON );
-
-        // a default empty texture will support any non-textured geometry 
-        osg::Texture2D* tex = new osg::Texture2D( ImageUtils::createEmptyImage() );
-        tex->setUnRefImageDataAfterApply( false );
-        stateSet->setTextureAttributeAndModes(0, tex, osg::StateAttribute::ON);
-        stateSet->getOrCreateUniform("tex0", osg::Uniform::SAMPLER_2D)->set(0);
+        StateSetCache* cache = context.getSession() ? context.getSession()->getStateSetCache() : 0L;
+        ShaderGenerator gen( cache );
+        group->accept( gen );
     }
+#endif
 
     return group;
 }

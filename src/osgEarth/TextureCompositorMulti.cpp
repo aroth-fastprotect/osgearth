@@ -313,7 +313,7 @@ _lodTransitionTime( *options.lodTransitionTime() ),
 _useGPU           ( useGPU ),
 _enableMipmapping ( *options.enableMipmapping() ),
 _minFilter        ( *options.minFilter() ),
-_magFilter        ( *options.magFilter() ),
+_magFilter        ( *options.magFilter() )
 {
     _enableMipmappingOnUpdatedTextures = Registry::capabilities().supportsMipmappedTextureUpdates();
 }

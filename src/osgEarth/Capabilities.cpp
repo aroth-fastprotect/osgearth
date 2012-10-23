@@ -215,6 +215,9 @@ _maxUniformBlockSize    ( 0 )
             
             _supportsDrawInstanced = osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
             _supportsUniformBufferObjects = osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
+	        if ( _supportsUniformBufferObjects && _maxUniformBlockSize == 0 )
+                _supportsUniformBufferObjects = false;
+    
             _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
         	_supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
 

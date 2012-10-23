@@ -16,7 +16,6 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 
 	ADD_SUBDIRECTORY(osgearth_clamp)
 	ADD_SUBDIRECTORY(osgearth_manip)
-	ADD_SUBDIRECTORY(osgearth_seed)
 	ADD_SUBDIRECTORY(osgearth_toc)
 	ADD_SUBDIRECTORY(osgearth_elevation)
 	ADD_SUBDIRECTORY(osgearth_features)
@@ -66,6 +65,7 @@ SET(TARGET_DEFAULT_LABEL_PREFIX "Applications")
 # always build osgearth_version
 ADD_SUBDIRECTORY(osgearth_version)
 ADD_SUBDIRECTORY(osgearth_package)
+ADD_SUBDIRECTORY(osgearth_seed)
 ADD_SUBDIRECTORY(osgearth_viewer)
 ADD_SUBDIRECTORY(osgearth_contour)
 

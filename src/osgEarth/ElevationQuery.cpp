@@ -79,9 +79,9 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
             
             for (osgEarth::DataExtentList::iterator j = ts->getDataExtents().begin(); j != ts->getDataExtents().end(); j++)
             {
-                if (j->getMaxLevel() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
+                if (j->maxLevel().isSet() && j->maxLevel().value() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
                 {
-                    layerMax = j->getMaxLevel();
+                    layerMax = j->maxLevel().value();
                 }
             }
 
@@ -117,9 +117,9 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
             
             for (osgEarth::DataExtentList::iterator j = ts->getDataExtents().begin(); j != ts->getDataExtents().end(); j++)
             {
-                if (j->getMaxLevel() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
+                if (j->maxLevel().isSet()  && j->maxLevel().value() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
                 {
-                    layerMax = j->getMaxLevel();
+                    layerMax = j->maxLevel().value();
                 }
             }
 
@@ -135,7 +135,8 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
         if ( i->get()->getTerrainLayerRuntimeOptions().maxLevel().isSet() )
             layerMax = std::min( layerMax, *i->get()->getTerrainLayerRuntimeOptions().maxLevel() );
 
-        if (layerMax > maxLevel) maxLevel = layerMax;
+        if (layerMax > maxLevel)
+            maxLevel = layerMax;
     }    
 
     return maxLevel;

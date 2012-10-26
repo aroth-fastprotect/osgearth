@@ -27,16 +27,16 @@ using namespace osgEarth;
 
 
 ElevationLOD::ElevationLOD(const SpatialReference* srs):
+_srs( srs ),
 _minElevation(-DBL_MAX),
-_maxElevation(DBL_MAX),
-_srs( srs )
+_maxElevation(DBL_MAX)
 {
 }
 
 ElevationLOD::ElevationLOD(const SpatialReference* srs, double minElevation, double maxElevation):
+_srs( srs ),
 _minElevation( minElevation ),
-_maxElevation( maxElevation ),
-_srs( srs )
+_maxElevation( maxElevation )
 {
 }
 

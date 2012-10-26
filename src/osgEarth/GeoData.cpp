@@ -570,8 +570,8 @@ _north  ( bounds.yMax() )
 
 GeoExtent::GeoExtent( const GeoExtent& rhs ) :
 _srs   ( rhs._srs ),
-_east  ( rhs._east ),
 _west  ( rhs._west ),
+_east  ( rhs._east ),
 _south ( rhs._south ),
 _north ( rhs._north ),
 _circle( rhs._circle )

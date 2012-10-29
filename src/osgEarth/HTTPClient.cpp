@@ -812,7 +812,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
             OE_WARN << LC
                 << "NULL Content-Type (protocol violation) " 
                 << "URL=" << request.getURL() << std::endl;
-            return HTTPResponse();
+            return HTTPResponse(0L);
         }
 
         // NOTE:

@@ -20,6 +20,8 @@
 #include <osgEarthAnnotation/TrackNode>
 #include <osgEarthAnnotation/AnnotationUtils>
 #include <osgEarth/MapNode>
+#include <osgEarth/Registry>
+#include <osgEarth/ShaderGenerator>
 #include <osg/Depth>
 #include <osgText/Text>
 
@@ -93,9 +95,12 @@ TrackNode::init( const TrackNodeFieldSchema& schema )
     osg::StateSet* stateSet = _geode->getOrCreateStateSet();
     stateSet->setAttributeAndModes( new osg::Depth(osg::Depth::ALWAYS, 0, 1, false), 1 );
 
-    AnnotationUtils::installAnnotationProgram( stateSet );
+    setLightingIfNotSet( false );
 
     getAttachPoint()->addChild( _geode );
+
+    ShaderGenerator gen( Registry::stateSetCache() );
+    this->accept( gen );
 }
 
 void
@@ -113,7 +118,7 @@ TrackNode::setFieldValue( const std::string& name, const osgText::String& value 
             if (drawable->getDataVariance() == osg::Object::DYNAMIC || this->getNumParents() == 0)
             {
                 // btw, setText checks for assigning an equal value, so we don't have to
-                drawable->setText( value );             
+                drawable->setText( value );
             }
             else
             {

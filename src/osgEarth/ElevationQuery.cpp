@@ -79,14 +79,14 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
             
             for (osgEarth::DataExtentList::iterator j = ts->getDataExtents().begin(); j != ts->getDataExtents().end(); j++)
             {
-                if (j->maxLevel().isSet() && j->maxLevel().value() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
+                if (j->maxLevel().isSet() && j->maxLevel() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
                 {
                     layerMax = j->maxLevel().value();
                 }
             }
 
             //Need to convert the layer max of this TileSource to that of the actual profile
-            layerMax = profile->getEquivalentLOD( ts->getProfile(), layerMax );                    
+            layerMax = profile->getEquivalentLOD( ts->getProfile(), layerMax );
         }
         else
         {
@@ -117,7 +117,7 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
             
             for (osgEarth::DataExtentList::iterator j = ts->getDataExtents().begin(); j != ts->getDataExtents().end(); j++)
             {
-                if (j->maxLevel().isSet()  && j->maxLevel().value() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
+                if (j->maxLevel().isSet()  && j->maxLevel() > layerMax && j->contains( tsCoord.x(), tsCoord.y(), tsSRS ))
                 {
                     layerMax = j->maxLevel().value();
                 }

@@ -30,6 +30,7 @@
 
 #include <osgEarth/MapNode>
 
+using namespace osgEarth_engine_quadtree;
 using namespace osgEarth;
 using namespace OpenThreads;
 
@@ -84,7 +85,7 @@ SerialKeyNodeFactory::addTile(TileModel* model, bool tileHasRealData, bool tileH
     if ( wrapInPagedLOD )
     {
         osg::BoundingSphere bs = tileNode->getBound();
-        double maxRange = 1e10;
+        float maxRange = FLT_MAX;
         
 #if 0
         //Compute the min range based on the actual bounds of the tile.  This can break down if you have very high resolution
@@ -101,7 +102,7 @@ SerialKeyNodeFactory::addTile(TileModel* model, bool tileHasRealData, bool tileH
         lowerLeft.toWorld( ll );
         upperRight.toWorld( ur );
         double radius = (ur - ll).length() / 2.0;
-        double minRange = radius * _options.minTileRangeFactor().value();
+        float minRange = (float)(radius * _options.minTileRangeFactor().value());
 #endif
 
         // create a PLOD so we can keep subdividing:
@@ -126,7 +127,7 @@ SerialKeyNodeFactory::addTile(TileModel* model, bool tileHasRealData, bool tileH
         {
             // Make the LOD transition distance, and a measure of how
             // close the tile is to an LOD change, to shaders.
-            result->addCullCallback(new Drivers::LODFactorCallback);
+            result->addCullCallback(new LODFactorCallback);
         }
     }
     else

@@ -17,7 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarthUtil/ChromaKeyColorFilter>
-#include <osgEarth/ShaderComposition>
+#include <osgEarth/VirtualProgram>
 #include <osgEarth/StringUtils>
 #include <osgEarth/ThreadingUtils>
 #include <osg/Program>
@@ -151,7 +151,7 @@ Config
 ChromaKeyColorFilter::getConfig() const
 {
     osg::Vec3f val = getColor();
-    Config conf("rgb");
+    Config conf("chroma_key");
     conf.add( "r", val[0] );
     conf.add( "g", val[1] );
     conf.add( "b", val[2] );

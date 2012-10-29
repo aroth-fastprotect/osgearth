@@ -6,11 +6,34 @@ SET(TARGET_COMMON_LIBRARIES
     osgEarthSymbology
     osgEarthAnnotation
 )
+
+SET(TARGET_DEFAULT_PREFIX "application_")
+SET(TARGET_DEFAULT_APPLICATION_FOLDER "Applications")
+
+# OSG Examples
+OPTION(BUILD_OSGEARTH_TOOLS "Enable to build osgEarth tools" ON)
+
+IF(BUILD_OSGEARTH_TOOLS)
+	SET(TARGET_DEFAULT_LABEL_PREFIX "Tool")
+	SET(TARGET_DEFAULT_APPLICATION_FOLDER "Tools")
+	ADD_SUBDIRECTORY(osgearth_viewer)
+	ADD_SUBDIRECTORY(osgearth_seed)
+	ADD_SUBDIRECTORY(osgearth_featureinfo)
+	ADD_SUBDIRECTORY(osgearth_package)
+	ADD_SUBDIRECTORY(osgearth_tfs)
+	ADD_SUBDIRECTORY(osgearth_boundarygen)
+	ADD_SUBDIRECTORY(osgearth_overlayviewer)
+	ADD_SUBDIRECTORY(osgearth_version)
+
+ENDIF(BUILD_OSGEARTH_TOOLS)
+
 # OSG Examples
 OPTION(BUILD_OSGEARTH_EXAMPLES "Enable to build osgEarth Examples" OFF)
 
 IF(BUILD_OSGEARTH_EXAMPLES)
 
+	SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
+	SET(TARGET_DEFAULT_APPLICATION_FOLDER "Samples")
 	SET(TARGET_DEFAULT_PREFIX "application_")
 	SET(TARGET_DEFAULT_LABEL_PREFIX "Sample")
 
@@ -20,7 +43,6 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_elevation)
 	ADD_SUBDIRECTORY(osgearth_features)
 	ADD_SUBDIRECTORY(osgearth_featurefilter)
-	ADD_SUBDIRECTORY(osgearth_featureinfo)
 	ADD_SUBDIRECTORY(osgearth_los)
 	ADD_SUBDIRECTORY(osgearth_terrainprofile)
 	ADD_SUBDIRECTORY(osgearth_map)
@@ -40,11 +62,9 @@ IF(BUILD_OSGEARTH_EXAMPLES)
 	ADD_SUBDIRECTORY(osgearth_graticule)
     ADD_SUBDIRECTORY(osgearth_featuremanip)
     ADD_SUBDIRECTORY(osgearth_featurequery)
-    ADD_SUBDIRECTORY(osgearth_overlayviewer)
 	ADD_SUBDIRECTORY(osgearth_occlusionculling)
     ADD_SUBDIRECTORY(osgearth_colorfilter)
-	ADD_SUBDIRECTORY(osgearth_tfs)
-	#ADD_SUBDIRECTORY(osgearth_contour)
+	ADD_SUBDIRECTORY(osgearth_contour)
 	ADD_SUBDIRECTORY(osgearth_verticalscale)
 
     IF(NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "3.1.0")
@@ -56,16 +76,5 @@ IF(BUILD_OSGEARTH_EXAMPLES)
     	ADD_SUBDIRECTORY(osgearth_qt_simple)
 	ENDIF()
 
-	#ADD_SUBDIRECTORY(osgearth_test_srs)
-
 ENDIF(BUILD_OSGEARTH_EXAMPLES)
-
-SET(TARGET_DEFAULT_PREFIX "")
-SET(TARGET_DEFAULT_LABEL_PREFIX "Applications")
-# always build osgearth_version
-ADD_SUBDIRECTORY(osgearth_version)
-ADD_SUBDIRECTORY(osgearth_package)
-ADD_SUBDIRECTORY(osgearth_seed)
-ADD_SUBDIRECTORY(osgearth_viewer)
-ADD_SUBDIRECTORY(osgearth_contour)
 

@@ -30,20 +30,12 @@ using namespace osgEarth;
 
 namespace
 {
-#if 0
-    // Custom group that limits traversals to CULL and any visitor internal to
-    // the operation of the OverlayDecorator.
-    struct OverlayTraversalGroup : public osg::Group {
-        virtual void traverse(osg::NodeVisitor& nv) {
-            if ( nv.getVisitorType() == osg::NodeVisitor::CULL_VISITOR ||  
-                 dynamic_cast<OverlayDecorator::InternalNodeVisitor*>(&nv) )
-            {
-                osg::Group::traverse(nv);
-            }
-        }
-    };
-#endif
-
+    /**
+     * When draping is enabled, the actual draped graph goes under an OverlayProxy
+     * group. It tracks the accumulated stateset and nodemask of the Drapeable
+     * itself and applies it to the draped geometry (which is installed under the
+     * MapNode's OverlayDecorator).
+     */
     struct OverlayProxy : public osg::Group
     {
         OverlayProxy( osg::Node* owner ) 
@@ -75,7 +67,7 @@ namespace
 
                     // first check the owner's traversal mask.
                     bool visible = true;
-                    for( unsigned k = 0; visible && k < ownerPath.size(); ++k )
+                    for( int k = 0; visible && k < (int)ownerPath.size(); ++k )
                     {
                         visible = nv.validNodeMask(*ownerPath[k]);
                     }
@@ -90,7 +82,7 @@ namespace
                             osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(&nv);
 
                             int pushes = 0;
-                            for( unsigned k = i+1; k < ownerPath.size(); ++k )
+                            for( int k = i+1; k < (int)ownerPath.size(); ++k )
                             {
                                 osg::Node* node = ownerPath[k];
                                 osg::StateSet* ss = node->getStateSet();

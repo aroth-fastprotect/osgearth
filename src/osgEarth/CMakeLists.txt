@@ -58,6 +58,10 @@ SET(TARGET_PUBLIC_H
 	Locators
     LocalTangentPlane
 	Map
+    MapCallback
+    MapFrame
+    MapInfo
+    MapModelChange
 	MapNode
     MapNodeObserver
 	MapNodeOptions
@@ -78,7 +82,8 @@ SET(TARGET_PUBLIC_H
 	Random
 	Registry
 	Revisioning
-    ShaderComposition
+    ShaderFactory
+    ShaderGenerator
     ShaderUtils
 	SparseTexture2DArray
 	SpatialReference
@@ -101,6 +106,7 @@ SET(TARGET_PUBLIC_H
 	Version
 	VerticalDatum
     Viewpoint
+    VirtualProgram
 	XmlUtils
 )
 
@@ -153,6 +159,9 @@ LIST(APPEND TARGET_SRC
     Locators.cpp
     LocalTangentPlane.cpp
     Map.cpp
+    MapCallback.cpp
+    MapFrame.cpp
+    MapInfo.cpp
     MapNode.cpp
     MapNodeOptions.cpp
     MapOptions.cpp
@@ -171,7 +180,9 @@ LIST(APPEND TARGET_SRC
 	Progress.cpp
 	Random.cpp
     Registry.cpp
-    ShaderComposition.cpp
+    Revisioning.cpp
+    ShaderFactory.cpp
+    ShaderGenerator.cpp
     ShaderUtils.cpp
     SparseTexture2DArray.cpp
     SpatialReference.cpp
@@ -194,6 +205,7 @@ LIST(APPEND TARGET_SRC
     Version.cpp
 	VerticalDatum.cpp
     Viewpoint.cpp
+    VirtualProgram.cpp
     XmlUtils.cpp
 )
 

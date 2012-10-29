@@ -26,7 +26,9 @@
 #include <osgEarth/NodeUtils>
 #include <osgEarth/ImageUtils>
 #include <osgEarth/DrapeableNode>
-#include <osgEarth/ShaderComposition>
+#include <osgEarth/VirtualProgram>
+#include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osg/Geode>
 #include <osg/ShapeDrawable>
 #include <osg/Texture2D>
@@ -56,7 +58,7 @@ namespace
 OSGEARTH_REGISTER_ANNOTATION( imageoverlay, osgEarth::Annotation::ImageOverlay );
 
 ImageOverlay::ImageOverlay(MapNode* mapNode, const Config& conf, const osgDB::Options* dbOptions) :
-AnnotationNode(mapNode),
+AnnotationNode(mapNode, conf),
 _lowerLeft    (10, 10),
 _lowerRight   (20, 10),
 _upperRight   (20, 20),
@@ -176,7 +178,7 @@ _texture      (0),
 _alpha        (1.0f),
 _minFilter    (osg::Texture::LINEAR_MIPMAP_LINEAR),
 _magFilter    (osg::Texture::LINEAR)
-{
+{        
     postCTOR();
 }
 
@@ -194,18 +196,17 @@ ImageOverlay::postCTOR()
 
     d->addChild( _transform );
 
-    // need a shader that supports one texture
-    VirtualProgram* vp = new VirtualProgram();
-    vp->setName( "imageoverlay");
-    vp->installDefaultColoringShaders(1);
-    //vp->installDefaultColoringAndLightingShaders(1);
-    //vp->setInheritShaders(false);
-    d->getOrCreateStateSet()->setAttributeAndModes( vp, 1 );
-    
+    if ( Registry::capabilities().supportsGLSL() )
+    {
+        // need a shader that supports one texture
+        VirtualProgram* vp = new VirtualProgram();
+        vp->setName( "imageoverlay");
+        vp->installDefaultColoringShaders(1);
+        d->getOrCreateStateSet()->setAttributeAndModes( vp, 1 );
+    }
+
     init();    
     ADJUST_UPDATE_TRAV_COUNT( this, 1 );
-
-//    getOrCreateStateSet()->setMode(GL_DEPTH_TEST, osg::StateAttribute::OFF);
 }
 
 void
@@ -305,6 +306,7 @@ ImageOverlay::init()
         Style style;
         style.getOrCreate<AltitudeSymbol>()->clamping() = AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN;
         applyStyle( style );
+        setLightingIfNotSet( false );
         clampMesh( getMapNode()->getTerrain()->getGraph() );
     }
 }

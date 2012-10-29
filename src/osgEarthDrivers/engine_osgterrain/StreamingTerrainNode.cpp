@@ -21,7 +21,8 @@
 #include "TransparentLayer"
 
 #include <osgEarth/Registry>
-#include <osgEarth/Map>
+#include <osgEarth/MapFrame>
+#include <osgEarth/MapInfo>
 #include <osgEarth/NodeUtils>
 
 #include <osg/NodeCallback>
@@ -31,6 +32,7 @@
 
 #include <OpenThreads/ScopedLock>
 
+using namespace osgEarth_engine_osgterrain;
 using namespace osgEarth;
 using namespace OpenThreads;
 

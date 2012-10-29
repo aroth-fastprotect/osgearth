@@ -19,11 +19,15 @@
 #include "KMLReader"
 #include "KML_Root"
 #include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osgEarth/XmlUtils>
+#include <osgEarth/ShaderGenerator>
+#include <osgEarth/VirtualProgram>
 #include <osgEarthAnnotation/Decluttering>
 #include <stack>
 #include <iterator>
 
+using namespace osgEarth_kml;
 using namespace osgEarth;
 
 KMLReader::KMLReader( MapNode* mapNode, const KMLOptions* options ) :

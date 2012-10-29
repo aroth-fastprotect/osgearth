@@ -108,35 +108,35 @@ DrawInstanced::createDrawInstancedProgram()
     std::stringstream buf;
 
     buf << "#version 120 \n"
-        << "#extension GL_EXT_draw_instanced : enable\n";
+        << "#extension GL_EXT_gpu_shader4 : enable \n";
+        //<< "#extension GL_EXT_draw_instanced : enable\n";
 
     if ( Registry::capabilities().supportsUniformBufferObjects() )
     {
+        // note: no newlines in the layout() line, please
         buf << "#extension GL_ARB_uniform_buffer_object : enable\n"
-            << "layout(std140) uniform osgearth_InstanceModelData\n"
-            << "{\n"
-            <<     "mat4 osgearth_instanceModelMatrix[ " << MAX_COUNT_UBO << "];\n"
-            << "};\n";
+            << "layout(std140) uniform oe_di_modelData { "
+            <<     "mat4 oe_di_modelMatrix[" << MAX_COUNT_UBO << "]; } ;\n";
+
+        vp->getTemplate()->addBindUniformBlock( "oe_di_modelData", 0 );
     }
     else
     {
-        buf << "uniform mat4 osgearth_instanceModelMatrix[" << MAX_COUNT_ARRAY << "];\n";
+        buf << "uniform mat4 oe_di_modelMatrix[" << MAX_COUNT_ARRAY << "];\n";
     }
 
-    buf << "void osgearth_setInstancePosition()\n"
+    buf << "void oe_di_setPosition()\n"
         << "{\n"
-        << "    gl_Position = gl_ModelViewProjectionMatrix * osgearth_instanceModelMatrix[gl_InstanceID] * gl_Vertex; \n"
+        << "    gl_Position = gl_ModelViewProjectionMatrix * oe_di_modelMatrix[gl_InstanceID] * gl_Vertex; \n"
         << "}\n";
 
     std::string src;
     src = buf.str();
 
     vp->setFunction(
-        "osgearth_setInstancePosition",
+        "oe_di_setPosition",
         src,
         ShaderComp::LOCATION_VERTEX_PRE_COLORING );
-
-    vp->getTemplate()->addBindUniformBlock( "osgearth_InstanceModelData", 0 );
 
     return vp;
 }
@@ -253,12 +253,13 @@ DrawInstanced::convertGraphToUseDrawInstanced( osg::Group* parent )
                 {
                     mats->push_back( matrices[offset + m] );
                 }
+                ubb->setDataVariance( osg::Object::DYNAMIC );
             }
             else // just use a uniform array
             {
                 // assign the matrices to the uniform array:
                 ArrayUniform uniform(
-                    "osgearth_instanceModelMatrix", 
+                    "oe_di_modelMatrix", 
                     osg::Uniform::FLOAT_MAT4,
                     sliceGroup->getOrCreateStateSet(),
                     currentSize );

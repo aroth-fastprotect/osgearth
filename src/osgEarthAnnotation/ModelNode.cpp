@@ -22,6 +22,9 @@
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/InstanceSymbol>
 #include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
+#include <osgEarth/ShaderGenerator>
+#include <osgEarth/VirtualProgram>
 
 #define LC "[ModelNode] "
 
@@ -59,25 +62,51 @@ ModelNode::init(const osgDB::Options* dbOptions)
 
     if ( sym.valid() )
     {
-        if ( sym->url().isSet() )
+        if ( ( sym->url().isSet() ) || (sym->getModel() != NULL) )
         {
-            URI uri( sym->url()->eval(), sym->url()->uriContext() );
-            osg::Node* node = 0L;
-            
-            if ( sym->uriAliasMap()->empty() )
+            // Try to get a model from symbol
+            osg::ref_ptr<osg::Node> node = sym->getModel();
+
+            // Try to get a model from URI
+            if (node.valid() == false)
             {
-                node = uri.getNode( dbOptions );
-            }
-            else
-            {
-                // install an alias map if there's one in the symbology.
-                osg::ref_ptr<osgDB::Options> tempOptions = Registry::instance()->cloneOrCreateOptions(dbOptions);
-                tempOptions->setReadFileCallback( new URIAliasMapReadCallback(*sym->uriAliasMap(), uri.full()) );
-                node = uri.getNode( tempOptions.get() );
+                URI uri( sym->url()->eval(), sym->url()->uriContext() );
+
+                if ( sym->uriAliasMap()->empty() )
+                {
+                    node = uri.getNode( dbOptions );
+                }
+                else
+                {
+                    // install an alias map if there's one in the symbology.
+                    osg::ref_ptr<osgDB::Options> tempOptions = Registry::instance()->cloneOrCreateOptions(dbOptions);
+                    tempOptions->setReadFileCallback( new URIAliasMapReadCallback(*sym->uriAliasMap(), uri.full()) );
+                    node = uri.getNode( tempOptions.get() );
+                }
+
+                if (node.valid() == false)
+                {
+                    OE_WARN << LC << "No model and failed to load data from " << uri.full() << std::endl;
+                }
             }
 
-            if ( node )
+            if (node.valid() == true)
             {
+                if ( Registry::capabilities().supportsGLSL() )
+                {
+                    // generate shader code for the loaded model:
+                    ShaderGenerator gen( Registry::stateSetCache() );
+                    node->accept( gen );
+
+                    // need a top-level shader too:
+                    VirtualProgram* vp = new VirtualProgram();
+                    vp->installDefaultColoringAndLightingShaders();
+                    this->getOrCreateStateSet()->setAttributeAndModes( vp, 1 );
+
+                    node->addCullCallback( new UpdateLightingUniformsHelper() );
+                }
+
+                // attach to the transform:
                 getTransform()->addChild( node );
                 this->addChild( getTransform() );
 
@@ -94,8 +123,8 @@ ModelNode::init(const osgDB::Options* dbOptions)
                     double pitch   = sym->pitch().isSet()   ? sym->pitch()->eval()   : 0.0;
                     double roll    = sym->roll().isSet()    ? sym->roll()->eval()    : 0.0;
                     rot.makeRotate( 
-                        osg::DegreesToRadians(heading), osg::Vec3(1,0,0),
-                        osg::DegreesToRadians(pitch),   osg::Vec3(0,0,1),
+                        osg::DegreesToRadians(heading), osg::Vec3(0,0,1),
+                        osg::DegreesToRadians(pitch),   osg::Vec3(1,0,0),
                         osg::DegreesToRadians(roll),    osg::Vec3(0,1,0) );
                     this->setLocalRotation( rot.getRotate() );
                 }
@@ -104,12 +133,12 @@ ModelNode::init(const osgDB::Options* dbOptions)
             }
             else
             {
-                OE_WARN << LC << "Failed to load data from " << uri.full() << std::endl;
+                OE_WARN << LC << "No model" << std::endl;
             }
         }
         else
         {
-            OE_WARN << LC << "Symbology: no URI" << std::endl;
+            OE_WARN << LC << "Symbology: no URI or model" << std::endl;
         }
     }
     else
@@ -124,7 +153,7 @@ OSGEARTH_REGISTER_ANNOTATION( model, osgEarth::Annotation::ModelNode );
 
 
 ModelNode::ModelNode(MapNode* mapNode, const Config& conf, const osgDB::Options* dbOptions) :
-LocalizedNode( mapNode )
+LocalizedNode( mapNode, conf )
 {
     conf.getObjIfSet( "style", _style );
 

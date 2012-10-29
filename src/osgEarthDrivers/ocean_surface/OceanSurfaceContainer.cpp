@@ -20,10 +20,8 @@
 #include "OceanCompositor"
 #include "ElevationProxyImageLayer"
 #include <osgEarth/Map>
-#include <osgEarth/ShaderComposition>
 #include <osgEarth/TextureCompositor>
 #include <osgEarthDrivers/osg/OSGOptions>
-//#include <osgEarthDrivers/engine_osgterrain/OSGTerrainOptions>
 #include <osgEarthDrivers/engine_quadtree/QuadTreeTerrainEngineOptions>
 
 #include <osg/CullFace>
@@ -31,6 +29,9 @@
 #include <osg/Texture2D>
 
 #define LC "[OceanSurface] "
+
+using namespace osgEarth_ocean_surface;
+
 
 OceanSurfaceContainer::OceanSurfaceContainer( MapNode* mapNode, const OceanSurfaceOptions& options ) :
 _parentMapNode( mapNode ),
@@ -80,6 +81,7 @@ OceanSurfaceContainer::rebuild()
         // install an "elevation proxy" layer that reads elevation tiles from the
         // parent map and turns them into encoded images for our shader to use.
         ImageLayerOptions epo( "ocean-proxy" );
+        epo.cachePolicy() = CachePolicy::NO_CACHE;
         epo.maxLevel() = *_options.maxLOD();
         oceanMap->addImageLayer( new ElevationProxyImageLayer(_parentMapNode->getMap(), epo) );
 

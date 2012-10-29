@@ -144,12 +144,13 @@ TileBlacklist::write(std::ostream &output) const
 
 
 TileSourceOptions::TileSourceOptions( const ConfigOptions& options ) :
-DriverConfigOptions( options ),
-_tileSize          ( 256 ),
-_noDataValue       ( (float)SHRT_MIN ),
-_noDataMinValue    ( -32000.0f ),
-_noDataMaxValue    (  32000.0f ),
-_L2CacheSize       ( 16 )
+DriverConfigOptions   ( options ),
+_tileSize             ( 256 ),
+_noDataValue          ( (float)SHRT_MIN ),
+_noDataMinValue       ( -32000.0f ),
+_noDataMaxValue       (  32000.0f ),
+_L2CacheSize          ( 16 ),
+_bilinearReprojection ( true )
 { 
     fromConfig( _conf );
 }
@@ -165,6 +166,7 @@ TileSourceOptions::getConfig() const
     conf.updateIfSet( "nodata_max", _noDataMaxValue );
     conf.updateIfSet( "blacklist_filename", _blacklistFilename);
     conf.updateIfSet( "l2_cache_size", _L2CacheSize );
+    conf.updateIfSet( "bilinear_reprojection", _bilinearReprojection );
     conf.updateObjIfSet( "profile", _profileOptions );
     return conf;
 }
@@ -187,6 +189,7 @@ TileSourceOptions::fromConfig( const Config& conf )
     conf.getIfSet( "nodata_max", _noDataMaxValue );
     conf.getIfSet( "blacklist_filename", _blacklistFilename);
     conf.getIfSet( "l2_cache_size", _L2CacheSize );
+    conf.getIfSet( "bilinear_reprojection", _bilinearReprojection );
     conf.getObjIfSet( "profile", _profileOptions );
 
     // special handling of default tile size:
@@ -402,7 +405,7 @@ TileSource::getMaxDataLevel() const
 
     for (DataExtentList::const_iterator itr = _dataExtents.begin(); itr != _dataExtents.end(); ++itr)
     {
-        if ( itr->maxLevel().isSet() && itr->maxLevel().value() > *maxDataLevel )
+        if ( itr->maxLevel().isSet() && itr->maxLevel() > *maxDataLevel )
         {
             maxDataLevel = itr->maxLevel().get();
         }
@@ -419,7 +422,7 @@ TileSource::getMinDataLevel() const
 
     for (DataExtentList::const_iterator itr = _dataExtents.begin(); itr != _dataExtents.end(); ++itr)
     {
-        if ( itr->minLevel().isSet() && itr->minLevel().value() < *minDataLevel )
+        if ( itr->minLevel().isSet() && itr->minLevel() < *minDataLevel )
         {
             minDataLevel = itr->minLevel().get();
         }
@@ -434,14 +437,14 @@ TileSource::hasDataAtLOD( unsigned lod ) const
 {
     // the sematics here are really "MIGHT have data at LOD".
 
-    //If no data extents are provided, just return true
+    // If no data extents are provided, just return true
     if ( _dataExtents.size() == 0 )
         return true;
 
     for (DataExtentList::const_iterator itr = _dataExtents.begin(); itr != _dataExtents.end(); ++itr)
     {
-        if ((!itr->minLevel().isSet() || itr->minLevel().value() <= lod) &&
-            (!itr->maxLevel().isSet() || itr->maxLevel().value() >= lod))
+        if ((!itr->minLevel().isSet() || itr->minLevel() <= lod) &&
+            (!itr->maxLevel().isSet() || itr->maxLevel() >= lod))
         {
             return true;
         }
@@ -491,8 +494,8 @@ TileSource::hasData(const osgEarth::TileKey& key) const
     for (DataExtentList::const_iterator itr = _dataExtents.begin(); itr != _dataExtents.end(); ++itr)
     {
         if ((keyExtent.intersects( *itr )) && 
-            (!itr->minLevel().isSet() || itr->minLevel().value() <= key.getLOD()) &&
-            (!itr->maxLevel().isSet() || itr->maxLevel().value() >= key.getLOD()))
+            (!itr->minLevel().isSet() || itr->minLevel() <= key.getLOD()) &&
+            (!itr->maxLevel().isSet() || itr->maxLevel() >= key.getLOD()))
         {
             intersectsData = true;
             break;

@@ -29,11 +29,21 @@ namespace osgEarth
     /**
      * Cache for optimizing state set sharing.
      */
-    class OSGEARTH_EXPORT StateSetCache
+    class OSGEARTH_EXPORT StateSetCache : public osg::Referenced
     {
     public:
         StateSetCache() { }
         virtual ~StateSetCache() { }
+
+        /**
+         * Check whether a StateSet is eligible for sharing.
+         */
+        bool eligible( osg::StateSet* stateSet ) const;
+
+        /**
+         * Check whether a StateAttribute is eligible for sharing.
+         */
+        bool eligible( osg::StateAttribute* attr ) const;
 
         /**
          * Traverse the node and consolidate equivalent state sets, updating
@@ -45,10 +55,35 @@ namespace osgEarth
          * Looks in the cache for a stateset matching the input. If found,
          * returns the cached one in output. If not found, stores the input 
          * in the cache and returns the same one in output.
+         *
+         * Must use ref_ptrs for thread safely
          */
         bool share( 
             osg::ref_ptr<osg::StateSet>& input, 
-            osg::ref_ptr<osg::StateSet>& output );
+            osg::ref_ptr<osg::StateSet>& output,
+            bool                         checkEligible =true );
+
+        /**
+         * Looks in the attribute cache for an attribute matching the input.
+         * If found, returns the cached one in output. If not found, stores
+         * the input in the cache and returns the same one in output.
+         *
+         * Must use ref_ptrs for thread safely
+         */
+        bool share(
+            osg::ref_ptr<osg::StateAttribute>& input,
+            osg::ref_ptr<osg::StateAttribute>& output,
+            bool                               checkEligible =true );
+
+        /**
+         * Number of statesets in the cache.
+         */
+        unsigned size() const { return _stateSetCache.size(); }
+
+        /**
+         * Clears out the cache.
+         */
+        void clear();
 
     protected: 
         struct CompareStateSets {
@@ -59,7 +94,18 @@ namespace osgEarth
             }
         };
         typedef std::set< osg::ref_ptr<osg::StateSet>, CompareStateSets> StateSetSet;
-        StateSetSet              _stateSetCache;
+        StateSetSet _stateSetCache;
+
+        struct CompareStateAttributes {
+            bool operator()(
+                const osg::ref_ptr<osg::StateAttribute>& lhs,
+                const osg::ref_ptr<osg::StateAttribute>& rhs) const {
+                    return lhs->compare(*rhs.get()) < 0;
+            }
+        };
+        typedef std::set< osg::ref_ptr<osg::StateAttribute>, CompareStateAttributes> StateAttributeSet;
+        StateAttributeSet _stateAttributeCache;
+
         mutable Threading::Mutex _mutex;
     };
 }

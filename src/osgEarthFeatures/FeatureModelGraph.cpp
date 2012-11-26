@@ -21,7 +21,9 @@
 #include <osgEarthFeatures/CropFilter>
 #include <osgEarthFeatures/FeatureSourceIndexNode>
 #include <osgEarth/Capabilities>
+#include <osgEarth/ClampableNode>
 #include <osgEarth/CullingUtils>
+#include <osgEarth/DrapeableNode>
 #include <osgEarth/ElevationLOD>
 #include <osgEarth/ElevationQuery>
 #include <osgEarth/FadeEffect>
@@ -44,9 +46,8 @@ using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
 #undef USE_PROXY_NODE_FOR_TESTING
-
-//#define OE_TEST OE_NULL
-#define OE_TEST OE_NOTICE
+#define OE_TEST OE_NULL
+//#define OE_TEST OE_NOTICE
 
 //---------------------------------------------------------------------------
 
@@ -83,9 +84,7 @@ namespace
         p->setFileName( 0, uri );
 #else
         PagedLODWithNodeOperations* p = new PagedLODWithNodeOperations(postMergeOps);
-        //osg::PagedLOD* p = new osg::PagedLOD();
         p->setCenter( bs.center() );
-        //p->setRadius( bs.radius() );
         p->setRadius(std::max((float)bs.radius(),maxRange));
         p->setFileName( 0, uri );
         p->setRange( 0, minRange, maxRange );
@@ -293,7 +292,7 @@ _pendingUpdate( false )
 
     // If the user requests fade-in, install a post-merge operation that will set the 
     // proper fade time for paged nodes.
-    if ( _options.fadeInDuration().value() > 0.0f )
+    if ( _options.fading().isSet() )
     {
         addPostMergeOperation( new SetupFading() );
         OE_INFO << LC << "Added fading post-merge operation" << std::endl;
@@ -377,9 +376,10 @@ FeatureModelGraph::setupPaging()
     osg::BoundingSphered bs = getBoundInWorldCoords( _usableMapExtent, &mapf );
 
     const FeatureProfile* featureProfile = _session->getFeatureSource()->getFeatureProfile();
-    if (featureProfile->getTiled() && 
-        !_options.layout()->tileSizeFactor().isSet() && 
-        (_options.layout()->maxRange().isSet() || _options.maxRange().isSet()))
+
+    optional<float> maxRangeOverride;
+
+    if (_options.layout()->maxRange().isSet() || _options.maxRange().isSet())
     {
         // select the max range either from the Layout or from the model layer options.
         float userMaxRange = FLT_MAX;
@@ -388,27 +388,39 @@ FeatureModelGraph::setupPaging()
         if ( _options.maxRange().isSet() )
             userMaxRange = std::min(userMaxRange, *_options.maxRange());
 
-        //Automatically compute the tileSizeFactor based on the max range
-        double width, height;
-        featureProfile->getProfile()->getTileDimensions(featureProfile->getFirstLevel(), width, height);
+        if (featureProfile->getTiled() )
+        {
+            if ( !_options.layout()->tileSizeFactor().isSet() )
+            {
+                //Automatically compute the tileSizeFactor based on the max range
+                double width, height;
+                featureProfile->getProfile()->getTileDimensions(featureProfile->getFirstLevel(), width, height);
 
-        GeoExtent ext(featureProfile->getSRS(),
-                      featureProfile->getExtent().west(),
-                      featureProfile->getExtent().south(),
-                      featureProfile->getExtent().west() + width,
-                      featureProfile->getExtent().south() + height);
-        osg::BoundingSphered bounds = getBoundInWorldCoords( ext, &mapf);
+                GeoExtent ext(featureProfile->getSRS(),
+                              featureProfile->getExtent().west(),
+                              featureProfile->getExtent().south(),
+                              featureProfile->getExtent().west() + width,
+                              featureProfile->getExtent().south() + height);
+                osg::BoundingSphered bounds = getBoundInWorldCoords( ext, &mapf);
 
-        float tileSizeFactor = userMaxRange / bounds.radius();
-        //The tilesize factor must be at least 1.0 to avoid culling the tile when you are within it's bounding sphere. 
-        tileSizeFactor = osg::maximum( tileSizeFactor, 1.0f);
-        OE_DEBUG << LC << "Computed a tilesize factor of " << tileSizeFactor << " with max range setting of " <<  userMaxRange << std::endl;
-        _options.layout()->tileSizeFactor() = tileSizeFactor * 1.5;
+                float tileSizeFactor = userMaxRange / bounds.radius();
+                //The tilesize factor must be at least 1.0 to avoid culling the tile when you are within it's bounding sphere. 
+                tileSizeFactor = osg::maximum( tileSizeFactor, 1.0f);
+                OE_DEBUG << LC << "Computed a tilesize factor of " << tileSizeFactor << " with max range setting of " <<  userMaxRange << std::endl;
+                _options.layout()->tileSizeFactor() = tileSizeFactor * 1.5;
+            }
+        }
+        else
+        {
+            // user set a max_range, but we'd not tiled. Just override the top level plod.
+            maxRangeOverride = userMaxRange;
+        }
     }
-   
 
     // calculate the max range for the top-level PLOD:
-    float maxRange = bs.radius() * _options.layout()->tileSizeFactor().value();
+    float maxRange = 
+        maxRangeOverride.isSet() ? *maxRangeOverride :
+        bs.radius() * _options.layout()->tileSizeFactor().value();
 
     // build the URI for the top-level paged LOD:
     std::string uri = s_makeURI( _uid, 0, 0, 0 );
@@ -633,9 +645,10 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
     // set up for feature indexing if appropriate:
     osg::ref_ptr<osg::Group> group;
     FeatureSourceIndexNode* index = 0L;
-    if ( _session->getFeatureSource() && (_options.featureIndexing() == true) )
+
+    if ( _session->getFeatureSource() && _options.featureIndexing().isSet() )
     {
-        index = new FeatureSourceIndexNode( _session->getFeatureSource() );
+        index = new FeatureSourceIndexNode( _session->getFeatureSource(), *_options.featureIndexing() );
         group = index;
     }
     else
@@ -692,18 +705,9 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
 
     if ( group->getNumChildren() > 0 )
     {
-        
         // account for a min-range here. Do not address the max-range here; that happens
         // above when generating paged LOD nodes, etc.        
         float minRange = level.minRange();
-
-        /*
-        if ( _options.minRange().isSet() ) 
-            minRange = std::max(minRange, *_options.minRange());
-
-        if ( _options.layout().isSet() && _options.layout()->minRange().isSet() )
-            minRange = std::max(minRange, *_options.layout()->minRange());
-            */
 
         if ( minRange > 0.0f )
         {
@@ -1028,11 +1032,14 @@ FeatureModelGraph::createStyleGroup(const Style&         style,
             if ( node.valid() )
                 styleGroup->addChild( node.get() );
         }
+
+        // Check the style and see if we need to active GPU clamping. GPU clamping
+        // is currently all-or-nothing for a single FMG.
+        checkForActiveClamping( style );
     }
 
     return styleGroup;
 }
-
 
 
 osg::Group*
@@ -1073,6 +1080,37 @@ FeatureModelGraph::createStyleGroup(const Style&        style,
 
 
 void
+FeatureModelGraph::checkForActiveClamping( const Style& style )
+{
+    const AltitudeSymbol* alt = style.get<AltitudeSymbol>();
+    if ( alt )
+    {
+        if ((alt->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || alt->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN) &&
+            (alt->technique() == AltitudeSymbol::TECHNIQUE_GPU))
+        {
+            _clamper->setActive( true );
+        }
+    }
+
+    // if we're using extrusion, don't perform depth offsetting:
+    const ExtrusionSymbol* extrusion = style.get<ExtrusionSymbol>();
+    if ( extrusion )
+    {
+        _clamper->depthOffset().enabled() = false;
+    }
+
+    // check for explicit depth offset render settings (note, this could
+    // override the automatic disable put in place by the presence of an
+    // ExtrusionSymbol above)
+    const RenderSymbol* render = style.get<RenderSymbol>();
+    if ( render && render->depthOffset().isSet() )
+    {
+        _clamper->depthOffset() = *render->depthOffset();
+    }
+}
+
+
+void
 FeatureModelGraph::traverse(osg::NodeVisitor& nv)
 {
     if ( nv.getVisitorType() == osg::NodeVisitor::EVENT_VISITOR )
@@ -1101,6 +1139,10 @@ void
 FeatureModelGraph::redraw()
 {
     removeChildren( 0, getNumChildren() );
+
+    // initialize the clamping node first, since we need it in order
+    // to build the default level
+    _clamper = new ClampableNode(0L, false);
 
     osg::Node* node = 0;
     // if there's a display schema in place, set up for quadtree paging.
@@ -1138,13 +1180,21 @@ FeatureModelGraph::redraw()
         node = lod;
     }
 
-    // If we want fading, install a fader.
-    if ( _options.fadeInDuration().value() > 0.0f )
+    // If we want fading, install fading.
+    if ( _options.fading().isSet() )
     {
         FadeEffect* fader = new FadeEffect();
-        fader->setFadeDuration( *_options.fadeInDuration() );
+        fader->setFadeDuration( *_options.fading()->duration() );
+        fader->setMaxRange( *_options.fading()->maxRange() );
+        fader->setAttenuationDistance( *_options.fading()->attenuationDistance() );
         fader->addChild( node );
         node = fader;
+    }
+
+    // clamper. TODO: figure out if we can optionally include this
+    {
+        _clamper->addChild( node );
+        node = _clamper;
     }
 
     addChild( node );

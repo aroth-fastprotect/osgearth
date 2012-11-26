@@ -27,6 +27,9 @@ SET(LIB_PUBLIC_HEADERS
     CachePolicy
     CacheSeed
     Capabilities
+    ClampableNode
+    ClampingTechnique
+    ClampingBinTechnique
     ColorFilter
     Common
     CompositeTileSource
@@ -38,6 +41,7 @@ SET(LIB_PUBLIC_HEADERS
     DPLineSegmentIntersector
     Draggers
     DrapeableNode
+    DrapingTechnique
     DrawInstanced
     ECEF
     ElevationLayer
@@ -81,6 +85,7 @@ SET(LIB_PUBLIC_HEADERS
     Notify
     optional
     OverlayDecorator
+    OverlayNode
     Pickers
     Profile
     Progress
@@ -141,6 +146,9 @@ ADD_LIBRARY(${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
     CachePolicy.cpp
     CacheSeed.cpp
     Capabilities.cpp
+    ClampableNode.cpp
+    ClampingTechnique.cpp
+    ClampingBinTechnique.cpp
     ColorFilter.cpp
     CompositeTileSource.cpp
     Config.cpp
@@ -150,6 +158,7 @@ ADD_LIBRARY(${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
     Draggers.cpp
     DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
+    DrapingTechnique.cpp
     DrawInstanced.cpp
     ECEF.cpp
     ElevationLayer.cpp
@@ -188,6 +197,7 @@ ADD_LIBRARY(${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
     NodeUtils.cpp
     Notify.cpp
     OverlayDecorator.cpp
+    OverlayNode.cpp
     Pickers.cpp
     Profile.cpp
     Progress.cpp

@@ -181,6 +181,7 @@ _maxUniformBlockSize    ( 0 )
 
             // Use the texture-proxy method to determine the maximum texture size 
             glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );
+#if !(defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE))
             for( int s = _maxTextureSize; s > 2; s >>= 1 )
             {
                 glTexImage2D( GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, s, s, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0L );
@@ -192,7 +193,16 @@ _maxUniformBlockSize    ( 0 )
                     break;
                 }
             }
+#endif
+        //PORT@tom, what effect will this have?
+#ifdef OSG_GL_FIXED_FUNCTION_AVAILABLE
             glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
+#else
+        _maxLights = 1;
+#endif
+        if ( ::getenv("OSGEARTH_NO_GLSL") )
+            _supportsGLSL = false;
+        else
             _supportsGLSL = GL2->isGlslSupported();
 
             if ( _supportsGLSL )
@@ -212,15 +222,21 @@ _maxUniformBlockSize    ( 0 )
             _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
         	_supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" ) || 
             	                                osg::isGLExtensionSupported( id, "GL_OES_packed_depth_stencil" );
-            
-            _supportsDrawInstanced = osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
-            _supportsUniformBufferObjects = osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
+        	_supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
+        	_supportsDrawInstanced = 
+    	        _supportsGLSL &&
+	            osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
+
+	        glGetIntegerv( GL_MAX_UNIFORM_BLOCK_SIZE, &_maxUniformBlockSize );
+	            
+	        _supportsUniformBufferObjects = 
+    	        _supportsGLSL &&
+        	    osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
 	        if ( _supportsUniformBufferObjects && _maxUniformBlockSize == 0 )
                 _supportsUniformBufferObjects = false;
-    
-            _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" );
-        	_supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
 
+	        //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
+    
             // ATI workarounds:
             bool isATI = _vendor.find("ATI ") == 0;
 
@@ -235,8 +251,6 @@ _maxUniformBlockSize    ( 0 )
 #endif
 
             _maxFastTextureSize = _maxTextureSize;
-            glGetIntegerv( GL_MAX_UNIFORM_BLOCK_SIZE, &_maxUniformBlockSize );
-
         }
         // delete the final object of the graphics context
         delete mgc;

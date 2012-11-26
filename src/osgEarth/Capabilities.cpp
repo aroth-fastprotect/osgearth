@@ -198,12 +198,12 @@ _maxUniformBlockSize    ( 0 )
 #ifdef OSG_GL_FIXED_FUNCTION_AVAILABLE
             glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
 #else
-        _maxLights = 1;
+        	_maxLights = 1;
 #endif
-        if ( ::getenv("OSGEARTH_NO_GLSL") )
-            _supportsGLSL = false;
-        else
-            _supportsGLSL = GL2->isGlslSupported();
+        	if ( ::getenv("OSGEARTH_NO_GLSL") )
+        	    _supportsGLSL = false;
+        	else
+        	    _supportsGLSL = GL2->isGlslSupported();
 
             if ( _supportsGLSL )
             {

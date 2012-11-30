@@ -292,7 +292,7 @@ namespace osgEarth { namespace Util { namespace Controls
 
         ControlEventHandlerList _eventHandlers;
 
-        virtual void fireValueChanged( ControlEventHandler* handler =0L ) { (void*)handler; }
+        virtual void fireValueChanged( ControlEventHandler* handler =0L ) { (void)(handler); }
 
     private:
         osgEarth::optional<float> _x, _y, _width, _height;

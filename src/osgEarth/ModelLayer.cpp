@@ -133,8 +133,8 @@ _initOptions( options )
 }
 
 ModelLayer::ModelLayer(const std::string& name, osg::Node* node):
-_initOptions( ModelLayerOptions(name) ),
-_modelSource( new NodeModelSource(node) )
+_modelSource( new NodeModelSource(node) ),
+_initOptions( ModelLayerOptions(name) )
 {
     copyOptions();
 }

@@ -114,10 +114,10 @@ _useShaders      ( false ),
 _mipmapping      ( false ),
 _rttBlending     ( true ),
 _updatePending   ( false ),
-_dumpRequested   ( false ),
 _rttTraversalMask( ~0 ),
 _maxHorizonDistance( DBL_MAX ),
-_attachStencil   ( true )
+_attachStencil   ( true ),
+_dumpRequested   ( false )
 {
     // nop
 }

@@ -30,10 +30,6 @@
 
 #include <fstream>
 
-#ifdef _WIN32
-extern "C" unsigned long __stdcall GetTempPathA(unsigned long nBufferLength,char * lpBuffer );
-#endif
-
 using namespace osgEarth;
 
 #define LC "[Capabilities] "
@@ -57,7 +53,7 @@ struct MyGraphicsContext
         traits->pbuffer = false;
 		traits->quadBufferStereo = quadBufferStereo;
 
-        // Intel graphics adapters dont' support pbuffers, and some of their drivers crash when
+        // Intel graphics adapters don't support pbuffers, and some of their drivers crash when
         // you try to create them. So by default we will only use the unmapped/pbuffer method
         // upon special request.
         if ( getenv( "OSGEARTH_USE_PBUFFER_TEST" ) )
@@ -141,122 +137,115 @@ _maxUniformBlockSize    ( 0 )
     if ( ::getenv( "OSGEARTH_QUADBUFFER_DISABLE" ) != 0L )
         disableQuadBufferStereoTest = true;
 
-    if(!readCache())
+    // first create a opengl context with quad buffer stereo enabled
+    MyGraphicsContext * mgc;
+    if(!disableQuadBufferStereoTest)
     {
-        // only detect the hardware when the cache failed
+        mgc = new MyGraphicsContext(true);
+        _supportsQuadBufferStereo = mgc->valid();
+    }
+    else
+    {
+        mgc = NULL;
+        _supportsQuadBufferStereo = false;
+    }
+    if(!_supportsQuadBufferStereo)
+    {
+        // delete the old context
+        if(mgc)
+            delete mgc;
+        // second try to create a new graphics context without quad buffer stereo
+        mgc = new MyGraphicsContext(false);
+    }
 
-        // first create a opengl context with quad buffer stereo enabled
-        MyGraphicsContext * mgc;
-	    if(!disableQuadBufferStereoTest)
-        {
-		    mgc = new MyGraphicsContext(true);
-		    _supportsQuadBufferStereo = mgc->valid();
-	    }
-	    else
-	    {
-		    mgc = NULL;
-		    _supportsQuadBufferStereo = false;
-	    }
-	    if(!_supportsQuadBufferStereo)
-	    {
-		    // delete the old context
-		    if(mgc)
-			    delete mgc;
-		    // second try to create a new graphics context without quad buffer stereo
-		    mgc = new MyGraphicsContext(false);
-	    }
+    if ( mgc->valid() )
+    {
+        osg::GraphicsContext* gc = mgc->gc();
+        unsigned int id = gc->getState()->getContextID();
+        const osg::GL2Extensions* GL2 = osg::GL2Extensions::Get( id, true );
+        _vendor = std::string( reinterpret_cast<const char*>(glGetString(GL_VENDOR)) );
+        _renderer = std::string( reinterpret_cast<const char*>(glGetString(GL_RENDERER)) );
+        _version = std::string( reinterpret_cast<const char*>(glGetString(GL_VERSION)) );
+        glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
+        glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &_maxGPUTextureUnits );
+        glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
+        glGetIntegerv( GL_DEPTH_BITS, &_depthBits );
 
-        if ( mgc->valid() )
-        {
-            osg::GraphicsContext* gc = mgc->gc();
-            unsigned int id = gc->getState()->getContextID();
-            const osg::GL2Extensions* GL2 = osg::GL2Extensions::Get( id, true );
-            _vendor = std::string( reinterpret_cast<const char*>(glGetString(GL_VENDOR)) );
-            _renderer = std::string( reinterpret_cast<const char*>(glGetString(GL_RENDERER)) );
-            _version = std::string( reinterpret_cast<const char*>(glGetString(GL_VERSION)) );
-            glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
-            glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &_maxGPUTextureUnits );
-            glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
-            glGetIntegerv( GL_DEPTH_BITS, &_depthBits );
-
-            // Use the texture-proxy method to determine the maximum texture size 
-            glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );
+        // Use the texture-proxy method to determine the maximum texture size 
+        glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );
 #if !(defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE))
-            for( int s = _maxTextureSize; s > 2; s >>= 1 )
+        for( int s = _maxTextureSize; s > 2; s >>= 1 )
+        {
+            glTexImage2D( GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, s, s, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0L );
+            GLint width = 0;
+            glGetTexLevelParameteriv( GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
+            if ( width == s )
             {
-                glTexImage2D( GL_PROXY_TEXTURE_2D, 0, GL_RGBA8, s, s, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0L );
-                GLint width = 0;
-                glGetTexLevelParameteriv( GL_PROXY_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width );
-                if ( width == s )
-                {
-                    _maxTextureSize = s;
-                    break;
-                }
+                _maxTextureSize = s;
+                break;
             }
+        }
 #endif
         //PORT@tom, what effect will this have?
 #ifdef OSG_GL_FIXED_FUNCTION_AVAILABLE
-            glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
+        glGetIntegerv( GL_MAX_LIGHTS, &_maxLights );
 #else
-        	_maxLights = 1;
+        _maxLights = 1;
 #endif
-        	if ( ::getenv("OSGEARTH_NO_GLSL") )
-        	    _supportsGLSL = false;
-        	else
-        	    _supportsGLSL = GL2->isGlslSupported();
+        if ( ::getenv("OSGEARTH_NO_GLSL") )
+            _supportsGLSL = false;
+        else
+            _supportsGLSL = GL2->isGlslSupported();
 
-            if ( _supportsGLSL )
-            {
-                _GLSLversion = GL2->getLanguageVersion();
-            }
-            _supportsTextureArrays = 
-                _supportsGLSL &&
-                osg::getGLVersionNumber() >= 2.0 && // hopefully this will detect Intel cards
-                osg::isGLExtensionSupported( id, "GL_EXT_texture_array" );
-            _supportsTexture3D = osg::isGLExtensionSupported( id, "GL_EXT_texture3D" );
-            _supportsMultiTexture = 
-                osg::getGLVersionNumber() >= 1.3 ||
-                osg::isGLExtensionSupported( id, "GL_ARB_multitexture") ||
-                osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
-            _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
-            _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
-        	_supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" ) || 
-            	                                osg::isGLExtensionSupported( id, "GL_OES_packed_depth_stencil" );
-        	_supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
-        	_supportsDrawInstanced = 
-    	        _supportsGLSL &&
-	            osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
+        if ( _supportsGLSL )
+        {
+            _GLSLversion = GL2->getLanguageVersion();
+        }
+        _supportsTextureArrays = 
+            _supportsGLSL &&
+            osg::getGLVersionNumber() >= 2.0 && // hopefully this will detect Intel cards
+            osg::isGLExtensionSupported( id, "GL_EXT_texture_array" );
+        _supportsTexture3D = osg::isGLExtensionSupported( id, "GL_EXT_texture3D" );
+        _supportsMultiTexture = 
+            osg::getGLVersionNumber() >= 1.3 ||
+            osg::isGLExtensionSupported( id, "GL_ARB_multitexture") ||
+            osg::isGLExtensionSupported( id, "GL_EXT_multitexture" );
+        _supportsStencilWrap = osg::isGLExtensionSupported( id, "GL_EXT_stencil_wrap" );
+        _supportsTwoSidedStencil = osg::isGLExtensionSupported( id, "GL_EXT_stencil_two_side" );
+        _supportsDepthPackedStencilBuffer = osg::isGLExtensionSupported( id, "GL_EXT_packed_depth_stencil" ) || 
+            osg::isGLExtensionSupported( id, "GL_OES_packed_depth_stencil" );
+        _supportsOcclusionQuery = osg::isGLExtensionSupported( id, "GL_ARB_occlusion_query" );
+        _supportsDrawInstanced = 
+            _supportsGLSL &&
+            osg::isGLExtensionOrVersionSupported( id, "GL_EXT_draw_instanced", 3.1f );
 
-	        glGetIntegerv( GL_MAX_UNIFORM_BLOCK_SIZE, &_maxUniformBlockSize );
-	            
-	        _supportsUniformBufferObjects = 
-    	        _supportsGLSL &&
-        	    osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
-	        if ( _supportsUniformBufferObjects && _maxUniformBlockSize == 0 )
-                _supportsUniformBufferObjects = false;
+        glGetIntegerv( GL_MAX_UNIFORM_BLOCK_SIZE, &_maxUniformBlockSize );
 
-	        //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
-    
-            // ATI workarounds:
-            bool isATI = _vendor.find("ATI ") == 0;
+        _supportsUniformBufferObjects = 
+            _supportsGLSL &&
+            osg::isGLExtensionOrVersionSupported( id, "GL_ARB_uniform_buffer_object", 2.0f );
+        if ( _supportsUniformBufferObjects && _maxUniformBlockSize == 0 )
+            _supportsUniformBufferObjects = false;
 
-            _supportsMipmappedTextureUpdates = isATI && enableATIworkarounds ? false : true;
+        //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
+
+        // ATI workarounds:
+        bool isATI = _vendor.find("ATI ") == 0;
+
+        _supportsMipmappedTextureUpdates = isATI && enableATIworkarounds ? false : true;
 
 #if 0
-            // Intel workarounds:
-            bool isIntel = 
-                _vendor.find("Intel ")   != std::string::npos ||
-                _vendor.find("Intel(R)") != std::string::npos ||
-                _vendor.compare("Intel") == 0;
+        // Intel workarounds:
+        bool isIntel = 
+            _vendor.find("Intel ")   != std::string::npos ||
+            _vendor.find("Intel(R)") != std::string::npos ||
+            _vendor.compare("Intel") == 0;
 #endif
 
-            _maxFastTextureSize = _maxTextureSize;
-        }
-        // delete the final object of the graphics context
-        delete mgc;
-
-        writeCache();
+        _maxFastTextureSize = _maxTextureSize;
     }
+    // delete the final object of the graphics context
+    delete mgc;
 
     OE_INFO << LC << "Detected hardware capabilities:" << std::endl;
 
@@ -316,33 +305,13 @@ _maxUniformBlockSize    ( 0 )
     OE_INFO << LC << "  Max Fast Texture Size = " << _maxFastTextureSize << std::endl;
 }
 
-static const std::string & osgearth_capabilities_cache_file()
-{
-    static std::string s_capabilitiesCacheFile;
-    if(s_capabilitiesCacheFile.empty())
-    {
-#ifdef _WIN32
-        char tmp[512];
-        if(GetTempPathA(sizeof(tmp)/sizeof(tmp[0]), tmp))
-        {
-            strcat(tmp, "\\_osgearth_capabilities_cache");
-            s_capabilitiesCacheFile = tmp;
-        }
-#else
-        s_capabilitiesCacheFile = "/tmp/_osgearth_capabilities_cache";
-#endif
-    }
-    return s_capabilitiesCacheFile;
-}
-
-bool Capabilities::readCache()
+bool Capabilities::loadFromFile(const std::string & filename)
 {
     bool ret;
-    const std::string & cache_file = osgearth_capabilities_cache_file();
-    XmlDocument * doc = XmlDocument::load(cache_file);
+    XmlDocument * doc = XmlDocument::load(filename);
     if(doc)
     {
-        OE_INFO << LC << "Read cached capabilities from " << cache_file << std::endl;
+        OE_INFO << LC << "Load capabilities from " << filename << std::endl;
 
         Config docConf = doc->getConfig();
         Config conf;
@@ -378,13 +347,13 @@ bool Capabilities::readCache()
     }
     else
     {
-        OE_INFO << LC << "Capabilities cache " << cache_file << " is invalid" << std::endl;
+        OE_INFO << LC << "Capabilities file " << filename << " is invalid" << std::endl;
         ret = false;
     }
     return ret;
 }
 
-bool Capabilities::writeCache()
+bool Capabilities::saveToFile(const std::string & filename)
 {
     bool ret;
     Config conf("capabilities");
@@ -413,12 +382,11 @@ bool Capabilities::writeCache()
     conf.update("renderer", _renderer );
     conf.update("version", _version );
 
-    const std::string & cache_file = osgearth_capabilities_cache_file();
-    std::ofstream out( cache_file.c_str());
+    std::ofstream out( filename.c_str());
     ret = out.is_open();
     if ( ret )
     {
-        OE_INFO << LC << "Write detected capabilities to " << cache_file << std::endl;
+        OE_INFO << LC << "Write capabilities to " << filename << std::endl;
 
         // dump that Config out as XML.
         osg::ref_ptr<XmlDocument> xml = new XmlDocument( conf );

@@ -29,15 +29,15 @@
 using namespace osgEarth::Util;
 using namespace osgEarth;
 
-
 TMSPackager::TMSPackager(const Profile* outProfile, osgDB::Options* imageWriteOptions) :
-_outProfile         ( outProfile ),
-_maxLevel           ( 99 ),
 _verbose            ( false ),
+_abortOnError       ( true ),
 _overwrite          ( false ),
 _keepEmptyImageTiles( false ),
 _subdivideSingleColorImageTiles ( false ),
-_abortOnError       ( true ),
+_maxLevel           ( 99 ),
+_extents            (),
+_outProfile         ( outProfile ),
 _imageWriteOptions  (imageWriteOptions)
 {
     //nop

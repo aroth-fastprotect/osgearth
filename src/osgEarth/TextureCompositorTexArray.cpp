@@ -45,8 +45,6 @@ namespace
     {
         std::stringstream buf;
        
-        const TextureLayout::TextureSlotVector& slots = layout.getTextureSlots();
-
         buf << "#version 130 \n"
             << "varying vec4 osg_FrontColor; \n"
             << "varying vec4 osg_FrontSecondaryColor; \n"

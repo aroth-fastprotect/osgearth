@@ -40,10 +40,20 @@ namespace
 //------------------------------------------------------------------------
 
 ClampableNode::ClampableNode( MapNode* mapNode, bool active ) :
-OverlayNode( mapNode, active, &getTechniqueGroup ),
-_autoBias  ( true ),
-_doDirty   ( false )
+OverlayNode( mapNode, active, &getTechniqueGroup )
 {
+    init();
+}
+
+void
+ClampableNode::init()
+{
+    // auto-bias starts out true, but if you set the depth offset options
+    // it will toggle to false.
+    _autoBias = true;
+
+    _doDirty  = false;
+
     osg::StateSet* s = this->getOrCreateStateSet();
 
     _biasUniform = s->getOrCreateUniform( "oe_clamp_bias", osg::Uniform::FLOAT_VEC2 );
@@ -92,7 +102,7 @@ ClampableNode::applyDepthOffsetOptions()
 }
 
 void
-ClampableNode::calculateMinDepthOffsetBiasFromSubgraph()
+ClampableNode::setAutoCalculateDepthOffset()
 {
     // prompts OSG to call computeBound() on the next pass which
     // will recalculate the minimum bias.

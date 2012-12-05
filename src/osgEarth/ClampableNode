@@ -52,7 +52,7 @@ namespace osgEarth
         
         /** Automatically attempt to select a minimum bias based on an analysis
          *  of the subgraph's geometry. */
-        void calculateMinDepthOffsetBiasFromSubgraph();
+        void setAutoCalculateDepthOffset();
 
         /** Backwards compatibility */
         void setClamped( bool value ) { setActive(value); }
@@ -75,6 +75,7 @@ namespace osgEarth
         mutable DepthOffsetOptions _do;
         bool _doDirty;
 
+        void init();
         void dirtyDepthOffsetOptions();
         void applyDepthOffsetOptions();
     };

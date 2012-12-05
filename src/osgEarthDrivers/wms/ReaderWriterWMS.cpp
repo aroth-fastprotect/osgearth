@@ -128,6 +128,7 @@ public:
         // first the mandatory keys:
         buf
             << std::fixed << _options.url()->full() << sep            
+	    << "SERVICE=WMS"
             << "&VERSION=" << _options.wmsVersion().value()
             << "&REQUEST=GetMap"
             << "&LAYERS=" << _options.layers().value()

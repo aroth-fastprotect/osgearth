@@ -582,16 +582,9 @@ MapNode::onModelLayerMoved( ModelLayer* layer, unsigned int oldIndex, unsigned i
         if ( i != _modelLayerNodes.end() )
         {
             osg::ref_ptr<osg::Node> node = i->second;
-            
-            //if ( dynamic_cast<osgSim::OverlayNode*>( node ) )
-            //{
-            //    // treat overlay node as a special case
-            //}
-            //else
-            {
-                _models->removeChild( node.get() );
-                _models->insertChild( newIndex, node.get() );
-            }
+
+            _models->removeChild( node.get() );
+            _models->insertChild( newIndex, node.get() );
         }
         
         dirtyBound();
@@ -663,7 +656,6 @@ MapNode::traverse( osg::NodeVisitor& nv )
             //Only remove the blacklisted filenames if new filenames have been added since last time.
             _lastNumBlacklistedFilenames = numBlacklist;
             RemoveBlacklistedFilenamesVisitor v;
-            //accept( v );
             _terrainEngine->accept( v );
         }
     }

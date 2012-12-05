@@ -268,9 +268,12 @@ TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
             if (itr->getOrder() == zoom)
             {
                 std::stringstream ss;
-                std::string path = osgDB::getFilePath(_filename);
-                ss << path << "/" << zoom << "/" << x << "/" << y << "." << _format.getExtension();
-                //OE_NOTICE << LC << "Returning URL " << ss.str() << std::endl;
+                std::string basePath = osgDB::getFilePath(_filename);                
+                if (!basePath.empty())
+                {
+                    ss << basePath << "/";
+                }
+                ss << zoom << "/" << x << "/" << y << "." << _format.getExtension();                
                 std::string ssStr;
 				ssStr = ss.str();
 				return ssStr;
@@ -280,8 +283,12 @@ TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
     else // Just go with it. No way of knowing the max level.
     {
         std::stringstream ss;
-        std::string path = osgDB::getFilePath(_filename);
-        ss << path << "/" << zoom << "/" << x << "/" << y << "." << _format.getExtension();
+        std::string basePath = osgDB::getFilePath(_filename);                
+        if (!basePath.empty())
+        {
+            ss << basePath << "/";
+        }
+        ss << zoom << "/" << x << "/" << y << "." << _format.getExtension();                
         std::string ssStr;
 		ssStr = ss.str();
 		return ssStr;        

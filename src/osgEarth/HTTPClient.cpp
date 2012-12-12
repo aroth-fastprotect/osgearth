@@ -315,8 +315,10 @@ HTTPClient::getClient()
 }
 
 HTTPClient::HTTPClient() :
-_initialized    ( false ),
 _curl_handle    ( 0L ),
+_previousPassword          (),
+_previousHttpAuthentication( 0L ),
+_initialized               ( false ),
 _simResponseCode( -1L )
 {
     //nop

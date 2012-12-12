@@ -419,8 +419,8 @@ namespace osgEarth
          * reports the results of the initialization.
          */
         virtual void initialize(
-            const osgDB::Options* dbOptions,
-            const Profile*        overrideProfile ) { }
+            const osgDB::Options* /*dbOptions*/,
+            const Profile*        /*overrideProfile*/ ) { }
 
     private:
 

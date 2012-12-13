@@ -67,6 +67,34 @@ namespace
     private:
         float m_lodScale;
     };
+
+    class SetLoadPriorityVisitor : public osg::NodeVisitor
+    {
+    public:
+        SetLoadPriorityVisitor(float scale=1.0f, float offset=0.0f)
+            : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
+            , m_scale(scale)
+            , m_offset(offset)
+        {}
+
+        virtual void apply(osg::PagedLOD& node)
+        {
+            for(unsigned n = 0; n < node.getNumFileNames(); n++)
+            {
+                float old;
+                old = node.getPriorityScale(n);
+                node.setPriorityScale(n, old * m_scale);
+                old = node.getPriorityOffset(n);
+                node.setPriorityOffset(n, old + m_offset);
+            }
+            traverse(node);
+        }
+
+    private:
+        float m_scale;
+        float m_offset;
+    };
+
 }
 
 //--------------------------------------------------------------------------
@@ -142,6 +170,12 @@ public:
                     _options.maxRange().isSet() ? (*_options.maxRange()) : FLT_MAX );
                 result = lod;
             }
+        }
+
+        if(_options.loadingPriorityScale().isSet() || _options.loadingPriorityOffset().isSet())
+        {
+            SetLoadPriorityVisitor slpv(_options.loadingPriorityScale().value(), _options.loadingPriorityOffset().value());
+            result->accept(slpv);
         }
 
         if(_options.lodScale().isSet())

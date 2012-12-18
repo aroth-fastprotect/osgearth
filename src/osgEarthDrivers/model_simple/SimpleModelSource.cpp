@@ -24,6 +24,7 @@
 #include <osgEarth/ShaderGenerator>
 #include <osgEarth/FileUtils>
 #include <osg/LOD>
+#include <osg/ProxyNode>
 #include <osg/Notify>
 #include <osg/MatrixTransform>
 #include <osg/io_utils>
@@ -93,6 +94,34 @@ namespace
     private:
         float m_scale;
         float m_offset;
+    };
+
+    class UseLoadOnceLoaderVisitor : public osg::NodeVisitor
+    {
+    public:
+        UseLoadOnceLoaderVisitor()
+            : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN)
+        {}
+
+        virtual void apply(osg::PagedLOD& node)
+        {
+            for(unsigned n = 0; n < node.getNumFileNames(); n++)
+            {
+                std::string olduri = node.getFileName(n);
+                node.setFileName(n, osgEarth::useLoadOnceLoader(olduri));
+            }
+            traverse(node);
+        }
+
+        virtual void apply(osg::ProxyNode& node)
+        {
+            for(unsigned n = 0; n < node.getNumFileNames(); n++)
+            {
+                std::string olduri = node.getFileName(n);
+                node.setFileName(n, osgEarth::useLoadOnceLoader(olduri));
+            }
+            traverse(node);
+        }
     };
 
 }
@@ -189,6 +218,8 @@ public:
         // generate a shader program to render the model.
         if ( result.valid() )
         {
+            UseLoadOnceLoaderVisitor loadoncevisitor;
+            result->accept( loadoncevisitor );
             if ( _options.shaderPolicy() == SHADERPOLICY_GENERATE )
             {
                 ShaderGenerator gen;

@@ -267,7 +267,7 @@ namespace osgEarth
         virtual void traverse( osg::NodeVisitor& nv );
         std::set<osg::Node*> _orphans;
     };
-
+    
     
     /**
      * Group that acts like a normal group but also notifies another
@@ -327,6 +327,9 @@ namespace osgEarth
         if ( oldCount + DELTA >= 0 ) \
             NODE ->setNumChildrenRequiringEventTraversal( (unsigned int)(oldCount + DELTA ) ); \
     }
+
+    OSGEARTH_EXPORT std::string useLoadOnceLoader(const std::string & uri);
+
 }
 
 #endif // OSGEARTH_CACHING_H

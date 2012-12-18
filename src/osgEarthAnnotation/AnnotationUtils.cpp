@@ -138,9 +138,15 @@ AnnotationUtils::createTextDrawable(const std::string& text,
     }
 
     // this disables the default rendering bin set by osgText::Font. Necessary if we're
-    // going to do decluttering at a higher level
-    osg::StateSet* stateSet = new osg::StateSet();
-    t->setStateSet( stateSet );
+    // going to do decluttering.
+    // TODO: verify that it's still OK to share the font stateset (think so) or does it
+    // need to be marked DYNAMIC
+    if ( t->getStateSet() )
+      t->getStateSet()->setRenderBinToInherit();
+    //osg::StateSet* stateSet = new osg::StateSet();
+    //t->setStateSet( stateSet );
+
+#if 0 // OBE: the decluttering bin is now set higher up (in OrthoNode)
     //osg::StateSet* stateSet = t->getOrCreateStateSet();
 
     if ( symbol && symbol->declutter().isSet() )
@@ -151,12 +157,15 @@ AnnotationUtils::createTextDrawable(const std::string& text,
     {
         stateSet->setRenderBinToInherit();
     }
+#endif
 
+#if 0 // OBE: shadergenerator now takes care of all this
     // add the static "isText=true" uniform; this is a hint for the annotation shaders
     // if they get installed.
-    static osg::ref_ptr<osg::Uniform> s_isTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
-    s_isTextUniform->set( true );
-    stateSet->addUniform( s_isTextUniform.get() );
+    //static osg::ref_ptr<osg::Uniform> s_isTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
+    //s_isTextUniform->set( true );
+    //stateSet->addUniform( s_isTextUniform.get() );
+#endif
 
     return t;
 }
@@ -225,11 +234,13 @@ AnnotationUtils::createImageGeometry(osg::Image*       image,
 
     geom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS,0,4));
 
+#if 0
     // add the static "isText=true" uniform; this is a hint for the annotation shaders
     // if they get installed.
     static osg::ref_ptr<osg::Uniform> s_isNotTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
     s_isNotTextUniform->set( false );
     dstate->addUniform( s_isNotTextUniform.get() );
+#endif
 
     return geom;
 }
@@ -558,6 +569,141 @@ AnnotationUtils::createHemisphere( float r, const osg::Vec4& color, float maxAng
     return installTwoPassAlpha( geode );
 }
 
+    // constucts an ellipsoidal mesh that we will use to draw the atmosphere
+osg::Geometry*
+AnnotationUtils::createEllipsoidGeometry(float majorRadius, 
+                                         float minorRadius,
+                                         const osg::Vec4f& color, 
+                                         float maxAngle,
+                                         float minLat,
+                                         float maxLat,
+                                         float minLon,
+                                         float maxLon)
+{
+    osg::EllipsoidModel em( majorRadius, minorRadius );
+
+    osg::Geometry* geom = new osg::Geometry();
+    geom->setUseVertexBufferObjects(true);
+
+    float latSpan = maxLat - minLat;
+    float lonSpan = maxLon - minLon;
+    float aspectRatio = lonSpan/latSpan;
+
+    int latSegments = std::max( 6, (int)(latSpan / maxAngle) );
+    int lonSegments = std::max( 3, (int)(latSegments * aspectRatio) );
+    //int lonSegments = 2 * latSegments;
+
+    float segmentSize = latSpan/latSegments; // degrees
+    //double segmentSize = 180.0/(double)latSegments; // degrees
+
+    osg::Vec3Array* verts = new osg::Vec3Array();
+    verts->reserve( latSegments * lonSegments );
+
+    bool genTexCoords = false; // TODO: optional
+    osg::Vec2Array* texCoords = 0;
+    if (genTexCoords)
+    {
+        texCoords = new osg::Vec2Array();
+        texCoords->reserve( latSegments * lonSegments );
+        geom->setTexCoordArray( 0, texCoords );
+    }
+
+    osg::Vec3Array* normals = 0;
+    {
+        normals = new osg::Vec3Array();
+        normals->reserve( latSegments * lonSegments );
+        geom->setNormalArray( normals );
+        geom->setNormalBinding(osg::Geometry::BIND_PER_VERTEX );
+    }
+
+    osg::DrawElementsUShort* el = new osg::DrawElementsUShort( GL_TRIANGLES );
+    el->reserve( latSegments * lonSegments * 6 );
+
+    for( int y = 0; y <= latSegments; ++y )
+    {
+        float lat = minLat + segmentSize * (float)y;
+        //double lat = -90.0 + segmentSize * (double)y;
+        for( int x = 0; x < lonSegments; ++x )
+        {
+            float lon = minLon + segmentSize * (float)x;
+            //double lon = -180.0 + segmentSize * (double)x;
+            double gx, gy, gz;
+            em.convertLatLongHeightToXYZ( osg::DegreesToRadians(lat), osg::DegreesToRadians(lon), 0.0, gx, gy, gz );
+            verts->push_back( osg::Vec3(gx, gy, gz) );
+
+            if (genTexCoords)
+            {
+                double s = (lon + 180) / 360.0;
+                double t = (lat + 90.0) / 180.0;
+                texCoords->push_back( osg::Vec2(s, t ) );
+            }
+
+            if (normals)
+            {
+                osg::Vec3 normal( gx, gy, gz);
+                normal.normalize();
+                normals->push_back( normal );
+            }
+
+            if ( y < latSegments )
+            {
+                int x_plus_1 = x < lonSegments-1 ? x+1 : 0;
+                int y_plus_1 = y+1;
+                el->push_back( y*lonSegments + x );
+                el->push_back( y*lonSegments + x_plus_1 );
+                el->push_back( y_plus_1*lonSegments + x );
+                el->push_back( y*lonSegments + x_plus_1 );
+                el->push_back( y_plus_1*lonSegments + x_plus_1 );
+                el->push_back( y_plus_1*lonSegments + x );
+            }
+        }
+    }
+
+    osg::Vec4Array* c = new osg::Vec4Array(1);
+    (*c)[0] = color;
+    geom->setColorArray( c );
+    geom->setColorBinding( osg::Geometry::BIND_OVERALL );
+
+    geom->setVertexArray( verts );
+    geom->addPrimitiveSet( el );
+
+    return geom;
+}
+
+osg::Node* 
+AnnotationUtils::createEllipsoid(float majorRadius, 
+                                 float minorRadius,
+                                 const osg::Vec4f& color, 
+                                 float maxAngle,
+                                 float minLat,
+                                 float maxLat,
+                                 float minLon,
+                                 float maxLon)
+{
+    osg::Geode* geode = new osg::Geode();
+    geode->addDrawable( createEllipsoidGeometry(majorRadius, minorRadius, color, maxAngle, minLat, maxLat, minLon, maxLon) );
+
+    if ( color.a() < 1.0f )
+    {
+        geode->getOrCreateStateSet()->setRenderingHint( osg::StateSet::TRANSPARENT_BIN );
+    }
+
+    bool solid = (maxLat-minLat >= 180.0f && maxLon-minLon >= 360.0f);
+
+    if ( solid )
+    {
+        geode->getOrCreateStateSet()->setAttributeAndModes( new osg::CullFace(osg::CullFace::BACK), 1 );
+    }
+
+    else if ( color.a() < 1.0f )
+    {
+        //geode->getOrCreateStateSet()->setAttributeAndModes( new osg::CullFace(), 0 );
+        return installTwoPassAlpha(geode);
+    }
+
+    return geode;
+}
+
 osg::Node* 
 AnnotationUtils::createEllipsoid( float xr, float yr, float zr, const osg::Vec4& color, float maxAngle )
 {
@@ -787,14 +933,13 @@ AnnotationUtils::styleRequiresAlphaBlending( const Style& style )
 void
 AnnotationUtils::getAltitudePolicy(const Style& style, AltitudePolicy& out)
 {
-    out.gpuAutoClamping = false;
-    out.cpuAutoClamping = false;
-    out.draping         = false;
+    out.sceneClamping = false;
+    out.gpuClamping   = false;
+    out.draping       = false;
 
+    // conditions where clamping is not yet compatible
     bool compatible =
-        !style.has<ExtrusionSymbol>() &&
-        !style.has<InstanceSymbol>()  &&
-        !style.has<MarkerSymbol>()    ;      // backwards-compability
+        !style.has<ExtrusionSymbol>();      // backwards-compability
 
     if ( compatible )
     {
@@ -804,9 +949,17 @@ AnnotationUtils::getAltitudePolicy(const Style& style, AltitudePolicy& out)
             if (alt->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || 
                 alt->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN )
             {
-                out.gpuAutoClamping = alt->technique() == AltitudeSymbol::TECHNIQUE_GPU;
-                out.cpuAutoClamping = alt->technique() == AltitudeSymbol::TECHNIQUE_MAP;
-                out.draping         = alt->technique() == AltitudeSymbol::TECHNIQUE_DRAPE;
+                out.sceneClamping = alt->technique() == AltitudeSymbol::TECHNIQUE_SCENE;
+                out.gpuClamping   = alt->technique() == AltitudeSymbol::TECHNIQUE_GPU;
+                out.draping       = alt->technique() == AltitudeSymbol::TECHNIQUE_DRAPE;
+
+                // for instance/markers, GPU clamping falls back on SCENE clamping.
+                if (out.gpuClamping &&
+                    (style.has<InstanceSymbol>() || style.has<MarkerSymbol>()))
+                {
+                    out.gpuClamping   = false;
+                    out.sceneClamping = true;
+                }
             }
         }
     }

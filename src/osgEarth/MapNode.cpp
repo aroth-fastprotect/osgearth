@@ -20,7 +20,6 @@
 #include <osgEarth/Capabilities>
 #include <osgEarth/ClampableNode>
 #include <osgEarth/ClampingTechnique>
-#include <osgEarth/ClampingBinTechnique>
 #include <osgEarth/DrapeableNode>
 #include <osgEarth/DrapingTechnique>
 #include <osgEarth/MapNodeObserver>
@@ -135,8 +134,16 @@ public:
                   osg::ref_ptr< MapNode::TileRangeData > ranges = static_cast< MapNode::TileRangeData* >(node.getUserData());
                   if (ranges)
                   {
-                      node.setRange(0, ranges->_minRange, ranges->_maxRange);
-                      node.setRange(1, 0, ranges->_minRange);
+                      if (node.getRangeMode() == osg::LOD::PIXEL_SIZE_ON_SCREEN)
+                      {
+                          node.setRange( 0, ranges->_minRange, ranges->_maxRange );
+                          node.setRange( 1, ranges->_maxRange, FLT_MAX );                          
+                      }
+                      else
+                      {                          
+                          node.setRange(0, ranges->_minRange, ranges->_maxRange);
+                          node.setRange(1, 0, ranges->_minRange);
+                      }
                   }                  
               }
               
@@ -328,8 +335,6 @@ MapNode::init()
     // install the Clamping technique for overlays:
     {
         _overlayDecorator->addTechnique( new ClampingTechnique() );
-        //_overlayDecorator->addTechnique( new ClampingBinTechnique() );
-        //...why not combine the 2 clamping techniques? use a group AND a bin?
     }
 
 

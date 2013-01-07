@@ -57,13 +57,28 @@ LineSymbol::parseSLD(const Config& c, Style& style)
         style.getOrCreate<LineSymbol>()->stroke()->color().a() = as<float>( c.value(), 1.0f );
     }
     else if ( match(c.key(), "stroke-width") ) {
-        style.getOrCreate<LineSymbol>()->stroke()->width() = as<float>( c.value(), 1.0f );
+        float width;
+        Units units;
+        if ( Units::parse(c.value(), width, units, Units::PIXELS) )
+        {
+            style.getOrCreate<LineSymbol>()->stroke()->width() = width;
+            style.getOrCreate<LineSymbol>()->stroke()->widthUnits() = units;
+        }
     }
     else if ( match(c.key(), "stroke-linecap") ) {
         style.getOrCreate<LineSymbol>()->stroke()->lineCap() =
-            c.value() == "round"  ?   Stroke::LINECAP_ROUND  :
+            c.value() == "flat"   ?   Stroke::LINECAP_FLAT   :
             c.value() == "square" ?   Stroke::LINECAP_SQUARE :
-          /*value == "butt"   ?*/ Stroke::LINECAP_BUTT;
+            /*value == "round"   ?*/  Stroke::LINECAP_ROUND;
+    }
+    else if (match(c.key(), "stroke-linejoin") ) {
+        style.getOrCreate<LineSymbol>()->stroke()->lineJoin() =
+            c.value() == "mitre" ?      Stroke::LINEJOIN_MITRE :
+            c.value() == "miter" ?      Stroke::LINEJOIN_MITRE : // alternate spelling
+            /*c.value() == "round"  ?*/ Stroke::LINEJOIN_ROUND;
+    }
+    else if ( match(c.key(), "stroke-rounding-ratio") ) {
+        style.getOrCreate<LineSymbol>()->stroke()->roundingRatio() = as<float>(c.value(), 0.4f);
     }
     else if ( match(c.key(), "stroke-tessellation") ) {
         style.getOrCreate<LineSymbol>()->tessellation() = as<unsigned>( c.value(), 0 );

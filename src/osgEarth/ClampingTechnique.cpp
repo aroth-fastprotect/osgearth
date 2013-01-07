@@ -21,6 +21,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/MapNode>
+#include <osgEarth/Utils>
 
 #include <osg/Depth>
 #include <osg/PolygonMode>
@@ -31,6 +32,9 @@
 
 //#define OE_TEST if (_dumpRequested) OE_INFO << std::setprecision(9)
 #define OE_TEST OE_NULL
+
+//#define USE_RENDER_BIN 1
+#undef USE_RENDER_BIN
 
 using namespace osgEarth;
 
@@ -46,7 +50,9 @@ namespace
 
 ClampingTechnique::TechniqueProvider ClampingTechnique::Provider = s_providerImpl;
 
-//---------------------------------------------------------------------------
+
+//--------------------------------------------------------------------------
+
 
 // SUPPORT_Z is a placeholder - we need to come up with another method for
 // clamping verts relative to Z without needing the current Model Matrix
@@ -209,8 +215,83 @@ namespace
         osg::ref_ptr<osg::Uniform>   _depthViewToCamViewUniform;
 
         osg::ref_ptr<osg::Uniform>   _horizonDistanceUniform;
+
+        unsigned _renderLeafCount;
     };
 }
+
+#ifdef USE_RENDER_BIN
+
+//---------------------------------------------------------------------------
+// Custom bin for clamping.
+
+namespace
+{
+    struct ClampingRenderBin : public osgUtil::RenderBin
+    {
+        struct PerViewData // : public osg::Referenced
+        {
+            osg::observer_ptr<LocalPerViewData> _techData;
+        };
+
+        // shared across ALL render bin instances.
+        typedef Threading::PerObjectMap<osg::Camera*, PerViewData> PerViewDataMap;
+        PerViewDataMap* _pvd; 
+
+        // support cloning (from RenderBin):
+        virtual osg::Object* cloneType() const { return new ClampingRenderBin(); }
+        virtual osg::Object* clone(const osg::CopyOp& copyop) const { return new ClampingRenderBin(*this,copyop); } // note only implements a clone of type.
+        virtual bool isSameKindAs(const osg::Object* obj) const { return dynamic_cast<const ClampingRenderBin*>(obj)!=0L; }
+        virtual const char* libraryName() const { return "osgEarth"; }
+        virtual const char* className() const { return "ClampingRenderBin"; }
+
+
+        // constructs the prototype for this render bin.
+        ClampingRenderBin() : osgUtil::RenderBin()
+        {
+            this->setName( OSGEARTH_CLAMPING_BIN );
+            _pvd = new PerViewDataMap();
+        }
+
+        ClampingRenderBin( const ClampingRenderBin& rhs, const osg::CopyOp& op )
+            : osgUtil::RenderBin( rhs, op ), _pvd( rhs._pvd )
+        {
+            // zero out the stateset...dont' want to share that!
+            _stateset = 0L;
+        }
+
+        // override.
+        void sortImplementation()
+        {
+            copyLeavesFromStateGraphListToRenderLeafList();
+        }
+
+        // override.
+        void drawImplementation(osg::RenderInfo& renderInfo, osgUtil::RenderLeaf*& previous)
+        {
+            // find and initialize the state set for this camera.
+            if ( !_stateset.valid() )
+            {
+                osg::Camera* camera = renderInfo.getCurrentCamera();
+                PerViewData& data = _pvd->get(camera);
+                if ( data._techData.valid() )
+                {
+                    _stateset = data._techData->_groupStateSet.get();
+                    LocalPerViewData* local = static_cast<LocalPerViewData*>(data._techData.get());
+                    local->_renderLeafCount = _renderLeafList.size();
+                }
+            }
+
+            osgUtil::RenderBin::drawImplementation( renderInfo, previous );
+        }
+    };
+}
+
+/** the static registration. */
+extern "C" void osgEarth_clamping_bin_registration(void) {}
+static osgEarthRegisterRenderBinProxy<ClampingRenderBin> s_regbin(OSGEARTH_CLAMPING_BIN);
+
+#endif // USE_RENDER_BIN
 
 //---------------------------------------------------------------------------
 
@@ -228,7 +309,12 @@ _textureSize( 4096 )
 bool
 ClampingTechnique::hasData(OverlayDecorator::TechRTTParams& params) const
 {
+#ifdef USE_RENDER_BIN
+    //TODO: reconsider
+    return true;
+#else
     return params._group->getNumChildren() > 0;
+#endif
 }
 
 
@@ -268,12 +354,13 @@ ClampingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     params._rttCamera->setReferenceFrame( osg::Camera::ABSOLUTE_RF_INHERIT_VIEWPOINT );
     params._rttCamera->setClearColor( osg::Vec4f(0,0,0,0) );
     params._rttCamera->setClearMask( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-    params._rttCamera->setComputeNearFarMode( osg::CullSettings::COMPUTE_NEAR_FAR_USING_BOUNDING_VOLUMES );
+    //params._rttCamera->setComputeNearFarMode( osg::CullSettings::COMPUTE_NEAR_FAR_USING_BOUNDING_VOLUMES );
+    params._rttCamera->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
     params._rttCamera->setViewport( 0, 0, *_textureSize, *_textureSize );
     params._rttCamera->setRenderOrder( osg::Camera::PRE_RENDER );
     params._rttCamera->setRenderTargetImplementation( osg::Camera::FRAME_BUFFER_OBJECT );
     params._rttCamera->attach( osg::Camera::DEPTH_BUFFER, local->_rttTexture.get() );
-    params._rttCamera->setClampProjectionMatrixCallback( local->_cpm.get() );
+    //params._rttCamera->setClampProjectionMatrixCallback( local->_cpm.get() );
 
     // set up a StateSet for the RTT camera.
     osg::StateSet* rttStateSet = params._rttCamera->getOrCreateStateSet();
@@ -375,9 +462,26 @@ void
 ClampingTechnique::preCullTerrain(OverlayDecorator::TechRTTParams& params,
                                  osgUtil::CullVisitor*             cv )
 {
-    if ( !params._rttCamera.valid() && params._group->getNumChildren() > 0 )
+    if ( !params._rttCamera.valid() && hasData(params) )
     {
         setUpCamera( params );
+
+#ifdef USE_RENDER_BIN
+
+        // store our camera's stateset in the perview data.
+        ClampingRenderBin* bin = dynamic_cast<ClampingRenderBin*>( osgUtil::RenderBin::getRenderBinPrototype(OSGEARTH_CLAMPING_BIN) );
+        if ( bin )
+        {
+            ClampingRenderBin::PerViewData& data = bin->_pvd->get( cv->getCurrentCamera() );
+            LocalPerViewData* local = static_cast<LocalPerViewData*>(params._techniqueData.get());
+            data._techData = local;
+        }
+        else
+        {
+            OE_WARN << LC << "Odd, no prototype found for the clamping bin." << std::endl;
+        }
+
+#endif
     }
 }
 
@@ -386,7 +490,7 @@ void
 ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
                                     osgUtil::CullVisitor*            cv )
 {
-    if ( params._rttCamera.valid() && params._group->getNumChildren() > 0 )
+    if ( params._rttCamera.valid() && hasData(params) )
     {
         // update the RTT camera.
         params._rttCamera->setViewMatrix      ( params._rttViewMatrix );
@@ -395,7 +499,7 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
         LocalPerViewData& local = *static_cast<LocalPerViewData*>(params._techniqueData.get());
 
         // prime our CPM with the current cull visitor:
-        local._cpm->setup( cv );
+        //local._cpm->setup( cv );
 
         // create the depth texture (render the terrain to tex)
         params._rttCamera->accept( *cv );
@@ -415,7 +519,8 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
             params._rttViewMatrix;
 
         osg::Matrix depthViewToDepthClip = 
-            local._cpm->_clampedDepthProjMatrix *
+            //local._cpm->_clampedDepthProjMatrix *
+            params._rttProjMatrix *
             s_scaleBiasMat;
 
         osg::Matrix cameraViewToDepthClip =
@@ -445,10 +550,13 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
 
 #endif
 
-        // traverse the overlay nodes, applying the clamping shader.
-        cv->pushStateSet( local._groupStateSet.get() );
-        params._group->accept( *cv );
-        cv->popStateSet();
+        if ( params._group->getNumChildren() > 0 )
+        {
+            // traverse the overlay nodes, applying the clamping shader.
+            cv->pushStateSet( local._groupStateSet.get() );
+            params._group->accept( *cv );
+            cv->popStateSet();
+        }
     }
 }
 

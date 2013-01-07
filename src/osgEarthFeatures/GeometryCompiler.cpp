@@ -22,6 +22,7 @@
 #include <osgEarthFeatures/AltitudeFilter>
 #include <osgEarthFeatures/CentroidFilter>
 #include <osgEarthFeatures/ExtrudeGeometryFilter>
+#include <osgEarthFeatures/PolygonizeLines>
 #include <osgEarthFeatures/ScatterFilter>
 #include <osgEarthFeatures/SubstituteModelFilter>
 #include <osgEarthFeatures/TessellateOperator>
@@ -383,6 +384,25 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         }
     }
 
+    // polygonized lines.
+    else if ( line != 0L && line->stroke()->widthUnits() != Units::PIXELS )
+    {
+        if ( altRequired )
+        {
+            AltitudeFilter clamp;
+            clamp.setPropertiesFromStyle( style );
+            sharedCX = clamp.push( workingSet, sharedCX );
+            altRequired = false;
+        }
+
+        PolygonizeLinesFilter filter( style );
+        osg::Node* node = filter.push( workingSet, sharedCX );
+        if ( node )
+        {
+            resultGroup->addChild( node );
+        }
+    }
+
     // simple geometry
     else if ( point || line || polygon )
     {
@@ -456,6 +476,17 @@ GeometryCompiler::compile(FeatureList&          workingSet,
 
     // Optimize stateset sharing.
     sscache->optimize( resultGroup.get() );
+    
+    // todo: this helps a lot, but is currently broken for non-triangle
+    // geometries. (gw, 12-17-2012)
+#if 0
+        osgUtil::Optimizer optimizer;
+        optimizer.optimize(
+            resultGroup.get(),
+            osgUtil::Optimizer::VERTEX_PRETRANSFORM );
+            osgUtil::Optimizer::VERTEX_POSTTRANSFORM );
+#endif
+
 
 
     //osgDB::writeNodeFile( *(resultGroup.get()), "out.osg" );

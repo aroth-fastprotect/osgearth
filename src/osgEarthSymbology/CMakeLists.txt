@@ -17,6 +17,7 @@ SET(TARGET_PUBLIC_H
     CssUtils
     Expression
     ExtrusionSymbol
+    Fill
     Geometry
     GeometryFactory
     GEOS
@@ -35,15 +36,16 @@ SET(TARGET_PUBLIC_H
     PointSymbol
     PolygonSymbol
 	Query
+    RenderSymbol
     Resource
     ResourceCache
     ResourceLibrary
     Skins
 	StencilVolumeNode
+    Stroke
     Style
     StyleSelector
     StyleSheet
-    SLD
     Symbol
     Tags
     TextSymbol
@@ -55,6 +57,7 @@ SET(TARGET_SRC
     CssUtils.cpp
     Expression.cpp
     ExtrusionSymbol.cpp
+    Fill.cpp
     Geometry.cpp
     GeometryFactory.cpp
     GEOS.cpp
@@ -73,15 +76,16 @@ SET(TARGET_SRC
     PointSymbol.cpp
     PolygonSymbol.cpp
     Query.cpp
+    RenderSymbol.cpp
     Resource.cpp
     ResourceCache.cpp
     ResourceLibrary.cpp
     Skins.cpp
     StencilVolumeNode.cpp
+    Stroke.cpp
     Style.cpp
     StyleSelector.cpp
     StyleSheet.cpp
-    SLD.cpp
     Symbol.cpp
     TextSymbol.cpp
 )

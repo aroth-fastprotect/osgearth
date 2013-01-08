@@ -36,6 +36,7 @@ SET(TARGET_PUBLIC_H
     TFS
     TFSPackager
     TMS
+    TMSBackFiller
     TMSPackager
     UTMGraticule
 	WFS
@@ -73,6 +74,7 @@ SET(TARGET_SRC
     TFS.cpp
     TFSPackager.cpp
     TMS.cpp
+    TMSBackFiller.cpp
     TMSPackager.cpp
     UTMGraticule.cpp
 	WFS.cpp

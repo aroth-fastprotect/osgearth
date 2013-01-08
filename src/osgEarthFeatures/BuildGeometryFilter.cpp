@@ -175,10 +175,10 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
 
             // resolve the color:
             osg::Vec4f primaryColor =
-                polySymbol ? polySymbol->fill()->color() :
-                lineSymbol ? lineSymbol->stroke()->color() :
+                polySymbol  ? polySymbol->fill()->color() :
+                lineSymbol  ? lineSymbol->stroke()->color() :
                 pointSymbol ? pointSymbol->fill()->color() :
-                osg::Vec4f(1,1,1,1);
+                osgEarth::Symbology::Color(1,1,1,1);
             
             osg::Geometry* osgGeom = new osg::Geometry();
             osgGeom->setUseVertexBufferObjects( _useVertexBufferObjects.value() );
@@ -264,7 +264,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
 
             // record the geometry's primitive set(s) in the index:
             if ( context.featureIndex() )
-                context.featureIndex()->tagPrimitiveSets( osgGeom, input->getFID() );
+                context.featureIndex()->tagPrimitiveSets( osgGeom, input );
 
             // build secondary geometry, if necessary (polygon outlines)
             if ( renderType == Geometry::TYPE_POLYGON && lineSymbol )
@@ -319,7 +319,7 @@ BuildGeometryFilter::process( FeatureList& features, const FilterContext& contex
 
                 // Mark each primitive set with its feature ID.
                 if ( context.featureIndex() )
-                    context.featureIndex()->tagPrimitiveSets( outline, input->getFID() );
+                    context.featureIndex()->tagPrimitiveSets( outline, input );
             }
 
         }
@@ -389,7 +389,16 @@ BuildGeometryFilter::push( FeatureList& input, FilterContext& context )
     // convert all geom to triangles and consolidate into minimal set of Geometries
     if ( !_featureNameExpr.isSet() )
     {
+#if 1
         MeshConsolidator::run( *_geode.get() );
+#else
+        osgUtil::Optimizer opt;
+        opt.optimize( _geode.get(),
+            osgUtil::Optimizer::VERTEX_PRETRANSFORM |
+            osgUtil::Optimizer::INDEX_MESH |
+            osgUtil::Optimizer::VERTEX_POSTTRANSFORM |
+            osgUtil::Optimizer::MERGE_GEOMETRY );
+#endif
     }
 
     osg::Node* result = 0L;

@@ -141,7 +141,7 @@ public:
     }
 
     // override
-    osg::Node* createNode(const Map* map, const osgDB::Options* dbOptions, ProgressCallback* progress )
+    osg::Node* createNodeImplementation(const Map* map, const osgDB::Options* dbOptions, ProgressCallback* progress )
     {
         osg::ref_ptr<osg::Node> result;
 

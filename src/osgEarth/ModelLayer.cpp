@@ -37,7 +37,7 @@ namespace
     {
         NodeModelSource( osg::Node* node ) : _node(node) { }
 
-        osg::Node* createNode(const Map* map, const osgDB::Options* dbOptions, ProgressCallback* progress) {
+        osg::Node* createNodeImplementation(const Map* map, const osgDB::Options* dbOptions, ProgressCallback* progress) {
             return _node.get();
         }
 
@@ -133,8 +133,8 @@ _initOptions( options )
 }
 
 ModelLayer::ModelLayer(const std::string& name, osg::Node* node):
-_modelSource( new NodeModelSource(node) ),
-_initOptions( ModelLayerOptions(name) )
+_initOptions( ModelLayerOptions(name) ),
+_modelSource( new NodeModelSource(node) )
 {
     copyOptions();
 }

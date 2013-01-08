@@ -37,6 +37,7 @@ SET(TARGET_PUBLIC_H
     MeshClamper
 	OgrUtils
     OptimizerHints
+    PolygonizeLines
     ResampleFilter
     ScaleFilter
     Session
@@ -76,7 +77,9 @@ SET(TARGET_SRC
 	GeometryUtils.cpp
     LabelSource.cpp
     MeshClamper.cpp
+    OgrUtils.cpp
     OptimizerHints.cpp
+    PolygonizeLines.cpp
     ResampleFilter.cpp
     ScaleFilter.cpp
     Session.cpp

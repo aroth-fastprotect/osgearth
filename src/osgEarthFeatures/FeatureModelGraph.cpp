@@ -92,6 +92,7 @@ namespace
         p->setPriorityOffset( 0, priOffset );
         p->setPriorityScale( 0, priScale );
 #endif
+
         return p;
     }
 }
@@ -157,6 +158,12 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
         FMGRegistry::const_iterator i = _fmgRegistry.find( uid );
         return i != _fmgRegistry.end() ? i->second.get() : 0L;
     }
+
+    /** User data structure for traversing the feature graph. */
+    struct CullUserData : public osg::Referenced
+    {
+        double _cameraElevation;
+    };
 };
 
 REGISTER_OSGPLUGIN(osgearth_pseudo_fmg, osgEarthFeatureModelPseudoLoader)
@@ -367,8 +374,11 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
 
     if ( _session->getMapInfo().isGeocentric() )
     {
-        workingExtent.getSRS()->transformToECEF( center, center );
-        workingExtent.getSRS()->transformToECEF( corner, corner );
+        const SpatialReference* ecefSRS = workingExtent.getSRS()->getECEF();
+        workingExtent.getSRS()->transform( center, ecefSRS, center );
+        workingExtent.getSRS()->transform( corner, ecefSRS, corner );
+        //workingExtent.getSRS()->transformToECEF( center, center );
+        //workingExtent.getSRS()->transformToECEF( corner, corner );
     }
 
     return osg::BoundingSphered( center, (center-corner).length() );
@@ -567,7 +577,8 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
     }
     else
     {
-        RemoveEmptyGroupsVisitor::run( result );
+        // For some unknown reason, this breaks when I insert an LOD. -gw
+        //RemoveEmptyGroupsVisitor::run( result );
     }
 
     if ( result->getNumChildren() == 0 )
@@ -712,17 +723,23 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
     if ( group->getNumChildren() > 0 )
     {
         // account for a min-range here. Do not address the max-range here; that happens
-        // above when generating paged LOD nodes, etc.        
+        // above when generating paged LOD nodes, etc.
         float minRange = level.minRange();
 
+#if 1
         if ( minRange > 0.0f )
         {
             // minRange can't be less than the tile geometry's radius.
-            minRange = std::max(minRange, (float)group->getBound().radius());
-            osg::LOD* lod = new osg::LOD();
-            lod->addChild( group.get(), minRange, FLT_MAX );
+            //minRange = std::max(minRange, (float)group->getBound().radius());
+            //osg::LOD* lod = new osg::LOD();
+            //lod->addChild( group.get(), minRange, FLT_MAX );
+
+            ElevationLOD* lod = new ElevationLOD( _session->getMapSRS() );
+            lod->setMinElevation( minRange );
+            lod->addChild( group.get() );
             group = lod;
-        }        
+        }
+#endif
 
         if ( _session->getMapInfo().isGeocentric() && _options.clusterCulling() == true )
         {
@@ -737,8 +754,10 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
                     // get the geocentric tile center:
                     osg::Vec3d tileCenter;
                     ccExtent.getCentroid( tileCenter.x(), tileCenter.y() );
+
                     osg::Vec3d centerECEF;
-                    ccExtent.getSRS()->transformToECEF( tileCenter, centerECEF );
+                    ccExtent.getSRS()->transform( tileCenter, _session->getMapSRS()->getECEF(), centerECEF );
+                    //ccExtent.getSRS()->transformToECEF( tileCenter, centerECEF );
 
                     osg::NodeCallback* ccc = ClusterCullingFactory::create2( group.get(), centerECEF );
                     if ( ccc )
@@ -1131,7 +1150,7 @@ FeatureModelGraph::checkForGlobalAltitudeStyles( const Style& style )
 void
 FeatureModelGraph::traverse(osg::NodeVisitor& nv)
 {
-    if ( nv.getVisitorType() == osg::NodeVisitor::EVENT_VISITOR )
+    if ( nv.getVisitorType() == nv.EVENT_VISITOR )
     {
         if ( !_pendingUpdate && (_dirty || _session->getFeatureSource()->outOfSyncWith(_revision)) )
         {
@@ -1145,7 +1164,7 @@ FeatureModelGraph::traverse(osg::NodeVisitor& nv)
         }
     }
 
-    else if ( nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR )
+    else if ( nv.getVisitorType() == nv.UPDATE_VISITOR )
     {
         if ( _pendingUpdate )
         {
@@ -1265,6 +1284,7 @@ FeatureModelGraph::redraw()
     //If they've specified a min/max range, setup an LOD
     if ( minRange != -FLT_MAX || maxRange != FLT_MAX )
     {        
+        // todo: revisit this, make sure this is still right.
         ElevationLOD *lod = new ElevationLOD(_session->getMapInfo().getSRS(), minRange, maxRange );
         lod->addChild( node );
         node = lod;

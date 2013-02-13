@@ -23,6 +23,7 @@
 #include <osgEarthUtil/MGRSFormatter>
 #include <osgEarthUtil/MouseCoordsTool>
 #include <osgEarthUtil/AutoClipPlaneHandler>
+#include <osgEarthUtil/DataScanner>
 
 #include <osgEarthAnnotation/AnnotationData>
 #include <osgEarthAnnotation/AnnotationRegistry>
@@ -36,6 +37,7 @@
 #include <osgGA/StateSetManipulator>
 #include <osgViewer/ViewerEventHandlers>
 #include <osgDB/FileNameUtils>
+#include <osgDB/WriteFile>
 
 #define KML_PUSHPIN_URL "http://demo.pelicanmapping.com/icons/pushpin_yellow.png"
 
@@ -412,16 +414,11 @@ MapNodeHelper::load(osg::ArgumentParser& args,
 
     if ( !node )
     {
-        OE_WARN << LC << "Unable to load an earth file from the command line." << std::endl;
-        return 0L;
-        //node = osgDB::readNodeFile( "gdal_tiff.earth" );
-        //if ( !node )
-        //{
-        //    return 0L;
-        //}
+        OE_WARN << LC << "No earth file from the command line; making one." << std::endl;
+        node = new MapNode();
     }
 
-    osg::ref_ptr<MapNode> mapNode = MapNode::findMapNode(node);
+    osg::ref_ptr<MapNode> mapNode = MapNode::get(node);
     if ( !mapNode.valid() )
     {
         OE_WARN << LC << "Loaded scene graph does not contain a MapNode - aborting" << std::endl;
@@ -465,7 +462,6 @@ MapNodeHelper::parse(MapNode*             mapNode,
     osg::ref_ptr<osgDB::Options> dbOptions = Registry::instance()->cloneOrCreateOptions();
 
     // parse out custom example arguments first:
-
     bool useSky        = args.read("--sky");
     bool useOcean      = args.read("--ocean");
     bool useMGRS       = args.read("--mgrs");
@@ -480,6 +476,15 @@ MapNodeHelper::parse(MapNode*             mapNode,
 
     std::string kmlFile;
     args.read( "--kml", kmlFile );
+
+    std::string imageFolder;
+    args.read( "--images", imageFolder );
+
+    std::string imageExtensions;
+    args.read("--image-extensions", imageExtensions);
+
+    std::string outEarth;
+    args.read("--out-earth", outEarth);
 
     // install a canvas for any UI controls we plan to create:
     ControlCanvas* canvas = ControlCanvas::get(view, false);
@@ -534,7 +539,8 @@ MapNodeHelper::parse(MapNode*             mapNode,
     {
         double hours = skyConf.value( "hours", 12.0 );
         SkyNode* sky = new SkyNode( mapNode->getMap() );
-        sky->setAmbientBrightness( ambientBrightness );
+        //sky->setAmbientBrightness( ambientBrightness );
+        sky->setAutoAmbience( true );
         sky->setDateTime( 2011, 3, 6, hours );
         sky->attach( view );
         root->addChild( sky );
@@ -631,17 +637,40 @@ MapNodeHelper::parse(MapNode*             mapNode,
     // Install an auto clip plane clamper
     if ( useAutoClip )
     {
-#if 0
-        HorizonClipNode* hcn = new HorizonClipNode( mapNode );
-        if ( mapNode->getNumParents() == 1 )
-        {
-            osg::Group* parent = mapNode->getParent(0);
-            hcn->addChild( mapNode );
-            parent->replaceChild( mapNode, hcn );
-        }
-#else
         mapNode->addCullCallback( new AutoClipPlaneCullCallback(mapNode) );
-#endif
+    }
+
+    // Scan for images if necessary.
+    if ( !imageFolder.empty() )
+    {
+        std::vector<std::string> extensions;
+        if ( !imageExtensions.empty() )
+            StringTokenizer( imageExtensions, extensions, ",;", "", false, true );
+        if ( extensions.empty() )
+            extensions.push_back( "tif" );
+
+        OE_INFO << LC << "Loading images from " << imageFolder << "..." << std::endl;
+        ImageLayerVector imageLayers;
+        DataScanner scanner;
+        scanner.findImageLayers( imageFolder, extensions, imageLayers );
+
+        if ( imageLayers.size() > 0 )
+        {
+            mapNode->getMap()->beginUpdate();
+            for( ImageLayerVector::iterator i = imageLayers.begin(); i != imageLayers.end(); ++i )
+            {
+                mapNode->getMap()->addImageLayer( i->get() );
+            }
+            mapNode->getMap()->endUpdate();
+        }
+        OE_INFO << LC << "...found " << imageLayers.size() << " image layers." << std::endl;
+    }
+
+    // Dump out an earth file if so directed.
+    if ( !outEarth.empty() )
+    {
+        OE_NOTICE << LC << "Writing earth file: " << outEarth << std::endl;
+        osgDB::writeNodeFile( *mapNode, outEarth );
     }
 
     root->addChild( canvas );
@@ -664,13 +693,16 @@ std::string
 MapNodeHelper::usage() const
 {
     return Stringify()
-        << "    --sky                : add a sky model\n"
-        << "    --ocean              : add an ocean model\n"
-        << "    --kml <file.kml>     : load a KML or KMZ file\n"
-        << "    --coords             : display map coords under mouse\n"
-        << "    --dms                : dispay deg/min/sec coords under mouse\n"
-        << "    --dd                 : display decimal degrees coords under mouse\n"
-        << "    --mgrs               : show MGRS coords under mouse\n"
-        << "    --ortho              : use an orthographic camera\n"
-        << "    --autoclip           : installs an auto-clip plane callback\n";
+        << "  --sky                         : add a sky model\n"
+        << "  --ocean                       : add an ocean model\n"
+        << "  --kml <file.kml>              : load a KML or KMZ file\n"
+        << "  --coords                      : display map coords under mouse\n"
+        << "  --dms                         : dispay deg/min/sec coords under mouse\n"
+        << "  --dd                          : display decimal degrees coords under mouse\n"
+        << "  --mgrs                        : show MGRS coords under mouse\n"
+        << "  --ortho                       : use an orthographic camera\n"
+        << "  --autoclip                    : installs an auto-clip plane callback\n"
+        << "  --images [path]               : finds and loads image layers from folder [path]\n"
+        << "  --image-extensions [ext,...]  : with --images, extensions to use\n"
+        << "  --out [earthfile]             : write the loaded map to an earth file\n";
 }

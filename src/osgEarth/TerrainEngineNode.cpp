@@ -18,6 +18,7 @@
  */
 #include <osgEarth/TerrainEngineNode>
 #include <osgEarth/Capabilities>
+#include <osgEarth/CullingUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/TextureCompositor>
 #include <osgEarth/NodeUtils>
@@ -217,6 +218,7 @@ TerrainEngineNode::preInitialize( const Map* map, const TerrainOptions& options 
     set->setMode( GL_CULL_FACE, 1 );
 
     // elevation uniform
+    // NOTE: wrong...this should be per-CullVisitor...consider putting in the Culling::CullUserData
     _cameraElevationUniform = new osg::Uniform( osg::Uniform::FLOAT, "osgearth_CameraElevation" );
     _cameraElevationUniform->set( 0.0f );
     set->addUniform( _cameraElevationUniform.get() );
@@ -413,7 +415,7 @@ TerrainEngineNode::traverse( osg::NodeVisitor& nv )
             if ( !_terrainInterface->_updateOperationQueue.valid() ) // double check pattern
             {
                 //TODO: think, will this work with >1 view?
-                osgUtil::CullVisitor* cv = dynamic_cast<osgUtil::CullVisitor*>( &nv );
+                osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
                 if ( cv->getCurrentCamera() )
                 {
                     osgViewer::View* view = dynamic_cast<osgViewer::View*>(cv->getCurrentCamera()->getView());
@@ -435,7 +437,7 @@ TerrainEngineNode::traverse( osg::NodeVisitor& nv )
         {
             _updateLightingUniformsHelper.cullTraverse( this, &nv );
 
-            osgUtil::CullVisitor* cv = dynamic_cast<osgUtil::CullVisitor*>( &nv );
+            osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
             if ( cv )
             {
                 osg::Vec3d eye = cv->getEyePoint();

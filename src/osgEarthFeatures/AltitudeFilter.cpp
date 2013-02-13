@@ -51,6 +51,7 @@ AltitudeFilter::push( FeatureList& features, FilterContext& cx )
         _altitude.valid()                                          && 
         _altitude->clamping()  != AltitudeSymbol::CLAMP_NONE       &&
         _altitude->technique() == AltitudeSymbol::TECHNIQUE_MAP    &&
+        //_altitude->technique() != AltitudeSymbol::TECHNIQUE_SCENE  &&
         cx.getSession()        != 0L                               &&
         cx.profile()           != 0L;
 
@@ -82,11 +83,11 @@ AltitudeFilter::pushAndDontClamp( FeatureList& features, FilterContext& cx )
 
         double scaleZ = 1.0;
         if ( _altitude.valid() && _altitude->verticalScale().isSet() )
-            scaleZ = feature->eval( scaleExpr );
+            scaleZ = feature->eval( scaleExpr, &cx );
 
         double offsetZ = 0.0;
         if ( _altitude.valid() && _altitude->verticalOffset().isSet() )
-            offsetZ = feature->eval( offsetExpr );
+            offsetZ = feature->eval( offsetExpr, &cx );
         
         GeometryIterator gi( feature->getGeometry() );
         while( gi.hasMore() )

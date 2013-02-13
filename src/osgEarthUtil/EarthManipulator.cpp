@@ -232,7 +232,8 @@ _auto_vp_duration( rhs._auto_vp_duration ),
 _min_vp_duration_s( rhs._min_vp_duration_s ),
 _max_vp_duration_s( rhs._max_vp_duration_s ),
 _camProjType( rhs._camProjType ),
-_camFrustOffsets( rhs._camFrustOffsets )
+_camFrustOffsets( rhs._camFrustOffsets ),
+_breakTetherActions( rhs._breakTetherActions )
 {
     //NOP
 }
@@ -900,9 +901,6 @@ EarthManipulator::setViewpoint( const Viewpoint& vp, double duration_s )
         
         _thrown = false;
         _task->_type = TASK_NONE;
-
-        // recalculate the center point.
-        recalculateCenter();
     }
     else
     {
@@ -962,8 +960,6 @@ EarthManipulator::setViewpoint( const Viewpoint& vp, double duration_s )
         osg::Matrix new_rot = osg::Matrixd( azim_q * pitch_q );
 
         _rotation = osg::Matrixd::inverse(new_rot).getRotate();
-
-        recalculateCenter();
     }
 }
 

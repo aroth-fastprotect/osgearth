@@ -44,10 +44,35 @@ using namespace osgEarth::Symbology;
 
 namespace
 {
-    osg::ref_ptr<PointSymbol>   s_defaultPointSymbol   = new PointSymbol();
-    osg::ref_ptr<LineSymbol>    s_defaultLineSymbol    = new LineSymbol();
-    osg::ref_ptr<PolygonSymbol> s_defaultPolygonSymbol = new PolygonSymbol();
-    osg::ref_ptr<osg::Program>  s_nullProgram          = new osg::Program();
+    /**
+     * Visitor that will exaggerate the bounding box of each Drawable
+     * in the scene graph to encompass a local high and low mark. We use this
+     * to support GPU-clamping, which will move vertex positions in the 
+     * GPU code. Since OSG is not aware of this movement, it may inadvertenly
+     * cull geometry which is actually visible.
+     */
+    struct OverlayGeometryAdjuster : public osg::NodeVisitor
+    {
+        float _low, _high;
+
+        OverlayGeometryAdjuster(float low, float high)
+            : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), _low(low), _high(high) { }
+
+        void apply(osg::Geode& geode)
+        {
+            for( unsigned i=0; i<geode.getNumDrawables(); ++i )
+            {
+                osg::Drawable* d = geode.getDrawable(i);
+                osg::BoundingBox bbox = d->getBound();
+                if ( bbox.zMin() > _low )
+                    bbox.expandBy( osg::Vec3f(bbox.xMin(), bbox.yMin(), _low) );
+                if ( bbox.zMax() < _high )
+                    bbox.expandBy( osg::Vec3f(bbox.xMax(), bbox.yMax(), _high) );
+                d->setInitialBound( bbox );
+                d->dirtyBound();
+            }
+        }
+    };
 }
 
 //-----------------------------------------------------------------------
@@ -63,6 +88,7 @@ _useVertexBufferObjects( true ),
 _shaderPolicy      ( SHADERPOLICY_GENERATE )
 {
     fromConfig(_conf);
+    _useVertexBufferObjects = !Registry::capabilities().preferDisplayListsForStaticGeometry();
 }
 
 void
@@ -188,15 +214,10 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         sharedCX.extent() = sharedCX.profile()->getExtent();
     }
 
-    // only localize coordinates if the map is geocentric AND the extent is
-    // less than 180 degrees.
-    bool localize = false;
-    if ( sharedCX.isGeoreferenced() )
-    {
-        const MapInfo& mi = sharedCX.getSession()->getMapInfo();
-        GeoExtent workingExtent = sharedCX.extent()->transform( sharedCX.profile()->getSRS()->getGeographicSRS() );
-        localize = mi.isGeocentric() && workingExtent.width() < 180.0;
-    }
+    // ref_ptr's to hold defaults in case we need them.
+    osg::ref_ptr<PointSymbol>   defaultPoint;
+    osg::ref_ptr<LineSymbol>    defaultLine;
+    osg::ref_ptr<PolygonSymbol> defaultPolygon;
 
     // go through the Style and figure out which filters to use.
     const PointSymbol*     point     = style.get<PointSymbol>();
@@ -229,13 +250,20 @@ GeometryCompiler::compile(FeatureList&          workingSet,
             {
             case Geometry::TYPE_LINESTRING:
             case Geometry::TYPE_RING:
-                line = s_defaultLineSymbol.get(); break;
+                defaultLine = new LineSymbol();
+                line = defaultLine.get();
+                break;
             case Geometry::TYPE_POINTSET:
-                point = s_defaultPointSymbol.get(); break;
+                defaultPoint = new PointSymbol();
+                point = defaultPoint.get();
+                break;
             case Geometry::TYPE_POLYGON:
-                polygon = s_defaultPolygonSymbol.get(); break;
-            case Geometry::TYPE_UNKNOWN: break;
-            case Geometry::TYPE_MULTI: break;
+                defaultPolygon = new PolygonSymbol();
+                polygon = defaultPolygon.get();
+                break;
+            case Geometry::TYPE_MULTI:
+            case Geometry::TYPE_UNKNOWN:
+                break;
             }
         }
     }
@@ -376,6 +404,8 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         // apply per-feature naming if requested.
         if ( _options.featureName().isSet() )
             extrude.setFeatureNameExpr( *_options.featureName() );
+        if ( _options.useVertexBufferObjects().isSet())
+            extrude.useVertexBufferObjects() = *_options.useVertexBufferObjects();
 
         osg::Node* node = extrude.push( workingSet, sharedCX );
         if ( node )
@@ -469,7 +499,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         else if ( _options.shaderPolicy() == SHADERPOLICY_DISABLE )
         {
             resultGroup->getOrCreateStateSet()->setAttributeAndModes(
-                s_nullProgram,
+                new osg::Program(),
                 osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE );
         }
     }
@@ -487,6 +517,17 @@ GeometryCompiler::compile(FeatureList&          workingSet,
             osgUtil::Optimizer::VERTEX_POSTTRANSFORM );
 #endif
 
+#if 0
+    // if necessary, modify the bounding boxes of the underlying Geometry
+    // drawables so they will work with clamping.
+    if (altitude &&
+        (altitude->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || altitude->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN) &&
+        altitude->technique() == AltitudeSymbol::TECHNIQUE_GPU)
+    {
+        OverlayGeometryAdjuster adjuster( -10000.0f, 10000.0f );
+        resultGroup->accept( adjuster );
+    }
+#endif
 
 
     //osgDB::writeNodeFile( *(resultGroup.get()), "out.osg" );

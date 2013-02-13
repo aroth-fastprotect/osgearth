@@ -107,16 +107,14 @@ namespace osgEarth
         /** maximum size of a uniform buffer block, in bytes */
         int getMaxUniformBlockSize() const { return _maxUniformBlockSize; }
 
+        bool        loadFromFile(const std::string & filename);
+        bool        saveToFile(const std::string & filename);
 
     protected:
         Capabilities();
 
         /** dtor */
         virtual ~Capabilities() { }
-
-    private:
-        bool        readCache();
-        bool        writeCache();
 
     private:
         int  _maxFFPTextureUnits;

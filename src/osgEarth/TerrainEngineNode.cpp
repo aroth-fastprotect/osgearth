@@ -145,8 +145,8 @@ TerrainEngineNode::ImageLayerController::onColorFiltersChanged( ImageLayer* laye
 TerrainEngineNode::TerrainEngineNode() :
 _verticalScale         ( 1.0f ),
 _elevationSamplingRatio( 1.0f ),
-_initStage             ( INIT_NONE ),
-_dirtyCount            ( 0 )
+_dirtyCount            ( 0 ),
+_initStage             ( INIT_NONE )
 {
     // register for event traversals so we can properly reset the dirtyCount
     ADJUST_EVENT_TRAV_COUNT( this, 1 );
@@ -213,7 +213,8 @@ TerrainEngineNode::preInitialize( const Map* map, const TerrainOptions& options 
 
     // enable backface culling
     osg::StateSet* set = getOrCreateStateSet();
-    set->setAttributeAndModes( new osg::CullFace( osg::CullFace::BACK ), osg::StateAttribute::ON );
+    //set->setAttributeAndModes( new osg::CullFace( osg::CullFace::BACK ), osg::StateAttribute::ON );
+    set->setMode( GL_CULL_FACE, 1 );
 
     // elevation uniform
     _cameraElevationUniform = new osg::Uniform( osg::Uniform::FLOAT, "osgearth_CameraElevation" );

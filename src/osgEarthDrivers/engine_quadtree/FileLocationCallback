@@ -49,7 +49,7 @@ namespace osgEarth_engine_quadtree
             //OE_NOTICE<<"fileLocation = "<<filename<<std::endl;
 
             unsigned int lod, x, y, id;
-            sscanf(filename.c_str(), "%d/%d/%d.%d", &lod, &x, &y, &id);
+            sscanf(filename.c_str(), "%d/%d/%d.%d", (int*)&lod, (int*)&x, (int*)&y, (int*)&id);
 
             osg::ref_ptr<QuadTreeTerrainEngineNode> engine;
             QuadTreeTerrainEngineNode::getEngineByUID( (UID)id, engine );

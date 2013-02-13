@@ -16,22 +16,43 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-#ifndef OSGEARTHSYMBOLOGY_STYLING_SLD_H
-#define OSGEARTHSYMBOLOGY_STYLING_SLD_H 1
+
+#ifndef OSGEARTHSYMBOLOGY_FILL_H
+#define OSGEARTHSYMBOLOGY_FILL_H 1
 
 #include <osgEarthSymbology/Common>
-#include <osgEarthSymbology/Style>
+#include <osgEarthSymbology/Color>
 #include <osgEarth/Config>
-#include <iostream>
+
 
 namespace osgEarth { namespace Symbology
 {
-    class OSGEARTHSYMBOLOGY_EXPORT SLDReader
+    /**
+     * Drawing parameters for a filled area.
+     */
+    class OSGEARTHSYMBOLOGY_EXPORT Fill
     {
     public:
-        static bool readStyleFromCSSParams( const Config& conf, Symbology::Style& out_style );
+        Fill();
+        Fill(const Fill& rhs);
+        Fill( float r, float g, float b, float a );
+        Fill( const Color& color );
+        Fill( const Config& conf );
+
+        virtual ~Fill() { }
+
+        Color& color() { return _color; }
+        const Color& color() const { return _color; }
+
+    public:
+        virtual Config getConfig() const;
+        virtual void mergeConfig( const Config& conf );
+
+    protected:
+        Color _color;
+        void init();
     };
 
-} } // namespace osgEarth::Features2
+} } // namespace osgEarth::Symbology
 
-#endif // OSGEARTHFEATURES_STYLING_SLD_H
+#endif // OSGEARTHSYMBOLOGY_FILL_H

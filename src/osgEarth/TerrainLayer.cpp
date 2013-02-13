@@ -463,14 +463,14 @@ TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
                 }
                 else if ( isCacheOnly() )
                 {
-                    OE_WARN << LC << "Failed to create a cache bin for layer"
+                    OE_WARN << LC << "Failed to create a cache bin (" << binId << ") for layer"
                         << " because cache_only mode is enabled and no existing cache could be found."
                         << std::endl;
                     return 0L;
                 }
                 else
                 {
-                    OE_WARN << LC << "Failed to create a cache bin for layer"
+                    OE_WARN << LC << "Failed to create a cache bin (" << binId << ") for layer"
                         << " because there is no valid tile source."
                         << std::endl;
                     return 0L;
@@ -487,7 +487,7 @@ TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
         {
             // bin creation failed, so disable caching for this layer.
             setCachePolicy( CachePolicy::NO_CACHE );
-            OE_WARN << LC << "Failed to create a caching bin for layer; cache disabled." << std::endl;
+            OE_WARN << LC << "Failed to create a caching bin (" << binId << ") for layer; cache disabled." << std::endl;
         }
 
         return newBin.get(); // not release()

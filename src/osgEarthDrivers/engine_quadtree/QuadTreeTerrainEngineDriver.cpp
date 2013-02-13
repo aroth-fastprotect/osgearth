@@ -98,7 +98,7 @@ public:
             // parse the tile key and engine ID:
             std::string tileDef = osgDB::getNameLessExtension(uri);
             unsigned int lod, x, y, engineID;
-            sscanf(tileDef.c_str(), "%d/%d/%d.%d", &lod, &x, &y, &engineID);
+            sscanf(tileDef.c_str(), "%d/%d/%d.%d", (int*)&lod, (int*)&x, (int*)&y, (int*)&engineID);
 
             // find the appropriate engine:
             osg::ref_ptr<QuadTreeTerrainEngineNode> engineNode;

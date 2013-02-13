@@ -315,8 +315,10 @@ HTTPClient::getClient()
 }
 
 HTTPClient::HTTPClient() :
-_initialized    ( false ),
 _curl_handle    ( 0L ),
+_previousPassword          (),
+_previousHttpAuthentication( 0L ),
+_initialized               ( false ),
 _simResponseCode( -1L )
 {
     //nop
@@ -812,7 +814,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
             OE_WARN << LC
                 << "NULL Content-Type (protocol violation) " 
                 << "URL=" << request.getURL() << std::endl;
-            return HTTPResponse();
+            return HTTPResponse(0L);
         }
 
         // NOTE:

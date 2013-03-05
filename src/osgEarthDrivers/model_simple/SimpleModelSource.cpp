@@ -201,23 +201,23 @@ public:
             }
         }
 
-        if(_options.loadingPriorityScale().isSet() || _options.loadingPriorityOffset().isSet())
-        {
-            SetLoadPriorityVisitor slpv(_options.loadingPriorityScale().value(), _options.loadingPriorityOffset().value());
-            result->accept(slpv);
-        }
-
-        if(_options.lodScale().isSet())
-        {
-            LODScaleOverrideNode * node = new LODScaleOverrideNode;
-            node->setLODScale(_options.lodScale().value());
-            node->addChild(result.release());
-            result = node;
-        }
-
         // generate a shader program to render the model.
         if ( result.valid() )
         {
+            if(_options.loadingPriorityScale().isSet() || _options.loadingPriorityOffset().isSet())
+            {
+                SetLoadPriorityVisitor slpv(_options.loadingPriorityScale().value(), _options.loadingPriorityOffset().value());
+                result->accept(slpv);
+            }
+
+            if(_options.lodScale().isSet())
+            {
+                LODScaleOverrideNode * node = new LODScaleOverrideNode;
+                node->setLODScale(_options.lodScale().value());
+                node->addChild(result.release());
+                result = node;
+            }
+
             UseLoadOnceLoaderVisitor loadoncevisitor;
             result->accept( loadoncevisitor );
             if ( _options.shaderPolicy() == SHADERPOLICY_GENERATE )

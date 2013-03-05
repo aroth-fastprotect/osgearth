@@ -86,7 +86,7 @@ Picker::pick( float x, float y, Hits& results ) const
         matrix.preMult( camera->getViewMatrix() );
 
         osg::NodePath prunedNodePath( _path.begin(), _path.end()-1 );
-        matrix.preMult( osg::computeWorldToLocal(prunedNodePath) );
+        matrix.preMult( osg::computeLocalToWorld(prunedNodePath) );
 
         osg::Polytope transformedPT;
         transformedPT.setAndTransformProvidingInverse( winPT, matrix );
@@ -121,7 +121,19 @@ Picker::pick( float x, float y, Hits& results ) const
 
     if (picker->containsIntersections())
     {
-        results = picker->getIntersections();
+        osg::Vec3d eye, center, up;
+        camera->getViewMatrixAsLookAt(eye, center, up);
+        const osgUtil::PolytopeIntersector::Intersections &  intersections = picker->getIntersections();
+        for(osgUtil::PolytopeIntersector::Intersections::const_iterator it = intersections.begin(); it != intersections.end(); it++)
+        {
+            const osgUtil::PolytopeIntersector::Intersection & hit = *it;
+            osg::Vec3d world = hit.localIntersectionPoint * (*hit.matrix);
+            
+            osgUtil::PolytopeIntersector::Intersection copyhit = hit;
+            copyhit.distance = (eye - world).length();
+            
+            results.insert(copyhit);
+        }
         return true;
     }
     else

@@ -63,8 +63,8 @@ namespace osgEarth { namespace Drivers
     public:
         SimpleModelOptions( const ConfigOptions& options=ConfigOptions() )
             : ModelSourceOptions( options ),
-              _shaderPolicy( SHADERPOLICY_GENERATE ),
               _lod_scale(1.0f),
+              _shaderPolicy( SHADERPOLICY_GENERATE ),
               _loadingPriorityScale(1.0f),
               _loadingPriorityOffset(0.0f)
         {

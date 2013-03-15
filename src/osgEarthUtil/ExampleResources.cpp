@@ -86,6 +86,16 @@ namespace
 
         osg::observer_ptr<osg::Node> _node;
     };
+
+    // sets a user-specified uniform.
+    struct ApplyValueUniform : public ControlEventHandler
+    {
+        osg::ref_ptr<osg::Uniform> _u;
+        ApplyValueUniform(osg::Uniform* u) :_u(u) { }
+        void onValueChanged(Control* c, double value) {
+            _u->set( float(value) );
+        }
+    };
 }
 
 //------------------------------------------------------------------------
@@ -400,6 +410,10 @@ MapNodeHelper::load(osg::ArgumentParser& args,
                     osgViewer::View*     view,
                     Control*             userControl ) const
 {
+    // do this first before scanning for an earth file
+    std::string outEarth;
+    args.read( "--out-earth", outEarth );
+
     // read in the Earth file:
     osg::Node* node = 0L;
     for( int i=0; i<args.argc(); ++i )
@@ -439,6 +453,13 @@ MapNodeHelper::load(osg::ArgumentParser& args,
 
     // parses common cmdline arguments.
     parse( mapNode.get(), args, view, root, userControl );
+
+    // Dump out an earth file if so directed.
+    if ( !outEarth.empty() )
+    {
+        OE_NOTICE << LC << "Writing earth file: " << outEarth << std::endl;
+        osgDB::writeNodeFile( *mapNode, outEarth );
+    }
 
     // configures the viewer with some stock goodies
     configureView( view );
@@ -482,9 +503,6 @@ MapNodeHelper::parse(MapNode*             mapNode,
 
     std::string imageExtensions;
     args.read("--image-extensions", imageExtensions);
-
-    std::string outEarth;
-    args.read("--out-earth", outEarth);
 
     // install a canvas for any UI controls we plan to create:
     ControlCanvas* canvas = ControlCanvas::get(view, false);
@@ -666,11 +684,32 @@ MapNodeHelper::parse(MapNode*             mapNode,
         OE_INFO << LC << "...found " << imageLayers.size() << " image layers." << std::endl;
     }
 
-    // Dump out an earth file if so directed.
-    if ( !outEarth.empty() )
+    // Generic named value uniform with min/max.
+    VBox* uniformBox = 0L;
+    while( args.find( "--uniform" ) >= 0 )
     {
-        OE_NOTICE << LC << "Writing earth file: " << outEarth << std::endl;
-        osgDB::writeNodeFile( *mapNode, outEarth );
+        std::string name;
+        float minval, maxval;
+        if ( args.read( "--uniform", name, minval, maxval ) )
+        {
+            if ( uniformBox == 0L )
+            {
+                uniformBox = new VBox();
+                uniformBox->setBackColor(0,0,0,0.5);
+                uniformBox->setAbsorbEvents( true );
+                canvas->addControl( uniformBox );
+            }
+            osg::Uniform* uniform = new osg::Uniform(osg::Uniform::FLOAT, name);
+            uniform->set( minval );
+            root->getOrCreateStateSet()->addUniform( uniform, osg::StateAttribute::OVERRIDE );
+            HBox* box = new HBox();
+            box->addControl( new LabelControl(name) );
+            HSliderControl* hs = box->addControl( new HSliderControl(minval, maxval, minval, new ApplyValueUniform(uniform)));
+            hs->setHorizFill(true, 200);
+            box->addControl( new LabelControl(hs) );
+            uniformBox->addControl( box );
+            OE_INFO << LC << "Installed uniform controller for " << name << std::endl;
+        }
     }
 
     root->addChild( canvas );
@@ -704,5 +743,5 @@ MapNodeHelper::usage() const
         << "  --autoclip                    : installs an auto-clip plane callback\n"
         << "  --images [path]               : finds and loads image layers from folder [path]\n"
         << "  --image-extensions [ext,...]  : with --images, extensions to use\n"
-        << "  --out [earthfile]             : write the loaded map to an earth file\n";
+        << "  --out-earth [file]            : write the loaded map to an earth file\n";
 }

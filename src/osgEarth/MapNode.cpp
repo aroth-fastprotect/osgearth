@@ -695,7 +695,7 @@ MapNode::onModelLayerOverlayChanged( ModelLayer* layer )
             overlay->addChild( node.get() );
             _models->replaceChild( node.get(), overlay );
         }
-        else
+        else if ( overlay )
         {
             overlay->setActive( layer->getOverlay() );
         }

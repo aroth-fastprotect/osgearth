@@ -62,8 +62,14 @@ _terrainEngineDriver( "quadtree" )
     OGRRegisterAll();
     GDALAllRegister();
 
+    // generates the basic shader code for the terrain engine and model layers.
     _shaderLib = new ShaderFactory();
+
+    // thread pool for general use
     _taskServiceManager = new TaskServiceManager();
+
+    // optimizes sharing of state attributes and state sets for
+    // performance boost
     _stateSetCache = new StateSetCache();
 
     // activate KMZ support
@@ -135,7 +141,6 @@ _terrainEngineDriver( "quadtree" )
     }
 
     // load a default font
-
     const char* envFont = ::getenv("OSGEARTH_DEFAULT_FONT");
     if ( envFont )
     {
@@ -147,6 +152,9 @@ _terrainEngineDriver( "quadtree" )
         _defaultFont = osgText::readFontFile("arial.ttf");
 #endif
     }
+
+    // register the system stock Units.
+    Units::registerAll( this );
 }
 
 class SpatialReferenceCacheClear : public osgEarth::SpatialReference
@@ -425,11 +433,10 @@ Registry::setCapabilities( Capabilities* caps )
     _caps = caps;
 }
 
-static OpenThreads::Mutex s_initCapsMutex;
 void
 Registry::initCapabilities()
 {
-    ScopedLock<Mutex> lock( s_initCapsMutex ); // double-check pattern (see getCapabilities)
+    ScopedLock<Mutex> lock( _capsMutex ); // double-check pattern (see getCapabilities)
     if ( !_caps.valid() )
         _caps = new Capabilities();
 }
@@ -477,8 +484,7 @@ UID
 Registry::createUID()
 {
     //todo: use OpenThreads::Atomic for this
-    static Mutex s_uidGenMutex;
-    ScopedLock<Mutex> lock( s_uidGenMutex );
+    ScopedLock<Mutex> exclusive( _uidGenMutex );
     return (UID)( _uidGen++ );
 }
 
@@ -502,12 +508,15 @@ Registry::cloneOrCreateOptions( const osgDB::Options* input ) const
 void
 Registry::registerUnits( const Units* units )
 {
+    Threading::ScopedWriteLock exclusive( _unitsVectorMutex );
     _unitsVector.push_back(units);
 }
 
 const Units*
 Registry::getUnits(const std::string& name) const
 {
+    Threading::ScopedReadLock shared( _unitsVectorMutex );
+
     std::string lower = toLower(name);
     for( UnitsVector::const_iterator i = _unitsVector.begin(); i != _unitsVector.end(); ++i )
     {

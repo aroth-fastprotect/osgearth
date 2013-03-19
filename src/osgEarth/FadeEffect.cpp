@@ -50,7 +50,7 @@ FadeOptions::getConfig() const
 
 namespace
 {
-    char* FadeEffectVertexShader =
+    const char* FadeEffectVertexShader =
         "#version " GLSL_VERSION_STR "\n"
 #ifdef OSG_GLES2_AVAILABLE
         "precision mediump float; \n"
@@ -71,7 +71,7 @@ namespace
         "    oe_fadeeffect_opacity = clamp(t, 0.0, 1.0) * clamp(r, 0.0, 1.0); \n"
         "} \n";
 
-    char* FadeEffectFragmentShader = 
+    const char* FadeEffectFragmentShader = 
         "#version " GLSL_VERSION_STR "\n"
 #ifdef OSG_GLES2_AVAILABLE
         "precision mediump float; \n"

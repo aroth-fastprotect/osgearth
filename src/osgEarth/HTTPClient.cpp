@@ -382,8 +382,8 @@ HTTPClient::initializeImpl()
     curl_easy_setopt( _curl_handle, CURLOPT_MAXREDIRS, (void*)5 );
     curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSFUNCTION, &CurlProgressCallback);
     curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);
-    curl_easy_setopt( _curl_handle, CURLOPT_MAX_SEND_SPEED_LARGE, (void*)limitRateSend );
-    curl_easy_setopt( _curl_handle, CURLOPT_MAX_RECV_SPEED_LARGE, (void*)limitRateRecv );
+    curl_easy_setopt( _curl_handle, CURLOPT_MAX_SEND_SPEED_LARGE, limitRateSend );
+    curl_easy_setopt( _curl_handle, CURLOPT_MAX_RECV_SPEED_LARGE, limitRateRecv );
     // don't let curl install any signal handlers which cause serious trouble in multi-thread environments.
     // see http://stackoverflow.com/questions/9191668/error-longjmp-causes-uninitialized-stack-frame
     curl_easy_setopt( _curl_handle, CURLOPT_NOSIGNAL, 1);

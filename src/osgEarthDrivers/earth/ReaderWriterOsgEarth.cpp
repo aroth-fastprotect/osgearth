@@ -28,24 +28,12 @@
 #include <sstream>
 #include <osgEarthUtil/Common>
 
+#include "osgEarthUtilLibraryName.h"
+
 using namespace osgEarth_osgearth;
 using namespace osgEarth;
 
 #define LC "[ReaderWriterEarth] "
-
-// Macros to determine the filename for dependent libs.
-#define Q2(x) #x
-#define Q(x)  Q2(x)
-
-#if defined(_DEBUG) && defined(OSGEARTH_DEBUG_POSTFIX)
-#    define LIBNAME_UTIL "osgEarthUtil" ## Q(OSGEARTH_DEBUG_POSTFIX)
-#elif defined(OSGEARTH_RELEASE_POSTFIX)
-#    define LIBNAME_UTIL "osgEarthUtil" ## Q(OSGEARTH_RELEASE_POSTFIX)
-#else
-#    define LIBNAME_UTIL "osgEarthUtil"
-#endif
-
-
 
 class ReaderWriterEarth : public osgDB::ReaderWriter
 {

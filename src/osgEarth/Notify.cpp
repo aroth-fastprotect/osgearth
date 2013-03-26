@@ -17,22 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Notify>
-
-using namespace osgEarth;
-
-/* -*-c++-*- OpenSceneGraph - Copyright (C) 1998-2006 Robert Osfield 
- *
- * This library is open source and may be redistributed and/or modified under  
- * the terms of the OpenSceneGraph Public License (OSGPL) version 0.0 or 
- * (at your option) any later version.  The full license is in LICENSE file
- * included with this distribution, and on the openscenegraph.org website.
- * 
- * This library is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
- * OpenSceneGraph Public License for more details.
-*/
-#include <osgEarth/Notify>
+#include <osgEarth/ThreadingUtils>
 #include <osg/ref_ptr>
 #include <osg/Notify>
 #include <string>
@@ -44,6 +29,7 @@ using namespace osgEarth;
 #include <iomanip>
 
 using namespace std;
+using namespace osgEarth;
 
 namespace osgEarth {
 
@@ -135,8 +121,34 @@ protected:
 
 static bool s_osgEarthNeedNotifyInit = true;
 static osg::NotifySeverity osgearth_g_NotifyLevel = osg::NOTICE;
-static osgEarth::NullStream *g_NullStream = NULL;
-static osgEarth::NotifyStream *g_NotifyStream = NULL;
+static osgEarth::NullStream * g_NullStream = NULL;
+static osg::NotifyHandler * g_NotifyHandler = NULL;
+
+namespace {
+    class ThreadNotifyData
+    {
+    public:
+        inline ThreadNotifyData() 
+            : notifyStream(new osgEarth::NotifyStream)
+            {
+                NotifyStreamBuffer *buffer = static_cast<NotifyStreamBuffer*>(notifyStream->rdbuf());
+                if (buffer) buffer->setNotifyHandler(g_NotifyHandler);
+            }
+        inline ~ThreadNotifyData()
+            {
+                delete notifyStream;
+            }
+
+        osgEarth::NotifyStream * notifyStream;
+    };
+    
+    ThreadNotifyData&
+    getThreadNotifyData()
+    {
+        static Threading::PerThread<ThreadNotifyData> s_notifyPerThread;
+        return s_notifyPerThread.get();
+    }
+}
 
 void
 osgEarth::setNotifyLevel(osg::NotifySeverity severity)
@@ -159,10 +171,8 @@ osgEarth::initNotifyLevel()
 		return true;
 
 	static osgEarth::NullStream s_NullStream;
-	static osgEarth::NotifyStream s_NotifyStream;
 
 	g_NullStream = &s_NullStream;
-	g_NotifyStream = &s_NotifyStream;
 
     // g_NotifyLevel
     // =============
@@ -196,11 +206,6 @@ osgEarth::initNotifyLevel()
  
     }
 
-	// Setup standard notify handler
-	osgEarth::NotifyStreamBuffer *buffer = dynamic_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
-	if (buffer && !buffer->getNotifyHandler())
-		buffer->setNotifyHandler(new osg::StandardNotifyHandler);
-
 	s_osgEarthNeedNotifyInit = false;
 
     return true;
@@ -217,16 +222,13 @@ bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 
 void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
 {
-	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
-	if (buffer)
-		buffer->setNotifyHandler(handler);
+    g_NotifyHandler = handler;
 }
 
 osg::NotifyHandler* osgEarth::getNotifyHandler()
 {
 	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
-	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
-	return buffer ? buffer->getNotifyHandler() : 0;
+    return g_NotifyHandler;
 }
 
 
@@ -236,8 +238,9 @@ std::ostream& osgEarth::notify(const osg::NotifySeverity severity)
 
 	if (osgEarth::isNotifyEnabled(severity))
 	{
-		g_NotifyStream->setCurrentSeverity(severity);
-		return *g_NotifyStream;
+        ThreadNotifyData & data = getThreadNotifyData();
+		data.notifyStream->setCurrentSeverity(severity);
+		return *data.notifyStream;
 	}
 	return *g_NullStream;
 }

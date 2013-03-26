@@ -673,6 +673,16 @@ namespace osgEarth
         const GeoExtent& getExtent() const;
 
         /**
+         * The minimum height in the heightfield
+         */
+        float getMinHeight() const { return _minHeight; }
+
+        /**
+         * The maximum height in the heightfield
+         */
+        float getMaxHeight() const { return _maxHeight; }
+
+        /**
          * Gets a pointer to the underlying OSG heightfield.
          */
         const osg::HeightField* getHeightField() const;
@@ -683,12 +693,37 @@ namespace osgEarth
          */
         osg::HeightField* takeHeightField();
 
+        /**
+         * Gets the X interval of this GeoHeightField
+         */
+        double getXInterval() const;
+
+        /**
+         * Gets the Y interval of this GeoHeightField
+         */
+        double getYInterval() const;
+
+
+        //Sort GeoHeightField's by resolution
+        struct SortByResolutionFunctor
+        {
+            inline bool operator() (const GeoHeightField& lhs, const GeoHeightField& rhs) const
+            {                
+                return lhs.getXInterval() < rhs.getXInterval();                
+            }
+        };
+
     protected:
         osg::ref_ptr<osg::HeightField> _heightField;
         GeoExtent                      _extent;
+        float                          _minHeight, _maxHeight;
     };
 
 	typedef std::vector<GeoHeightField> GeoHeightFieldVector;
+
+
+
+
 }
 
 #endif // OSGEARTH_GEODATA_H

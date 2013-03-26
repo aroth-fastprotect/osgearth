@@ -134,6 +134,11 @@ namespace {
                 NotifyStreamBuffer *buffer = static_cast<NotifyStreamBuffer*>(notifyStream->rdbuf());
                 if (buffer) buffer->setNotifyHandler(g_NotifyHandler);
             }
+        inline ThreadNotifyData(const ThreadNotifyData & rhs)
+            : notifyStream(rhs.notifyStream)
+            {
+                const_cast<ThreadNotifyData&>(rhs).notifyStream = NULL;
+            }
         inline ~ThreadNotifyData()
             {
                 delete notifyStream;

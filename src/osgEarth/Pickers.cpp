@@ -86,7 +86,7 @@ Picker::pick( float x, float y, Hits& results ) const
         matrix.preMult( camera->getViewMatrix() );
 
         osg::NodePath prunedNodePath( _path.begin(), _path.end()-1 );
-        matrix.preMult( osg::computeWorldToLocal(prunedNodePath) );
+        matrix.preMult( osg::computeLocalToWorld(prunedNodePath) );
 
         osg::Polytope transformedPT;
         transformedPT.setAndTransformProvidingInverse( winPT, matrix );

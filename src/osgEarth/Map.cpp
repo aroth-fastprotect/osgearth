@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -83,6 +83,12 @@ _dataModelRevision   ( 0 )
     // store the IO information in the top-level DB Options:
     _mapOptions.cachePolicy()->apply( _dbOptions.get() );
     URIContext( _mapOptions.referrer() ).apply( _dbOptions.get() );
+
+    // apply an express tile size if there is one.
+    if ( _mapOptions.elevationTileSize().isSet() )
+    {
+        _elevationLayers.setExpressTileSize( *_mapOptions.elevationTileSize() );
+    }
 }
 
 Map::~Map()
@@ -1084,10 +1090,13 @@ Map::sync( MapFrame& frame ) const
 
         if ( frame._parts & ELEVATION_LAYERS )
         {
-            if ( !frame._initialized )
-                frame._elevationLayers.reserve( _elevationLayers.size() );
-            frame._elevationLayers.clear();
-            std::copy( _elevationLayers.begin(), _elevationLayers.end(), std::back_inserter(frame._elevationLayers) );
+            frame._elevationLayers = _elevationLayers;
+            //if ( !frame._initialized )
+            //    frame._elevationLayers.reserve( _elevationLayers.size() );
+            //frame._elevationLayers.clear();
+            //std::copy( _elevationLayers.begin(), _elevationLayers.end(), std::back_inserter(frame._elevationLayers) );
+            if ( _mapOptions.elevationTileSize().isSet() )
+                frame._elevationLayers.setExpressTileSize( *_mapOptions.elevationTileSize() );
         }
 
         if ( frame._parts & MODEL_LAYERS )

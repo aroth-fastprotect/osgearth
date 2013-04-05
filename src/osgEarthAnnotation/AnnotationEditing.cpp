@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -111,8 +111,8 @@ public:
 
 CircleNodeEditor::CircleNodeEditor( CircleNode* node ):
 LocalizedNodeEditor( node ),
-_bearing( osg::DegreesToRadians( 90.0 ) ),
-_radiusDragger( 0 )
+_radiusDragger( 0 ),
+_bearing( osg::DegreesToRadians( 90.0 ) )
 {
     _radiusDragger  = new SphereDragger(_node->getMapNode());
     _radiusDragger->addPositionChangedCallback(new SetRadiusCallback( node,this ) );        
@@ -243,8 +243,8 @@ public:
 
 EllipseNodeEditor::EllipseNodeEditor( EllipseNode* node ):
 LocalizedNodeEditor( node ),
-_majorDragger( 0 ),
-_minorDragger( 0 )
+_minorDragger( 0 ),
+_majorDragger( 0 )
 {
     _minorDragger  = new SphereDragger( _node->getMapNode());
     _minorDragger->addPositionChangedCallback(new SetEllipseRadiusCallback( node, this, false ) );        

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -74,9 +74,10 @@ namespace osgEarth { namespace QtGui
 
         QTimer _timer;
 
+        void installFrameTimer();
+
         void createViewer();
         void reconfigure( osgViewer::View* );
-        void installFrameTimer();
         void paintEvent( QPaintEvent* );
 
         osg::observer_ptr<osgViewer::ViewerBase> _viewer;

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -25,6 +25,7 @@
 #include <osgEarth/IOTypes>
 #include <osgEarth/ColorFilter>
 #include <osgEarth/StateSetCache>
+#include <osgEarth/HTTPClient>
 #include <osgEarthDrivers/cache_filesystem/FileSystemCache>
 #include <osg/Notify>
 #include <osg/Version>
@@ -61,6 +62,9 @@ _terrainEngineDriver( "quadtree" )
     // set up GDAL and OGR.
     OGRRegisterAll();
     GDALAllRegister();
+
+    // global initialization for CURL (not thread safe)
+    HTTPClient::globalInit();
 
     // generates the basic shader code for the terrain engine and model layers.
     _shaderLib = new ShaderFactory();
@@ -541,16 +545,10 @@ Registry::setStateSetCache( StateSetCache* cache )
     _stateSetCache = cache;
 }
 
-// A registry-wide StateSetCache is ONLY supported in OSG 3.1.4+
-// because of a mutex introduced in OSG changeset 13171.
 StateSetCache*
 Registry::getStateSetCache() const
 {
-#if OSG_MIN_VERSION_REQUIRED(3,1,4)
     return _stateSetCache.get();
-#else
-    return 0L;
-#endif
 }
 
 

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -270,14 +270,17 @@ HeightFieldUtils::createSubSample(osg::HeightField* input, const GeoExtent& inpu
 }
 
 osg::HeightField*
-HeightFieldUtils::resizeHeightField(osg::HeightField* input, int newColumns, int newRows,
+HeightFieldUtils::resampleHeightField(osg::HeightField*      input,
+                                      int                    newColumns, 
+                                      int                    newRows,
                                     ElevationInterpolation interp)
 {
     if ( newColumns <= 1 && newRows <= 1 )
         return 0L;
 
     if ( newColumns == (int)input->getNumColumns() && newRows == (int)input->getNumRows() )
-        return new osg::HeightField( *input, osg::CopyOp::DEEP_COPY_ALL );
+        return input;
+        //return new osg::HeightField( *input, osg::CopyOp::DEEP_COPY_ALL );
 
     double spanX = (input->getNumColumns()-1) * input->getXInterval();
     double spanY = (input->getNumRows()-1) * input->getYInterval();

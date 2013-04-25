@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -447,11 +447,15 @@ ImageLayer::createImageInNativeProfile( const TileKey& key, ProgressCallback* pr
                 mosaic.createImage(), 
                 GeoExtent( nativeProfile->getSRS(), rxmin, rymin, rxmax, rymax ) );
 
+            return result;
+
+#if 0 // let's try this.
             // calculate a tigher extent that matches the original input key:
             GeoExtent tightExtent = nativeProfile->clampAndTransformExtent( key.getExtent() );
 
             // a non-exact crop is critical here to avoid resampling the data
             return result.crop( tightExtent, false, 0, 0, *_runtimeOptions.driver()->bilinearReprojection() );
+#endif
         }
 
         else // all fallback data
@@ -703,8 +707,6 @@ ImageLayer::createImageFromTileSource(const TileKey&    key,
         source->getBlacklist()->add( key.getTileId() );
     }
 
-    //return result.release();
-    //return GeoImage(result.get(), finalKey.getExtent());
     return GeoImage(result.get(), key.getExtent());
 }
 

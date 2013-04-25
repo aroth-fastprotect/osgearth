@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -43,7 +43,7 @@ _dataModelRevision   ( 0 )
         OE_INFO << LC << "CACHE-ONLY MODE activated from map" << std::endl;
     }
 
-    // if the map was a cache policy set, make this the system-wide default, UNLESS
+    // if the map has a cache policy set, make this the system-wide default, UNLESS
     // there ALREADY IS a registry default, in which case THAT will override THIS one.
     // (In other words, whichever one is set first wins. And of course, if the registry
     // has an override set, that will cancel out all of this.)
@@ -83,6 +83,12 @@ _dataModelRevision   ( 0 )
     // store the IO information in the top-level DB Options:
     _mapOptions.cachePolicy()->apply( _dbOptions.get() );
     URIContext( _mapOptions.referrer() ).apply( _dbOptions.get() );
+
+    // apply an express tile size if there is one.
+    if ( _mapOptions.elevationTileSize().isSet() )
+    {
+        _elevationLayers.setExpressTileSize( *_mapOptions.elevationTileSize() );
+    }
 }
 
 Map::~Map()
@@ -333,13 +339,11 @@ Map::setCache( Cache* cache )
         for (ImageLayerVector::iterator i = _imageLayers.begin(); i != _imageLayers.end(); ++i)
         {
             i->get()->setDBOptions( _dbOptions.get() );
-            //i->get()->setCache( _cache.get() );
         }
 
         for (ElevationLayerVector::iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); ++i)
         {
             i->get()->setDBOptions( _dbOptions.get() );
-            //i->get()->setCache( _cache.get() );
         }
     }
 }
@@ -1064,10 +1068,13 @@ Map::sync( MapFrame& frame ) const
 
         if ( frame._parts & ELEVATION_LAYERS )
         {
-            if ( !frame._initialized )
-                frame._elevationLayers.reserve( _elevationLayers.size() );
-            frame._elevationLayers.clear();
-            std::copy( _elevationLayers.begin(), _elevationLayers.end(), std::back_inserter(frame._elevationLayers) );
+            frame._elevationLayers = _elevationLayers;
+            //if ( !frame._initialized )
+            //    frame._elevationLayers.reserve( _elevationLayers.size() );
+            //frame._elevationLayers.clear();
+            //std::copy( _elevationLayers.begin(), _elevationLayers.end(), std::back_inserter(frame._elevationLayers) );
+            if ( _mapOptions.elevationTileSize().isSet() )
+                frame._elevationLayers.setExpressTileSize( *_mapOptions.elevationTileSize() );
         }
 
         if ( frame._parts & MODEL_LAYERS )

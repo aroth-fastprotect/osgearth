@@ -165,16 +165,19 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
                 // see if we were given a reference URI to use:
                 std::string refURI = uriContext.referrer();                                
 
-                if ( conf.value("version") == "2" )
-                {
-                    OE_INFO << LC << "Detected a version 2.x earth file" << std::endl;
-                    EarthFileSerializer2 ser;
-                    mapNode = ser.deserialize( conf, refURI );
-                }
-                else
+                if ( conf.value("version") == "1" )
                 {
                     OE_INFO << LC << "Detected a version 1.x earth file" << std::endl;
                     EarthFileSerializer1 ser;
+                    mapNode = ser.deserialize( conf, refURI );
+                }
+
+                else
+                {
+                    if ( conf.value("version") != "2" )
+                        OE_INFO << LC << "No valid earth file version; assuming version='2'" << std::endl;
+
+                    EarthFileSerializer2 ser;
                     mapNode = ser.deserialize( conf, refURI );
                 }
             }

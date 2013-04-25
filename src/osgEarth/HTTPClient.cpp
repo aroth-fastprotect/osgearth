@@ -358,6 +358,17 @@ HTTPClient::initializeImpl()
         OE_WARN << LC << "Simulating a network error with Response Code = " << _simResponseCode << std::endl;
     }
 
+    // default bandwidth is not limited (zero)
+    curl_off_t limitRateSend = 0, limitRateRecv = 0;
+    const char* limitRate = getenv("OSGEARTH_HTTP_LIMIT_RATE");
+    if ( limitRate )
+    {
+        curl_off_t rate = osgEarth::as<long>(std::string(limitRate), 0L);
+        limitRateSend = rate;
+        limitRateRecv = rate;
+        OE_WARN << LC << "Limit bandwidth to " << rate << " bytes/sec per connection" << std::endl;
+    }
+
     // Dumps out HTTP request/response info
     if ( ::getenv("OSGEARTH_HTTP_DEBUG") )
     {
@@ -373,6 +384,8 @@ HTTPClient::initializeImpl()
     curl_easy_setopt( _curl_handle, CURLOPT_MAXREDIRS, (void*)5 );
     curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSFUNCTION, &CurlProgressCallback);
     curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);    
+    curl_easy_setopt( _curl_handle, CURLOPT_MAX_SEND_SPEED_LARGE, limitRateSend );
+    curl_easy_setopt( _curl_handle, CURLOPT_MAX_RECV_SPEED_LARGE, limitRateRecv );
     // don't let curl install any signal handlers which cause serious trouble in multi-thread environments.
     // see http://stackoverflow.com/questions/9191668/error-longjmp-causes-uninitialized-stack-frame
     curl_easy_setopt( _curl_handle, CURLOPT_NOSIGNAL, 1);

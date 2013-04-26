@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -119,8 +119,8 @@ namespace osgEarth { namespace Drivers
             conf.getIfSet("secondary_split_level", _secondarySplitLevel);
             conf.getIfSet("layer", _layer);
 			conf.getIfSet("layer_setname", _layerSetName);
-            conf.getIfSet("numTilesWideAtLod0", _widthLod0 );
-            conf.getIfSet("numTilesHighAtLod0", _heightLod0 );
+            conf.getIfSet("num_tiles_wide_at_lod_0", _widthLod0 );
+            conf.getIfSet("num_tiles_high_at_lod_0", _heightLod0 );
             conf.getIfSet("base_name", _baseName);
             conf.getIfSet("terrain_tile_cache_size", _terrainTileCacheSize);
             

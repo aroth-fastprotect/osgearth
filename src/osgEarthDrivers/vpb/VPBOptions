@@ -68,6 +68,9 @@ namespace osgEarth { namespace Drivers
 
         optional<int>& terrainTileCacheSize() { return _terrainTileCacheSize; }
         const optional<int>& terrainTileCacheSize() const { return _terrainTileCacheSize; }
+
+        optional<int>& maxLevel() { return _maxLevel; }
+        const optional<int>& maxLevel() const { return _maxLevel; }
         
     public:
         VPBOptions( const TileSourceOptions& opt =TileSourceOptions() ) : TileSourceOptions( opt ),
@@ -77,7 +80,8 @@ namespace osgEarth { namespace Drivers
             _widthLod0( 1 ),
             _heightLod0( 1 ),
             _dirStruct( DS_NESTED ),
-            _terrainTileCacheSize(128)
+            _terrainTileCacheSize(128),
+            _maxLevel(23)
         {
             setDriver( "vpb" );
             fromConfig( _conf );
@@ -98,6 +102,7 @@ namespace osgEarth { namespace Drivers
             conf.updateIfSet("num_tiles_high_at_lod_0", _heightLod0 );
             conf.updateIfSet("base_name", _baseName );
             conf.updateIfSet("terrain_tile_cache_size", _terrainTileCacheSize);
+            conf.updateIfSet("max_level", _maxLevel);
             if ( _dirStruct.isSet() ) {
                 if ( _dirStruct == DS_FLAT ) conf.update("directory_structure", "flat");
                 else if ( _dirStruct == DS_TASK ) conf.update("directory_structure", "task");
@@ -123,6 +128,7 @@ namespace osgEarth { namespace Drivers
             conf.getIfSet("num_tiles_high_at_lod_0", _heightLod0 );
             conf.getIfSet("base_name", _baseName);
             conf.getIfSet("terrain_tile_cache_size", _terrainTileCacheSize);
+            conf.getIfSet("max_level", _maxLevel);
             
             std::string ds = conf.value("directory_structure");
             if ( ds == "flat" ) _dirStruct = DS_FLAT;
@@ -135,6 +141,7 @@ namespace osgEarth { namespace Drivers
         optional<int>         _primarySplitLevel, _secondarySplitLevel, _layer, _widthLod0, _heightLod0;
         optional<DirectoryStructure> _dirStruct;
         optional<int> _terrainTileCacheSize;
+        optional<int> _maxLevel;
     };
 
 } } // namespace osgEarth::Drivers

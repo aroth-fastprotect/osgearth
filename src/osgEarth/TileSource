@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -279,22 +279,6 @@ namespace osgEarth
          */
         virtual float getNoDataMaxValue() {
             return _options.noDataMaxValue().value(); }
-
-        /**
-         * Gets the maximum level of detail available from the tile source. Unlike
-         * getMaxLevel(), which reports the maximum level at which to use this tile
-         * source in a Map, this method reports the maximum level for which the
-         * tile source is able to return data.
-         */
-        virtual unsigned int getMaxDataLevel() const;
-
-        /**
-         * Gets the minimum level of detail available from the tile source. Unlike
-         * getMinLevel(), which reports the minimum level at which to use this tile
-         * source in a Map, this method reports the minimum level for which the
-         * tile source is able to return data.
-         */
-        virtual unsigned int getMinDataLevel() const;
 
         /**
          * Gets the preferred extension for this TileSource

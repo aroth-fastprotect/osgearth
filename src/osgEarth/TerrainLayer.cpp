@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -84,7 +84,6 @@ TerrainLayerOptions::getConfig( bool isolate ) const
     conf.updateIfSet( "enabled", _enabled );
     conf.updateIfSet( "visible", _visible );
     conf.updateIfSet( "edge_buffer_ratio", _edgeBufferRatio);
-    conf.updateIfSet( "max_data_level", _maxDataLevel);
     conf.updateIfSet( "reprojected_tilesize", _reprojectedTileSize);
 
     conf.updateIfSet( "vdatum", _vertDatum );
@@ -113,7 +112,6 @@ TerrainLayerOptions::fromConfig( const Config& conf )
     conf.getIfSet( "enabled", _enabled );
     conf.getIfSet( "visible", _visible );
     conf.getIfSet( "edge_buffer_ratio", _edgeBufferRatio);
-    conf.getIfSet( "max_data_level", _maxDataLevel);
     conf.getIfSet( "reprojected_tilesize", _reprojectedTileSize);
 
     conf.getIfSet( "vdatum", _vertDatum );
@@ -328,27 +326,6 @@ TerrainLayer::getProfile() const
     return _profile.get();
 }
 
-unsigned int
-TerrainLayer::getMaxDataLevel() const
-{
-    //Try the setting first
-
-    if ( _runtimeOptions->maxDataLevel().isSet() )
-    {
-        return _runtimeOptions->maxDataLevel().get();
-    }
-
-    //Try the TileSource
-    TileSource* ts = getTileSource();
-    if ( ts )
-    {
-        return ts->getMaxDataLevel();
-    }
-
-    //Just default
-    return 20;
-}
-
 unsigned
 TerrainLayer::getTileSize() const
 {
@@ -438,9 +415,6 @@ TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
                     // in cacheonly mode, create a profile from the first cache bin accessed
                     // (they SHOULD all be the same...)
                     _profile = Profile::create( *meta._sourceProfile );
-
-                    // copy the max data level from the cache
-                    _runtimeOptions->maxDataLevel() = *meta._maxDataLevel;
                 }
             }
 
@@ -453,7 +427,6 @@ TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
                     // no existing metadata; create some.
                     meta._cacheBinId    = binId;
                     meta._sourceName    = this->getName();
-                    meta._maxDataLevel  = getMaxDataLevel();
                     meta._sourceDriver  = getTileSource()->getOptions().getDriver();
                     meta._sourceProfile = getProfile()->toProfileOptions();
                     meta._cacheProfile  = profile->toProfileOptions();

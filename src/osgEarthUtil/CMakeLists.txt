@@ -11,7 +11,6 @@ SET(TARGET_PUBLIC_H
 	Controls
 	ClampCallback
 	EarthManipulator
-	ElevationManager
     ExampleResources
 	Export
     FeatureManipTool
@@ -53,7 +52,6 @@ SET(TARGET_SRC
 	ClampCallback.cpp
     Controls.cpp
 	EarthManipulator.cpp
-	ElevationManager.cpp
     ExampleResources.cpp
     FeatureManipTool.cpp
     FeatureQueryTool.cpp

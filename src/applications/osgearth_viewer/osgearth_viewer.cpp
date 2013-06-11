@@ -29,11 +29,13 @@ using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgEarth::Annotation;
 
-int usage(char** argv)
+int
+usage(const char* name)
 {
     OE_NOTICE 
-        << "\nUsage: " << argv[0] << " file.earth" << std::endl
+        << "\nUsage: " << name << " file.earth" << std::endl
         << MapNodeHelper().usage() << std::endl;
+
     return 0;
 }
 
@@ -42,8 +44,9 @@ main(int argc, char** argv)
 {
     osg::ArgumentParser arguments(&argc,argv);
 
+    // help?
     if ( arguments.read("--help") )
-        return usage( argv );
+        return usage(argv[0]);
 
     if ( arguments.read("--stencil") )
         osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
@@ -66,12 +69,13 @@ main(int argc, char** argv)
 
         // configure the near/far so we don't clip things that are up close
         viewer.getCamera()->setNearFarRatio(0.00002);
+        viewer.getCamera()->setSmallFeatureCullingPixelSize(-1.0f);
 
         viewer.run();
     }
     else
     {
-        return usage(argv);
+        return usage(argv[0]);
     }
     return 0;
 }

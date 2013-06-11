@@ -203,7 +203,7 @@ Control::init()
     _vfill = false;    
     _visible = true;
     _active = false;
-    _absorbEvents = false;
+    _absorbEvents = true;
     _dirty = true;
 }
 
@@ -1208,7 +1208,7 @@ HSliderControl::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapte
     {
         float relX = ea.getX() - _renderPos.x();
 
-        setValue( _min + (_max-_min) * ( relX/_renderSize.x() ) );
+        setValue( osg::clampBetween(_min + (_max-_min) * ( relX/_renderSize.x() ), _min, _max) );
         aa.requestRedraw();
 
         return true;
@@ -1872,6 +1872,17 @@ osg::ref_ptr<Control>&
 Grid::cell(int col, int row)
 {
     return _rows[row][col];
+}
+
+Control*
+Grid::getControl(int col, int row)
+{
+    if ( row < (int)_rows.size() && col < (int)_rows[row].size() )
+    {
+        osg::ref_ptr<Control>& c = cell(col, row);
+        return c.get();
+    }
+    else return 0L;
 }
 
 void
@@ -2556,8 +2567,8 @@ ControlCanvas::init( osgViewer::View* view, bool registerCanvas )
     ss->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE );
     ss->setMode( GL_BLEND, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE );
     ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS, 0, 1, false ) );
-    ss->setRenderBinMode( osg::StateSet::USE_RENDERBIN_DETAILS );
-    ss->setBinName( OSGEARTH_CONTROLS_BIN );
+    //ss->setRenderBinMode( osg::StateSet::USE_RENDERBIN_DETAILS );
+    //ss->setBinName( OSGEARTH_CONTROLS_BIN );
 
     // keeps the control bin shaders from "leaking out" into the scene graph :/
     ss->setAttributeAndModes( new osg::Program(), osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );

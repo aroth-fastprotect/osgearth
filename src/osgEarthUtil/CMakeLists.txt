@@ -13,15 +13,19 @@ SET(HEADERS_ROOT
     AutoClipPlaneHandler
     Common
     Controls
+    ContourMap
     ClampCallback
     DataScanner
+    DetailTexture
     EarthManipulator
+    ElevationMorph
     ExampleResources
     Export
     FeatureManipTool
     FeatureQueryTool
     Formatter
     GeodeticGraticule
+    HTM
     LatLongFormatter
     LineOfSight
     LinearLineOfSight
@@ -29,6 +33,7 @@ SET(HEADERS_ROOT
     MGRSFormatter
     MGRSGraticule
     MouseCoordsTool
+    NormalMap
     ObjectLocator
     PolyhedralLineOfSight
     RadialLineOfSight
@@ -42,6 +47,7 @@ SET(HEADERS_ROOT
     TMSBackFiller
     TMSPackager
     UTMGraticule
+    VerticalScale
     WFS
     WMS
 )
@@ -57,18 +63,23 @@ SET(SOURCES_ROOT
     AutoClipPlaneHandler.cpp
     ClampCallback.cpp
     Controls.cpp
+    ContourMap.cpp
     DataScanner.cpp
-    EarthManipulator.cpp    
+    DetailTexture.cpp
+    EarthManipulator.cpp
+    ElevationMorph.cpp
     ExampleResources.cpp
     FeatureManipTool.cpp
     FeatureQueryTool.cpp
     GeodeticGraticule.cpp
+    HTM.cpp
     LatLongFormatter.cpp
     LinearLineOfSight.cpp
     MeasureTool.cpp
     MGRSFormatter.cpp
     MGRSGraticule.cpp
     MouseCoordsTool.cpp
+    NormalMap.cpp
     ObjectLocator.cpp
     PolyhedralLineOfSight.cpp
     RadialLineOfSight.cpp
@@ -81,6 +92,7 @@ SET(SOURCES_ROOT
     TMSBackFiller.cpp
     TMSPackager.cpp
     UTMGraticule.cpp
+    VerticalScale.cpp
     WFS.cpp
     WMS.cpp
 )

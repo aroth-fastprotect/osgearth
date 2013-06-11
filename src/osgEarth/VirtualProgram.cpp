@@ -36,6 +36,8 @@ using namespace osgEarth::ShaderComp;
 #define OE_TEST OE_NULL
 //#define OE_TEST OE_NOTICE
 
+//#define USE_ATTRIB_ALIASES
+
 //------------------------------------------------------------------------
 
 // environment variable control
@@ -79,16 +81,42 @@ namespace
 // same type as PROGRAM (for proper state sorting)
 const osg::StateAttribute::Type VirtualProgram::SA_TYPE = osg::StateAttribute::PROGRAM;
 
+VirtualProgram* 
+VirtualProgram::getOrCreate(osg::StateSet* stateset)
+{
+    if ( !stateset )
+        return 0L;
+
+    VirtualProgram* vp = dynamic_cast<VirtualProgram*>( stateset->getAttribute(SA_TYPE) );
+    if ( !vp )
+    {
+        vp = new VirtualProgram();
+        stateset->setAttributeAndModes( vp, 1 );
+    }
+    return vp;
+}
+
+VirtualProgram* 
+VirtualProgram::get(osg::StateSet* stateset)
+{
+    if ( !stateset )
+        return 0L;
+
+    return dynamic_cast<VirtualProgram*>( stateset->getAttribute(SA_TYPE) );
+}
+
+//------------------------------------------------------------------------
+
 
 VirtualProgram::VirtualProgram( unsigned mask ) : 
 _mask              ( mask ),
-_inherit           ( true ),
-_useLightingShaders( true )
+_inherit           ( true )
 {
     // check the the dump env var
     if ( ::getenv(OSGEARTH_DUMP_SHADERS) != 0L )
     {
         s_dumpShaders = true;
+        s_mergeShaders = true;
     }
 
     // check the merge env var
@@ -109,7 +137,6 @@ _shaderMap         ( rhs._shaderMap ),
 _mask              ( rhs._mask ),
 _functions         ( rhs._functions ),
 _inherit           ( rhs._inherit ),
-_useLightingShaders( rhs._useLightingShaders ),
 _template          ( osg::clone(rhs._template.get()) )
 {
     //nop
@@ -161,15 +188,34 @@ VirtualProgram::compare(const osg::StateAttribute& sa) const
 void
 VirtualProgram::addBindAttribLocation( const std::string& name, GLuint index )
 {
+#ifdef USE_ATTRIB_ALIASES
+    _attribAliases[name] = Stringify() << "oe_attrib_" << index;
+    _attribBindingList[_attribAliases[name]] = index;
+#else
     _attribBindingList[name] = index;
+#endif
 }
 
 void
 VirtualProgram::removeBindAttribLocation( const std::string& name )
 {
-    _attribBindingList.erase(name);
+    std::map<std::string,std::string>::iterator i = _attribAliases.find(name);
+    if ( i != _attribAliases.end() )
+        _attribBindingList.erase(i->second);
 }
 
+void
+VirtualProgram::applyAttributeAliases(osg::Shader*             shader,
+                                      const AttribAliasVector& sortedAliases)
+{
+    std::string src = shader->getShaderSource();
+    for( AttribAliasVector::const_iterator i = sortedAliases.begin(); i != sortedAliases.end(); ++i )
+    {
+        //OE_DEBUG << LC << "Replacing " << i->first << " with " << i->second << std::endl;
+        osgEarth::replaceIn( src, i->first, i->second );
+    }
+    shader->setShaderSource( src );
+}
 
 osg::Shader*
 VirtualProgram::getShader( const std::string& shaderID ) const
@@ -333,6 +379,35 @@ namespace
 {
     typedef std::map<std::string, std::string> HeaderMap;
 
+    // removes leading and trailing whitespace, and replaces all other
+    // whitespace with single spaces
+    std::string trimAndCompress(const std::string& in)
+    {
+        bool inwhite = true;
+        std::stringstream buf;
+        for( unsigned i=0; i<in.length(); ++i )
+        {
+            char c = in.at(i);
+            if ( ::isspace(c) )
+            {
+                if ( !inwhite )
+                {
+                    buf << ' ';
+                    inwhite = true;
+                }
+            }
+            else
+            {
+                inwhite = false;
+                buf << c;
+            }
+        }
+        std::string r;
+        r = buf.str();
+        return trim(r);
+    }
+
+
     void parseShaderForMerging( const std::string& source, unsigned& version, HeaderMap& headers, std::stringstream& body )
     {
         // break into lines:
@@ -341,7 +416,7 @@ namespace
 
         for( StringVector::const_iterator line_iter = lines.begin(); line_iter != lines.end(); ++line_iter )
         {
-            std::string line = trim(*line_iter);
+            std::string line = trimAndCompress(*line_iter);
 
             if ( line.size() > 0 )
             {
@@ -382,12 +457,35 @@ namespace
     }
 }
 
+namespace
+{
+    bool s_attribAliasSortFunc(const std::pair<std::string,std::string>& a, const std::pair<std::string,std::string>& b) {
+        return a.first.size() > b.first.size();
+    }
+}
 
 void 
 VirtualProgram::addShadersToProgram(const ShaderVector&      shaders, 
                                     const AttribBindingList& attribBindings,
+                                    const AttribAliasMap&    attribAliases,
                                     osg::Program*            program )
 {
+#ifdef USE_ATTRIB_ALIASES
+    // apply any vertex attribute aliases. But first, sort them from longest to shortest 
+    // so we don't get any overlap and bad replacements.
+    AttribAliasVector sortedAliases;
+    sortedAliases.reserve( attribAliases.size() );
+    sortedAliases.insert(sortedAliases.begin(), attribAliases.begin(), attribAliases.end());
+    std::sort( sortedAliases.begin(), sortedAliases.end(), s_attribAliasSortFunc );
+
+    for( VirtualProgram::ShaderVector::const_iterator i = shaders.begin(); i != shaders.end(); ++i )
+    {
+        osg::Shader* shader = i->get();
+        applyAttributeAliases( shader, sortedAliases );
+    }
+#endif
+
+    // merge the shaders if necessary.
     if ( s_mergeShaders )
     {
         unsigned          vertVersion = 0;
@@ -478,7 +576,8 @@ VirtualProgram::addTemplateDataToProgram( osg::Program* program )
 osg::Program*
 VirtualProgram::buildProgram(osg::State&        state, 
                              ShaderMap&         accumShaderMap,
-                             AttribBindingList& accumAttribBindings)
+                             AttribBindingList& accumAttribBindings,
+                             AttribAliasMap&    accumAttribAliases)
 {
     OE_TEST << LC << "Building new Program for VP " << getName() << std::endl;
 
@@ -511,38 +610,8 @@ VirtualProgram::buildProgram(osg::State&        state,
     // Create the new program.
     osg::Program* program = new osg::Program();
     program->setName(getName());
-    addShadersToProgram( buildVector, accumAttribBindings, program );
+    addShadersToProgram( buildVector, accumAttribBindings, accumAttribAliases, program );
     addTemplateDataToProgram( program );
-
-
-#if 0 // gw - obe, don't do this anymore
-
-    // Since we replaced the "mains", we have to go through the cache and update all its
-    // entries to point at the new mains instead of the old ones.
-    if ( oldVertMain.valid() || oldFragMain.valid() )
-    {
-        ProgramMap newProgramCache;
-
-        for( ProgramMap::iterator m = _programCache.begin(); m != _programCache.end(); ++m )
-        {
-            const ShaderVector& originalKey = m->first;
-
-            osg::Program* newProgram = new osg::Program();
-            newProgram->setName( m->second->getName() );
-
-            ShaderVector newBuildKey( originalKey );
-            newBuildKey.push_back( _vertMain.get() );
-            newBuildKey.push_back( _fragMain.get() );
-            addShadersToProgram( newBuildKey, m->second->getAttribBindingList(), newProgram );
-
-            addTemplateDataToProgram( newProgram );
-
-            newProgramCache[originalKey] = newProgram;
-        }
-
-        _programCache = newProgramCache;
-    }
-#endif
 
     // finally, put own new program in the cache.
     _programCache[ keyVector ] = program;
@@ -569,6 +638,7 @@ VirtualProgram::apply( osg::State& state ) const
     // first, find and collect all the VirtualProgram attributes:
     ShaderMap         accumShaderMap;
     AttribBindingList accumAttribBindings;
+    AttribAliasMap    accumAttribAliases;
     
     if ( _inherit )
     {
@@ -597,6 +667,9 @@ VirtualProgram::apply( osg::State& state ) const
 
                     const AttribBindingList& abl = vp->getAttribBindingList();
                     accumAttribBindings.insert( abl.begin(), abl.end() );
+
+                    const AttribAliasMap& aliases = vp->getAttribAliases();
+                    accumAttribAliases.insert( aliases.begin(), aliases.end() );
                 }
             }
         }
@@ -609,8 +682,11 @@ VirtualProgram::apply( osg::State& state ) const
     }
     const AttribBindingList& abl = this->getAttribBindingList();
     accumAttribBindings.insert( abl.begin(), abl.end() );
-    
-    
+
+    const AttribAliasMap& aliases = this->getAttribAliases();
+    accumAttribAliases.insert( aliases.begin(), aliases.end() );
+
+
     if ( accumShaderMap.size() )
     {
         // next, assemble a list of the shaders in the map so we can use it as our
@@ -655,7 +731,7 @@ VirtualProgram::apply( osg::State& state ) const
             else
             {
                 VirtualProgram* nc = const_cast<VirtualProgram*>(this);
-                program = nc->buildProgram( state, accumShaderMap, accumAttribBindings );
+                program = nc->buildProgram( state, accumShaderMap, accumAttribBindings, accumAttribAliases);
             }
         }
         

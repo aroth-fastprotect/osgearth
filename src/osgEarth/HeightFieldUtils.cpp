@@ -80,8 +80,6 @@ HeightFieldUtils::getHeightAtPixel(const osg::HeightField* hf, double c, double 
             return NO_DATA_VALUE;
         }
 
-        double dx = c - (double)colMin;
-        double dy = r - (double)rowMin;
 
         //The quad consisting of the 4 corner points can be made into two triangles.
         //The "left" triangle is ll, ur, ul
@@ -89,6 +87,55 @@ HeightFieldUtils::getHeightAtPixel(const osg::HeightField* hf, double c, double 
 
         //Determine which triangle the point falls in.
         osg::Vec3d v0, v1, v2;
+
+        bool orientation = fabs(llHeight-urHeight) < fabs(ulHeight-lrHeight);
+        if ( orientation )
+        {
+            double dx = c - (double)colMin;
+            double dy = r - (double)rowMin;
+
+            // divide along ll->ur
+            if (dx > dy)
+            {
+                //The point lies in the right triangle
+                v0.set(colMin, rowMin, llHeight);
+                v1.set(colMax, rowMin, lrHeight);
+                v2.set(colMax, rowMax, urHeight);
+            }
+            else
+            {
+                //The point lies in the left triangle
+                v0.set(colMin, rowMin, llHeight);
+                v1.set(colMax, rowMax, urHeight);
+                v2.set(colMin, rowMax, ulHeight);
+            }
+        }
+        else
+        {
+            double dx = c - (double)colMin;
+            double dy = (double)rowMax - r;
+
+            // divide along ul->lr
+            if (dx > dy)
+            {
+                //The point lies in the right triangle
+                v0.set(colMax, rowMin, lrHeight);
+                v1.set(colMax, rowMax, urHeight);
+                v2.set(colMin, rowMax, ulHeight);
+            }
+            else
+            {
+                //The point lies in the left triangle
+                v0.set(colMin, rowMin, llHeight);
+                v1.set(colMax, rowMin, lrHeight);
+                v2.set(colMin, rowMax, ulHeight);
+            }
+        }
+
+#if 0
+        double dx = c - (double)colMin;
+        double dy = r - (double)rowMin;
+
         if (dx > dy)
         {
             //The point lies in the right triangle
@@ -103,6 +150,7 @@ HeightFieldUtils::getHeightAtPixel(const osg::HeightField* hf, double c, double 
             v1.set(colMax, rowMax, urHeight);
             v2.set(colMin, rowMax, ulHeight);
         }
+#endif
 
         //Compute the normal
         osg::Vec3d n = (v1 - v0) ^ (v2 - v0);
@@ -182,6 +230,39 @@ HeightFieldUtils::getHeightAtPixel(const osg::HeightField* hf, double c, double 
     return result;
 }
 
+bool
+HeightFieldUtils::getInterpolatedHeight(const osg::HeightField* hf, 
+                                        unsigned c, unsigned r, 
+                                        float& out_height,
+                                        ElevationInterpolation interpolation)
+{
+    int count = 0;
+    float total = 0.0f;
+    if ( c > 0 ) {
+        total += hf->getHeight(c-1, r);
+        count++;
+    }
+    if ( c < hf->getNumColumns()-1 ) {
+        total += hf->getHeight(c+1, r);
+        count++;
+    }
+    if ( r > 0 ) {
+        total += hf->getHeight(c, r-1);
+        count++;
+    }
+    if ( r < hf->getNumRows()-1 ) {
+        total += hf->getHeight(c, r+1);
+        count++;
+    }
+    if ( count > 0 )
+        total /= (float)count;
+    else
+        return false;
+
+    out_height = total;
+    return true;
+}
+
 float
 HeightFieldUtils::getHeightAtLocation(const osg::HeightField* hf, double x, double y, double llx, double lly, double dx, double dy, ElevationInterpolation interpolation)
 {
@@ -196,11 +277,34 @@ HeightFieldUtils::getHeightAtNormalizedLocation(const osg::HeightField* input,
                                                 double nx, double ny,
                                                 ElevationInterpolation interp)
 {
-    double px = nx * (double)(input->getNumColumns() - 1);
-    double py = ny * (double)(input->getNumRows() - 1);
+    double px = osg::clampBetween(nx, 0.0, 1.0) * (double)(input->getNumColumns() - 1);
+    double py = osg::clampBetween(ny, 0.0, 1.0) * (double)(input->getNumRows() - 1);
     return getHeightAtPixel( input, px, py, interp );
 }
 
+bool
+HeightFieldUtils::getNormalAtNormalizedLocation(const osg::HeightField* input,
+                                                double nx, double ny,
+                                                osg::Vec3& output,
+                                                ElevationInterpolation interp)
+{
+    double dx = 1.0/(double)(input->getNumColumns()-1);
+    double dy = 1.0/(double)(input->getNumRows()-1);
+
+    double xmin = osg::clampAbove( nx-dx, 0.0 );
+    double xmax = osg::clampBelow( nx+dx, 1.0 );
+    double ymin = osg::clampAbove( ny-dx, 0.0 );
+    double ymax = osg::clampBelow( ny+dy, 1.0 );
+
+    osg::Vec3 west (xmin, ny, getHeightAtNormalizedLocation(input, xmin, ny, interp));
+    osg::Vec3 east (xmax, ny, getHeightAtNormalizedLocation(input, xmax, ny, interp));
+    osg::Vec3 south(nx, ymin, getHeightAtNormalizedLocation(input, nx, ymin, interp));
+    osg::Vec3 north(nx, ymax, getHeightAtNormalizedLocation(input, nx, ymax, interp));
+
+    output = (west-east) ^ (north-south);
+    output.normalize();
+    return true;
+}
 
 void
 HeightFieldUtils::scaleHeightFieldToDegrees( osg::HeightField* hf )
@@ -271,6 +375,7 @@ HeightFieldUtils::createSubSample(osg::HeightField* input, const GeoExtent& inpu
 
 osg::HeightField*
 HeightFieldUtils::resampleHeightField(osg::HeightField*      input,
+                                      const GeoExtent&       extent,
                                       int                    newColumns, 
                                       int                    newRows,
                                       ElevationInterpolation interp)
@@ -282,8 +387,8 @@ HeightFieldUtils::resampleHeightField(osg::HeightField*      input,
         return input;
         //return new osg::HeightField( *input, osg::CopyOp::DEEP_COPY_ALL );
 
-    double spanX = (input->getNumColumns()-1) * input->getXInterval();
-    double spanY = (input->getNumRows()-1) * input->getYInterval();
+    double spanX = extent.width(); //(input->getNumColumns()-1) * input->getXInterval();
+    double spanY = extent.height(); //(input->getNumRows()-1) * input->getYInterval();
     const osg::Vec3& origin = input->getOrigin();
 
     double stepX = spanX/(double)(newColumns-1);
@@ -301,7 +406,7 @@ HeightFieldUtils::resampleHeightField(osg::HeightField*      input,
         {
             double nx = (double)x / (double)(newColumns-1);
             double ny = (double)y / (double)(newRows-1);
-            float h = getHeightAtNormalizedLocation( input, nx, ny );
+            float h = getHeightAtNormalizedLocation( input, nx, ny, interp );
             output->setHeight( x, y, h );
         }
     }
@@ -394,7 +499,9 @@ HeightFieldUtils::resolveInvalidHeights(osg::HeightField* grid,
 }
 
 osg::NodeCallback*
-HeightFieldUtils::createClusterCullingCallback( osg::HeightField* grid, osg::EllipsoidModel* et, float verticalScale )
+HeightFieldUtils::createClusterCullingCallback(osg::HeightField*          grid, 
+                                               const osg::EllipsoidModel* et, 
+                                               float                      verticalScale )
 {
     //This code is a very slightly modified version of the DestinationTile::createClusterCullingCallback in VirtualPlanetBuilder.
     if ( !grid || !et )

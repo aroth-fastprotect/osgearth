@@ -725,8 +725,8 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
                 offset = input->eval( _heightOffsetExpr.mutable_value(), &context );
             }
 
-            osg::StateSet* wallStateSet = 0L;
-            osg::StateSet* roofStateSet = 0L;
+            osg::ref_ptr<osg::StateSet> wallStateSet;
+            osg::ref_ptr<osg::StateSet> roofStateSet;
 
             // calculate the wall texturing:
             SkinResource* wallSkin = 0L;
@@ -796,7 +796,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             {      
                 if ( wallSkin )
                 {
-                    wallStateSet = context.resourceCache()->getStateSet( wallSkin );
+                    context.resourceCache()->getStateSet( wallSkin, wallStateSet );
                 }
 
                 // generate per-vertex normals, altering the geometry as necessary to avoid
@@ -832,7 +832,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
 
                     if ( roofSkin )
                     {
-                        roofStateSet = context.resourceCache()->getStateSet( roofSkin );
+                        context.resourceCache()->getStateSet( roofSkin, roofStateSet );
                     }
                 }
 
@@ -850,11 +850,11 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
 
                 FeatureSourceIndex* index = context.featureIndex();
 
-                addDrawable( walls.get(), wallStateSet, name, input, index );
+                addDrawable( walls.get(), wallStateSet.get(), name, input, index );
 
                 if ( rooflines.valid() )
                 {
-                    addDrawable( rooflines.get(), roofStateSet, name, input, index );
+                    addDrawable( rooflines.get(), roofStateSet.get(), name, input, index );
                 }
 
                 if ( baselines.valid() )

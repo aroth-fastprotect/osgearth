@@ -43,6 +43,9 @@ SET(OPENTHREADS_SONAMES TRUE)
 
 SET(OpenThreads_SOURCE_DIR ${OSGEARTH_SOURCE_DIR})
 
+# Good place to look for the OSG 3rd party libs
+SET(THIRD_PARTY_DIR "" CACHE PATH "OSG 3rd-party dependency folder")
+
 # We have some custom .cmake scripts not in the official distribution.
 # Maybe this can be used override existing behavior if needed?
 SET(CMAKE_MODULE_PATH "${OSGEARTH_SOURCE_DIR}/CMakeModules;${CMAKE_MODULE_PATH}")
@@ -56,7 +59,7 @@ OPTION(OSG_BUILD_PLATFORM_IPHONE_SIMULATOR "Enable IPhoneSDK Simulator support" 
 IF(OSG_BUILD_PLATFORM_IPHONE OR OSG_BUILD_PLATFORM_IPHONE_SIMULATOR)
   
   #you need to manually set the default sdk version here
-  SET (IPHONE_SDKVER "6.0")
+  SET (IPHONE_SDKVER "6.1")
   #the below is taken from ogre, it states the gcc stuff needs to happen before PROJECT() is called. I've no clue if we even need it
   # Force gcc <= 4.2 on iPhone
   include(CMakeForceCompiler)
@@ -107,16 +110,16 @@ FIND_PACKAGE(GEOS)
 FIND_PACKAGE(Sqlite3)
 FIND_PACKAGE(ZLIB)
 FIND_PACKAGE(V8)
+FIND_PACKAGE(JavaScriptCore)
+FIND_PACKAGE(LibNoise)
+
+FIND_PACKAGE(Qt4)
+IF (QT4_FOUND)
+    INCLUDE(${QT_USE_FILE})
+    SET(QT_ALL_LIBRARIES ${QT_LIBRARIES} ${QT_QTCORE_LIBRARY} ${QT_QTWEBKIT_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTOPENGL_LIBRARY})
+ENDIF (QT4_FOUND)
 
 OPTION(OSGEARTH_USE_QT "Enable to use Qt (build Qt-dependent libraries, plugins and examples)" ON)
-
-IF(OSGEARTH_USE_QT)
-    FIND_PACKAGE(Qt4 4.6)
-    IF (QT4_FOUND)
-        INCLUDE(${QT_USE_FILE})
-        SET(QT_ALL_LIBRARIES ${QT_LIBRARIES} ${QT_QTCORE_LIBRARY} ${QT_QTWEBKIT_LIBRARY} ${QT_QTNETWORK_LIBRARY} ${QT_QTXML_LIBRARY} ${QT_QTOPENGL_LIBRARY})
-    ENDIF (QT4_FOUND)
-ENDIF()
 
 SET (WITH_EXTERNAL_TINYXML FALSE CACHE BOOL "Use bundled or system wide version of TinyXML")
 IF (WITH_EXTERNAL_TINYXML)
@@ -307,7 +310,7 @@ IF(APPLE)
     IF(OSG_BUILD_PLATFORM_IPHONE OR OSG_BUILD_PLATFORM_IPHONE_SIMULATOR)
 
         IF(OSG_BUILD_PLATFORM_IPHONE)
-            SET(CMAKE_OSX_ARCHITECTURES "armv7;armv7s" CACHE STRING "Build architectures for iOS" FORCE)
+            SET(CMAKE_OSX_ARCHITECTURES "armv7" CACHE STRING "Build architectures for iOS" FORCE)
             SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -miphoneos-version-min=4.1 -mno-thumb -arch armv7 -pipe -no-cpp-precomp" CACHE STRING "Flags used by the compiler during all build types." FORCE)
         ELSE()
             #simulator uses i386 architectures
@@ -383,6 +386,11 @@ CONFIGURE_FILE(
 ADD_CUSTOM_TARGET(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
 
+
+
+#------------------------------------------------------------------------------
+# Docs.
+add_subdirectory(docs)
 
 
 

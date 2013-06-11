@@ -17,11 +17,11 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 #include "TileNode"
-#include "TerrainNode"
 
 #include <osg/ClusterCullingCallback>
 #include <osg/NodeCallback>
 #include <osg/NodeVisitor>
+#include <osg/Uniform>
 
 using namespace osgEarth_engine_mp;
 using namespace osgEarth;
@@ -32,63 +32,91 @@ using namespace OpenThreads;
 
 //----------------------------------------------------------------------------
 
-TileNode::TileNode( const TileKey& key, GeoLocator* keyLocator ) :
-_key              ( key ),
-_locator          ( keyLocator ),
-_publicStateSet   ( 0L )
+TileNode::TileNode( const TileKey& key, const TileModel* model ) :
+_key  ( key ),
+_model( model )
 {
     this->setName( key.str() );
+
+    osg::StateSet* stateset = getOrCreateStateSet();
+
+    // TileKey uniform.
+    _keyUniform = new osg::Uniform(osg::Uniform::FLOAT_VEC4, "oe_tile_key");
+    _keyUniform->setDataVariance( osg::Object::STATIC );
+    _keyUniform->set( osg::Vec4f(0,0,0,0) );
+    stateset->addUniform( _keyUniform );
+
+    // born-on date uniform.
+    _bornUniform = new osg::Uniform(osg::Uniform::FLOAT, "oe_tile_birthtime");
+    _bornUniform->set( -1.0f );
+    stateset->addUniform( _bornUniform );
+
+#if 0
+    // Texture matrix uniform that transforms texture coordinates from the 
+    // parent tile into the quadrant of this tile.
+    _tileParentMatrixUniform = new osg::Uniform(osg::Uniform::FLOAT_MAT4, "oe_tile_parent_matrix");
+    unsigned q = key.getQuadrant();
+    osg::Matrixf scaleBias;
+    model->createScaleBiasMatrix(scaleBias);
+    scaleBias(0,0) = 0.5f;
+    scaleBias(1,1) = 0.5f;
+    scaleBias(3,0) = (float)(key.getTileX() & 0x1) * 0.5f;
+    scaleBias(3,1) = (float)(1 - key.getTileY() & 0x1) * 0.5f;
+    _tileParentMatrixUniform->set( scaleBias );
+    stateset->addUniform( _tileParentMatrixUniform );
+#endif
 }
 
 
-TileNode::~TileNode()
+osg::BoundingSphere
+TileNode::computeBound() const
 {
-    //nop
+    osg::BoundingSphere bs = osg::MatrixTransform::computeBound();
+    
+    unsigned tw, th;
+    _key.getProfile()->getNumTiles(_key.getLOD(), tw, th);
+
+    // swap the Y index.
+    _keyUniform->set( osg::Vec4f(
+        _key.getTileX(),
+        th-_key.getTileY()-1.0,
+        _key.getLOD(),
+        bs.radius()) );
+
+    return bs;
 }
 
-
-void
-TileNode::setTileModel( TileModel* model )
-{
-    _model = model;
-    _publicStateSet = 0L;
-}
-
-
-bool
-TileNode::compile( TileModelCompiler* compiler, bool releaseModel )
-{
-    if ( !_model.valid() )
-        return false;
-
-    osg::Node* node = 0L;
-    _publicStateSet = 0L;
-
-    if ( !compiler->compile( _model.get(), node, _publicStateSet ) )
-        return false;
-
-    this->removeChildren( 0, this->getNumChildren() );
-    this->addChild( node );
-
-    // release the memory associated with the tile model.
-    if ( releaseModel )
-        _model = 0L;
-
-    return true;
-}
 
 void
 TileNode::traverse( osg::NodeVisitor& nv )
 {
     // TODO: not sure we need this.
-    if ( nv.getVisitorType()==osg::NodeVisitor::CULL_VISITOR )
+    if ( nv.getVisitorType() == nv.CULL_VISITOR )
     {
         osg::ClusterCullingCallback* ccc = dynamic_cast<osg::ClusterCullingCallback*>(getCullCallback());
         if (ccc)
         {
             if (ccc->cull(&nv,0,static_cast<osg::State *>(0))) return;
         }
+
+        // set the birth time if not already set.
+        const osg::FrameStamp* fs = nv.getFrameStamp();
+
+        float bt;
+        _bornUniform->get( bt );
+        if ( bt < 0.0f )
+        {
+            _bornUniform->set( nv.getFrameStamp() ? (float)nv.getFrameStamp()->getReferenceTime() : 0.0f );
+        }
     }
 
-    osg::Group::traverse( nv );
+    osg::MatrixTransform::traverse( nv );
+}
+
+
+void
+TileNode::releaseGLObjects(osg::State* state) const
+{
+    if ( _model.valid() )
+        _model->releaseGLObjects( state );
 }

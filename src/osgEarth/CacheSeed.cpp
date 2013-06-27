@@ -74,10 +74,10 @@ void CacheSeed::seed( Map* map )
         {
             OE_WARN << "Warning: Layer \"" << layer->getName() << "\" could not create TileSource; skipping." << std::endl;
         }
-        else if ( src->getCachePolicyHint() == CachePolicy::NO_CACHE )
-        {
-            OE_WARN << LC << "Warning: Layer \"" << layer->getName() << "\" does not support seeding; skipping." << std::endl;
-        }
+        //else if ( src->getCachePolicyHint(0L) == CachePolicy::NO_CACHE )
+        //{
+        //    OE_WARN << LC << "Warning: Layer \"" << layer->getName() << "\" does not support seeding; skipping." << std::endl;
+        //}
         else if ( !layer->getCache() )
         {
             OE_WARN << LC << "Notice: Layer \"" << layer->getName() << "\" has no cache defined; skipping." << std::endl;
@@ -107,10 +107,10 @@ void CacheSeed::seed( Map* map )
         {
             OE_WARN << "Warning: Layer \"" << layer->getName() << "\" could not create TileSource; skipping." << std::endl;
         }
-        else if ( src->getCachePolicyHint() == CachePolicy::NO_CACHE )
-        {
-            OE_WARN << LC << "Warning: Layer \"" << layer->getName() << "\" does not support seeding; skipping." << std::endl;
-        }
+        //else if ( src->getCachePolicyHint(0L) == CachePolicy::NO_CACHE )
+        //{
+        //    OE_WARN << LC << "Warning: Layer \"" << layer->getName() << "\" does not support seeding; skipping." << std::endl;
+        //}
         else if ( !layer->getCache() )
         {
             OE_WARN << LC << "Notice: Layer \"" << layer->getName() << "\" has no cache defined; skipping." << std::endl;
@@ -163,13 +163,16 @@ void CacheSeed::seed( Map* map )
                 TileKey ll = map->getProfile()->createTileKey(extent.xMin(), extent.yMin(), level);
                 TileKey ur = map->getProfile()->createTileKey(extent.xMax(), extent.yMax(), level);
 
+                if (!ll.valid() || !ur.valid()) continue;
+                
                 int tilesWide = ur.getTileX() - ll.getTileX() + 1;
                 int tilesHigh = ll.getTileY() - ur.getTileY() + 1;
                 int tilesAtLevel = tilesWide * tilesHigh;
                 //OE_NOTICE << "Tiles at level " << level << "=" << tilesAtLevel << std::endl;
 
+                /*
                 bool hasData = false;
-
+                
                 for (ImageLayerVector::const_iterator itr = mapf.imageLayers().begin(); itr != mapf.imageLayers().end(); itr++)
                 {
                     TileSource* src = itr->get()->getTileSource();
@@ -242,7 +245,7 @@ void CacheSeed::seed( Map* map )
                 //tiles are either processed or not and the ratio is exact so will cover tiles partially
                 //and potentially be too small
                 double adjust = 4.0;
-                coverageRatio = osg::clampBetween(coverageRatio * adjust, 0.0, 1.0);
+                coverageRatio = osg::clampBetween(coverageRatio * adjust, 0.0, 1.0);                
 
                 //OE_NOTICE << level <<  " CoverageRatio = " << coverageRatio << std::endl;
 
@@ -250,12 +253,12 @@ void CacheSeed::seed( Map* map )
                 {
                     _total += (int)ceil(coverageRatio * (double)tilesAtLevel );
                 }
+                */
+                _total += tilesAtLevel;
             }
         }
     }
 
-    //Adjust the # of tiles again to be bigger than computed to avoid giving false hope
-    _total *= 2;
     osg::Timer_t endTime = osg::Timer::instance()->tick();
     //OE_NOTICE << "Counted tiles in " << osg::Timer::instance()->delta_s(startTime, endTime) << " s" << std::endl;
 

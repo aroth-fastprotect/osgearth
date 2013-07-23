@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -177,6 +177,16 @@ FeatureNode::setFeature( Feature* feature )
 {
     _feature = feature;
     init();
+}
+
+void
+FeatureNode::setStyle(const Style& style)
+{
+    if ( _feature.valid() )
+    {
+        _feature->style() = style;
+        init();
+    }
 }
 
 osg::Group*

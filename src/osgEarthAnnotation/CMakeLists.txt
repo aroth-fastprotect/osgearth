@@ -13,7 +13,6 @@ SET(TARGET_PUBLIC_H
     AnnotationUtils
     CircleNode
     Common
-    Decluttering
     Decoration
     EllipseNode
     Export
@@ -33,14 +32,13 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
-	AnnotationEditing.cpp
-	AnnotationSettings.cpp
+    AnnotationEditing.cpp
+    AnnotationSettings.cpp
     AnnotationData.cpp
     AnnotationNode.cpp
     AnnotationRegistry.cpp
     AnnotationUtils.cpp
     CircleNode.cpp
-    Decluttering.cpp
     Decoration.cpp
     EllipseNode.cpp
     FeatureNode.cpp
@@ -50,8 +48,8 @@ SET(TARGET_SRC
     ImageOverlayEditor.cpp
     LabelNode.cpp
     LocalizedNode.cpp
-	RectangleNode.cpp
-	ModelNode.cpp
+    RectangleNode.cpp
+    ModelNode.cpp
     OrthoNode.cpp
     PlaceNode.cpp
     TrackNode.cpp

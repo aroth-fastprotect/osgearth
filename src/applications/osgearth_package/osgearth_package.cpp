@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -56,7 +56,7 @@ usage( const std::string& msg = "" )
         << "USAGE: osgearth_package <earth_file>" << std::endl
         << std::endl
         << "         --tms                              : make a TMS repo\n"
-        << "            <earth_file>                    : earth file defining layers to export (requied)\n"
+        << "            <earth_file>                    : earth file defining layers to export (required)\n"
         << "            --out <path>                    : root output folder of the TMS repo (required)\n"
         << "            [--bounds xmin ymin xmax ymax]* : bounds to package (in map coordinates; default=entire map)\n"
         << "            [--max-level <num>]             : max LOD level for tiles (all layers; default=inf)\n"
@@ -64,6 +64,7 @@ usage( const std::string& msg = "" )
         << "            [--ext <extension>]             : overrides the image file extension (e.g. jpg)\n"
         << "            [--overwrite]                   : overwrite existing tiles\n"
         << "            [--keep-empties]                : writes out fully transparent image tiles (normally discarded)\n"
+        << "            [--continue-single-color]       : continues to subdivide single color tiles, subdivision typicall stops on single color images\n"
         << "            [--db-options]                : db options string to pass to the image writer in quotes (e.g., \"JPEG_QUALITY 60\")\n"
         << std::endl
         << "         [--quiet]               : suppress progress output" << std::endl;
@@ -156,6 +157,8 @@ makeTMS( osg::ArgumentParser& args )
     // whether to keep 'empty' tiles
     bool keepEmpties = args.read("--keep-empties");    
 
+    bool continueSingleColor = args.read("--continue-single-color");
+
     // load up the map
     osg::ref_ptr<MapNode> mapNode = MapNode::load( args );
     if ( !mapNode.valid() )
@@ -174,6 +177,7 @@ makeTMS( osg::ArgumentParser& args )
     packager.setVerbose( verbose );
     packager.setOverwrite( overwrite );
     packager.setKeepEmptyImageTiles( keepEmpties );
+    packager.setSubdivideSingleColorImageTiles( continueSingleColor );
 
     if ( maxLevel != ~0u )
         packager.setMaxLevel( maxLevel );

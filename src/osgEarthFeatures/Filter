@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -160,6 +160,15 @@ namespace osgEarth { namespace Features
             const std::vector<osg::Vec3d>& input,
             const SpatialReference*        inputSRS,
             osg::Vec3Array*                output,
+            const SpatialReference*        outputSRS,
+            const osg::Matrixd&            world2local,
+            bool                           toECEF );
+
+        void transformAndLocalize(
+            const std::vector<osg::Vec3d>& input,
+            const SpatialReference*        inputSRS,
+            osg::Vec3Array*                out_verts,
+            osg::Vec3Array*                out_normals,
             const SpatialReference*        outputSRS,
             const osg::Matrixd&            world2local,
             bool                           toECEF );

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -31,6 +31,8 @@
 #include <osgEarth/Common>
 #include <osgEarth/Registry>
 #include <osgEarth/Utils>
+#include <osgEarth/CullingUtils>
+#include <osgEarth/VirtualProgram>
 
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
@@ -46,31 +48,39 @@ namespace
     // ControlNodeBin shaders.
 
     const char* s_controlVertexShader =
+        "#version " GLSL_VERSION_STR "\n"
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
+        "varying vec4 texcoord; \n"
         "void main() \n"
         "{ \n"
         "    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex; \n"
-        "    gl_TexCoord[0] = gl_MultiTexCoord0; \n"
+        "    texcoord = gl_MultiTexCoord0; \n"
         "    gl_FrontColor = gl_Color; \n"
         "} \n";
 
     const char* s_imageControlFragmentShader =
+        "#version " GLSL_VERSION_STR "\n"
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
         "uniform sampler2D tex0; \n"
-        "uniform float visibleTime; \n"
+        "uniform float oe_controls_visibleTime; \n"
         "uniform float osg_FrameTime; \n"
+        "varying vec4 texcoord; \n"
         "void main() \n"
         "{ \n"
-        "    float opacity = clamp( osg_FrameTime - visibleTime, 0.0, 1.0 ); \n"
-        "    vec4 texel = texture2D(tex0, gl_TexCoord[0].st); \n"
+        "    float opacity = clamp( osg_FrameTime - oe_controls_visibleTime, 0.0, 1.0 ); \n"
+        "    vec4 texel = texture2D(tex0, texcoord.st); \n"
         "    gl_FragColor = vec4(texel.rgb, texel.a * opacity); \n"
         "} \n";
 
     const char* s_labelControlFragmentShader =
+        "#version " GLSL_VERSION_STR "\n"
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
         "uniform sampler2D tex0; \n"
-        "uniform float visibleTime; \n"
+        "uniform float oe_controls_visibleTime; \n"
         "uniform float osg_FrameTime; \n"
         "void main() \n"
         "{ \n"
-        "    float opacity = clamp( osg_FrameTime - visibleTime, 0.0, 1.0 ); \n"
+        "    float opacity = clamp( osg_FrameTime - oe_controls_visibleTime, 0.0, 1.0 ); \n"
         "    vec4 texel = texture2D(tex0, gl_TexCoord[0].st); \n"       
         "    gl_FragColor = vec4(gl_Color.rgb, texel.a * opacity); \n"
         "} \n";
@@ -202,7 +212,7 @@ Control::init()
     _vfill = false;    
     _visible = true;
     _active = false;
-    _absorbEvents = false;
+    _absorbEvents = true;
     _dirty = true;
 }
 
@@ -703,10 +713,10 @@ LabelControl::setText( const std::string& value )
 void
 LabelControl::setEncoding( osgText::String::Encoding value )
 {
-	if ( value != _encoding ) {
-		_encoding = value;
-		dirty();
-	}
+    if ( value != _encoding ) {
+        _encoding = value;
+        dirty();
+    }
 }
 
 void
@@ -780,7 +790,7 @@ LabelControl::calcSize(const ControlContext& cx, osg::Vec2f& out_size)
         t->getOrCreateStateSet()->setAttributeAndModes( program, osg::StateAttribute::ON );
 #endif
 
-		t->setText( _text, _encoding );
+        t->setText( _text, _encoding );
         // yes, object coords. screen coords won't work becuase the bounding box will be wrong.
         t->setCharacterSizeMode( osgText::Text::OBJECT_COORDS );
         t->setCharacterSize( _fontSize );
@@ -816,9 +826,9 @@ LabelControl::calcSize(const ControlContext& cx, osg::Vec2f& out_size)
             (_bmax.x() - _bmin.x()) + padding().x(),
             (_bmax.y() - _bmin.y()) + padding().y() );
 
-	// If width explicitly set and > measured width of label text - use it.
-	if (width().isSet() && width().get() > _renderSize.x()) _renderSize.x() = width().get();
-	
+    // If width explicitly set and > measured width of label text - use it.
+    if (width().isSet() && width().get() > _renderSize.x()) _renderSize.x() = width().get();
+    
         _drawable = t;
 
         out_size.set(
@@ -847,6 +857,50 @@ LabelControl::draw( const ControlContext& cx, DrawableList& out )
         t->setPosition( osg::Vec3( _renderPos.x(), vph - _renderPos.y(), 0 ) );
         out.push_back( _drawable.get() );
     }
+}
+
+// ---------------------------------------------------------------------------
+
+ButtonControl::ButtonControl(const std::string&   text,
+                             float                fontSize,
+                             const osg::Vec4f&    foreColor,
+                             const osg::Vec4f&    backColor,
+                             const osg::Vec4f&    activeColor,
+                             ControlEventHandler* handler) :
+LabelControl(text, fontSize, foreColor)
+{
+    setBackColor( backColor );
+    setActiveColor( activeColor );
+    setPadding( 6.0f );
+    if ( handler )
+        this->addEventHandler( handler );
+}
+
+ButtonControl::ButtonControl(const std::string&   text,
+                             const osg::Vec4f&    foreColor,
+                             const osg::Vec4f&    backColor,
+                             const osg::Vec4f&    activeColor,
+                             float                fontSize,
+                             ControlEventHandler* handler) :
+LabelControl(text, foreColor, fontSize)
+{
+    setBackColor( backColor );
+    setActiveColor( activeColor );
+    setPadding( 6.0f );
+    if ( handler )
+        this->addEventHandler( handler );
+}
+
+ButtonControl::ButtonControl(const std::string&   text,
+                             ControlEventHandler* handler) :
+LabelControl(text)
+{
+    setForeColor( Color::White );
+    setBackColor( Color::DarkGray );
+    setActiveColor( Color::Blue );
+    setPadding( 6.0f );
+    if ( handler )
+        this->addEventHandler( handler );
 }
 
 // ---------------------------------------------------------------------------
@@ -1028,19 +1082,19 @@ _min(min),
 _max(max),
 _value(value)
 {
-   //if ( _max <= _min )
-   //    _max = _min+1.0f;
-   //if ( _value < _min )
-   //    _value = _min;
-   //if ( _value > _max )
-   //    _value = _max;
+    //if ( _max <= _min )
+    //    _max = _min+1.0f;
+    //if ( _value < _min )
+    //    _value = _min;
+    //if ( _value > _max )
+    //    _value = _max;
 
-   setHorizFill( true );
-   setVertAlign( ALIGN_CENTER );
-   setHeight( 20.0f );
+    setHorizFill( true );
+    setVertAlign( ALIGN_CENTER );
+    setHeight( 20.0f );
 
-   if ( handler )
-    addEventHandler( handler );
+    if ( handler )
+        addEventHandler( handler );
 }
 
 void
@@ -1163,7 +1217,7 @@ HSliderControl::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapte
     {
         float relX = ea.getX() - _renderPos.x();
 
-        setValue( _min + (_max-_min) * ( relX/_renderSize.x() ) );
+        setValue( osg::clampBetween(_min + (_max-_min) * ( relX/_renderSize.x() ), _min, _max) );
         aa.requestRedraw();
 
         return true;
@@ -1359,7 +1413,7 @@ RoundedFrame::draw( const ControlContext& cx, DrawableList& out )
 // ---------------------------------------------------------------------------
 
 Container::Container() :
-_spacing( 1 )
+_spacing( 5.0f )
 {
     //nop
 }
@@ -1702,9 +1756,9 @@ HBox::calcSize(const ControlContext& cx, osg::Vec2f& out_size)
             _renderSize.x() += first ? childSize.x() : childSpacing() + childSize.x();
             _renderSize.y() = osg::maximum( _renderSize.y(), childSize.y() );
         }
-
-	// If width explicitly set and > total width of children - use it
-	if (width().isSet() && width().get() > _renderSize.x()) _renderSize.x() = width().get();
+    
+    // If width explicitly set and > total width of children - use it
+    if (width().isSet() && width().get() > _renderSize.x()) _renderSize.x() = width().get();
 
         _renderSize.set(
             _renderSize.x() + padding().x(),
@@ -1764,16 +1818,6 @@ HBox::calcPos(const ControlContext& cx, const osg::Vec2f& cursor, const osg::Vec
 
     osg::Vec2f childCursor = _renderPos;
 
-#if 0
-    // collect all the members
-    for( ControlList::const_iterator i = _controls.begin(); i != _controls.end(); ++i )
-    {
-        Control* child = i->get();
-        child->calcPos( cx, childCursor, _renderSize - padding().size() ); // GW1
-        childCursor.x() += child->margin().left() + child->renderSize().x() + child->margin().right() + childSpacing();
-    }
-#endif
-
     osg::Vec2f renderArea = _renderSize - padding().size();
     for( ControlList::const_iterator i = _controls.begin(); i != _controls.end(); ++i )
     {
@@ -1797,7 +1841,8 @@ HBox::draw( const ControlContext& cx, DrawableList& out )
 
 Grid::Grid()
 {
-    //nop
+    setChildHorizAlign( ALIGN_LEFT );
+    setChildVertAlign( ALIGN_CENTER );
 }
 
 Grid::Grid( const Alignment& halign, const Alignment& valign, const Gutter& padding, float spacing ) :
@@ -1836,6 +1881,17 @@ osg::ref_ptr<Control>&
 Grid::cell(int col, int row)
 {
     return _rows[row][col];
+}
+
+Control*
+Grid::getControl(int col, int row)
+{
+    if ( row < (int)_rows.size() && col < (int)_rows[row].size() )
+    {
+        osg::ref_ptr<Control>& c = cell(col, row);
+        return c.get();
+    }
+    else return 0L;
 }
 
 void
@@ -2142,7 +2198,7 @@ ControlNode::traverse( osg::NodeVisitor& nv )
     {
         static osg::Vec3d s_zero(0,0,0);
         static osg::Vec4d s_zero_w(0,0,0,1);
-        osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>( &nv );
+        osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
 
         // pull up the per-view data for this view:
         PerViewData& data = _perViewData[cv->getCurrentCamera()->getView()];
@@ -2230,11 +2286,12 @@ _sortingEnabled( true )
     program->addShader( new osg::Shader( osg::Shader::FRAGMENT, s_labelControlFragmentShader ) );
     stateSet->setAttributeAndModes( program, osg::StateAttribute::ON );
 
-    osg::Uniform* defaultOpacity = new osg::Uniform( osg::Uniform::FLOAT, "opacity" );
+    //TODO: appears to be unused
+    osg::Uniform* defaultOpacity = new osg::Uniform( osg::Uniform::FLOAT, "oe_controls_opacity" );
     defaultOpacity->set( 1.0f );
     stateSet->addUniform( defaultOpacity );
 
-    osg::Uniform* defaultVisibleTime = new osg::Uniform( osg::Uniform::FLOAT, "visibleTime" );
+    osg::Uniform* defaultVisibleTime = new osg::Uniform( osg::Uniform::FLOAT, "oe_controls_visibleTime" );
     defaultVisibleTime->set( 0.0f );
     stateSet->addUniform( defaultVisibleTime );    
 }
@@ -2520,8 +2577,8 @@ ControlCanvas::init( osgViewer::View* view, bool registerCanvas )
     ss->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE );
     ss->setMode( GL_BLEND, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE );
     ss->setAttributeAndModes( new osg::Depth( osg::Depth::ALWAYS, 0, 1, false ) );
-    ss->setRenderBinMode( osg::StateSet::USE_RENDERBIN_DETAILS );
-    ss->setBinName( OSGEARTH_CONTROLS_BIN );
+    //ss->setRenderBinMode( osg::StateSet::USE_RENDERBIN_DETAILS );
+    //ss->setBinName( OSGEARTH_CONTROLS_BIN );
 
     // keeps the control bin shaders from "leaking out" into the scene graph :/
     ss->setAttributeAndModes( new osg::Program(), osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
@@ -2545,12 +2602,12 @@ ControlCanvas::~ControlCanvas()
     EventHandlersMap::iterator itr;
     for (itr = _eventHandlersMap.begin(); itr != _eventHandlersMap.end(); ++itr)
     {
-		osgGA::GUIEventHandler* pGUIEventHandler = itr->first.get();
-		osgViewer::View* pView = itr->second.get();
-		if ( (pView != NULL) && (pGUIEventHandler != NULL) )
-		{
-			pView->removeEventHandler(pGUIEventHandler);
-		}
+        osgGA::GUIEventHandler* pGUIEventHandler = itr->first.get();
+        osgViewer::View* pView = itr->second.get();
+        if ( (pView != NULL) && (pGUIEventHandler != NULL) )
+        {
+            pView->removeEventHandler(pGUIEventHandler);
+        }
     }
 }
 
@@ -2603,17 +2660,17 @@ ControlCanvas::handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter
     if ( !_context._vp )
         return false;
 
-	for (ControlList::reverse_iterator i = _controls.rbegin(); i != _controls.rend(); ++i)
-	{
-		Control* control = i->get();
-		if (control->isDirty())
-		{
-			aa.requestRedraw();
-			break;
-		}
-	}
+    for (ControlList::reverse_iterator i = _controls.rbegin(); i != _controls.rend(); ++i)
+    {
+        Control* control = i->get();
+        if (control->isDirty())
+        {
+            aa.requestRedraw();
+            break;
+        }
+    }
 
-	bool handled = false;
+    bool handled = false;
     //Send a frame event to all controls
     if ( ea.getEventType() == osgGA::GUIEventAdapter::FRAME )
     {

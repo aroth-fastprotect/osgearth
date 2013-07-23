@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -91,6 +91,16 @@ AltitudeSymbol::parseSLD(const Config& c, Style& style)
             style.getOrCreate<AltitudeSymbol>()->clamping() = CLAMP_ABSOLUTE;
         else if ( match(c.value(), "relative") ) 
             style.getOrCreate<AltitudeSymbol>()->clamping() = CLAMP_RELATIVE_TO_TERRAIN;
+        else if ( match(c.value(), "terrain-drape") )
+        {
+            style.getOrCreate<AltitudeSymbol>()->clamping()  = CLAMP_TO_TERRAIN;
+            style.getOrCreate<AltitudeSymbol>()->technique() = TECHNIQUE_DRAPE;
+        }
+        else if ( match(c.value(), "terrain-gpu") )
+        {
+            style.getOrCreate<AltitudeSymbol>()->clamping()  = CLAMP_TO_TERRAIN;
+            style.getOrCreate<AltitudeSymbol>()->technique() = TECHNIQUE_GPU;
+        }
     }
     else if ( match(c.key(), "altitude-technique") ) {
         if      ( match(c.value(), "map") )

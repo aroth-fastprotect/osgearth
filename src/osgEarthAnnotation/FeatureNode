@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -69,6 +69,8 @@ namespace osgEarth { namespace Annotation
 
         virtual osg::Group* getAttachPoint();
 
+        virtual void setStyle(const Style& style);
+
     public: // MapNodeObserver
 
         virtual void setMapNode( MapNode* mapNode );
@@ -79,11 +81,11 @@ namespace osgEarth { namespace Annotation
         virtual Config getConfig() const;
 
     protected:
-        osg::ref_ptr<Feature>       _feature;
-        GeometryCompilerOptions     _options;
-        bool                        _draped;
-        osg::Group*                 _attachPoint;
-        osg::Polytope               _featurePolytope;
+        osg::ref_ptr<Feature>        _feature;
+        GeometryCompilerOptions      _options;
+        bool                         _draped;
+        osg::Group*                  _attachPoint;
+        osg::Polytope                _featurePolytope;
 
         FeatureNode() { }
         FeatureNode(const FeatureNode& rhs, const osg::CopyOp& op) { }

@@ -136,7 +136,7 @@ namespace osgEarth
     private:
         MapFrame  _mapf;
         unsigned  _maxCacheSize;
-        int       _tileSize;
+        int       _tileSize;        
         int       _maxLevelOverride;
 
         typedef LRUCache< TileKey, osg::ref_ptr<osg::HeightField> > TileCache;

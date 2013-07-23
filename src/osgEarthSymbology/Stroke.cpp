@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -56,11 +56,12 @@ void
 Stroke::init()
 {
     _color.set         ( 1.0f, 1.0f, 1.0f, 1.0f );
-    _lineCap.init      ( LINECAP_ROUND );
+    _lineCap.init      ( LINECAP_FLAT );
     _lineJoin.init     ( LINEJOIN_ROUND );
     _width.init        ( 1.0f );
     _widthUnits.init   ( Units::PIXELS );
     _roundingRatio.init( 0.4f );
+    _minPixels.init    ( 0.0f );
 }
 
 Config 
@@ -77,6 +78,7 @@ Stroke::getConfig() const {
     conf.addIfSet("rounding_ratio", _roundingRatio);
     if ( _widthUnits.isSet() )
         conf.add( "width_units", _widthUnits->getAbbr() );
+    conf.addIfSet("min_pixels", _minPixels );
     return conf;
 }
 
@@ -94,4 +96,5 @@ Stroke::mergeConfig( const Config& conf ) {
     conf.getIfSet("rounding_ratio", _roundingRatio);
     if ( conf.hasValue("width_units" ) )
         Units::parse( conf.value("width_units"), _widthUnits.mutable_value() );
+    conf.getIfSet("min_pixels", _minPixels );
 }

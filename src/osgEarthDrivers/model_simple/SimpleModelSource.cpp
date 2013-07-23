@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarth/Map>
 #include <osgEarth/ShaderGenerator>
 #include <osgEarth/FileUtils>
+#include <osgEarth/AutoScale>
 #include <osg/LOD>
 #include <osg/ProxyNode>
 #include <osg/Notify>
@@ -168,8 +169,6 @@ public:
                 (*_options.location()).y(), 
                 (*_options.location()).z(),
                 ALTMODE_ABSOLUTE );
-
-            OE_NOTICE << "Read location " << geoPoint.vec3d() << std::endl;
             
             osg::Matrixd matrix;
             geoPoint.createLocalToWorld( matrix );
@@ -209,7 +208,7 @@ public:
                 SetLoadPriorityVisitor slpv(_options.loadingPriorityScale().value(), _options.loadingPriorityOffset().value());
                 result->accept(slpv);
             }
-
+    
             if(_options.lodScale().isSet())
             {
                 LODScaleOverrideNode * node = new LODScaleOverrideNode;
@@ -232,6 +231,7 @@ public:
                     osg::StateAttribute::OFF | osg::StateAttribute::OVERRIDE );
             }
         }
+
 
         return result.release();
     }

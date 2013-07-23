@@ -16,6 +16,9 @@ LIST(APPEND TARGET_COMMON_LIBRARIES
     OpenThreads osg osgDB osgUtil osgEarth
 )
 
+# Folder name for plugins
+SET(OSGEARTH_PLUGINS_FOLDER Plugins)
+
 ############################################################
 #
 #  NodeKit/Psudo loader plugins
@@ -40,16 +43,22 @@ ADD_SUBDIRECTORY(cache_filesystem)
 ADD_SUBDIRECTORY(ocean_surface)
 ADD_SUBDIRECTORY(refresh)
 ADD_SUBDIRECTORY(xyz)
+ADD_SUBDIRECTORY(bing)
+ADD_SUBDIRECTORY(tileindex)
+
+IF(LIBNOISE_FOUND)
+    ADD_SUBDIRECTORY(noise)
+ENDIF(LIBNOISE_FOUND)
 
 IF(GDAL_FOUND)
-	ADD_SUBDIRECTORY(gdal)
-	ADD_SUBDIRECTORY(feature_ogr)
-  	ADD_SUBDIRECTORY(feature_wfs)  
+  ADD_SUBDIRECTORY(gdal)
+  ADD_SUBDIRECTORY(feature_ogr)
+  ADD_SUBDIRECTORY(feature_wfs)  
   ADD_SUBDIRECTORY(feature_tfs)
-	ADD_SUBDIRECTORY(model_feature_stencil)
-	ADD_SUBDIRECTORY(model_feature_geom)
-  	ADD_SUBDIRECTORY(mask_feature)
-  	ADD_SUBDIRECTORY(label_overlay)
+  ADD_SUBDIRECTORY(model_feature_stencil)
+  ADD_SUBDIRECTORY(model_feature_geom)
+  ADD_SUBDIRECTORY(mask_feature)
+  ADD_SUBDIRECTORY(label_overlay)
   ADD_SUBDIRECTORY(label_annotation)
 ENDIF(GDAL_FOUND)
 
@@ -60,10 +69,16 @@ ENDIF(SQLITE3_FOUND)
 
 ADD_SUBDIRECTORY(engine_osgterrain)
 ADD_SUBDIRECTORY(engine_quadtree)
+ADD_SUBDIRECTORY(engine_mp)
+ADD_SUBDIRECTORY(engine_byo)
 
 IF(V8_FOUND)
   ADD_SUBDIRECTORY(script_engine_v8)
 ENDIF(V8_FOUND)
+
+IF(JAVASCRIPTCORE_FOUND)
+  ADD_SUBDIRECTORY(script_engine_javascriptcore)
+ENDIF(JAVASCRIPTCORE_FOUND)
 
 ADD_SUBDIRECTORY(vdatum_egm84)
 ADD_SUBDIRECTORY(vdatum_egm96)

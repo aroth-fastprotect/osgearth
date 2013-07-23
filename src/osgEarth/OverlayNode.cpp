@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -79,7 +79,7 @@ namespace
 
                         if ( i >= 0 && i < (int)ownerPath.size()-1 )
                         {
-                            osgUtil::CullVisitor* cv = static_cast<osgUtil::CullVisitor*>(&nv);
+                            osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
 
                             int pushes = 0;
                             for( int k = i+1; k < (int)ownerPath.size(); ++k )

@@ -32,7 +32,6 @@
 #include <osgEarth/TileKey>
 #include <osgEarth/Profile>
 #include <osgEarth/MemCache>
-#include <osgEarth/Progress>
 #include <osgEarth/ThreadingUtils>
 
 #include <osg/Referenced>
@@ -54,6 +53,8 @@
 
 namespace osgEarth
 {
+    class ProgressCallback;
+
     /**
      * Configuration options for a tile source driver.
      */
@@ -278,10 +279,11 @@ namespace osgEarth
          * Gets the nodata max value
          */
         virtual float getNoDataMaxValue() {
-            return _options.noDataMaxValue().value(); }
+            return _options.noDataMaxValue().value(); }        
 
         /**
          * Gets the preferred extension for this TileSource
+         * @deprecated No longer used
          */
         virtual std::string getExtension() const {return "png";}
 
@@ -318,15 +320,8 @@ namespace osgEarth
          * cache if one is configured. But a TileSource can report that caching should
          * not be used (for whatever reason) by returning CachePolicy::NO_CACHE.
          */
-        virtual CachePolicy getCachePolicyHint() const { return CachePolicy::DEFAULT; }
-
-
-        /**
-         * Returns true if data from this source can be cached to disk
-         * @deprecated. Use getCachePolicyHint instead.
-         */
-        bool supportsPersistentCaching() const {
-            return getCachePolicyHint() != CachePolicy::NO_CACHE; }
+        virtual CachePolicy getCachePolicyHint(const Profile* targetProfile) const 
+            { return CachePolicy::DEFAULT; }
 
         /**
          * Starts up the tile source.

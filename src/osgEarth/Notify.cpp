@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,9 +17,24 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Notify>
-#include <osgEarth/ThreadingUtils>
-#include <osg/ApplicationUsage>
+
+using namespace osgEarth;
+
+/* -*-c++-*- OpenSceneGraph - Copyright (C) 1998-2006 Robert Osfield 
+ *
+ * This library is open source and may be redistributed and/or modified under  
+ * the terms of the OpenSceneGraph Public License (OSGPL) version 0.0 or 
+ * (at your option) any later version.  The full license is in LICENSE file
+ * included with this distribution, and on the openscenegraph.org website.
+ * 
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the 
+ * OpenSceneGraph Public License for more details.
+*/
+#include <osgEarth/Notify>
 #include <osg/ref_ptr>
+#include <osg/Notify>
 #include <string>
 #include <stdlib.h>
 #include <sstream>
@@ -29,7 +44,6 @@
 #include <iomanip>
 
 using namespace std;
-using namespace osgEarth;
 
 namespace osgEarth {
 
@@ -119,157 +133,111 @@ protected:
 
 } // namespace osgEarth
 
-using namespace osgEarth;
+static bool s_osgEarthNeedNotifyInit = true;
+static osg::NotifySeverity osgearth_g_NotifyLevel = osg::NOTICE;
+static osgEarth::NullStream *g_NullStream = NULL;
+static osgEarth::NotifyStream *g_NotifyStream = NULL;
 
-static osg::ApplicationUsageProxy Notify_e0(osg::ApplicationUsage::ENVIRONMENTAL_VARIABLE, "OSGEARTH_NOTIFY_LEVEL <mode>", "FATAL | WARN | NOTICE | DEBUG_INFO | DEBUG_FP | DEBUG | INFO | ALWAYS");
-
-namespace {
-    typedef OpenThreads::ScopedLock<OpenThreads::Mutex> ScopedMutexLock;
-
-    class ThreadNotifyData
-    {
-    public:
-        inline ThreadNotifyData() 
-            : notifyStream(new osgEarth::NotifyStream)
-            {
-                setNotifyHandler(osgEarth::getNotifyHandler());
-            }
-        inline ThreadNotifyData(const ThreadNotifyData & rhs)
-            : notifyStream(rhs.notifyStream)
-            {
-                const_cast<ThreadNotifyData&>(rhs).notifyStream = NULL;
-            }
-        inline ~ThreadNotifyData()
-            {
-                delete notifyStream;
-            }
-        void setNotifyHandler(osg::NotifyHandler *handler)
-        {
-            osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer*>(notifyStream->rdbuf());
-            if (buffer) buffer->setNotifyHandler(handler);
-        }
-
-        osgEarth::NotifyStream * notifyStream;
-    };
+void
+osgEarth::setNotifyLevel(osg::NotifySeverity severity)
+{
+    if(s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
+    osgearth_g_NotifyLevel = severity;
 }
 
-struct NotifySingleton
+osg::NotifySeverity
+osgEarth::getNotifyLevel()
 {
-    NotifySingleton()
-    {
-        // _notifyLevel
-        // =============
-
-        _notifyLevel = osg::NOTICE; // Default value
-
-        char* OSGNOTIFYLEVEL=getenv("OSGEARTH_NOTIFY_LEVEL");
-        if (!OSGNOTIFYLEVEL) OSGNOTIFYLEVEL=getenv("OSGEARTHNOTIFYLEVEL");
-        if(OSGNOTIFYLEVEL)
-        {
-
-            std::string stringOSGNOTIFYLEVEL(OSGNOTIFYLEVEL);
-
-            // Convert to upper case
-            for(std::string::iterator i=stringOSGNOTIFYLEVEL.begin();
-                i!=stringOSGNOTIFYLEVEL.end();
-                ++i)
-            {
-                *i=toupper(*i);
-            }
-
-            if(stringOSGNOTIFYLEVEL.find("ALWAYS")!=std::string::npos)          _notifyLevel=osg::ALWAYS;
-            else if(stringOSGNOTIFYLEVEL.find("FATAL")!=std::string::npos)      _notifyLevel=osg::FATAL;
-            else if(stringOSGNOTIFYLEVEL.find("WARN")!=std::string::npos)       _notifyLevel=osg::WARN;
-            else if(stringOSGNOTIFYLEVEL.find("NOTICE")!=std::string::npos)     _notifyLevel=osg::NOTICE;
-            else if(stringOSGNOTIFYLEVEL.find("DEBUG_INFO")!=std::string::npos) _notifyLevel=osg::DEBUG_INFO;
-            else if(stringOSGNOTIFYLEVEL.find("DEBUG_FP")!=std::string::npos)   _notifyLevel=osg::DEBUG_FP;
-            else if(stringOSGNOTIFYLEVEL.find("DEBUG")!=std::string::npos)      _notifyLevel=osg::DEBUG_INFO;
-            else if(stringOSGNOTIFYLEVEL.find("INFO")!=std::string::npos)       _notifyLevel=osg::INFO;
-            else std::cout << "Warning: invalid OSGEARTH_NOTIFY_LEVEL set ("<<stringOSGNOTIFYLEVEL<<")"<<std::endl;
-
-        }
-
-        // Setup standard notify handler
-        _notifyHandler = new osg::StandardNotifyHandler;
-    }
-    
-    typedef std::map<unsigned,ThreadNotifyData> ThreadNotifyDataMap;
-
-    ThreadNotifyData& getThreadNotifyData()
-    {
-        ScopedMutexLock lock(_notifyStreamPerThreadMutex);
-        return _notifyStreamPerThread[Threading::getCurrentThreadId()];
-    }
-    
-    void setNotifyHandler(osg::NotifyHandler *handler)
-    {
-        _notifyHandler = handler;
-        ScopedMutexLock lock(_notifyStreamPerThreadMutex);
-        for(ThreadNotifyDataMap::iterator it = _notifyStreamPerThread.begin(); it != _notifyStreamPerThread.end(); it++)
-        {
-            ThreadNotifyData & thread = it->second;
-            thread.setNotifyHandler(handler);
-        }
-    }
-
-    osg::ref_ptr<osg::NotifyHandler> _notifyHandler;
-    osg::NotifySeverity _notifyLevel;
-    osgEarth::NullStream     _nullStream;
-    OpenThreads::Mutex      _notifyStreamPerThreadMutex;
-    ThreadNotifyDataMap     _notifyStreamPerThread;
-};
-
-static NotifySingleton& getNotifySingleton()
-{
-    static NotifySingleton s_NotifySingleton;
-    return s_NotifySingleton;
+    if(s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
+    return osgearth_g_NotifyLevel;
 }
 
-bool osgEarth::initNotifyLevel()
+bool
+osgEarth::initNotifyLevel()
 {
-    getNotifySingleton();
+	if (!s_osgEarthNeedNotifyInit)
+		return true;
+
+	static osgEarth::NullStream s_NullStream;
+	static osgEarth::NotifyStream s_NotifyStream;
+
+	g_NullStream = &s_NullStream;
+	g_NotifyStream = &s_NotifyStream;
+
+    // g_NotifyLevel
+    // =============
+
+    osgearth_g_NotifyLevel = osg::NOTICE; // Default value
+
+    char* OSGNOTIFYLEVEL=getenv("OSGEARTH_NOTIFY_LEVEL");
+    if (!OSGNOTIFYLEVEL) OSGNOTIFYLEVEL=getenv("OSGEARTHNOTIFYLEVEL");
+    if(OSGNOTIFYLEVEL)
+    {
+
+        std::string stringOSGNOTIFYLEVEL(OSGNOTIFYLEVEL);
+
+        // Convert to upper case
+        for(std::string::iterator i=stringOSGNOTIFYLEVEL.begin();
+            i!=stringOSGNOTIFYLEVEL.end();
+            ++i)
+        {
+            *i=toupper(*i);
+        }
+
+        if(stringOSGNOTIFYLEVEL.find("ALWAYS")!=std::string::npos)          osgearth_g_NotifyLevel=osg::ALWAYS;
+        else if(stringOSGNOTIFYLEVEL.find("FATAL")!=std::string::npos)      osgearth_g_NotifyLevel=osg::FATAL;
+        else if(stringOSGNOTIFYLEVEL.find("WARN")!=std::string::npos)       osgearth_g_NotifyLevel=osg::WARN;
+        else if(stringOSGNOTIFYLEVEL.find("NOTICE")!=std::string::npos)     osgearth_g_NotifyLevel=osg::NOTICE;
+        else if(stringOSGNOTIFYLEVEL.find("DEBUG_INFO")!=std::string::npos) osgearth_g_NotifyLevel=osg::DEBUG_INFO;
+        else if(stringOSGNOTIFYLEVEL.find("DEBUG_FP")!=std::string::npos)   osgearth_g_NotifyLevel=osg::DEBUG_FP;
+        else if(stringOSGNOTIFYLEVEL.find("DEBUG")!=std::string::npos)      osgearth_g_NotifyLevel=osg::DEBUG_INFO;
+        else if(stringOSGNOTIFYLEVEL.find("INFO")!=std::string::npos)       osgearth_g_NotifyLevel=osg::INFO;
+        else std::cout << "Warning: invalid OSG_NOTIFY_LEVEL set ("<<stringOSGNOTIFYLEVEL<<")"<<std::endl;
+ 
+    }
+
+	// Setup standard notify handler
+	osgEarth::NotifyStreamBuffer *buffer = dynamic_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
+	if (buffer && !buffer->getNotifyHandler())
+		buffer->setNotifyHandler(new osg::StandardNotifyHandler);
+
+	s_osgEarthNeedNotifyInit = false;
+
     return true;
-}
 
-// Use a proxy to force the initialization of the the NotifySingleton during static initialization
-//OSG_INIT_SINGLETON_PROXY(NotifySingletonProxy, osgEarth::initNotifyLevel())
-static struct NotifySingletonProxy{ NotifySingletonProxy() { osgEarth::initNotifyLevel(); } } s_NotifySingletonProxy;
-
-
-void osgEarth::setNotifyLevel(osg::NotifySeverity severity)
-{
-	getNotifySingleton()._notifyLevel = severity;
-}
-
-osg::NotifySeverity osgEarth::getNotifyLevel()
-{
-    return getNotifySingleton()._notifyLevel;
-}
-
-void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
-{
-    getNotifySingleton().setNotifyHandler(handler);
-}
-
-osg::NotifyHandler* osgEarth::getNotifyHandler()
-{
-    return getNotifySingleton()._notifyHandler;
 }
 
 #ifndef OSG_NOTIFY_DISABLED
 bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 {
-    return severity<=getNotifySingleton()._notifyLevel;
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
+    return severity<=getNotifyLevel();
 }
 #endif
 
+void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
+{
+	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
+	if (buffer)
+		buffer->setNotifyHandler(handler);
+}
+
+osg::NotifyHandler* osgEarth::getNotifyHandler()
+{
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
+	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
+	return buffer ? buffer->getNotifyHandler() : 0;
+}
+
+
 std::ostream& osgEarth::notify(const osg::NotifySeverity severity)
 {
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
+
 	if (osgEarth::isNotifyEnabled(severity))
 	{
-        ThreadNotifyData & data = getNotifySingleton().getThreadNotifyData();
-		data.notifyStream->setCurrentSeverity(severity);
-		return *data.notifyStream;
+		g_NotifyStream->setCurrentSeverity(severity);
+		return *g_NotifyStream;
 	}
-	return getNotifySingleton()._nullStream;
+	return *g_NullStream;
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,11 +24,7 @@
 #include <osg/GL2Extensions>
 #include <osg/Texture>
 #include <osgViewer/Version>
-#include <osgEarth/Config>
-#include <osgEarth/XmlUtils>
-#include <osgEarth/Version>
-
-#include <fstream>
+#include <OpenThreads/Thread>
 
 using namespace osgEarth;
 
@@ -106,6 +102,7 @@ Capabilities::Capabilities() :
 _maxFFPTextureUnits     ( 1 ),
 _maxGPUTextureUnits     ( 1 ),
 _maxGPUTextureCoordSets ( 1 ),
+_maxGPUAttribs          ( 1 ),
 _maxTextureSize         ( 256 ),
 _maxFastTextureSize     ( 256 ),
 _maxLights              ( 1 ),
@@ -123,7 +120,10 @@ _supportsQuadBufferStereo( false ),
 _supportsOcclusionQuery ( false ),
 _supportsDrawInstanced  ( false ),
 _supportsUniformBufferObjects( false ),
-_maxUniformBlockSize    ( 0 )
+_supportsNonPowerOfTwoTextures( false ),
+_maxUniformBlockSize    ( 0 ),
+_preferDLforStaticGeom  ( true ),
+_numProcessors          ( 1 )
 {
     // little hack to force the osgViewer library to link so we can create a graphics context
     osgViewerGetVersion();
@@ -132,6 +132,9 @@ _maxUniformBlockSize    ( 0 )
     bool enableATIworkarounds = true;
     if ( ::getenv( "OSGEARTH_DISABLE_ATI_WORKAROUNDS" ) != 0L )
         enableATIworkarounds = false;
+
+    // logical CPUs (cores)
+    _numProcessors = OpenThreads::GetNumberOfProcessors();
 
 	bool disableQuadBufferStereoTest = false;
     if ( ::getenv( "OSGEARTH_QUADBUFFER_DISABLE" ) != 0L )
@@ -169,9 +172,19 @@ _maxUniformBlockSize    ( 0 )
         glGetIntegerv( GL_MAX_TEXTURE_UNITS, &_maxFFPTextureUnits );
         glGetIntegerv( GL_MAX_TEXTURE_IMAGE_UNITS_ARB, &_maxGPUTextureUnits );
         glGetIntegerv( GL_MAX_TEXTURE_COORDS_ARB, &_maxGPUTextureCoordSets );
+        glGetIntegerv( GL_MAX_VERTEX_ATTRIBS, &_maxGPUAttribs );
+
+#if 0
+#if defined(OSG_GLES2_AVAILABLE)
+        int maxVertAttributes = 0;
+        glGetIntegerv(GL_MAX_VERTEX_ATTRIBS, &maxVertAttributes);
+        _maxGPUTextureCoordSets = maxVertAttributes - 5; //-5 for vertex, normal, color, tangent and binormal
+#endif
+#endif
+
         glGetIntegerv( GL_DEPTH_BITS, &_depthBits );
 
-        // Use the texture-proxy method to determine the maximum texture size 
+        
         glGetIntegerv( GL_MAX_TEXTURE_SIZE, &_maxTextureSize );
 #if !(defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE))
         for( int s = _maxTextureSize; s > 2; s >>= 1 )
@@ -227,7 +240,37 @@ _maxUniformBlockSize    ( 0 )
         if ( _supportsUniformBufferObjects && _maxUniformBlockSize == 0 )
             _supportsUniformBufferObjects = false;
 
+        _supportsNonPowerOfTwoTextures =
+            osg::isGLExtensionSupported( id, "GL_ARB_texture_non_power_of_two" );
+
         //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
+
+        // NVIDIA:
+        bool isNVIDIA = _vendor.find("NVIDIA") == 0;
+
+        // NVIDIA has h/w acceleration of some kind for display lists, supposedly.
+        // In any case they do benchmark much faster in osgEarth for static geom.
+        // BUT unfortunately, they dont' seem to work too well with shaders. Colors
+        // change randomly, etc. Might work OK for textured geometry but not for 
+        // untextured. TODO: investigate.
+#if 1
+        _preferDLforStaticGeom = false;
+        if ( ::getenv("OSGEARTH_TRY_DISPLAY_LISTS") )
+        {
+            _preferDLforStaticGeom = true;
+        }
+#else
+        if ( ::getenv("OSGEARTH_ALWAYS_USE_VBOS") )
+        {
+            _preferDLforStaticGeom = false;
+        }
+        else
+        {
+            _preferDLforStaticGeom = isNVIDIA;
+        }
+#endif
+
+        OE_INFO << LC << "  prefer DL for static geom = " << SAYBOOL(_preferDLforStaticGeom) << std::endl;
 
         // ATI workarounds:
         bool isATI = _vendor.find("ATI ") == 0;
@@ -301,98 +344,10 @@ _maxUniformBlockSize    ( 0 )
     //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
     //OE_INFO << LC << "  texture2DLod = " << SAYBOOL(_supportsTexture2DLod) << std::endl;
     OE_INFO << LC << "  Mipmapped texture updates = " << SAYBOOL(_supportsMipmappedTextureUpdates) << std::endl;
+    
+    OE_INFO << LC << "  NPOT textures = " << SAYBOOL(_supportsNonPowerOfTwoTextures) << std::endl;
 
     OE_INFO << LC << "  Max Fast Texture Size = " << _maxFastTextureSize << std::endl;
-}
-
-bool Capabilities::loadFromFile(const std::string & filename)
-{
-    bool ret;
-    XmlDocument * doc = XmlDocument::load(filename);
-    if(doc)
-    {
-        OE_INFO << LC << "Load capabilities from " << filename << std::endl;
-
-        Config docConf = doc->getConfig();
-        Config conf;
-        if ( docConf.hasChild( "capabilities" ) )
-            conf = docConf.child( "capabilities" );
-
-        conf.getIfSet("maxffptextureunits", _maxFFPTextureUnits );
-        conf.getIfSet("maxgputextureunits", _maxGPUTextureUnits );
-        conf.getIfSet("maxgputexturecoordsets", _maxGPUTextureCoordSets );
-        conf.getIfSet("maxtexturesize", _maxTextureSize );
-        conf.getIfSet("maxfasttexturesize", _maxFastTextureSize );
-        conf.getIfSet("maxlights", _maxLights );
-        conf.getIfSet("depthbits", _depthBits );
-        conf.getIfSet("supportsglsl", _supportsGLSL );
-        conf.getIfSet("glslversion", _GLSLversion );
-        conf.getIfSet("supportstexturearrays", _supportsTextureArrays );
-        conf.getIfSet("supportstexture3d", _supportsTexture3D );
-        conf.getIfSet("supportsmultitexture", _supportsMultiTexture );
-        conf.getIfSet("supportsstencilwrap", _supportsStencilWrap );
-        conf.getIfSet("supportstwosidedstencil", _supportsTwoSidedStencil );
-        conf.getIfSet("supportstexture2dlod", _supportsTexture2DLod );
-        conf.getIfSet("supportsmipmappedtextureupdates", _supportsMipmappedTextureUpdates );
-        conf.getIfSet("supportsdepthpackedstencilbuffer", _supportsDepthPackedStencilBuffer );
-        conf.getIfSet("supportsquadbufferstereo", _supportsQuadBufferStereo );
-        conf.getIfSet("supportsocclusionquery", _supportsOcclusionQuery );
-        conf.getIfSet("supportsdrawinstanced", _supportsDrawInstanced );
-        conf.getIfSet("supportsuniformbufferobjects", _supportsUniformBufferObjects );
-        conf.getIfSet("vendor", _vendor );
-        conf.getIfSet("renderer", _renderer );
-        conf.getIfSet("version", _version );
-
-        ret = true;
-    }
-    else
-    {
-        OE_INFO << LC << "Capabilities file " << filename << " is invalid" << std::endl;
-        ret = false;
-    }
-    return ret;
-}
-
-bool Capabilities::saveToFile(const std::string & filename)
-{
-    bool ret;
-    Config conf("capabilities");
-    conf.update("maxffptextureunits", _maxFFPTextureUnits );
-    conf.update("maxgputextureunits", _maxGPUTextureUnits );
-    conf.update("maxgputexturecoordsets", _maxGPUTextureCoordSets );
-    conf.update("maxtexturesize", _maxTextureSize );
-    conf.update("maxfasttexturesize", _maxFastTextureSize );
-    conf.update("maxlights", _maxLights );
-    conf.update("depthbits", _depthBits );
-    conf.update("supportsglsl", _supportsGLSL );
-    conf.update("glslversion", _GLSLversion );
-    conf.update("supportstexturearrays", _supportsTextureArrays );
-    conf.update("supportstexture3d", _supportsTexture3D );
-    conf.update("supportsmultitexture", _supportsMultiTexture );
-    conf.update("supportsstencilwrap", _supportsStencilWrap );
-    conf.update("supportstwosidedstencil", _supportsTwoSidedStencil );
-    conf.update("supportstexture2dlod", _supportsTexture2DLod );
-    conf.update("supportsmipmappedtextureupdates", _supportsMipmappedTextureUpdates );
-    conf.update("supportsdepthpackedstencilbuffer", _supportsDepthPackedStencilBuffer );
-    conf.update("supportsquadbufferstereo", _supportsQuadBufferStereo );
-    conf.update("supportsocclusionquery", _supportsOcclusionQuery );
-    conf.update("supportsdrawinstanced", _supportsDrawInstanced );
-    conf.update("supportsuniformbufferobjects", _supportsUniformBufferObjects );
-    conf.update("vendor", _vendor );
-    conf.update("renderer", _renderer );
-    conf.update("version", _version );
-
-    std::ofstream out( filename.c_str());
-    ret = out.is_open();
-    if ( ret )
-    {
-        OE_INFO << LC << "Write capabilities to " << filename << std::endl;
-
-        // dump that Config out as XML.
-        osg::ref_ptr<XmlDocument> xml = new XmlDocument( conf );
-        xml->store( out );
-    }
-    return ret;
 }
 
 

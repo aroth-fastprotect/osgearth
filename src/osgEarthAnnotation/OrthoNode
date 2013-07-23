@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 #define OSGEARTH_ANNO_ORTHO_NODE_H 1
 
 #include <osgEarthAnnotation/AnnotationNode>
-#include <osgEarthAnnotation/Decluttering>
+#include <osgEarth/Decluttering>
 #include <osgEarth/SpatialReference>
 #include <osgEarth/CullingUtils>
 #include <osg/AutoTransform>

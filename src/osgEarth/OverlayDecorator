@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -81,9 +81,19 @@ namespace osgEarth
 
     protected:
         virtual ~OverlayDecorator() { }
-        
+
+        //// Root group for an overlay technique
+        //struct OverlayRootGroup : public osg::Group
+        //{
+        //    OverlayRootGroup();
+        //    osg::Polytope& cullingFrustum() { return _cb->_cullingFrustum; }
+        //    osg::ref_ptr<osg::NodeCallback> _cb;
+        //    mutable Threading::Mutex        _mutex;
+        //    osg::BoundingSphere computeBound() const; // override
+        //};
 
     public:
+
         // RTT camera parameters for an overlay technique. There will be
         // one of these per technique, per view.
         struct TechRTTParams

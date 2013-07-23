@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -18,7 +18,6 @@
 */
 
 #include <osgEarthAnnotation/AnnotationUtils>
-#include <osgEarthAnnotation/Decluttering>
 #include <osgEarthSymbology/Color>
 #include <osgEarthSymbology/MeshSubdivider>
 #include <osgEarth/ThreadingUtils>
@@ -66,6 +65,22 @@ AnnotationUtils::UNIFORM_FADE()
   return s;
 }
 
+osgText::String::Encoding
+AnnotationUtils::convertTextSymbolEncoding (const TextSymbol::Encoding encoding) {
+	osgText::String::Encoding text_encoding = osgText::String::ENCODING_UNDEFINED;
+
+	switch(encoding)
+	{
+	case TextSymbol::ENCODING_ASCII: text_encoding = osgText::String::ENCODING_ASCII; break;
+	case TextSymbol::ENCODING_UTF8: text_encoding = osgText::String::ENCODING_UTF8; break;
+	case TextSymbol::ENCODING_UTF16: text_encoding = osgText::String::ENCODING_UTF16; break;
+	case TextSymbol::ENCODING_UTF32: text_encoding = osgText::String::ENCODING_UTF32; break;
+	default: text_encoding = osgText::String::ENCODING_UNDEFINED; break;
+	}
+
+	return text_encoding;
+}
+
 osg::Drawable* 
 AnnotationUtils::createTextDrawable(const std::string& text,
                                     const TextSymbol*  symbol,
@@ -73,21 +88,28 @@ AnnotationUtils::createTextDrawable(const std::string& text,
                                     
 {
     osgText::Text* t = new osgText::Text();
-    osgText::String::Encoding text_encoding = osgText::String::ENCODING_UNDEFINED;
+    
+	osgText::String::Encoding text_encoding = osgText::String::ENCODING_UNDEFINED;
     if ( symbol && symbol->encoding().isSet() )
     {
-        switch(symbol->encoding().value())
+		text_encoding = convertTextSymbolEncoding(symbol->encoding().value());
+    }
+    
+	t->setText( text, text_encoding );
+
+    if ( symbol && symbol->layout().isSet() )
+    {
+        if(symbol->layout().value() == TextSymbol::LAYOUT_RIGHT_TO_LEFT)
         {
-        case TextSymbol::ENCODING_ASCII: text_encoding = osgText::String::ENCODING_ASCII; break;
-        case TextSymbol::ENCODING_UTF8: text_encoding = osgText::String::ENCODING_UTF8; break;
-        case TextSymbol::ENCODING_UTF16: text_encoding = osgText::String::ENCODING_UTF16; break;
-        case TextSymbol::ENCODING_UTF32: text_encoding = osgText::String::ENCODING_UTF32; break;
-        default: text_encoding = osgText::String::ENCODING_UNDEFINED; break;
+            t->setLayout(osgText::TextBase::RIGHT_TO_LEFT);
+        }else if(symbol->layout().value() == TextSymbol::LAYOUT_LEFT_TO_RIGHT)
+        {
+            t->setLayout(osgText::TextBase::LEFT_TO_RIGHT);
+        }else if(symbol->layout().value() == TextSymbol::LAYOUT_VERTICAL)
+        {
+            t->setLayout(osgText::TextBase::VERTICAL);
         }
     }
-
-    t->setText( text, text_encoding );
-
     if ( symbol && symbol->pixelOffset().isSet() )
     {
         t->setPosition( osg::Vec3(
@@ -143,29 +165,6 @@ AnnotationUtils::createTextDrawable(const std::string& text,
     // need to be marked DYNAMIC
     if ( t->getStateSet() )
       t->getStateSet()->setRenderBinToInherit();
-    //osg::StateSet* stateSet = new osg::StateSet();
-    //t->setStateSet( stateSet );
-
-#if 0 // OBE: the decluttering bin is now set higher up (in OrthoNode)
-    //osg::StateSet* stateSet = t->getOrCreateStateSet();
-
-    if ( symbol && symbol->declutter().isSet() )
-    {
-        Decluttering::setEnabled( stateSet, *symbol->declutter() );
-    }
-    else
-    {
-        stateSet->setRenderBinToInherit();
-    }
-#endif
-
-#if 0 // OBE: shadergenerator now takes care of all this
-    // add the static "isText=true" uniform; this is a hint for the annotation shaders
-    // if they get installed.
-    //static osg::ref_ptr<osg::Uniform> s_isTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
-    //s_isTextUniform->set( true );
-    //stateSet->addUniform( s_isTextUniform.get() );
-#endif
 
     return t;
 }
@@ -260,86 +259,6 @@ AnnotationUtils::createHighlightUniform()
     u->set( false );
     return u;
 }
-
-#if 0
-void
-AnnotationUtils::installAnnotationProgram(osg::StateSet*                     stateSet,
-                                          osg::StateAttribute::OverrideValue qualifier)
-{
-    static Threading::Mutex             s_mutex;
-    static osg::ref_ptr<VirtualProgram> s_program;
-    static osg::ref_ptr<osg::Uniform>   s_samplerUniform;
-    static osg::ref_ptr<osg::Uniform>   s_defaultFadeUniform;
-    static osg::ref_ptr<osg::Uniform>   s_defaultIsTextUniform;
-
-    if ( !s_program.valid() )
-    {
-        Threading::ScopedMutexLock lock(s_mutex);
-        if ( !s_program.valid() )
-        {
-            std::string vertSource =
-                "#version " GLSL_VERSION_STR "\n"
-#ifdef OSG_GLES2_AVAILABLE
-                "precision mediump float;\n"
-#endif
-                //NOTE: Tom commented this out; I commented it back in b/c that breaks things 
-                //( //not sure why but these arn't merging properly, osg earth color funcs decalre it anyhow for now)
-                "varying vec4 osg_FrontColor; \n"
-                "varying vec4 oeAnno_texCoord; \n"
-                "void oeAnno_vertColoring() \n"
-                "{ \n"
-                "    osg_FrontColor = gl_Color; \n"
-                "    oeAnno_texCoord = gl_MultiTexCoord0; \n"
-                "} \n";
-
-            std::string fragSource = Stringify() <<
-                "#version " << GLSL_VERSION_STR << "\n"
-#ifdef OSG_GLES2_AVAILABLE
-                "precision mediump float;\n"
-#endif
-                "uniform float " << UNIFORM_FADE()      << "; \n"
-                "uniform bool  " << UNIFORM_IS_TEXT()   << "; \n"
-                "uniform sampler2D oeAnno_tex0; \n"
-                "varying vec4 oeAnno_texCoord; \n"
-                "varying vec4 osg_FrontColor; \n"
-                "void oeAnno_fragColoring( inout vec4 color ) \n"
-                "{ \n"
-                "    color = osg_FrontColor; \n"
-                "    if (" << UNIFORM_IS_TEXT() << ") \n"
-                "    { \n"
-                "        float alpha = texture2D(oeAnno_tex0, oeAnno_texCoord.st).a; \n"
-                "        color = vec4(color.rgb, color.a * alpha * " << UNIFORM_FADE() << "); \n"
-                "    } \n"
-                "    else \n"
-                "    { \n"
-                "        color = color * texture2D(oeAnno_tex0, oeAnno_texCoord.st) * vec4(1,1,1," << UNIFORM_FADE() << "); \n"
-                "    } \n"
-                "} \n";
-
-            s_program = new VirtualProgram();
-            s_program->setName( PROGRAM_NAME() );
-            s_program->setInheritShaders( false );
-            s_program->setUseLightingShaders( false );
-            s_program->installDefaultColoringShaders();
-            s_program->setFunction( "oeAnno_vertColoring", vertSource, ShaderComp::LOCATION_VERTEX_PRE_LIGHTING );
-            s_program->setFunction( "oeAnno_fragColoring", fragSource, ShaderComp::LOCATION_FRAGMENT_PRE_LIGHTING, 2.0f );
-
-            s_samplerUniform = new osg::Uniform(osg::Uniform::SAMPLER_2D, "oeAnno_tex0");
-            s_samplerUniform->set( 0 );
-
-            s_defaultFadeUniform = createFadeUniform();
-
-            s_defaultIsTextUniform = new osg::Uniform(osg::Uniform::BOOL, "oeAnno_isText");
-            s_defaultIsTextUniform->set( false );
-        }
-    }
-
-    stateSet->setAttributeAndModes( s_program.get(), qualifier );
-    stateSet->addUniform( s_samplerUniform.get() );
-    stateSet->addUniform( s_defaultFadeUniform.get() );
-    stateSet->addUniform( s_defaultIsTextUniform.get() );
-}
-#endif
 
 //-------------------------------------------------------------------------
 

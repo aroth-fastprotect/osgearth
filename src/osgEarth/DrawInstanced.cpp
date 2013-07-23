@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -99,11 +99,13 @@ ConvertToDrawInstanced::apply( osg::Geode& geode )
 }
 
 
-VirtualProgram*
-DrawInstanced::createDrawInstancedProgram()
+void
+DrawInstanced::install(osg::StateSet* stateset)
 {
-    VirtualProgram* vp = new VirtualProgram();
-    vp->setName( "DrawInstanced" );
+    if ( !stateset )
+        return;
+
+    VirtualProgram* vp = VirtualProgram::getOrCreate(stateset);
 
     std::stringstream buf;
 
@@ -125,9 +127,9 @@ DrawInstanced::createDrawInstancedProgram()
         buf << "uniform mat4 oe_di_modelMatrix[" << MAX_COUNT_ARRAY << "];\n";
     }
 
-    buf << "void oe_di_setPosition()\n"
+    buf << "void oe_di_setPosition(inout vec4 VertexModel)\n"
         << "{\n"
-        << "    gl_Position = gl_ModelViewProjectionMatrix * oe_di_modelMatrix[gl_InstanceID] * gl_Vertex; \n"
+        << "    VertexModel = oe_di_modelMatrix[gl_InstanceID] * VertexModel; \n"
         << "}\n";
 
     std::string src;
@@ -136,9 +138,22 @@ DrawInstanced::createDrawInstancedProgram()
     vp->setFunction(
         "oe_di_setPosition",
         src,
-        ShaderComp::LOCATION_VERTEX_PRE_COLORING );
+        ShaderComp::LOCATION_VERTEX_MODEL );
+}
 
-    return vp;
+
+void
+DrawInstanced::remove(osg::StateSet* stateset)
+{
+    if ( !stateset )
+        return;
+
+    VirtualProgram* vp = VirtualProgram::get(stateset);
+    if ( !vp )
+        return;
+
+    vp->removeShader( "oe_di_setPosition" );
+    vp->getTemplate()->removeBindUniformBlock( "oe_di_modelData" );
 }
 
 

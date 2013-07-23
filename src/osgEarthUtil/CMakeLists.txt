@@ -4,78 +4,94 @@ ELSE (DYNAMIC_OSGEARTH)
     ADD_DEFINITIONS(-DOSGEARTHUTIL_LIBRARY_STATIC)
 ENDIF(DYNAMIC_OSGEARTH)
 
-SET(TARGET_PUBLIC_H
-	AnnotationEvents
-	AutoClipPlaneHandler
-	Common
-	Controls
-	ClampCallback
-	EarthManipulator
+SET(HEADERS_ROOT
+    AnnotationEvents
+    AutoClipPlaneHandler
+    Common
+    Controls
+    ContourMap
+    ClampCallback
+    DataScanner
+    DetailTexture
+    EarthManipulator
     ExampleResources
-	Export
+    Export
     FeatureManipTool
     FeatureQueryTool
     Formatter
     GeodeticGraticule
+    HTM
     LatLongFormatter
-	LineOfSight
+    LineOfSight
     LinearLineOfSight
-	MeasureTool
+    LODBlending
+    MeasureTool
     MGRSFormatter
-	MGRSGraticule
-	MouseCoordsTool
-	ObjectPlacer
-	ObjectLocator
+    MGRSGraticule
+    MouseCoordsTool
+    NormalMap
+    ObjectLocator
     PolyhedralLineOfSight
     RadialLineOfSight
-	SkyNode
-	SpatialData
-	StarData
-	TerrainProfile
+    SkyNode
+    SpatialData
+    StarData
+    TerrainProfile
+	TileIndex
+	TileIndexBuilder
     TFS
     TFSPackager
     TMS
     TMSBackFiller
     TMSPackager
     UTMGraticule
-	WFS
-	WMS
+    VerticalScale
+    WFS
+    WMS
 )
 IF(NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "3.1.0")
     SET(TARGET_PUBLIC_H ${TARGET_PUBLIC_H}
         ShadowUtils)
 ENDIF()
 
-SET(TARGET_SRC
-	AnnotationEvents.cpp
-	AutoClipPlaneHandler.cpp
-	ClampCallback.cpp
+SET(SOURCES_ROOT
+    AnnotationEvents.cpp
+    AutoClipPlaneHandler.cpp
+    ClampCallback.cpp
     Controls.cpp
-	EarthManipulator.cpp
+    ContourMap.cpp
+    DataScanner.cpp
+    DetailTexture.cpp
+    EarthManipulator.cpp
     ExampleResources.cpp
     FeatureManipTool.cpp
     FeatureQueryTool.cpp
     GeodeticGraticule.cpp
+    HTM.cpp
     LatLongFormatter.cpp
     LinearLineOfSight.cpp
-	MeasureTool.cpp
+    LODBlending.cpp
+    MeasureTool.cpp
     MGRSFormatter.cpp
-	MGRSGraticule.cpp
-	MouseCoordsTool.cpp
-	ObjectPlacer.cpp
+    MGRSGraticule.cpp
+    MouseCoordsTool.cpp
+    NormalMap.cpp
     ObjectLocator.cpp
     PolyhedralLineOfSight.cpp
     RadialLineOfSight.cpp
     SpatialData.cpp
     SkyNode.cpp
-	TerrainProfile.cpp
+    TerrainProfile.cpp
+	TileIndex.cpp
+	TileIndexBuilder.cpp
     TFS.cpp
     TFSPackager.cpp
     TMS.cpp
     TMSBackFiller.cpp
     TMSPackager.cpp
     UTMGraticule.cpp
-	WFS.cpp
+    VerticalScale.cpp
+    WFS.cpp
     WMS.cpp
 )
 IF(NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "3.1.0")
@@ -87,6 +103,7 @@ LIST(APPEND TARGET_PUBLIC_H
     BrightnessContrastColorFilter
     CMYKColorFilter
     GammaColorFilter
+    GLSLColorFilter
     HSLColorFilter
     RGBColorFilter
     ChromaKeyColorFilter
@@ -96,6 +113,7 @@ LIST(APPEND TARGET_SRC
     BrightnessContrastColorFilter.cpp
     CMYKColorFilter.cpp
     GammaColorFilter.cpp
+    GLSLColorFilter.cpp
     HSLColorFilter.cpp
     RGBColorFilter.cpp
     ChromaKeyColorFilter.cpp

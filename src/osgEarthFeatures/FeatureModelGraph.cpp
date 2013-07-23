@@ -1,6 +1,6 @@
 /* --*-c++-*-- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -92,6 +92,7 @@ namespace
         p->setPriorityOffset( 0, priOffset );
         p->setPriorityScale( 0, priScale );
 #endif
+
         return p;
     }
 }
@@ -157,6 +158,12 @@ struct osgEarthFeatureModelPseudoLoader : public osgDB::ReaderWriter
         FMGRegistry::const_iterator i = _fmgRegistry.find( uid );
         return i != _fmgRegistry.end() ? i->second.get() : 0L;
     }
+
+    /** User data structure for traversing the feature graph. */
+    struct CullUserData : public osg::Referenced
+    {
+        double _cameraElevation;
+    };
 };
 
 REGISTER_OSGPLUGIN(osgearth_pseudo_fmg, osgEarthFeatureModelPseudoLoader)
@@ -367,8 +374,11 @@ FeatureModelGraph::getBoundInWorldCoords(const GeoExtent& extent,
 
     if ( _session->getMapInfo().isGeocentric() )
     {
-        workingExtent.getSRS()->transformToECEF( center, center );
-        workingExtent.getSRS()->transformToECEF( corner, corner );
+        const SpatialReference* ecefSRS = workingExtent.getSRS()->getECEF();
+        workingExtent.getSRS()->transform( center, ecefSRS, center );
+        workingExtent.getSRS()->transform( corner, ecefSRS, corner );
+        //workingExtent.getSRS()->transformToECEF( center, center );
+        //workingExtent.getSRS()->transformToECEF( corner, corner );
     }
 
     return osg::BoundingSphered( center, (center-corner).length() );
@@ -567,7 +577,8 @@ FeatureModelGraph::load( unsigned lod, unsigned tileX, unsigned tileY, const std
     }
     else
     {
-        RemoveEmptyGroupsVisitor::run( result );
+        // For some unknown reason, this breaks when I insert an LOD. -gw
+        //RemoveEmptyGroupsVisitor::run( result );
     }
 
     if ( result->getNumChildren() == 0 )
@@ -712,17 +723,23 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
     if ( group->getNumChildren() > 0 )
     {
         // account for a min-range here. Do not address the max-range here; that happens
-        // above when generating paged LOD nodes, etc.        
+        // above when generating paged LOD nodes, etc.
         float minRange = level.minRange();
 
+#if 1
         if ( minRange > 0.0f )
         {
             // minRange can't be less than the tile geometry's radius.
-            minRange = std::max(minRange, (float)group->getBound().radius());
-            osg::LOD* lod = new osg::LOD();
-            lod->addChild( group.get(), minRange, FLT_MAX );
+            //minRange = std::max(minRange, (float)group->getBound().radius());
+            //osg::LOD* lod = new osg::LOD();
+            //lod->addChild( group.get(), minRange, FLT_MAX );
+
+            ElevationLOD* lod = new ElevationLOD( _session->getMapSRS() );
+            lod->setMinElevation( minRange );
+            lod->addChild( group.get() );
             group = lod;
-        }        
+        }
+#endif
 
         if ( _session->getMapInfo().isGeocentric() && _options.clusterCulling() == true )
         {
@@ -737,8 +754,10 @@ FeatureModelGraph::buildLevel( const FeatureLevel& level, const GeoExtent& exten
                     // get the geocentric tile center:
                     osg::Vec3d tileCenter;
                     ccExtent.getCentroid( tileCenter.x(), tileCenter.y() );
+
                     osg::Vec3d centerECEF;
-                    ccExtent.getSRS()->transformToECEF( tileCenter, centerECEF );
+                    ccExtent.getSRS()->transform( tileCenter, _session->getMapSRS()->getECEF(), centerECEF );
+                    //ccExtent.getSRS()->transformToECEF( tileCenter, centerECEF );
 
                     osg::NodeCallback* ccc = ClusterCullingFactory::create2( group.get(), centerECEF );
                     if ( ccc )
@@ -795,11 +814,13 @@ FeatureModelGraph::build(const Style&        defaultStyle,
 
                 // Get the Group that parents all features of this particular style. Note, this
                 // might be NULL if the factory does not support style groups.
-                osg::Group* styleGroup = _factory->getOrCreateStyleGroup(*feature->style(), _session.get());
+                osg::Group* styleGroup = getOrCreateStyleGroupFromFactory( *feature->style() );
                 if ( styleGroup )
                 {
                     if ( !group->containsNode( styleGroup ) )
+                    {
                         group->addChild( styleGroup );
+                    }
                 }
 
                 if ( _factory->createOrUpdateNode( cursor.get(), *feature->style(), context, node ) )
@@ -842,7 +863,7 @@ FeatureModelGraph::build(const Style&        defaultStyle,
                 }
 
                 // otherwise, all feature returned by this query will have the same style:
-                else
+                else if ( !_useTiledSource )
                 {
                     // combine the selection style with the incoming base style:
                     Style selectedStyle = *styles->getStyle( sel.getSelectedStyleName() );
@@ -856,6 +877,16 @@ FeatureModelGraph::build(const Style&        defaultStyle,
 
                     if ( styleGroup && !group->containsNode(styleGroup) )
                         group->addChild( styleGroup );
+                }
+
+                // Tried to apply a selector query to a tiled source, which is illegal because
+                // you cannot run an SQL expression on pre-tiled data (like TFS).
+                else
+                {
+                    OE_WARN << LC 
+                        << "Illegal: you cannot use a selector SQL query with a tiled feature source. "
+                        << "Consider using a JavaScript style expression instead."
+                        << std::endl;
                 }
             }
         }
@@ -976,22 +1007,30 @@ FeatureModelGraph::queryAndSortIntoStyleGroups(const Query&            query,
         if ( styleString.length() > 0 && styleString.at(0) == '{' )
         {
             Config conf( "style", styleString );
+            conf.setReferrer( styleExpr.uriContext().referrer() );
             conf.set( "type", "text/css" );
             combinedStyle = Style(conf);
         }
 
-        // otherwise, look up the style in the stylesheet:
+        // otherwise, look up the style in the stylesheet. Do NOT fall back on a default
+        // style in this case: for style expressions, the user must be explicity about 
+        // default styling; this is because there is no other way to exclude unwanted
+        // features.
         else
         {
-            const Style* selectedStyle = _session->styles()->getStyle(styleString);
+            const Style* selectedStyle = _session->styles()->getStyle(styleString, false);
             if ( selectedStyle )
                 combinedStyle = *selectedStyle;
         }
 
-        // create the node and add it.
-        osg::Group* styleGroup = createStyleGroup(combinedStyle, workingSet, context);
-        if ( styleGroup )
-            parent->addChild( styleGroup );
+        // if there is a valid style, create the node and add it. (Otherwise we will skip
+        // the feature.)
+        if ( !combinedStyle.empty() )
+        {
+            osg::Group* styleGroup = createStyleGroup(combinedStyle, workingSet, context);
+            if ( styleGroup )
+                parent->addChild( styleGroup );
+        }
     }
 }
 
@@ -1032,16 +1071,12 @@ FeatureModelGraph::createStyleGroup(const Style&         style,
         if ( _factory->createOrUpdateNode( newCursor.get(), style, context, node ) )
         {
             if ( !styleGroup )
-                styleGroup = _factory->getOrCreateStyleGroup( style, _session.get() );
+                styleGroup = getOrCreateStyleGroupFromFactory( style );
 
             // if it returned a node, add it. (it doesn't necessarily have to)
             if ( node.valid() )
                 styleGroup->addChild( node.get() );
         }
-
-        // Check the style and see if we need to active GPU clamping. GPU clamping
-        // is currently all-or-nothing for a single FMG.
-        checkForGlobalAltitudeStyles( style );
     }
 
     return styleGroup;
@@ -1091,7 +1126,8 @@ FeatureModelGraph::checkForGlobalAltitudeStyles( const Style& style )
     const AltitudeSymbol* alt = style.get<AltitudeSymbol>();
     if ( alt )
     {
-        if ((alt->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || alt->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN))
+        if (alt->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || 
+            alt->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN)
         {
             if ( alt->technique() == AltitudeSymbol::TECHNIQUE_GPU && !_clampable )
             {
@@ -1128,10 +1164,23 @@ FeatureModelGraph::checkForGlobalAltitudeStyles( const Style& style )
 }
 
 
+osg::Group*
+FeatureModelGraph::getOrCreateStyleGroupFromFactory(const Style& style)
+{
+    osg::Group* styleGroup = _factory->getOrCreateStyleGroup( style, _session.get() );
+
+    // Check the style and see if we need to active GPU clamping. GPU clamping
+    // is currently all-or-nothing for a single FMG.
+    checkForGlobalAltitudeStyles( style );
+
+    return styleGroup;
+}
+
+
 void
 FeatureModelGraph::traverse(osg::NodeVisitor& nv)
 {
-    if ( nv.getVisitorType() == osg::NodeVisitor::EVENT_VISITOR )
+    if ( nv.getVisitorType() == nv.EVENT_VISITOR )
     {
         if ( !_pendingUpdate && (_dirty || _session->getFeatureSource()->outOfSyncWith(_revision)) )
         {
@@ -1145,7 +1194,7 @@ FeatureModelGraph::traverse(osg::NodeVisitor& nv)
         }
     }
 
-    else if ( nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR )
+    else if ( nv.getVisitorType() == nv.UPDATE_VISITOR )
     {
         if ( _pendingUpdate )
         {
@@ -1265,6 +1314,7 @@ FeatureModelGraph::redraw()
     //If they've specified a min/max range, setup an LOD
     if ( minRange != -FLT_MAX || maxRange != FLT_MAX )
     {        
+        // todo: revisit this, make sure this is still right.
         ElevationLOD *lod = new ElevationLOD(_session->getMapInfo().getSRS(), minRange, maxRange );
         lod->addChild( node );
         node = lod;

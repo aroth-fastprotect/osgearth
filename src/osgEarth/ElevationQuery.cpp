@@ -39,7 +39,7 @@ ElevationQuery::sync()
 {
     if ( _mapf.sync() || _tileSize == 0  )
     {
-        _tileSize = 0;
+        _tileSize = 0;        
 
         for( ElevationLayerVector::const_iterator i = _mapf.elevationLayers().begin(); i != _mapf.elevationLayers().end(); ++i )
         {
@@ -78,7 +78,7 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
             }
 
             //Need to convert the layer max of this TileSource to that of the actual profile
-            layerMax = profile->getEquivalentLOD( ts->getProfile(), layerMax );
+            layerMax = profile->getEquivalentLOD( ts->getProfile(), layerMax );            
         }
 
         if ( i->get()->getTerrainLayerRuntimeOptions().maxLevel().isSet() )
@@ -112,15 +112,15 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
             }
 
             //Need to convert the layer max of this TileSource to that of the actual profile
-            layerMax = profile->getEquivalentLOD( ts->getProfile(), layerMax );
-        }
+            layerMax = profile->getEquivalentLOD( ts->getProfile(), layerMax );            
+        }        
         
         if ( i->get()->getTerrainLayerRuntimeOptions().maxLevel().isSet() )
             layerMax = std::min( layerMax, *i->get()->getTerrainLayerRuntimeOptions().maxLevel() );
 
         if (layerMax > maxLevel)
             maxLevel = layerMax;
-    }    
+    } 
 
     if (maxLevel == 0) 
     {
@@ -215,14 +215,14 @@ ElevationQuery::getElevationImpl(const GeoPoint& point,
                                  double*         out_actualResolution)
 {
     osg::Timer_t start = osg::Timer::instance()->tick();
-
+    
     if ( _mapf.elevationLayers().empty() )
     {
         // this means there are no heightfields.
         out_elevation = 0.0;
         return true;
     }
-
+    
     //This is the max resolution that we actually have data at this point
     unsigned int bestAvailLevel = getMaxLevel( point.x(), point.y(), point.getSRS(), _mapf.getProfile());
 
@@ -263,9 +263,11 @@ ElevationQuery::getElevationImpl(const GeoPoint& point,
     // fallback on a lower resolution, this cache will hold the final resolution heightfield
     // instead of trying to fetch the higher resolution one each item.
 
-    TileCache::Record record = _tileCache.get( key );
-    if ( record.valid() )
+    TileCache::Record record;
+    if ( _tileCache.get(key, record) )
+    {
         tile = record.value().get();
+    }
 
     // if we didn't find it, build it.
     if ( !tile.valid() )

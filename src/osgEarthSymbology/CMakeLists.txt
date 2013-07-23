@@ -10,7 +10,7 @@ ENDIF(GEOS_FOUND)
 
 SET(TARGET_PUBLIC_H
 #   header files go here
-	AGG.h
+    AGG.h
     AltitudeSymbol
     Common
     Color
@@ -35,13 +35,13 @@ SET(TARGET_PUBLIC_H
     ModelSymbol
     PointSymbol
     PolygonSymbol
-	Query
+    Query
     RenderSymbol
     Resource
     ResourceCache
     ResourceLibrary
     Skins
-	StencilVolumeNode
+    StencilVolumeNode
     Stroke
     Style
     StyleSelector

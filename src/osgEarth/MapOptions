@@ -48,8 +48,8 @@ namespace osgEarth
               _cachePolicy           ( ),
               _cstype                ( CSTYPE_GEOCENTRIC ),
               _referenceURI          ( "" ),
-              _elevationInterpolation( INTERP_BILINEAR ),
-              _elevTileSize          ( 8 )
+              _elevationInterpolation( INTERP_TRIANGULATE ), //INTERP_BILINEAR ),
+              _elevTileSize          ( 15 )
         {
             fromConfig(_conf);
         }
@@ -122,12 +122,12 @@ namespace osgEarth
     private:
         void fromConfig( const Config& conf );
 
-        optional<std::string>          _name;
-        optional<ProfileOptions>       _profileOptions;
-        optional<CacheOptions>         _cacheOptions;
-        optional<CachePolicy>          _cachePolicy;
-        optional<CoordinateSystemType> _cstype;
-        optional<std::string>          _referenceURI;
+        optional<std::string>            _name;
+        optional<ProfileOptions>         _profileOptions;
+        optional<CacheOptions>           _cacheOptions;
+        optional<CachePolicy>            _cachePolicy;
+        optional<CoordinateSystemType>   _cstype;
+        optional<std::string>            _referenceURI;
         optional<ElevationInterpolation> _elevationInterpolation;
         optional<unsigned>               _elevTileSize;
     };

@@ -19,6 +19,7 @@
 #include <osgEarth/HTTPClient>
 #include <osgEarth/Registry>
 #include <osgEarth/Version>
+#include <osgEarth/Progress>
 #include <osgDB/ReadFile>
 #include <osgDB/Registry>
 #include <osgDB/FileNameUtils>
@@ -317,11 +318,11 @@ HTTPClient::getClient()
 }
 
 HTTPClient::HTTPClient() :
-_curl_handle               ( 0L ),
+_curl_handle    ( 0L ),
 _previousPassword          (),
 _previousHttpAuthentication( 0L ),
 _initialized               ( false ),
-_simResponseCode           ( -1L )
+_simResponseCode( -1L )
 {
     //nop
     //do no CURL calls here.
@@ -383,7 +384,7 @@ HTTPClient::initializeImpl()
     curl_easy_setopt( _curl_handle, CURLOPT_FOLLOWLOCATION, (void*)1 );
     curl_easy_setopt( _curl_handle, CURLOPT_MAXREDIRS, (void*)5 );
     curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSFUNCTION, &CurlProgressCallback);
-    curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);
+    curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);    
     curl_easy_setopt( _curl_handle, CURLOPT_MAX_SEND_SPEED_LARGE, limitRateSend );
     curl_easy_setopt( _curl_handle, CURLOPT_MAX_RECV_SPEED_LARGE, limitRateRecv );
     // don't let curl install any signal handlers which cause serious trouble in multi-thread environments.
@@ -828,7 +829,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
     }
 
     HTTPResponse response( response_code );
-   
+    
     // read the response content type:
     char* content_type_cp;
     curl_easy_getinfo( _curl_handle, CURLINFO_CONTENT_TYPE, &content_type_cp );

@@ -7,6 +7,8 @@ ENDIF(DYNAMIC_OSGEARTH)
 OPTION(CURL_IS_STATIC "on if curl is a static lib " ON)
 MARK_AS_ADVANCED(CURL_IS_STATIC)
 
+ADD_DEFINITIONS(-DTIXML_USE_STL)
+
 #IF(WIN32)
 #   SET(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:MSVCRT")
 #    IF(CURL_IS_STATIC)
@@ -16,21 +18,23 @@ MARK_AS_ADVANCED(CURL_IS_STATIC)
 #ENDIF(WIN32)
 
 SET(TARGET_PUBLIC_H
-	Bounds
+    AutoScale
+    Bounds
     Cache
     CacheBin
     CachePolicy
-	CacheSeed
-	Capabilities
+    CacheSeed
+    Capabilities
     ClampableNode
     ClampingTechnique
     ColorFilter
-	Common
-	CompositeTileSource
-	Config
+    Common
+    CompositeTileSource
+    Config
     Containers
-	Cube
+    Cube
     CullingUtils
+    Decluttering
     DepthOffset
     DPLineSegmentIntersector
     Draggers
@@ -38,80 +42,84 @@ SET(TARGET_PUBLIC_H
     DrapingTechnique
     DrawInstanced
     ECEF
-	ElevationLayer
+    ElevationLayer
     ElevationLOD
     ElevationQuery
-	Export
+    Export
     FadeEffect
-	FileUtils
-	GeoCommon
-	GeoData
+    FileUtils
+    GeoCommon
+    GeoData
     Geoid
-	GeoMath
-	HeightFieldUtils
-	HTTPClient
-	ImageLayer
-	ImageMosaic
+    GeoMath
+    HeightFieldUtils
+    HTTPClient
+    ImageLayer
+    ImageMosaic
     ImageToHeightFieldConverter
-	ImageUtils
+    ImageUtils
     IOTypes
-	JsonUtils
-	Layer
+    JsonUtils
+    Layer
     LineFunctor
-	Locators
+    Locators
     LocalTangentPlane
-	Map
+    Map
     MapCallback
     MapFrame
     MapInfo
     MapModelChange
-	MapNode
+    MapNode
     MapNodeObserver
-	MapNodeOptions
-	MapOptions
-	MaskLayer
-	MaskNode
+    MapNodeOptions
+    MapOptions
+    MaskLayer
+    MaskNode
     MaskSource
     MemCache
-	ModelLayer
-	ModelSource
+    ModelLayer
+    ModelSource
     NodeUtils
-	Notify
-	optional
-	OverlayDecorator
+    Notify
+    optional
+    OverlayDecorator
     OverlayNode
     Pickers
-	Profile
-	Progress
-	Random
-	Registry
-	Revisioning
+    PrimitiveIntersector
+    Profile
+    Progress
+    Random
+    Registry
+    Revisioning
     ShaderFactory
     ShaderGenerator
     ShaderUtils
-	SparseTexture2DArray
-	SpatialReference
+    SparseTexture2DArray
+    SpatialReference
     StateSetCache
-	StringUtils
-	TaskService
+    StringUtils
+    TaskService
     Terrain
+    TerrainEffect
     TerrainLayer
     TerrainOptions
-	TerrainEngineNode
+    TerrainEngineNode
     TextureCompositor
     TextureCompositorMulti
     TextureCompositorTexArray
-	TileKey
-	TileSource
-	ThreadingUtils
-	Units
+    TileKey
+    TileSource
+    TimeControl
+    TraversalData
+    ThreadingUtils
+    Units
     URI
     Utils
-	Version
-	VerticalDatum
+    Version
+    VerticalDatum
     Viewpoint
     VirtualProgram
-	XmlUtils
+    XmlUtils
 )
 
 SET(TARGET_H
@@ -127,11 +135,12 @@ LIST(APPEND TARGET_SRC
 	)
 
 LIST(APPEND TARGET_SRC
-	Bounds.cpp
+    AutoScale.cpp
+    Bounds.cpp
     Cache.cpp
     CachePolicy.cpp
     CacheSeed.cpp
-	Capabilities.cpp
+    Capabilities.cpp
     ClampableNode.cpp
     ClampingTechnique.cpp
     ColorFilter.cpp
@@ -139,8 +148,9 @@ LIST(APPEND TARGET_SRC
     Config.cpp
     Cube.cpp
     CullingUtils.cpp
+    Decluttering.cpp
     DepthOffset.cpp
-	Draggers.cpp
+    Draggers.cpp
     DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
     DrapingTechnique.cpp
@@ -176,17 +186,18 @@ LIST(APPEND TARGET_SRC
     MaskNode.cpp
     MaskSource.cpp
     MemCache.cpp
-	MimeTypes.cpp
-	ModelLayer.cpp
-	ModelSource.cpp
-	NodeUtils.cpp
-	Notify.cpp
-	OverlayDecorator.cpp
+    MimeTypes.cpp
+    ModelLayer.cpp
+    ModelSource.cpp
+    NodeUtils.cpp
+    Notify.cpp
+    OverlayDecorator.cpp
     OverlayNode.cpp
-	Pickers.cpp
+    Pickers.cpp
+    PrimitiveIntersector.cpp
     Profile.cpp
-	Progress.cpp
-	Random.cpp
+    Progress.cpp
+    Random.cpp
     Registry.cpp
     Revisioning.cpp
     ShaderFactory.cpp
@@ -206,12 +217,14 @@ LIST(APPEND TARGET_SRC
     TextureCompositorTexArray.cpp
     TileKey.cpp
     TileSource.cpp
+    TimeControl.cpp
+    TraversalData.cpp
     ThreadingUtils.cpp
     Units.cpp
     URI.cpp
     Utils.cpp
     Version.cpp
-	VerticalDatum.cpp
+    VerticalDatum.cpp
     Viewpoint.cpp
     VirtualProgram.cpp
     XmlUtils.cpp

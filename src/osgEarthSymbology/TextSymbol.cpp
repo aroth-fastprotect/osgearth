@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -32,7 +32,9 @@ _removeDuplicateLabels( false ),
 _provider             ( "annotation" ),
 _encoding             ( ENCODING_ASCII ),
 _alignment            ( ALIGN_BASE_LINE ),
-_declutter            ( true )
+_layout               ( LAYOUT_LEFT_TO_RIGHT ),
+_declutter            ( true ),
+_occlusionCull        ( false )
 {
     mergeConfig(conf);
 }
@@ -73,13 +75,20 @@ TextSymbol::getConfig() const
     conf.addIfSet( "alignment", "right_bottom_base_line",  _alignment, ALIGN_RIGHT_BOTTOM_BASE_LINE );
     conf.addIfSet( "alignment", "base_line",               _alignment, ALIGN_BASE_LINE );
 
+    conf.addIfSet( "layout", "ltr",  _layout, LAYOUT_LEFT_TO_RIGHT );
+    conf.addIfSet( "layout", "rtl",  _layout, LAYOUT_RIGHT_TO_LEFT );
+    conf.addIfSet( "layout", "vertical",  _layout, LAYOUT_VERTICAL );
+
     conf.addIfSet( "declutter", _declutter );
 
     conf.addIfSet( "provider", _provider );
     if ( _pixelOffset.isSet() ) {
         conf.add( "pixel_offset_x", toString(_pixelOffset->x()) );
         conf.add( "pixel_offset_y", toString(_pixelOffset->y()) );
-    }
+    }	
+
+	conf.addIfSet( "text-occlusion-cull", _occlusionCull );
+
     return conf;
 }
 
@@ -117,6 +126,10 @@ TextSymbol::mergeConfig( const Config& conf )
     conf.getIfSet( "alignment", "right_bottom_base_line",  _alignment, ALIGN_RIGHT_BOTTOM_BASE_LINE );
     conf.getIfSet( "alignment", "base_line" ,              _alignment, ALIGN_BASE_LINE );
 
+    conf.getIfSet( "layout", "ltr",  _layout, LAYOUT_LEFT_TO_RIGHT );
+    conf.getIfSet( "layout", "rtl",  _layout, LAYOUT_RIGHT_TO_LEFT );
+    conf.getIfSet( "layout", "vertical",  _layout, LAYOUT_VERTICAL );
+
     conf.getIfSet( "declutter", _declutter );
 
     conf.getIfSet( "provider", _provider );
@@ -124,6 +137,8 @@ TextSymbol::mergeConfig( const Config& conf )
         _pixelOffset = osg::Vec2s( conf.value<short>("pixel_offset_x",0), 0 );
     if ( conf.hasValue( "pixel_offset_y" ) )
         _pixelOffset = osg::Vec2s( _pixelOffset->x(), conf.value<short>("pixel_offset_y",0) );
+	
+	conf.getIfSet( "text-occlusion-cull", _occlusionCull );
 }
 
 
@@ -188,6 +203,14 @@ TextSymbol::parseSLD(const Config& c, Style& style)
         else if ( match(c.value(), "base-line" ) ) 
             style.getOrCreate<TextSymbol>()->alignment() = TextSymbol::ALIGN_BASE_LINE;
     }
+    else if ( match(c.key(), "text-layout") ) {
+        if ( match(c.value(), "ltr") )
+            style.getOrCreate<TextSymbol>()->layout() = TextSymbol::LAYOUT_LEFT_TO_RIGHT;
+        else if ( match(c.value(), "rtl" ) )
+            style.getOrCreate<TextSymbol>()->layout() = TextSymbol::LAYOUT_RIGHT_TO_LEFT;
+        else if ( match(c.value(), "vertical" ) )
+            style.getOrCreate<TextSymbol>()->layout() = TextSymbol::LAYOUT_VERTICAL;
+    }
     else if ( match(c.key(), "text-content") ) {        
         style.getOrCreate<TextSymbol>()->content() = StringExpression( c.value() );
     }
@@ -211,5 +234,8 @@ TextSymbol::parseSLD(const Config& c, Style& style)
     }
     else if ( match(c.key(), "text-declutter") ) {
         style.getOrCreate<TextSymbol>()->declutter() = as<bool>(c.value(), true);
+    }
+	else if ( match(c.key(), "text-occlusion-cull") ) {
+        style.getOrCreate<TextSymbol>()->occlusionCull() = as<bool>(c.value(), false);
     }
 }

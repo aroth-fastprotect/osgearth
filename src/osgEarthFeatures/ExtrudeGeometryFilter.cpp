@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -37,8 +37,6 @@
 #include <osgEarth/Version>
 
 #define LC "[ExtrudeGeometryFilter] "
-
-#define USE_VBOS true
 
 using namespace osgEarth;
 using namespace osgEarth::Features;
@@ -80,7 +78,8 @@ _maxAngle_deg       ( 5.0 ),
 _mergeGeometry      ( true ),
 _wallAngleThresh_deg( 60.0 ),
 _makeStencilVolume  ( false ),
-_styleDirty         ( true )
+_styleDirty         ( true ),
+_useVertexBufferObjects( true )
 {
     //NOP
 }
@@ -674,7 +673,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             Geometry* part = iter.next();
 
             osg::ref_ptr<osg::Geometry> walls = new osg::Geometry();
-            walls->setUseVertexBufferObjects(USE_VBOS);
+            walls->setUseVertexBufferObjects( _useVertexBufferObjects.get() );
             
             osg::ref_ptr<osg::Geometry> rooflines = 0L;
             osg::ref_ptr<osg::Geometry> baselines = 0L;
@@ -683,7 +682,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             if ( part->getType() == Geometry::TYPE_POLYGON )
             {
                 rooflines = new osg::Geometry();
-                rooflines->setUseVertexBufferObjects(USE_VBOS);
+                rooflines->setUseVertexBufferObjects( _useVertexBufferObjects.get() );
 
                 // prep the shapes by making sure all polys are open:
                 static_cast<Polygon*>(part)->open();
@@ -693,14 +692,14 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             if ( _outlineSymbol != 0L )
             {
                 outlines = new osg::Geometry();
-                outlines->setUseVertexBufferObjects(USE_VBOS);
+                outlines->setUseVertexBufferObjects( _useVertexBufferObjects.get() );
             }
 
             // make a base cap if we're doing stencil volumes.
             if ( _makeStencilVolume )
             {
                 baselines = new osg::Geometry();
-                baselines->setUseVertexBufferObjects(USE_VBOS);
+                baselines->setUseVertexBufferObjects( _useVertexBufferObjects.get() );
             }
 
             // calculate the extrusion height:
@@ -726,8 +725,8 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
                 offset = input->eval( _heightOffsetExpr.mutable_value(), &context );
             }
 
-            osg::StateSet* wallStateSet = 0L;
-            osg::StateSet* roofStateSet = 0L;
+            osg::ref_ptr<osg::StateSet> wallStateSet;
+            osg::ref_ptr<osg::StateSet> roofStateSet;
 
             // calculate the wall texturing:
             SkinResource* wallSkin = 0L;
@@ -797,7 +796,7 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
             {      
                 if ( wallSkin )
                 {
-                    wallStateSet = context.resourceCache()->getStateSet( wallSkin );
+                    context.resourceCache()->getStateSet( wallSkin, wallStateSet );
                 }
 
                 // generate per-vertex normals, altering the geometry as necessary to avoid
@@ -829,11 +828,11 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
 
                     // mark this geometry as DYNAMIC because otherwise the OSG optimizer will destroy it.
                     // TODO: why??
-                    rooflines->setDataVariance( osg::Object::DYNAMIC );
+                    //rooflines->setDataVariance( osg::Object::DYNAMIC );
 
                     if ( roofSkin )
                     {
-                        roofStateSet = context.resourceCache()->getStateSet( roofSkin );
+                        context.resourceCache()->getStateSet( roofSkin, roofStateSet );
                     }
                 }
 
@@ -851,11 +850,11 @@ ExtrudeGeometryFilter::process( FeatureList& features, FilterContext& context )
 
                 FeatureSourceIndex* index = context.featureIndex();
 
-                addDrawable( walls.get(), wallStateSet, name, input, index );
+                addDrawable( walls.get(), wallStateSet.get(), name, input, index );
 
                 if ( rooflines.valid() )
                 {
-                    addDrawable( rooflines.get(), roofStateSet, name, input, index );
+                    addDrawable( rooflines.get(), roofStateSet.get(), name, input, index );
                 }
 
                 if ( baselines.valid() )

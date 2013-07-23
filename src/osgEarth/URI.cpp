@@ -21,6 +21,7 @@
 #include <osgEarth/CacheBin>
 #include <osgEarth/HTTPClient>
 #include <osgEarth/Registry>
+#include <osgEarth/Progress>
 #include <osgDB/FileNameUtils>
 #include <osgDB/ReadFile>
 #include <osgDB/ReaderWriter>
@@ -362,10 +363,10 @@ namespace
             URIResultCache* memCache = URIResultCache::from( localOptions );
             if ( memCache )
             {
-                URIResultCache::Record r = memCache->get( uri );
-                if ( r.valid() )
+                URIResultCache::Record rec;
+                if ( memCache->get(uri, rec) )
                 {
-                    result = r.value();
+                    result = rec.value();
                 }
             }
 

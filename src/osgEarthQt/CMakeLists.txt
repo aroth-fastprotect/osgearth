@@ -78,14 +78,8 @@ SET(TARGET_ADDED_LIBRARIES
     osgEarthFeatures
     osgEarthUtil
     osg
-    osgWidget
     osgUtil
-    osgSim
-    osgTerrain
-    osgDB
-	osgFX
 	osgViewer
-	osgText
 	osgGA
 	osgQt
     OpenThreads

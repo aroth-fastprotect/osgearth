@@ -1,5 +1,5 @@
 
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthSymbology)
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthSymbology osgTerrain)
 
 SET(TARGET_SRC
     TilePagedLOD.cpp
@@ -16,6 +16,9 @@ SET(TARGET_SRC
     TileNodeRegistry.cpp
     TileModelFactory.cpp
 )
+SET(TARGET_PUBLIC_H
+    MPTerrainEngineOptions
+)
 
 SET(TARGET_H
     Common
@@ -25,7 +28,6 @@ SET(TARGET_H
     KeyNodeFactory
     MPGeometry
     MPTerrainEngineNode
-    MPTerrainEngineOptions
     QuickReleaseGLObjects
     SerialKeyNodeFactory
     TerrainNode
@@ -36,11 +38,9 @@ SET(TARGET_H
     TileNodeRegistry
     TileModelFactory
 )
+IF(WIN32)
+	LIST(APPEND TARGET_ADDED_LIBRARIES opengl32.lib)
+ENDIF(WIN32)
 
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_mp)
 SETUP_PLUGIN(osgearth_engine_mp)
-
-# to install public driver includes:
-SET(LIB_NAME engine_mp)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

@@ -4,7 +4,7 @@ ELSE (DYNAMIC_OSGEARTH)
     ADD_DEFINITIONS(-DOSGEARTHUTIL_LIBRARY_STATIC)
 ENDIF(DYNAMIC_OSGEARTH)
 
-SET(HEADERS_ROOT
+SET(TARGET_PUBLIC_H
     AnnotationEvents
     AutoClipPlaneHandler
     Common
@@ -54,7 +54,7 @@ IF(NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "3.1.0")
         ShadowUtils)
 ENDIF()
 
-SET(SOURCES_ROOT
+SET(TARGET_SRC
     AnnotationEvents.cpp
     AutoClipPlaneHandler.cpp
     ClampCallback.cpp

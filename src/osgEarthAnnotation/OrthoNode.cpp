@@ -31,6 +31,8 @@
 #include <osg/Point>
 #include <osg/Depth>
 
+#define LC "[OrthoNode] "
+
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
 
@@ -282,7 +284,7 @@ OrthoNode::applyStyle(const Style& style)
     // check for decluttering.
     const TextSymbol* text = style.get<TextSymbol>();
     if ( text && text->declutter().isSet() )
-    {		
+    {
         if ( text->declutter() == true )
         {
             this->getOrCreateStateSet()->setRenderBinDetails(
@@ -294,13 +296,18 @@ OrthoNode::applyStyle(const Style& style)
             this->getOrCreateStateSet()->setRenderBinToInherit();
         }
     }
-	
 
-	// check for occlusion culling
-	if ( text && text->occlusionCull().isSet() )
-	{		
-		this->setOcclusionCulling( *text->occlusionCull() );				
-	}	
+
+    // check for occlusion culling
+    if ( text && text->occlusionCull().isSet() )
+    {
+        setOcclusionCulling( *text->occlusionCull() );
+
+        if (text->occlusionCullAltitude().isSet())
+        {
+            setOcclusionCullingMaxAltitude( *text->occlusionCullAltitude() );
+        }
+    }
 
     const IconSymbol* icon = style.get<IconSymbol>();
     if ( icon && icon->declutter().isSet() )
@@ -315,13 +322,18 @@ OrthoNode::applyStyle(const Style& style)
         {
             this->getOrCreateStateSet()->setRenderBinToInherit();
         }
-    }	
+    }
 
-	// check for occlusion culling
-	if ( icon && icon->occlusionCull().isSet() )
-	{				
-		this->setOcclusionCulling( *icon->occlusionCull() );				
-	}		
+    // check for occlusion culling
+    if ( icon && icon->occlusionCull().isSet() )
+    {
+        this->setOcclusionCulling( *icon->occlusionCull() );
+
+        if (icon->occlusionCullAltitude().isSet())
+        {
+            setOcclusionCullingMaxAltitude( *icon->occlusionCullAltitude() );
+        }
+    }
 
     // up the chain
     PositionedAnnotationNode::applyStyle( style );
@@ -429,7 +441,7 @@ OrthoNode::adjustOcclusionCullingPoint( const osg::Vec3d& world )
     {
         const osg::EllipsoidModel* em = getMapNode()->getMapSRS()->getEllipsoid();
         osg::Vec3d up = em ? em->computeLocalUpVector( world.x(), world.y(), world.z() ) : osg::Vec3d(0,0,1);
-        osg::Vec3d adjust = up * 0.1;
+        osg::Vec3d adjust = up * AnnotationSettings::getOcclusionCullingHeightAdjustment();        
         return world + adjust;
     }
     else
@@ -454,8 +466,8 @@ OrthoNode::setOcclusionCulling( bool value )
         if ( _occlusionCulling && getMapNode() )
         {
             osg::Vec3d world = _autoxform->getPosition();
-            _occlusionCuller = new OcclusionCullingCallback(adjustOcclusionCullingPoint(world), getMapNode());
-            _occlusionCuller->setMaxRange( AnnotationSettings::getOcclusionQueryMaxRange() );
+            _occlusionCuller = new OcclusionCullingCallback( getMapNode()->getMapSRS(),  adjustOcclusionCullingPoint(world), getMapNode()->getTerrainEngine() );
+            _occlusionCuller->setMaxAltitude( getOcclusionCullingMaxAltitude() );
             addCullCallback( _occlusionCuller.get()  );
         }
         else
@@ -469,6 +481,25 @@ OrthoNode::setOcclusionCulling( bool value )
                 }
             }
         }
+    }
+}
+
+double
+OrthoNode::getOcclusionCullingMaxAltitude() const
+{
+    if (_occlusionCullingMaxAltitude.isSet())
+    {
+        return *_occlusionCullingMaxAltitude;
+    }
+    return AnnotationSettings::getOcclusionCullingMaxAltitude();
+}
+
+void OrthoNode::setOcclusionCullingMaxAltitude( double occlusionCullingMaxAltitude )
+{
+    _occlusionCullingMaxAltitude = occlusionCullingMaxAltitude;
+    if ( _occlusionCuller.valid() )
+    {
+        _occlusionCuller->setMaxAltitude( getOcclusionCullingMaxAltitude() );         
     }
 }
 

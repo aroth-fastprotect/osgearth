@@ -217,6 +217,7 @@ bool osgEarth::isNotifyEnabled( osg::NotifySeverity severity )
 
 void osgEarth::setNotifyHandler(osg::NotifyHandler *handler)
 {
+	if (s_osgEarthNeedNotifyInit) osgEarth::initNotifyLevel();
 	osgEarth::NotifyStreamBuffer *buffer = static_cast<osgEarth::NotifyStreamBuffer *>(g_NotifyStream->rdbuf());
 	if (buffer)
 		buffer->setNotifyHandler(handler);

@@ -143,7 +143,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
     NumericExpression scaleEx = *symbol->scale();
 
     const ModelSymbol* modelSymbol = dynamic_cast<const ModelSymbol*>(symbol);
-    //const IconSymbol*  iconSymbol  = dynamic_cast<const IconSymbol*> (symbol);
+    const IconSymbol*  iconSymbol  = dynamic_cast<const IconSymbol*> (symbol);
 
     NumericExpression headingEx;
     if ( modelSymbol )

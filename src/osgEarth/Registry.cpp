@@ -158,6 +158,8 @@ _terrainEngineDriver( "mp" )
 class SpatialReferenceCacheClear : public osgEarth::SpatialReference
 {
 public:
+    /// make VS11 happy
+    SpatialReferenceCacheClear() : osgEarth::SpatialReference(NULL) {}
     static void clear()
     {
         osgEarth::SpatialReference::getSRSCache().clear();

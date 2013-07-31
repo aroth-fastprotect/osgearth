@@ -123,7 +123,8 @@ _supportsUniformBufferObjects( false ),
 _supportsNonPowerOfTwoTextures( false ),
 _maxUniformBlockSize    ( 0 ),
 _preferDLforStaticGeom  ( true ),
-_numProcessors          ( 1 )
+_numProcessors          ( 1 ),
+_supportsFragDepthWrite ( false )
 {
     // little hack to force the osgViewer library to link so we can create a graphics context
     osgViewerGetVersion();
@@ -242,6 +243,13 @@ _numProcessors          ( 1 )
 
         _supportsNonPowerOfTwoTextures =
             osg::isGLExtensionSupported( id, "GL_ARB_texture_non_power_of_two" );
+
+        // Writing to gl_FragDepth is not supported under GLES:
+#if (defined(OSG_GLES1_AVAILABLE) || defined(OSG_GLES2_AVAILABLE))
+        _supportsFragDepthWrite = false;
+#else
+        _supportsFragDepthWrite = true;
+#endif
 
         //_supportsTexture2DLod = osg::isGLExtensionSupported( id, "GL_ARB_shader_texture_lod" );
 

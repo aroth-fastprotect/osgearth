@@ -12,6 +12,7 @@ SET(TARGET_PUBLIC_H
     ContourMap
     ClampCallback
     DataScanner
+    DateTime
     DetailTexture
     EarthManipulator
     ExampleResources
@@ -61,6 +62,7 @@ SET(TARGET_SRC
     Controls.cpp
     ContourMap.cpp
     DataScanner.cpp
+    DateTime.cpp
     DetailTexture.cpp
     EarthManipulator.cpp
     ExampleResources.cpp

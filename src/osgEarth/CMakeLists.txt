@@ -21,6 +21,7 @@ SET(TARGET_PUBLIC_H
     AutoScale
     Bounds
     Cache
+	CacheEstimator
     CacheBin
     CachePolicy
     CacheSeed
@@ -138,6 +139,7 @@ LIST(APPEND TARGET_SRC
     AutoScale.cpp
     Bounds.cpp
     Cache.cpp
+	CacheEstimator.cpp
     CachePolicy.cpp
     CacheSeed.cpp
     Capabilities.cpp

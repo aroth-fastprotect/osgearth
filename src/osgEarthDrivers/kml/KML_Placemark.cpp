@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,8 +24,8 @@
 #include <osgEarthAnnotation/PlaceNode>
 #include <osgEarthAnnotation/LabelNode>
 #include <osgEarthAnnotation/ModelNode>
-#include <osgEarthAnnotation/Decluttering>
 #include <osgEarthAnnotation/LocalGeometryNode>
+#include <osgEarth/Decluttering>
 
 #include <osg/Depth>
 #include <osgDB/WriteFile>
@@ -198,9 +198,12 @@ KML_Placemark::build( const Config& conf, KMLContext& cx )
                         !extruded &&
                         (!altitude || altitude->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN);
 
+                    if ( draped && style.get<LineSymbol>() && !style.get<PolygonSymbol>() )
+                        draped = false;
+
                     // turn off the clamping if we're draping.
                     if ( draped && altitude )
-                        altitude->clamping() = AltitudeSymbol::CLAMP_NONE;
+                        altitude->technique() = AltitudeSymbol::TECHNIQUE_DRAPE;
 
                     GeometryCompilerOptions compilerOptions;
 

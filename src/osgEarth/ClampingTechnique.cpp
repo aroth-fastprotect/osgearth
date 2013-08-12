@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -18,6 +18,7 @@
 */
 #include <osgEarth/ClampingTechnique>
 #include <osgEarth/Capabilities>
+#include <osgEarth/CullingUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/MapNode>
@@ -28,6 +29,8 @@
 #include <osg/Texture2D>
 #include <osg/Uniform>
 
+#include <osgDB/WriteFile>
+
 #define LC "[ClampingTechnique] "
 
 //#define OE_TEST if (_dumpRequested) OE_INFO << std::setprecision(9)
@@ -35,6 +38,9 @@
 
 //#define USE_RENDER_BIN 1
 #undef USE_RENDER_BIN
+
+//#define DUMP_RTT_IMAGE 1
+//#undef DUMP_RTT_IMAGE
 
 using namespace osgEarth;
 
@@ -49,7 +55,6 @@ namespace
 }
 
 ClampingTechnique::TechniqueProvider ClampingTechnique::Provider = s_providerImpl;
-
 
 //--------------------------------------------------------------------------
 
@@ -78,19 +83,12 @@ namespace
 #endif
 
          "uniform float oe_clamp_horizonDistance; \n"
-
-         // uniforms from ClampableNode:
-         "uniform vec2 oe_clamp_bias; \n"
-         "uniform vec2 oe_clamp_range; \n"
-
-         "varying vec4 oe_clamp_simvert; \n"
-         "varying float oe_clamp_simvertrange; \n"
          "varying float oe_clamp_alphaFactor; \n"
 
-         "void oe_clamp_vertex(void) \n"
+         "void oe_clamp_vertex(inout vec4 VertexVIEW) \n"
          "{ \n"
          //   start by mocing the vertex into view space.
-         "    vec4 v_view_orig = gl_ModelViewMatrix * gl_Vertex; \n"
+         "    vec4 v_view_orig = VertexVIEW; \n"
 
          //   if the distance to the vertex is beyond the visible horizon,
          //   "hide" the vertex by setting its alpha component to 0.0.
@@ -106,6 +104,9 @@ namespace
          //   sample the depth map.
          "    float d = texture2DProj( oe_clamp_depthTex, v_depthClip ).r; \n"
 
+         //   blank it out if it's at the far plane (no terrain visible)
+         "    if ( d > 0.999999 ) { oe_clamp_alphaFactor = 0.0; } \n"
+
          //   now transform into depth-view space so we can apply the height-above-ground:
          "    vec4 p_depthClip = vec4(v_depthClip.x, v_depthClip.y, d, 1.0); \n"
 
@@ -118,34 +119,11 @@ namespace
          "    p_depthView.z += gl_Vertex.z*gl_Vertex.w/p_depthView.w; \n"
 
               // then transform the vert back into camera view space.
-         "    vec4 v_view_clamped = oe_clamp_depthView2cameraView * p_depthView; \n"
+         "    VertexVIEW = oe_clamp_depthView2cameraView * p_depthView; \n"
 #else
               // transform the depth-clip point back into camera view coords.
-         "    vec4 v_view_clamped = oe_clamp_depthClip2cameraView * p_depthClip; \n"
+         "    VertexVIEW = oe_clamp_depthClip2cameraView * p_depthClip; \n"
 #endif
-
-
-         //   now simulate a "closer" vertex for depth offsetting.
-         //   remap depth offset based on camera distance to vertex. The farther you are away,
-         //   the more of an offset you need.
-
-         //   calculate the range to target:
-         "    vec3 v_view_clamped3 = v_view_clamped.xyz/v_view_clamped.w; \n"
-         "    float range = length(v_view_clamped3); \n"
-
-         //   calculate the depth offset bias for this range:
-         "    float ratio = (clamp(range, oe_clamp_range[0], oe_clamp_range[1])-oe_clamp_range[0])/(oe_clamp_range[1]-oe_clamp_range[0]);\n"
-         "    float bias = oe_clamp_bias[0] + ratio * (oe_clamp_bias[1]-oe_clamp_bias[0]);\n"
-
-         //   calculate the "simluated" vertex:
-         "    vec3 adj_vec = normalize(v_view_clamped3); \n"
-         "    vec3 v_view_offset3 = v_view_clamped3 - (adj_vec * bias); \n"
-
-         "    vec4 v_view_sim = vec4( v_view_offset3 * v_view_clamped.w, v_view_clamped.w ); \n"
-         "    oe_clamp_simvert = gl_ProjectionMatrix * v_view_sim;\n"
-         "    oe_clamp_simvertrange = range - bias; \n"
-
-         "    gl_Position = gl_ProjectionMatrix * v_view_clamped; \n"
          "} \n";
 
 
@@ -154,21 +132,10 @@ namespace
         "#version " GLSL_VERSION_STR "\n"
         GLSL_DEFAULT_PRECISION_FLOAT "\n"
 
-        "varying vec4 oe_clamp_simvert; \n"
-        "varying float oe_clamp_simvertrange; \n"
         "varying float oe_clamp_alphaFactor; \n"
 
         "void oe_clamp_fragment(inout vec4 color)\n"
         "{ \n"
-        "    float sim_depth = 0.5 * (1.0+(oe_clamp_simvert.z/oe_clamp_simvert.w));\n"
-
-             // if the offset pushed the Z behind the eye, the projection mapping will
-             // result in a z>1. We need to bring these values back down to the 
-             // near clip plan (z=0). We need to check simRange too before doing this
-             // so we don't draw fragments that are legitimently beyond the far clip plane.
-        "    if ( sim_depth > 1.0 && oe_clamp_simvertrange < 0.0 ) { sim_depth = 0.0; } \n"
-        "    gl_FragDepth = max(0.0, sim_depth); \n"
-
              // adjust the alpha component to "hide" geometry beyond the visible horizon.
         "    color.a *= oe_clamp_alphaFactor; \n"
         "}\n";
@@ -179,29 +146,6 @@ namespace
 
 namespace
 {
-    // Projection clamping callback that simply records the clamped matrix for
-    // later use
-    struct CPM : public osg::CullSettings::ClampProjectionMatrixCallback
-    {
-        void setup( osgUtil::CullVisitor* cv ) {
-            _clampedDepthProjMatrix.makeIdentity();
-            _cv = cv;
-        }
-        bool clampProjectionMatrixImplementation(osg::Matrixf& projection, double& znear, double& zfar) const {
-            return _cv->clampProjectionMatrixImplementation(projection, znear, zfar);
-            OE_WARN << "NO!" << std::endl;
-        }
-        bool clampProjectionMatrixImplementation(osg::Matrixd& projection, double& znear, double& zfar) const {
-            bool r = _cv->clampProjectionMatrixImplementation(projection, znear, zfar);
-            if ( r ) _clampedDepthProjMatrix = projection;
-            return r;
-        }
-        
-        osgUtil::CullVisitor* _cv;
-        mutable osg::Matrixd  _clampedDepthProjMatrix;
-    };
-
-
     // Additional per-view data stored by the clamping technique.
     struct LocalPerViewData : public osg::Referenced
     {
@@ -209,7 +153,6 @@ namespace
         osg::ref_ptr<osg::StateSet>  _groupStateSet;
         osg::ref_ptr<osg::Uniform>   _camViewToDepthClipUniform;
         osg::ref_ptr<osg::Uniform>   _depthClipToCamViewUniform;
-        osg::ref_ptr<CPM>            _cpm;
 
         osg::ref_ptr<osg::Uniform>   _depthClipToDepthViewUniform;
         osg::ref_ptr<osg::Uniform>   _depthViewToCamViewUniform;
@@ -217,7 +160,26 @@ namespace
         osg::ref_ptr<osg::Uniform>   _horizonDistanceUniform;
 
         unsigned _renderLeafCount;
+
+#ifdef DUMP_RTT_IMAGE
+        osg::ref_ptr<osg::Image> _rttDebugImage;
+#endif
     };
+
+#ifdef DUMP_RTT_IMAGE
+    struct DumpTex : public osg::Camera::DrawCallback
+    {
+        osg::ref_ptr<osg::Image> _tex;
+        DumpTex(osg::Image* tex) : _tex(tex) { }
+        void operator () (osg::RenderInfo& renderInfo) const
+        {
+            static int s_cc = 0;
+            if ( s_cc++ % 60 == 0 ) {
+                osgDB::writeImageFile(*_tex.get(), "rttimage.osgb");
+            }
+        }
+    };
+#endif
 }
 
 #ifdef USE_RENDER_BIN
@@ -332,9 +294,6 @@ ClampingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     LocalPerViewData* local = new LocalPerViewData();
     params._techniqueData = local;
 
-    // set up a callback to extract the overlay projection matrix.
-    local->_cpm = new CPM();
-
     // create the projected texture:
     local->_rttTexture = new osg::Texture2D();
     local->_rttTexture->setTextureSize( *_textureSize, *_textureSize );
@@ -354,13 +313,19 @@ ClampingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     params._rttCamera->setReferenceFrame( osg::Camera::ABSOLUTE_RF_INHERIT_VIEWPOINT );
     params._rttCamera->setClearColor( osg::Vec4f(0,0,0,0) );
     params._rttCamera->setClearMask( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
-    //params._rttCamera->setComputeNearFarMode( osg::CullSettings::COMPUTE_NEAR_FAR_USING_BOUNDING_VOLUMES );
     params._rttCamera->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
     params._rttCamera->setViewport( 0, 0, *_textureSize, *_textureSize );
     params._rttCamera->setRenderOrder( osg::Camera::PRE_RENDER );
     params._rttCamera->setRenderTargetImplementation( osg::Camera::FRAME_BUFFER_OBJECT );
     params._rttCamera->attach( osg::Camera::DEPTH_BUFFER, local->_rttTexture.get() );
-    //params._rttCamera->setClampProjectionMatrixCallback( local->_cpm.get() );
+
+#ifdef DUMP_RTT_IMAGE
+    local->_rttDebugImage = new osg::Image();
+    local->_rttDebugImage->allocateImage(4096, 4096, 1, GL_RGB, GL_UNSIGNED_BYTE);
+    memset( (void*)local->_rttDebugImage->getDataPointer(), 0xff, local->_rttDebugImage->getTotalSizeInBytes() );
+    params._rttCamera->attach( osg::Camera::COLOR_BUFFER, local->_rttDebugImage.get() );
+    params._rttCamera->setFinalDrawCallback( new DumpTex(local->_rttDebugImage.get()) );
+#endif
 
     // set up a StateSet for the RTT camera.
     osg::StateSet* rttStateSet = params._rttCamera->getOrCreateStateSet();
@@ -402,7 +367,7 @@ ClampingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     local->_groupStateSet->setTextureAttributeAndModes( 
         _textureUnit, 
         local->_rttTexture.get(), 
-        osg::StateAttribute::ON );
+        osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE );
 
 #if 1
     // set up depth test/write parameters for the overlay geometry:
@@ -450,11 +415,10 @@ ClampingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
 #endif
 
     // make the shader that will do clamping and depth offsetting.
-    VirtualProgram* vp = new VirtualProgram();
-    vp->setName( "ClampingTechnique program" );
-    vp->setFunction( "oe_clamp_vertex",   clampingVertexShader,   ShaderComp::LOCATION_VERTEX_POST_LIGHTING );
-    vp->setFunction( "oe_clamp_fragment", clampingFragmentShader, ShaderComp::LOCATION_FRAGMENT_PRE_LIGHTING );
-    local->_groupStateSet->setAttributeAndModes( vp, osg::StateAttribute::ON );
+    VirtualProgram* vp = VirtualProgram::getOrCreate(local->_groupStateSet.get());
+    vp->setName( "ClampingTechnique" );
+    vp->setFunction( "oe_clamp_vertex",   clampingVertexShader,   ShaderComp::LOCATION_VERTEX_VIEW );
+    vp->setFunction( "oe_clamp_fragment", clampingFragmentShader, ShaderComp::LOCATION_FRAGMENT_COLORING );
 }
 
 
@@ -498,11 +462,19 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
 
         LocalPerViewData& local = *static_cast<LocalPerViewData*>(params._techniqueData.get());
 
-        // prime our CPM with the current cull visitor:
-        //local._cpm->setup( cv );
+#if 0
+        osg::Vec3d eye, lookat, up;
+        params._rttViewMatrix.getLookAt(eye, lookat, up);
+        OE_WARN << "rtt eye=" << eye.x() << ", " << eye.y() << ", " << eye.z() << std::endl;
+
+        double left, right, bottom, top, n, f;
+        params._rttProjMatrix.getOrtho(left, right, bottom, top, n, f);
+        OE_WARN << "rtt prj=" << left << ", " << right << ", " << bottom << ", " << top << ", " << n << ", " << f << std::endl << std::endl;
+#endif
 
         // create the depth texture (render the terrain to tex)
         params._rttCamera->accept( *cv );
+
 
         // construct a matrix that transforms from camera view coords to depth texture
         // clip coords directly. This will avoid precision loss in the 32-bit shader.
@@ -519,7 +491,6 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
             params._rttViewMatrix;
 
         osg::Matrix depthViewToDepthClip = 
-            //local._cpm->_clampedDepthProjMatrix *
             params._rttProjMatrix *
             s_scaleBiasMat;
 
@@ -533,7 +504,6 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
         //OE_NOTICE << "HD = " << std::setprecision(8) << float(*params._horizonDistance) << std::endl;
 
 #if SUPPORT_Z
-
         osg::Matrix depthClipToDepthView;
         depthClipToDepthView.invert( depthViewToDepthClip );
         local._depthClipToDepthViewUniform->set( depthClipToDepthView );
@@ -541,20 +511,30 @@ ClampingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
         osg::Matrix depthViewToCameraView;
         depthViewToCameraView.invert( cameraViewToDepthView );
         local._depthViewToCamViewUniform->set( depthViewToCameraView );
-
 #else
 
         osg::Matrix depthClipToCameraView;
         depthClipToCameraView.invert( cameraViewToDepthClip );
         local._depthClipToCamViewUniform->set( depthClipToCameraView );
-
 #endif
 
         if ( params._group->getNumChildren() > 0 )
         {
             // traverse the overlay nodes, applying the clamping shader.
             cv->pushStateSet( local._groupStateSet.get() );
-            params._group->accept( *cv );
+
+            // Since the vertex shader is moving the verts to clamp them to the terrain,
+            // OSG will not be able to properly cull the geometry. (Specifically: OSG may
+            // cull geometry which is invisible when NOT clamped, but becomes visible after
+            // GPU clamping.) We work around that by using a Proxy cull visitor that will 
+            // use the RTT camera's matrixes for frustum culling (instead of the main camera's).
+            ProxyCullVisitor pcv( cv, params._rttProjMatrix, params._rttViewMatrix );
+
+            // cull the clampable geometry.
+            params._group->accept( pcv );
+            //params._group->accept( *cv ); // old way - direct traversal
+
+            // done; pop the clamping shaders.
             cv->popStateSet();
         }
     }

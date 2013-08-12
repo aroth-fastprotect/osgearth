@@ -129,8 +129,9 @@ namespace osgEarth
          * shader factory if you want to alter any of osgEarth's baseline shaders
          * (advanced usage).
          */
-        ShaderFactory* getShaderFactory() const;
+        const ShaderFactory* getShaderFactory() const;
         void setShaderFactory( ShaderFactory* lib );
+        static const ShaderFactory* shaderFactory() { return instance()->getShaderFactory(); }
 
         /**
          * A default StateSetCache to use by any process that uses one.
@@ -221,7 +222,7 @@ namespace osgEarth
         osg::ref_ptr<TaskServiceManager> _taskServiceManager;
 
         // unique ID generator:
-        int _uidGen;
+        int                      _uidGen;
         mutable Threading::Mutex _uidGenMutex;
 
         // system capabilities:
@@ -236,7 +237,7 @@ namespace osgEarth
         osg::ref_ptr<osgText::Font> _defaultFont;
 
         typedef std::vector<const Units*> UnitsVector;
-        UnitsVector _unitsVector;
+        UnitsVector                       _unitsVector;
         mutable Threading::ReadWriteMutex _unitsVectorMutex;
 
         osg::ref_ptr<StateSetCache> _stateSetCache;

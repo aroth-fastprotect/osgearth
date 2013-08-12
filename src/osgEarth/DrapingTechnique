@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -116,6 +116,7 @@ namespace osgEarth
         bool                          _mipmapping;
         bool                          _rttBlending;
         bool                          _attachStencil;
+        double                        _maxFarNearRatio;
 
         struct TechData : public osg::Referenced
         {

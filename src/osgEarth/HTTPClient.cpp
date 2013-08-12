@@ -19,6 +19,7 @@
 #include <osgEarth/HTTPClient>
 #include <osgEarth/Registry>
 #include <osgEarth/Version>
+#include <osgEarth/Progress>
 #include <osgDB/ReadFile>
 #include <osgDB/Registry>
 #include <osgDB/FileNameUtils>
@@ -317,11 +318,11 @@ HTTPClient::getClient()
 }
 
 HTTPClient::HTTPClient() :
-_curl_handle               ( 0L ),
+_curl_handle    ( 0L ),
 _previousPassword          (),
 _previousHttpAuthentication( 0L ),
 _initialized               ( false ),
-_simResponseCode           ( -1L )
+_simResponseCode( -1L )
 {
     //nop
     //do no CURL calls here.
@@ -383,7 +384,7 @@ HTTPClient::initializeImpl()
     curl_easy_setopt( _curl_handle, CURLOPT_FOLLOWLOCATION, (void*)1 );
     curl_easy_setopt( _curl_handle, CURLOPT_MAXREDIRS, (void*)5 );
     curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSFUNCTION, &CurlProgressCallback);
-    curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);
+    curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);    
     curl_easy_setopt( _curl_handle, CURLOPT_MAX_SEND_SPEED_LARGE, limitRateSend );
     curl_easy_setopt( _curl_handle, CURLOPT_MAX_RECV_SPEED_LARGE, limitRateRecv );
     // don't let curl install any signal handlers which cause serious trouble in multi-thread environments.
@@ -822,13 +823,8 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
         res = response_code == 408 ? CURLE_OPERATION_TIMEDOUT : CURLE_COULDNT_CONNECT;
     }
 
-    if ( s_HTTP_DEBUG )
-    {
-        OE_NOTICE << LC << "GET(" << response_code << "): \"" << request.getURL() << "\"" << std::endl;
-    }
-
     HTTPResponse response( response_code );
-   
+    
     // read the response content type:
     char* content_type_cp;
     curl_easy_getinfo( _curl_handle, CURLINFO_CONTENT_TYPE, &content_type_cp );
@@ -840,6 +836,13 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
         return HTTPResponse(0L);
     }
     response._mimeType = content_type_cp;
+
+    if ( s_HTTP_DEBUG )
+    {
+        OE_NOTICE << LC 
+            << "GET(" << response_code << ", " << response._mimeType << ") : \"" 
+            << request.getURL() << "\"" << std::endl;
+    }
 
 
     if ( /*response_code == 200L &&*/ res != CURLE_ABORTED_BY_CALLBACK && res != CURLE_OPERATION_TIMEDOUT )
@@ -949,6 +952,13 @@ namespace
             }
         }
 
+        if ( !reader )
+        {
+            OE_WARN << LC << "Cannot find an OSG plugin to read response data (ext="
+                << ext << "; mime-type=" << response.getMimeType()
+                << ")" << std::endl;
+        }
+
         return reader;
     }
 }
@@ -969,7 +979,6 @@ HTTPClient::doReadImage(const std::string&    location,
         osgDB::ReaderWriter* reader = getReader(location, response);
         if (!reader)
         {
-            OE_WARN << LC << "Can't find an OSG plugin to read "<<location<<std::endl;
             result = ReadResult(ReadResult::RESULT_NO_READER);
         }
 
@@ -1033,7 +1042,6 @@ HTTPClient::doReadNode(const std::string&    location,
         osgDB::ReaderWriter* reader = getReader(location, response);
         if (!reader)
         {
-            OE_WARN << LC << "Can't find an OSG plugin to read "<<location<<std::endl;
             result = ReadResult(ReadResult::RESULT_NO_READER);
         }
 
@@ -1093,7 +1101,6 @@ HTTPClient::doReadObject(const std::string&    location,
         osgDB::ReaderWriter* reader = getReader(location, response);
         if (!reader)
         {
-            OE_WARN << LC << "Can't find an OSG plugin to read "<<location<<std::endl;
             result = ReadResult(ReadResult::RESULT_NO_READER);
         }
 

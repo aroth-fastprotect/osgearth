@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -21,6 +21,7 @@
 #include <osgEarthAnnotation/AnnotationRegistry>
 #include <osgEarthSymbology/Style>
 #include <osgEarthSymbology/InstanceSymbol>
+#include <osgEarth/AutoScale>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
 #include <osgEarth/ShaderGenerator>
@@ -114,11 +115,6 @@ ModelNode::init()
                     ShaderGenerator gen( Registry::stateSetCache() );
                     node->accept( gen );
 
-                    // need a top-level shader too:
-                    VirtualProgram* vp = new VirtualProgram();
-                    vp->installDefaultColoringAndLightingShaders();
-                    this->getOrCreateStateSet()->setAttributeAndModes( vp, 1 );
-
                     // do we really need this? perhaps
                     node->addCullCallback( new UpdateLightingUniformsHelper() );
                 }
@@ -135,6 +131,13 @@ ModelNode::init()
                     this->setScale( osg::Vec3f(s, s, s) );
                 }
 
+                // auto scaling?
+                if ( sym->autoScale() == true )
+                {
+                    this->getOrCreateStateSet()->setRenderBinDetails(0, osgEarth::AUTO_SCALE_BIN );
+                }
+
+                // rotational offsets?
                 if (sym && (sym->heading().isSet() || sym->pitch().isSet() || sym->roll().isSet()) )
                 {
                     osg::Matrix rot;

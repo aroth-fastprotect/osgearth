@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -20,12 +20,15 @@
 #include <osgEarth/Capabilities>
 #include <osgEarth/ClampableNode>
 #include <osgEarth/ClampingTechnique>
+#include <osgEarth/CullingUtils>
 #include <osgEarth/DrapeableNode>
 #include <osgEarth/DrapingTechnique>
 #include <osgEarth/MapNodeObserver>
 #include <osgEarth/MaskNode>
 #include <osgEarth/NodeUtils>
 #include <osgEarth/Registry>
+#include <osgEarth/ShaderFactory>
+#include <osgEarth/TraversalData>
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/OverlayDecorator>
 #include <osgEarth/TerrainEngineNode>
@@ -236,7 +239,7 @@ MapNode::init()
     // Since we have global uniforms in the stateset, mark it dynamic so it is immune to
     // multi-threaded overlap
     // TODO: do we need this anymore? there are no more global uniforms in here.. gw
-    getOrCreateStateSet()->setDataVariance(osg::Object::DYNAMIC);
+    //getOrCreateStateSet()->setDataVariance(osg::Object::DYNAMIC);
 
     _modelLayerCallback = new MapModelLayerCallback(this);
 
@@ -367,14 +370,9 @@ MapNode::init()
     // Install top-level shader programs:
     if ( Registry::capabilities().supportsGLSL() )
     {
-        // Note. We use OVERRIDE here so that child object that use the ShaderGenerator
-        // don't have to worry about installing default shaders. The usage pattern is
-        // to use PROTECTED mode if you want to override the defaults in (say) a ModelLayer
-        // or in a TextureCompositor.
-
         VirtualProgram* vp = new VirtualProgram();
         vp->setName( "MapNode" );
-        vp->installDefaultColoringAndLightingShaders( 0, osg::StateAttribute::ON | osg::StateAttribute::OVERRIDE );
+        Registry::instance()->getShaderFactory()->installLightingShaders( vp );
         ss->setAttributeAndModes( vp, osg::StateAttribute::ON );
     }
 
@@ -677,9 +675,58 @@ MapNode::traverse( osg::NodeVisitor& nv )
             RemoveBlacklistedFilenamesVisitor v;
             _terrainEngine->accept( v );
         }
+
+        // traverse:
+        std::for_each( _children.begin(), _children.end(), osg::NodeAcceptOp(nv) );
     }
 
-    osg::Group::traverse( nv );
+    else if ( nv.getVisitorType() == nv.CULL_VISITOR )
+    {
+        osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
+        if ( cv )
+        {
+            // insert traversal data for this camera:
+            osg::ref_ptr<osg::Referenced> oldUserData = cv->getUserData();
+            MapNodeCullData* cullData = getCullData( cv->getCurrentCamera() );
+            cv->setUserData( cullData );
+
+            cullData->_mapNode = this;
+
+            // calculate altitude:
+            osg::Vec3d eye = cv->getViewPoint();
+            const SpatialReference* srs = getMapSRS();
+            if ( srs && !srs->isProjected() )
+            {
+                GeoPoint ecef;
+                ecef.fromWorld( srs, eye );
+                cullData->_cameraAltitude = ecef.alt();
+            }
+            else
+            {
+                cullData->_cameraAltitude = eye.z();
+            }
+
+            // window scale matrix:
+            osg::Matrix  m4 = cv->getWindowMatrix();
+            osg::Matrix3 m3( m4(0,0), m4(1,0), m4(2,0),
+                             m4(0,1), m4(1,1), m4(2,1),
+                             m4(0,2), m4(1,2), m4(2,2) );
+            cullData->_windowScaleMatrix->set( m3 );
+
+            // traverse:
+            cv->pushStateSet( cullData->_stateSet.get() );
+            std::for_each( _children.begin(), _children.end(), osg::NodeAcceptOp(nv) );
+            cv->popStateSet();
+
+            // restore:
+            cv->setUserData( oldUserData.get() );
+        }
+    }
+
+    else
+    {
+        osg::Group::traverse( nv );
+    }
 }
 
 void
@@ -699,5 +746,29 @@ MapNode::onModelLayerOverlayChanged( ModelLayer* layer )
         {
             overlay->setActive( layer->getOverlay() );
         }
+    }
+}
+
+MapNodeCullData*
+MapNode::getCullData(osg::Camera* key) const
+{
+    // first look it up:
+    {
+        Threading::ScopedReadLock shared( _cullDataMutex );
+        CullDataMap::const_iterator i = _cullData.find( key );
+        if ( i != _cullData.end() )
+            return i->second.get();
+    }
+    // if it's not there, make it, but double-check.
+    {
+        Threading::ScopedWriteLock exclusive( _cullDataMutex );
+        
+        CullDataMap::const_iterator i = _cullData.find( key );
+        if ( i != _cullData.end() )
+            return i->second.get();
+
+        MapNodeCullData* cullData = new MapNodeCullData();
+        _cullData[key] = cullData;
+        return cullData;
     }
 }

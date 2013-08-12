@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -79,6 +79,19 @@ TileKey::getTileXY(unsigned int& out_tile_x,
 {
     out_tile_x = _x;
     out_tile_y = _y;
+}
+
+unsigned
+TileKey::getQuadrant() const
+{
+    if ( _lod == 0 )
+        return 0;
+    bool xeven = (_x & 1) == 0;
+    bool yeven = (_y & 1) == 0;
+    return 
+        xeven && yeven ? 0 :
+        xeven          ? 2 :
+        yeven          ? 1 : 3;
 }
 
 osgTerrain::TileID

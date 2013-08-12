@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -23,10 +23,10 @@
 #include <osgEarthAnnotation/AnnotationData>
 #include <osgEarthAnnotation/Decoration>
 #include <osgEarthSymbology/Style>
+#include <osgEarth/DepthOffset>
 #include <osgEarth/MapNodeObserver>
 #include <osgEarth/Terrain>
 #include <osgEarth/TileKey>
-#include <osg/Switch>
 
 
 #define META_AnnotationNode(library,name) \
@@ -138,6 +138,8 @@ namespace osgEarth { namespace Annotation
         bool                         _autoclamp;
         bool                         _depthAdj;
         osg::ref_ptr<const AltitudeSymbol> _altitude;
+
+        DepthOffsetAdapter _doAdapter;
 
         typedef std::map<std::string, osg::ref_ptr<Decoration> > DecorationMap;
         DecorationMap _dsMap;

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -20,7 +20,6 @@
 #include <osgEarthAnnotation/OrthoNode>
 #include <osgEarthAnnotation/AnnotationUtils>
 #include <osgEarthAnnotation/AnnotationSettings>
-#include <osgEarthAnnotation/Decluttering>
 #include <osgEarthSymbology/Color>
 #include <osgEarth/ThreadingUtils>
 #include <osgEarth/CullingUtils>
@@ -31,6 +30,8 @@
 #include <osg/OcclusionQueryNode>
 #include <osg/Point>
 #include <osg/Depth>
+
+#define LC "[OrthoNode] "
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
@@ -164,7 +165,7 @@ OrthoNode::traverse( osg::NodeVisitor& nv )
 
     if ( nv.getVisitorType() == osg::NodeVisitor::CULL_VISITOR )
     {
-        cv = static_cast<osgUtil::CullVisitor*>( &nv );
+        cv = Culling::asCullVisitor(nv);
 
         // make sure that we're NOT using the AutoTransform if this node is in the decluttering bin;
         // the decluttering bin automatically manages screen space transformation.
@@ -284,30 +285,55 @@ OrthoNode::applyStyle(const Style& style)
     const TextSymbol* text = style.get<TextSymbol>();
     if ( text && text->declutter().isSet() )
     {
-        if ( text->declutter() == true )
+        Decluttering::setEnabled( this->getOrCreateStateSet(), (text->declutter() == true) );
+        //if ( text->declutter() == true )
+        //{
+        //    this->getOrCreateStateSet()->setRenderBinDetails(
+        //        0,
+        //        OSGEARTH_DECLUTTER_BIN );
+        //}
+        //else
+        //{
+        //    this->getOrCreateStateSet()->setRenderBinToInherit();
+        //}
+    }
+
+
+    // check for occlusion culling
+    if ( text && text->occlusionCull().isSet() )
+    {
+        setOcclusionCulling( *text->occlusionCull() );
+
+        if (text->occlusionCullAltitude().isSet())
         {
-            this->getOrCreateStateSet()->setRenderBinDetails(
-                12,
-                OSGEARTH_DECLUTTER_BIN );
-        }
-        else
-        {
-            this->getOrCreateStateSet()->setRenderBinToInherit();
+            setOcclusionCullingMaxAltitude( *text->occlusionCullAltitude() );
         }
     }
 
     const IconSymbol* icon = style.get<IconSymbol>();
     if ( icon && icon->declutter().isSet() )
     {
-        if ( icon->declutter() == true )
+        Decluttering::setEnabled( this->getOrCreateStateSet(), (icon->declutter() == true) );
+        //if ( icon->declutter() == true )
+        //{
+        //    this->getOrCreateStateSet()->setRenderBinDetails(
+        //        0,
+        //        OSGEARTH_DECLUTTER_BIN );
+        //}
+        //else
+        //{
+        //    this->getOrCreateStateSet()->setRenderBinToInherit();
+        //}
+    }
+
+    // check for occlusion culling
+    if ( icon && icon->occlusionCull().isSet() )
+    {
+        this->setOcclusionCulling( *icon->occlusionCull() );
+
+        if (icon->occlusionCullAltitude().isSet())
         {
-            this->getOrCreateStateSet()->setRenderBinDetails(
-                12,
-                OSGEARTH_DECLUTTER_BIN );
-        }
-        else
-        {
-            this->getOrCreateStateSet()->setRenderBinToInherit();
+            setOcclusionCullingMaxAltitude( *icon->occlusionCullAltitude() );
         }
     }
 
@@ -417,7 +443,7 @@ OrthoNode::adjustOcclusionCullingPoint( const osg::Vec3d& world )
     {
         const osg::EllipsoidModel* em = getMapNode()->getMapSRS()->getEllipsoid();
         osg::Vec3d up = em ? em->computeLocalUpVector( world.x(), world.y(), world.z() ) : osg::Vec3d(0,0,1);
-        osg::Vec3d adjust = up * 0.1;
+        osg::Vec3d adjust = up * AnnotationSettings::getOcclusionCullingHeightAdjustment();        
         return world + adjust;
     }
     else
@@ -442,8 +468,8 @@ OrthoNode::setOcclusionCulling( bool value )
         if ( _occlusionCulling && getMapNode() )
         {
             osg::Vec3d world = _autoxform->getPosition();
-            _occlusionCuller = new OcclusionCullingCallback(adjustOcclusionCullingPoint(world), getMapNode());
-            _occlusionCuller->setMaxRange( AnnotationSettings::getOcclusionQueryMaxRange() );
+            _occlusionCuller = new OcclusionCullingCallback( getMapNode()->getMapSRS(),  adjustOcclusionCullingPoint(world), getMapNode()->getTerrainEngine() );
+            _occlusionCuller->setMaxAltitude( getOcclusionCullingMaxAltitude() );
             addCullCallback( _occlusionCuller.get()  );
         }
         else
@@ -457,6 +483,25 @@ OrthoNode::setOcclusionCulling( bool value )
                 }
             }
         }
+    }
+}
+
+double
+OrthoNode::getOcclusionCullingMaxAltitude() const
+{
+    if (_occlusionCullingMaxAltitude.isSet())
+    {
+        return *_occlusionCullingMaxAltitude;
+    }
+    return AnnotationSettings::getOcclusionCullingMaxAltitude();
+}
+
+void OrthoNode::setOcclusionCullingMaxAltitude( double occlusionCullingMaxAltitude )
+{
+    _occlusionCullingMaxAltitude = occlusionCullingMaxAltitude;
+    if ( _occlusionCuller.valid() )
+    {
+        _occlusionCuller->setMaxAltitude( getOcclusionCullingMaxAltitude() );         
     }
 }
 

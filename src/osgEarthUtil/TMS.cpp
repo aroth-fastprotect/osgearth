@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -266,8 +266,8 @@ TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
         for (TileSetList::iterator itr = _tileSets.begin(); itr != _tileSets.end(); ++itr)
         { 
             if (itr->getOrder() == zoom)
-            {
-                std::stringstream ss;
+            {                
+                std::stringstream ss; 
                 std::string basePath = osgDB::getFilePath(_filename);                
                 if (!basePath.empty())
                 {
@@ -282,7 +282,7 @@ TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
     }
     else // Just go with it. No way of knowing the max level.
     {
-        std::stringstream ss;
+        std::stringstream ss; 
         std::string basePath = osgDB::getFilePath(_filename);                
         if (!basePath.empty())
         {
@@ -290,8 +290,8 @@ TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
         }
         ss << zoom << "/" << x << "/" << y << "." << _format.getExtension();                
         std::string ssStr;
-		ssStr = ss.str();
-		return ssStr;        
+        ssStr = ss.str();
+        return ssStr;
     }
 
     return "";

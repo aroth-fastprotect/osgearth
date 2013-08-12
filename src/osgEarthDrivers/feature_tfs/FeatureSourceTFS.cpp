@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -60,7 +60,7 @@ public:
       FeatureSource( options ),
       _options     ( options ),
       _layerValid(false)
-    {        
+    {                
     }
 
     /** Destruct the object, cleaning up and OGR handles. */
@@ -337,7 +337,7 @@ private:
     const TFSFeatureOptions         _options;    
     FeatureSchema                   _schema;
     osg::ref_ptr<CacheBin>          _cacheBin;
-    osg::ref_ptr<osgDB::Options>    _dbOptions;
+    osg::ref_ptr<osgDB::Options>    _dbOptions;    
     TFSLayer                        _layer;
     bool                            _layerValid;
 };

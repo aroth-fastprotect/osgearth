@@ -11,7 +11,7 @@ SET(TARGET_H
 )
 
 SET(TARGET_PUBLIC_H 
-	ArcGISOptions
+    ArcGISOptions
 )
 SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/arcgis)
 

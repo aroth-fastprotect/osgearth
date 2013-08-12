@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -206,6 +206,23 @@ namespace
                         }
                     }
                 }
+
+#if 0
+                if ( *_opt->morphLODs() )
+                {
+                    // find the parent tile as well, for LOD morphing!!
+                    if ( _key.getLevelOfDetail() > 0 )
+                    {
+                        if (_hfCache->getOrCreateHeightField( *_mapf, _key.createParentKey(), true, hf, &isFallback ))
+                        {       
+                            if ( mapInfo.isPlateCarre() )
+                                HeightFieldUtils::scaleHeightFieldToDegrees( hf.get() );
+
+                            _model->_elevationData.setParent( hf.get() );
+                        }
+                    }
+                }
+#endif
             }
         }
 

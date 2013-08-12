@@ -23,19 +23,19 @@ SET(TARGET_PUBLIC_H
     FeatureCursor
     FeatureDisplayLayout
     FeatureDrawSet
-	FeatureListSource
+    FeatureListSource
     FeatureModelGraph
-    FeatureModelSource    
+    FeatureModelSource
     FeatureSource
     FeatureSourceIndexNode
     FeatureTileSource
     Filter
     FilterContext
     GeometryCompiler
-	GeometryUtils
+    GeometryUtils
     LabelSource
     MeshClamper
-	OgrUtils
+    OgrUtils
     OptimizerHints
     PolygonizeLines
     ResampleFilter
@@ -52,7 +52,7 @@ SET(TARGET_PUBLIC_H
 )
 
 SET(TARGET_SRC
-	AltitudeFilter.cpp
+    AltitudeFilter.cpp
     BufferFilter.cpp
     BuildGeometryFilter.cpp 
     BuildTextFilter.cpp

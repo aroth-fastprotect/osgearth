@@ -88,7 +88,7 @@ namespace osgEarth
          */
         optional<double>& maxResolution() { return _maxResolution; }
         const optional<double>& maxResolution() const { return _maxResolution; }
-
+        
         /**
          * Whether to use this layer with the map. Setting this to false means that 
          * the layer will remain in its map model but will not be used by the 
@@ -196,7 +196,7 @@ namespace osgEarth
         virtual ~TerrainLayerCallback() { }
     };
 
-    typedef void (TerrainLayerCallback::*TerrainLayerCallbackMethodPtr)(TerrainLayer* layer);
+    typedef void (TerrainLayerCallback::*TerrainLayerCallbackMethodPtr)(class TerrainLayer* layer);
 
 
     /**
@@ -256,7 +256,7 @@ namespace osgEarth
          * Gets the tile size of the this MapLayer
          */
         unsigned int getTileSize() const;
-
+        
         /**
          * Whether the layer represents dynamic data, i.e. tile data that can change.
          */
@@ -299,6 +299,11 @@ namespace osgEarth
                 _runtimeOptions->cachePolicy()->usage() == CachePolicy::USAGE_CACHE_ONLY;
         }
 
+    public: // Layer interface
+
+        virtual SequenceControl* getSequenceControl();
+
+
     public:
         
         /**
@@ -313,7 +318,7 @@ namespace osgEarth
                 _empty        ( rhs._empty ),
                 _cacheBinId   ( rhs._cacheBinId ),
                 _sourceName   ( rhs._sourceName ),
-                _sourceDriver ( rhs._sourceDriver ),
+                _sourceDriver ( rhs._sourceDriver ),                
                 _sourceProfile( rhs._sourceProfile ),
                 _cacheProfile ( rhs._cacheProfile ) { }
 
@@ -322,7 +327,7 @@ namespace osgEarth
                 _empty = conf.empty();
                 conf.getIfSet   ( "cachebin_id",    _cacheBinId );
                 conf.getIfSet   ( "source_name",    _sourceName );
-                conf.getIfSet   ( "source_driver",  _sourceDriver );
+                conf.getIfSet   ( "source_driver",  _sourceDriver );                
                 conf.getObjIfSet( "source_profile", _sourceProfile );
                 conf.getObjIfSet( "cache_profile",  _cacheProfile );
             }
@@ -332,7 +337,7 @@ namespace osgEarth
                 Config conf( "osgearth_terrainlayer_cachebin" );
                 conf.addIfSet   ( "cachebin_id",    _cacheBinId );
                 conf.addIfSet   ( "source_name",    _sourceName );
-                conf.addIfSet   ( "source_driver",  _sourceDriver );
+                conf.addIfSet   ( "source_driver",  _sourceDriver );                
                 conf.addObjIfSet( "source_profile", _sourceProfile );
                 conf.addObjIfSet( "cache_profile",  _cacheProfile );
                 return conf;
@@ -341,7 +346,7 @@ namespace osgEarth
             bool                     _empty;
             optional<std::string>    _cacheBinId;
             optional<std::string>    _sourceName;
-            optional<std::string>    _sourceDriver;
+            optional<std::string>    _sourceDriver;            
             optional<ProfileOptions> _sourceProfile;
             optional<ProfileOptions> _cacheProfile;
         };

@@ -21,6 +21,7 @@
 #include <osgEarth/CacheBin>
 #include <osgEarth/HTTPClient>
 #include <osgEarth/Registry>
+#include <osgEarth/Progress>
 #include <osgDB/FileNameUtils>
 #include <osgDB/ReadFile>
 #include <osgDB/ReaderWriter>
@@ -328,6 +329,12 @@ namespace
         ReadResult fromFile( const std::string& uri, const osgDB::Options* opt ) { return readStringFile(uri, opt); }
     };
 
+    /*
+    static OpenThreads::Mutex s_statsLock;
+    static double totalTime = 0;
+    static int totalRequests = 0;
+    */
+
     //--------------------------------------------------------------------
     // MASTER read template function. I templatized this so we wouldn't
     // have 4 95%-identical code paths to maintain...
@@ -337,7 +344,9 @@ namespace
         const URI&            inputURI,
         const osgDB::Options* dbOptions,
         ProgressCallback*     progress)
-    {
+    {        
+        //osg::Timer_t startTime = osg::Timer::instance()->tick();
+
         ReadResult result;
 
         if ( !inputURI.empty() )
@@ -362,10 +371,10 @@ namespace
             URIResultCache* memCache = URIResultCache::from( localOptions );
             if ( memCache )
             {
-                URIResultCache::Record r = memCache->get( uri );
-                if ( r.valid() )
+                URIResultCache::Record rec;
+                if ( memCache->get(uri, rec) )
                 {
-                    result = r.value();
+                    result = rec.value();
                 }
             }
 
@@ -485,6 +494,21 @@ namespace
         {
             (*post)(result);
         }
+
+        /*
+        osg::Timer_t endTime = osg::Timer::instance()->tick();
+
+        double time = osg::Timer::instance()->delta_s( startTime, endTime );
+        {
+            OpenThreads::ScopedLock< OpenThreads::Mutex > lock( s_statsLock );            
+            totalTime += time;
+            totalRequests += 1;
+            double avg = (double)totalRequests / totalTime;
+            OE_NOTICE << "total req = " << totalRequests << " totalTime = " << totalTime << " " << avg << " req/s" << std::endl;            
+        }
+        */
+
+        
 
         return result;
     }

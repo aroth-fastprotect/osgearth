@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -206,7 +206,8 @@ _auto_vp_duration               ( false ),
 _min_vp_duration_s              ( 3.0 ),
 _max_vp_duration_s              ( 8.0 ),
 _camProjType                    ( PROJ_PERSPECTIVE ),
-_camFrustOffsets                ( 0, 0 )
+_camFrustOffsets                ( 0, 0 ),
+_disableCollisionAvoidance      ( false )
 {
     //NOP
 }
@@ -232,7 +233,9 @@ _auto_vp_duration( rhs._auto_vp_duration ),
 _min_vp_duration_s( rhs._min_vp_duration_s ),
 _max_vp_duration_s( rhs._max_vp_duration_s ),
 _camProjType( rhs._camProjType ),
-_camFrustOffsets( rhs._camFrustOffsets )
+_camFrustOffsets( rhs._camFrustOffsets ),
+_breakTetherActions( rhs._breakTetherActions ),
+_disableCollisionAvoidance( rhs._disableCollisionAvoidance)
 {
     //NOP
 }
@@ -430,8 +433,9 @@ EarthManipulator::Settings::setCameraFrustumOffsets( const osg::Vec2s& value )
 
 EarthManipulator::EarthManipulator() :
 osgGA::CameraManipulator(),
-_frame_count      ( 0 ),
-_last_action      ( ACTION_NULL )
+_frame_count           ( 0 ),
+_last_action           ( ACTION_NULL ),
+_findNodeTraversalMask ( 0x01 )
 {
     reinitialize();
     configureDefaultSettings();
@@ -441,7 +445,8 @@ EarthManipulator::EarthManipulator( const EarthManipulator& rhs ) :
 osgGA::CameraManipulator( rhs ),
 _last_action            ( ACTION_NULL ),
 _frame_count            ( 0 ),
-_settings               ( new Settings(*rhs.getSettings()) )
+_settings               ( new Settings(*rhs.getSettings()) ),
+_findNodeTraversalMask  ( rhs._findNodeTraversalMask )
 {
     reinitialize();
 }
@@ -453,7 +458,7 @@ EarthManipulator::~EarthManipulator()
     if (safeNode && _terrainCallback)
     {
         // find a map node.
-        MapNode* mapNode = MapNode::findMapNode( safeNode.get(), 0x01 );
+        MapNode* mapNode = MapNode::findMapNode( safeNode.get(), _findNodeTraversalMask );
         if ( mapNode )
         {             
             mapNode->getTerrain()->removeTerrainCallback( _terrainCallback );
@@ -588,15 +593,15 @@ EarthManipulator::established()
             return false;
 
         // find a map node.
-        MapNode* mapNode = MapNode::findMapNode( safeNode.get(), 0x01 );
-        if ( mapNode )
-        {
+        MapNode* mapNode = MapNode::findMapNode( safeNode.get(), _findNodeTraversalMask );
+        if ( mapNode && !_settings->getDisableCollisionAvoidance() )
+        {            
             _terrainCallback = new ManipTerrainCallback( this );
             mapNode->getTerrain()->addTerrainCallback( _terrainCallback );
-        }
+        }   
 
         // find a CSN node - if there is one, we want to attach the manip to that
-        _csn = findRelativeNodeOfType<osg::CoordinateSystemNode>( safeNode.get(), 0x01 );
+        _csn = findRelativeNodeOfType<osg::CoordinateSystemNode>( safeNode.get(), _findNodeTraversalMask );
 
         if ( _csn.valid() )
         {
@@ -900,9 +905,6 @@ EarthManipulator::setViewpoint( const Viewpoint& vp, double duration_s )
         
         _thrown = false;
         _task->_type = TASK_NONE;
-
-        // recalculate the center point.
-        recalculateCenter();
     }
     else
     {
@@ -962,8 +964,6 @@ EarthManipulator::setViewpoint( const Viewpoint& vp, double duration_s )
         osg::Matrix new_rot = osg::Matrixd( azim_q * pitch_q );
 
         _rotation = osg::Matrixd::inverse(new_rot).getRotate();
-
-        recalculateCenter();
     }
 }
 

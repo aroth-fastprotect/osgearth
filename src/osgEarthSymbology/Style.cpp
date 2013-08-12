@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -155,10 +155,15 @@ Style::mergeConfig( const Config& conf )
     conf.getIfSet( "url", _uri ); // named "url" for back compat
 
     _origType = conf.value( "type" );
+    std::string textData = trim(conf.value());
 
-    if ( conf.value( "type" ) == "text/css" )
+    bool useCSS =
+        _origType.compare("text/css") == 0 ||
+        !textData.empty();
+
+    if ( useCSS )
     {
-        _origData = conf.value();
+        _origData = textData;
         
         // just take the first block.
         ConfigSet blocks;

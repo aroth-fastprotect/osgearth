@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -18,6 +18,7 @@
 */
 
 #include <osgEarth/MapNode>
+#include <osgEarth/Decluttering>
 #include <osgEarth/ECEF>
 
 #include <osgEarthUtil/EarthManipulator>
@@ -36,7 +37,6 @@
 #include <osgEarthAnnotation/LabelNode>
 #include <osgEarthAnnotation/LocalGeometryNode>
 #include <osgEarthAnnotation/FeatureNode>
-#include <osgEarthAnnotation/Decluttering>
 #include <osgEarthAnnotation/HighlightDecoration>
 #include <osgEarthAnnotation/ScaleDecoration>
 
@@ -273,18 +273,39 @@ main(int argc, char** argv)
     {
         Style circleStyle;
         circleStyle.getOrCreate<PolygonSymbol>()->fill()->color() = Color(Color::Cyan, 0.5);
+        //circleStyle.getOrCreate<LineSymbol>()->stroke()->color() = Color(Color::Cyan, 1.0);
+        //circleStyle.getOrCreate<LineSymbol>()->stroke()->width() = 6.0f;
+        //circleStyle.getOrCreate<ExtrusionSymbol>()->height() = 250000.0; // meters MSL
         circleStyle.getOrCreate<AltitudeSymbol>()->clamping() = AltitudeSymbol::CLAMP_TO_TERRAIN;
         circleStyle.getOrCreate<AltitudeSymbol>()->technique() = AltitudeSymbol::TECHNIQUE_DRAPE;
 
         CircleNode* circle = new CircleNode(
-            mapNode, 
+            mapNode,
             GeoPoint(geoSRS, -90.25, 29.98, 1000., ALTMODE_RELATIVE),
-            Linear(300, Units::KILOMETERS ),
-            circleStyle );
-        annoGroup->addChild( circle );        
+            Linear(300, Units::KILOMETERS),
+            circleStyle, Angular(-45.0, Units::DEGREES), Angular(45.0, Units::DEGREES), true);
+        annoGroup->addChild( circle );
 
         editorGroup->addChild( new CircleNodeEditor( circle ) );
     }
+	{
+		Style circleStyle;
+		circleStyle.getOrCreate<PolygonSymbol>()->fill()->color() = Color(Color::Red, 0.5);
+		//circleStyle.getOrCreate<LineSymbol>()->stroke()->color() = Color(Color::Red, 1.0);
+		//circleStyle.getOrCreate<LineSymbol>()->stroke()->width() = 6.0f;
+		//circleStyle.getOrCreate<ExtrusionSymbol>()->height() = 250000.0; // meters MSL
+		circleStyle.getOrCreate<AltitudeSymbol>()->clamping() = AltitudeSymbol::CLAMP_TO_TERRAIN;
+		circleStyle.getOrCreate<AltitudeSymbol>()->technique() = AltitudeSymbol::TECHNIQUE_DRAPE;
+
+		CircleNode* circle = new CircleNode(
+			mapNode,
+			GeoPoint(geoSRS, -90.25, 29.98, 1000., ALTMODE_RELATIVE),
+			Linear(300, Units::KILOMETERS),
+			circleStyle, Angular(45.0, Units::DEGREES), Angular(360.0 - 45.0, Units::DEGREES), true);
+		annoGroup->addChild( circle );
+
+		editorGroup->addChild( new CircleNodeEditor( circle ) );
+	}
 
     //--------------------------------------------------------------------
 
@@ -292,16 +313,35 @@ main(int argc, char** argv)
     {
         Style ellipseStyle;
         ellipseStyle.getOrCreate<PolygonSymbol>()->fill()->color() = Color(Color::Orange, 0.75);
+        //ellipseStyle.getOrCreate<LineSymbol>()->stroke()->color() = Color(Color::Orange, 0.75);
+        //ellipseStyle.getOrCreate<LineSymbol>()->stroke()->width() = 4.0f;
+        ellipseStyle.getOrCreate<ExtrusionSymbol>()->height() = 250000.0; // meters MSL
         EllipseNode* ellipse = new EllipseNode(
             mapNode, 
             GeoPoint(geoSRS, -80.28, 25.82, 0.0, ALTMODE_RELATIVE),
             Linear(500, Units::MILES),
             Linear(100, Units::MILES),
             Angular(0, Units::DEGREES),
-            ellipseStyle );
+            ellipseStyle, Angular(45.0, Units::DEGREES), Angular(360.0 - 45.0, Units::DEGREES), true);
         annoGroup->addChild( ellipse );
         editorGroup->addChild( new EllipseNodeEditor( ellipse ) );
     }
+	{
+		Style ellipseStyle;
+		ellipseStyle.getOrCreate<PolygonSymbol>()->fill()->color() = Color(Color::Blue, 0.75);
+		//ellipseStyle.getOrCreate<LineSymbol>()->stroke()->color() = Color(Color::Blue, 0.75);
+		//ellipseStyle.getOrCreate<LineSymbol>()->stroke()->width() = 4.0f;
+		ellipseStyle.getOrCreate<ExtrusionSymbol>()->height() = 250000.0; // meters MSL
+		EllipseNode* ellipse = new EllipseNode(
+			mapNode, 
+			GeoPoint(geoSRS, -80.28, 25.82, 0.0, ALTMODE_RELATIVE),
+			Linear(500, Units::MILES),
+			Linear(100, Units::MILES),
+			Angular(0, Units::DEGREES),
+			ellipseStyle, Angular(-45.0, Units::DEGREES), Angular(45.0, Units::DEGREES), true);
+		annoGroup->addChild( ellipse );
+		editorGroup->addChild( new EllipseNodeEditor( ellipse ) );
+	}
 
     {
         // A rectangle around San Diego

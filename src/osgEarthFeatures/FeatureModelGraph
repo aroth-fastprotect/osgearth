@@ -1,6 +1,6 @@
 /* --*-c++-*-- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -84,6 +84,11 @@ namespace osgEarth { namespace Features
          */
         Session* getSession() { return _session; }
 
+		/**
+         * UID given to this feature graph when registered with the pseudo-loader
+         */
+        UID getUID() const { return _uid; }
+
         /**
          * Mark the feature graph dirty and in need of regeneration 
          */
@@ -146,6 +151,9 @@ namespace osgEarth { namespace Features
             const StringExpression& styleExpr,
             FeatureSourceIndex*     index,
             osg::Group*             parent);
+
+        osg::Group* getOrCreateStyleGroupFromFactory(
+            const Style& style);
        
         osg::BoundingSphered getBoundInWorldCoords( 
             const GeoExtent& extent, 

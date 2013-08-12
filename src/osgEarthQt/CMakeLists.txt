@@ -17,6 +17,7 @@ SET(TARGET_PUBLIC_MOC_H
     MapCatalogWidget
     TerrainProfileGraph
     TerrainProfileWidget
+    ViewerWidget
 )
 
 # Qt resource files
@@ -47,6 +48,7 @@ SET(TARGET_PUBLIC_H
     MultiViewerWidget
     TerrainProfileGraph
     TerrainProfileWidget
+    ViewWidget
     ViewerWidget
 )
 
@@ -63,6 +65,7 @@ SET(TARGET_SRC
     MultiViewerWidget.cpp
     TerrainProfileGraph.cpp
     TerrainProfileWidget.cpp
+    ViewWidget.cpp
     ViewerWidget.cpp
 )
 
@@ -75,14 +78,8 @@ SET(TARGET_ADDED_LIBRARIES
     osgEarthFeatures
     osgEarthUtil
     osg
-    osgWidget
     osgUtil
-    osgSim
-    osgTerrain
-    osgDB
-	osgFX
 	osgViewer
-	osgText
 	osgGA
 	osgQt
     OpenThreads

@@ -10,7 +10,7 @@ SET(TARGET_SRC
     ParallelKeyNodeFactory.cpp
     Plugin.cpp
     SerialKeyNodeFactory.cpp
-    SinglePassTerrainTechnique.cpp
+    SinglePassTerrainTechnique.cpp    
     StreamingTerrainNode.cpp
     StreamingTile.cpp
     TerrainNode.cpp

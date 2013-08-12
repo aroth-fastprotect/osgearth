@@ -524,12 +524,6 @@ public:
             setProfile(_vpbDatabase->_profile.get());
         }
 
-        osg::ref_ptr<const Profile> profile = getProfile();
-        if(profile.valid())
-        {
-            //Push back a single area that encompasses the whole profile going up to the max level
-            this->getDataExtents().push_back(DataExtent(profile->getExtent(), 0, _options.maxLevel().value()));
-        }
         return STATUS_OK;
     }
 

@@ -20,6 +20,7 @@
 #include <osgEarth/TileSource>
 #include <osgEarth/Registry>
 #include <osgEarth/StringUtils>
+#include <osgEarth/TimeControl>
 #include <osgEarth/URI>
 #include <osgDB/WriteFile>
 #include <osg/Version>
@@ -83,7 +84,7 @@ TerrainLayerOptions::getConfig( bool isolate ) const
     conf.updateIfSet( "loading_weight", _loadingWeight );
     conf.updateIfSet( "enabled", _enabled );
     conf.updateIfSet( "visible", _visible );
-    conf.updateIfSet( "edge_buffer_ratio", _edgeBufferRatio);
+    conf.updateIfSet( "edge_buffer_ratio", _edgeBufferRatio);    
     conf.updateIfSet( "reprojected_tilesize", _reprojectedTileSize);
 
     conf.updateIfSet( "vdatum", _vertDatum );
@@ -111,7 +112,7 @@ TerrainLayerOptions::fromConfig( const Config& conf )
     conf.getIfSet( "loading_weight", _loadingWeight );
     conf.getIfSet( "enabled", _enabled );
     conf.getIfSet( "visible", _visible );
-    conf.getIfSet( "edge_buffer_ratio", _edgeBufferRatio);
+    conf.getIfSet( "edge_buffer_ratio", _edgeBufferRatio);    
     conf.getIfSet( "reprojected_tilesize", _reprojectedTileSize);
 
     conf.getIfSet( "vdatum", _vertDatum );
@@ -277,7 +278,7 @@ TerrainLayer::getTileSource() const
             // a policy in the initialization options.
             if ( _tileSource.valid() && !_initOptions.cachePolicy().isSet() )
             {
-                CachePolicy hint = _tileSource->getCachePolicyHint();
+                CachePolicy hint = _tileSource->getCachePolicyHint( _targetProfileHint.get() );
 
                 if ( hint.usage().isSetTo(CachePolicy::USAGE_NO_CACHE) )
                 {
@@ -414,7 +415,7 @@ TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
                 {
                     // in cacheonly mode, create a profile from the first cache bin accessed
                     // (they SHOULD all be the same...)
-                    _profile = Profile::create( *meta._sourceProfile );
+                    _profile = Profile::create( *meta._sourceProfile );                    
                 }
             }
 
@@ -426,7 +427,7 @@ TerrainLayer::getCacheBin( const Profile* profile, const std::string& binId )
                 {
                     // no existing metadata; create some.
                     meta._cacheBinId    = binId;
-                    meta._sourceName    = this->getName();
+                    meta._sourceName    = this->getName();                    
                     meta._sourceDriver  = getTileSource()->getOptions().getDriver();
                     meta._sourceProfile = getProfile()->toProfileOptions();
                     meta._cacheProfile  = profile->toProfileOptions();
@@ -653,3 +654,8 @@ TerrainLayer::storeProxySettings(osgDB::Options* opt)
     }
 }
 
+SequenceControl*
+TerrainLayer::getSequenceControl()
+{
+    return dynamic_cast<SequenceControl*>( getTileSource() );
+}

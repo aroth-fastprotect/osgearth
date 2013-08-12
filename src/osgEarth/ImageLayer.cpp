@@ -23,6 +23,7 @@
 #include <osgEarth/ImageUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/StringUtils>
+#include <osgEarth/Progress>
 #include <osgEarth/URI>
 #include <osg/Version>
 #include <osgDB/WriteFile>
@@ -62,6 +63,7 @@ ImageLayerOptions::setDefaults()
     _minRange.init( -FLT_MAX );
     _maxRange.init( FLT_MAX );
     _lodBlending.init( false );
+    _featherPixels.init( false );
 }
 
 void
@@ -74,11 +76,13 @@ ImageLayerOptions::mergeConfig( const Config& conf )
 void
 ImageLayerOptions::fromConfig( const Config& conf )
 {
-    conf.getIfSet( "nodata_image", _noDataImageFilename );
-    conf.getIfSet( "opacity", _opacity );
-    conf.getIfSet( "min_range", _minRange );
-    conf.getIfSet( "max_range", _maxRange );
-    conf.getIfSet( "lod_blending", _lodBlending );
+    conf.getIfSet( "nodata_image",   _noDataImageFilename );
+    conf.getIfSet( "opacity",        _opacity );
+    conf.getIfSet( "min_range",      _minRange );
+    conf.getIfSet( "max_range",      _maxRange );
+    conf.getIfSet( "lod_blending",   _lodBlending );
+    conf.getIfSet( "shared",         _shared );
+    conf.getIfSet( "feather_pixels", _featherPixels);
 
     if ( conf.hasValue( "transparent_color" ) )
         _transparentColor = stringToColor( conf.value( "transparent_color" ), osg::Vec4ub(0,0,0,0));
@@ -95,11 +99,13 @@ ImageLayerOptions::getConfig( bool isolate ) const
 {
     Config conf = TerrainLayerOptions::getConfig( isolate );
 
-    conf.updateIfSet( "nodata_image", _noDataImageFilename );
-    conf.updateIfSet( "opacity", _opacity );
-    conf.updateIfSet( "min_range", _minRange );
-    conf.updateIfSet( "max_range", _maxRange );
-    conf.updateIfSet( "lod_blending", _lodBlending );
+    conf.updateIfSet( "nodata_image",   _noDataImageFilename );
+    conf.updateIfSet( "opacity",        _opacity );
+    conf.updateIfSet( "min_range",      _minRange );
+    conf.updateIfSet( "max_range",      _maxRange );
+    conf.updateIfSet( "lod_blending",   _lodBlending );
+    conf.updateIfSet( "shared",         _shared );
+    conf.updateIfSet( "feather_pixels", _featherPixels );
 
     if (_transparentColor.isSet())
         conf.update("transparent_color", colorToString( _transparentColor.value()));
@@ -164,12 +170,10 @@ ImageLayerTileProcessor::init(const ImageLayerOptions& options,
 
     if ( _options.noDataImageFilename().isSet() && !_options.noDataImageFilename()->empty() )
     {
-        URI noDataURI( *_options.noDataImageFilename() );
-        _noDataImage = noDataURI.getImage( dbOptions );
-        //_noDataImage = URI( *_options.noDataImageFilename() ).readImage(dbOptions).getImage();
+        _noDataImage = _options.noDataImageFilename()->getImage( dbOptions );
         if ( !_noDataImage.valid() )
         {
-            OE_WARN << "Failed to read nodata image from \"" << _options.noDataImageFilename().value() << "\"" << std::endl;
+            OE_WARN << "Failed to read nodata image from \"" << _options.noDataImageFilename()->full() << "\"" << std::endl;
         }
     }
 }
@@ -408,6 +412,11 @@ ImageLayer::createImageInNativeProfile( const TileKey& key, ProgressCallback* pr
         // find the intersection of keys.
         std::vector<TileKey> nativeKeys;
         nativeProfile->getIntersectingTiles(key.getExtent(), nativeKeys);
+
+
+        //OE_INFO << "KEY = " << key.str() << ":" << std::endl;
+        //for(int i=0; i<nativeKeys.size(); ++i)
+        //    OE_INFO << "    " << nativeKeys[i].str() << std::endl;
         
         // build a mosaic of the images from the native profile keys:
         bool foundAtLeastOneRealTile = false;
@@ -447,9 +456,12 @@ ImageLayer::createImageInNativeProfile( const TileKey& key, ProgressCallback* pr
                 mosaic.createImage(), 
                 GeoExtent( nativeProfile->getSRS(), rxmin, rymin, rxmax, rymax ) );
 
+#if 1
             return result;
 
-#if 0 // let's try this.
+#else // let's try this. why crop? Just leave it. Faster and more compatible with NPOT
+      // systems (like iOS)
+
             // calculate a tigher extent that matches the original input key:
             GeoExtent tightExtent = nativeProfile->clampAndTransformExtent( key.getExtent() );
 
@@ -699,6 +711,12 @@ ImageLayer::createImageFromTileSource(const TileKey&    key,
     {
         result = source->createImage( key, op.get(), progress );
     }
+
+    // Process images with full alpha to properly support MP blending.    
+    if ( result != 0L && *_runtimeOptions.featherPixels())
+    {
+        ImageUtils::featherAlphaRegions( result.get() );
+    }    
     
     // If image creation failed (but was not intentionally canceled),
     // blacklist this tile for future requests.
@@ -815,6 +833,12 @@ ImageLayer::assembleImageFromTileSource(const TileKey&    key,
             *_runtimeOptions.reprojectedTileSize(),
             *_runtimeOptions.reprojectedTileSize(),
             *_runtimeOptions.driver()->bilinearReprojection());
+    }
+
+    // Process images with full alpha to properly support MP blending.
+    if ( result.valid() && *_runtimeOptions.featherPixels() )
+    {
+        ImageUtils::featherAlphaRegions( result.getImage() );
     }
 
     return result;

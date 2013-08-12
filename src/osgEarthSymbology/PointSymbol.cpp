@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -51,10 +51,10 @@ PointSymbol::mergeConfig( const Config& conf )
 void
 PointSymbol::parseSLD(const Config& c, Style& style)
 {
-    if ( match(c.key(), "fill") ) {
+    if ( match(c.key(), "point-fill") ) {
         style.getOrCreate<PointSymbol>()->fill()->color() = Color(c.value());
     }
-    else if ( match(c.key(), "fill-opacity") ) {
+    else if ( match(c.key(), "point-fill-opacity") ) {
         style.getOrCreate<PointSymbol>()->fill()->color().a() = as<float>( c.value(), 1.0f );
     }
     else if ( match(c.key(), "point-size") ) {

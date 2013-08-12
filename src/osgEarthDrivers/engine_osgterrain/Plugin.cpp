@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -68,8 +68,14 @@ public:
 
     virtual ReadResult readNode(const std::string& uri, const Options* options) const
     {
+        static int s_tileCount = 0;
+        static osg::Timer_t s_startTime;
+
         if ( "osgearth_osgterrain_tile" == osgDB::getFileExtension(uri) )
         {
+            if ( s_tileCount == 0 )
+                s_startTime = osg::Timer::instance()->tick();
+
             // See if the filename starts with server: and strip it off.  This will trick OSG
             // into passing in the filename to our plugin instead of using the CURL plugin if
             // the filename contains a URL.  So, if you want to read a URL, you can use the

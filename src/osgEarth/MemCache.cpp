@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2012 Pelican Mapping
+ * Copyright 2008-2013 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,8 @@
 
 using namespace osgEarth;
 
+#define LC "[MemCacheBin] "
+
 //------------------------------------------------------------------------
 
 namespace
@@ -42,18 +44,24 @@ namespace
         ReadResult readObject(const std::string& key,
                               double             maxAge )
         {
-            MemCacheLRU::Record rec = _lru.get(key);
+            MemCacheLRU::Record rec;
+            _lru.get(key, rec);
 
             // clone required since the cache is in memory
 
             if ( rec.valid() )
             {
+                //OE_INFO << LC << "hits: " << _lru.getStats()._hitRatio*100.0f << "%" << std::endl;
+
                 return ReadResult( 
                    osg::clone(rec.value().first.get(), osg::CopyOp::DEEP_COPY_ALL),
                    rec.value().second );
             }
             else
+            {
+                //OE_INFO << LC << "hits: " << _lru.getStats()._hitRatio*100.0f << "%" << std::endl;
                 return ReadResult();
+            }
         }
 
         ReadResult readImage(const std::string& key,

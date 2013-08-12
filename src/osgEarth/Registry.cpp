@@ -57,7 +57,7 @@ _numGdalMutexGets   ( 0 ),
 _uidGen             ( 0 ),
 _caps               ( 0L ),
 _defaultFont        ( 0L ),
-_terrainEngineDriver( "quadtree" )
+_terrainEngineDriver( "mp" )
 {
     // set up GDAL and OGR.
     OGRRegisterAll();
@@ -77,7 +77,7 @@ _terrainEngineDriver( "quadtree" )
     _stateSetCache = new StateSetCache();
 
     // activate KMZ support
-    osgDB::Registry::instance()->addArchiveExtension  ( "kmz" );    
+    osgDB::Registry::instance()->addArchiveExtension  ( "kmz" );
     osgDB::Registry::instance()->addFileExtensionAlias( "kmz", "kml" );
 
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/vnd.google-earth.kml+xml", "kml" );
@@ -87,6 +87,7 @@ _terrainEngineDriver( "quadtree" )
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "application/json",                     "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/json",                            "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/x-json",                          "osgb" );
+    osgDB::Registry::instance()->addMimeTypeExtensionMapping( "image/jpg",                            "jpg" );
     
     // pre-load OSG's ZIP plugin so that we can use it in URIs
     std::string zipLib = osgDB::Registry::instance()->createLibraryNameForExtension( "zip" );
@@ -132,12 +133,6 @@ _terrainEngineDriver( "quadtree" )
         OE_INFO << LC << "NO-CACHE MODE set from environment variable" << std::endl;
     }
 
-    // set the default terrain engine driver from the environment
-#ifdef OSG_GLES2_AVAILABLE
-    // default to "quadtree" if we're on iOS/Android/GLES
-    _terrainEngineDriver = "quadtree";
-#endif
-
     const char* teStr = ::getenv("OSGEARTH_TERRAIN_ENGINE");
     if ( teStr )
     {
@@ -164,6 +159,8 @@ _terrainEngineDriver( "quadtree" )
 class SpatialReferenceCacheClear : public osgEarth::SpatialReference
 {
 public:
+    /// make VS11 happy
+    SpatialReferenceCacheClear() : osgEarth::SpatialReference(NULL) {}
     static void clear()
     {
         osgEarth::SpatialReference::getSRSCache().clear();
@@ -445,7 +442,7 @@ Registry::initCapabilities()
         _caps = new Capabilities();
 }
 
-ShaderFactory*
+const ShaderFactory*
 Registry::getShaderFactory() const
 {
     return _shaderLib.get();

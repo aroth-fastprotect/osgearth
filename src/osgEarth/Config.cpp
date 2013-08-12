@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -166,6 +166,7 @@ namespace
             {
                 Json::Value children( Json::arrayValue );
                 unsigned i = 0;
+
                 for( ConfigSet::const_iterator c = conf.children().begin(); c != conf.children().end(); ++c )
                 {
                     if ( c->isSimple() )
@@ -214,6 +215,12 @@ namespace
                 {
                     json2conf( value, conf );
                 }
+                else if ( value.isArray() )
+                {
+                    Config element( *i );
+                    json2conf( value, element );
+                    conf.add( element );
+                }
                 else
                 {
                     conf.add( *i, value.asString() );
@@ -232,7 +239,7 @@ namespace
         }
         else if ( json.type() != Json::nullValue )
         {
-            //conf.value() = json.asString();
+            conf.value() = json.asString();
         }
     }
 }

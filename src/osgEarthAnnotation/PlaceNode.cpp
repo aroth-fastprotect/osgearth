@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2012 Pelican Mapping
+* Copyright 2008-2013 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -195,7 +195,8 @@ PlaceNode::init()
 
     getAttachPoint()->addChild( _geode );
 
-    // for clamping
+    // for clamping and occlusion culling    
+    //OE_WARN << LC << "PlaceNode::applyStyle: " << _style.getConfig().toJSON(true) << std::endl;
     applyStyle( _style );
 
     setLightingIfNotSet( false );
@@ -230,7 +231,14 @@ PlaceNode::setText( const std::string& text )
         osgText::Text* d = dynamic_cast<osgText::Text*>( i->get() );
         if ( d )
         {
-            d->setText( text );
+			TextSymbol* symbol =  _style.getOrCreate<TextSymbol>();
+			osgText::String::Encoding text_encoding = osgText::String::ENCODING_UNDEFINED;
+			if ( symbol && symbol->encoding().isSet() )
+			{
+				text_encoding = AnnotationUtils::convertTextSymbolEncoding(symbol->encoding().value());
+			}
+
+            d->setText( text, text_encoding );
             break;
         }
     }

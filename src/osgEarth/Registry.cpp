@@ -149,6 +149,8 @@ _terrainEngineDriver( "mp" )
     {
 #ifdef WIN32
         _defaultFont = osgText::readFontFile("arial.ttf");
+#else
+        _defaultFont = osgText::readFontFile("ttf-dejavu/DejaVuSans.ttf");
 #endif
     }
 

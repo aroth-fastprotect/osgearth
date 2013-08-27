@@ -1,11 +1,6 @@
 SET(TARGET_SRC FeatureLabelModelSource.cpp)
-SET(TARGET_H FeatureLabelModelOptions)
+SET(TARGET_PUBLIC_H FeatureLabelModelOptions)
+
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarthSymbology)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/model_feature_label)
 SETUP_PLUGIN(osgearth_model_feature_label)
-
-
-# to install public driver includes:
-SET(LIB_NAME model_feature_label)
-SET(LIB_PUBLIC_HEADERS FeatureLabelModelOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

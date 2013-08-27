@@ -5,15 +5,10 @@ SET(TARGET_SRC
 
 SET(TARGET_H
     TileService
-    WMSOptions
 )
+SET(TARGET_PUBLIC_H WMSOptions)
 
-SET(TARGET_COMMON_LIBRARIES osgEarthUtil)
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthUtil)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/wms)
 
 SETUP_PLUGIN(osgearth_wms)
-
-# to install public driver includes:
-SET(LIB_NAME wms)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H} )
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

@@ -10,16 +10,11 @@ SET(TARGET_SRC
 )
 
 # headers to show in IDE
-SET(TARGET_H    
+SET(TARGET_PUBLIC_H    
     MBTilesOptions
 )
 
 SET(TARGET_LIBRARIES_VARS SQLITE3_LIBRARY)
 
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/mbtiles)
 SETUP_PLUGIN(osgearth_mbtiles)
-
-
-# to install public driver includes:
-SET(LIB_NAME mbtiles)
-SET(LIB_PUBLIC_HEADERS MBTilesOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

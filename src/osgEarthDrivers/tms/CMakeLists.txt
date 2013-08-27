@@ -1,15 +1,11 @@
 SET(TARGET_SRC
   ReaderWriterTMS.cpp
 )
-SET(TARGET_H
+SET(TARGET_PUBLIC_H
   TMSOptions
 )
-    
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthUtil)
+
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthUtil)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/tms)
 
 SETUP_PLUGIN(osgearth_tms)
-
-# to install public driver includes:
-SET(LIB_NAME tms)
-SET(LIB_PUBLIC_HEADERS TMSOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

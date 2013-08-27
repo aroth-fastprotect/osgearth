@@ -1,15 +1,9 @@
 SET(TARGET_SRC
     ReaderWriterTileService.cpp
 )
-SET(TARGET_H
+SET(TARGET_PUBLIC_H
     TileServiceOptions
 )
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/tileservice)
 
 SETUP_PLUGIN(osgearth_tileservice)
-
-
-# to install public driver includes:
-SET(LIB_NAME tileservice)
-SET(LIB_PUBLIC_HEADERS TileServiceOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

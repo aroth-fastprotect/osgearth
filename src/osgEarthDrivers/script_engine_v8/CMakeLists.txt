@@ -7,18 +7,13 @@ SET(TARGET_SRC
     JSWrappers.cpp
 )
 
-SET(TARGET_H
+SET(TARGET_PUBLIC_H
     JavascriptEngineV8
     JSWrappers
     V8Util
 )
-
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} ${V8_LIBRARY} osgEarthFeatures)
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthFeatures osgEarthSymbology)
+LIST(APPEND TARGET_LIBRARIES_VARS V8_LIBRARY)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/script_engine_v8)
 
 SETUP_PLUGIN(osgearth_scriptengine_javascript)
-
-# to install public driver includes:
-SET(LIB_NAME scriptengine_javascript)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H} )
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

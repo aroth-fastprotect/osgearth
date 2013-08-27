@@ -2,7 +2,7 @@ SET(TARGET_SRC
     FeatureStencilModelSource.cpp
 )
 
-SET(TARGET_H
+SET(TARGET_PUBLIC_H
     FeatureStencilModelOptions
 )
     
@@ -12,10 +12,8 @@ SET(TARGET_COMMON_LIBRARIES
     osgEarthSymbology
 )
 
+IF(MSVC)
+	SET(TARGET_LDFLAGS "/MANIFEST:NO")
+ENDIF()
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/model_feature_stencil)
 SETUP_PLUGIN(osgearth_model_feature_stencil)
-
-
-# to install public driver includes:
-SET(LIB_NAME model_feature_stencil)
-SET(LIB_PUBLIC_HEADERS FeatureStencilModelOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

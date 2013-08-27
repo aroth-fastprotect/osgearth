@@ -1,5 +1,3 @@
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES})
-
 SET(TARGET_SRC
         QSC.cpp
         Euler.cpp
@@ -13,7 +11,7 @@ SET(TARGET_SRC
         SeamlessPlugin.cpp
 )
 
-SET(TARGET_H
+SET(TARGET_PUBLIC_H 
         QSC
         Euler
         Patch
@@ -29,10 +27,6 @@ SET(TARGET_H
 
 INCLUDE_DIRECTORIES(${GDAL_INCLUDE_DIR})
 
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_seamless)
 # to install public driver includes:
 SETUP_PLUGIN(osgearth_engine_seamless)
-
-SET(LIB_NAME engine_seamless)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

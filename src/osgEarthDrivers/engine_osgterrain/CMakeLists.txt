@@ -1,5 +1,5 @@
 
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthSymbology)
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthSymbology osgTerrain osgGA)
 
 SET(TARGET_SRC
     KeyNodeFactory.cpp
@@ -18,7 +18,7 @@ SET(TARGET_SRC
     TileBuilder.cpp
 )
 
-SET(TARGET_H
+SET(TARGET_PUBLIC_H 
     Common
     CustomTerrainTechnique
     DynamicLODScaleCallback   
@@ -38,12 +38,6 @@ SET(TARGET_H
     Tile
     TileBuilder
     TransparentLayer
-)
-
+    )
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_osgterrain)
 SETUP_PLUGIN(osgearth_engine_osgterrain)
-
-# to install public driver includes:
-SET(LIB_NAME engine_osgterrain)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

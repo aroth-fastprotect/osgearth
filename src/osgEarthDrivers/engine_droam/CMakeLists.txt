@@ -13,6 +13,9 @@ SET(TARGET_SRC
 )
 
 SET(TARGET_H
+    AMRShaders.h
+	)
+SET(TARGET_PUBLIC_H
     Common
     CubeManifold
     Diamond
@@ -21,13 +24,8 @@ SET(TARGET_H
     Manifold
     MeshManager
     AMRGeometry
-    AMRShaders.h
-)
+	)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_droam)
 
 SETUP_PLUGIN(osgearth_engine_droam)
-
-# to install public driver includes:
-SET(LIB_NAME engine_droam)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
 

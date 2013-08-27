@@ -159,6 +159,8 @@ _terrainEngineDriver( "mp" )
     {
 #ifdef WIN32
         _defaultFont = osgText::readFontFile("arial.ttf");
+#else
+        _defaultFont = osgText::readFontFile("ttf-dejavu/DejaVuSans.ttf");
 #endif
     }
 
@@ -169,6 +171,8 @@ _terrainEngineDriver( "mp" )
 class SpatialReferenceCacheClear : public osgEarth::SpatialReference
 {
 public:
+    /// make VS11 happy
+    SpatialReferenceCacheClear() : osgEarth::SpatialReference(NULL) {}
     static void clear()
     {
         osgEarth::SpatialReference::getSRSCache().clear();

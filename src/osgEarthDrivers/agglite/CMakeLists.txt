@@ -3,14 +3,8 @@ SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthFeatures osgEarth
 
 SET(TARGET_SRC
 	AGGLiteRasterizerTileSource.cpp)
-	
-SET(TARGET_H
-	AGGLiteOptions
-)
+
+SET(TARGET_PUBLIC_H AGGLiteOptions)
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/agglite)
 
 SETUP_PLUGIN(osgearth_agglite)
-
-# to install public driver includes:
-SET(LIB_NAME agglite)
-SET(LIB_PUBLIC_HEADERS AGGLiteOptions)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

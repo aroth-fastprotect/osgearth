@@ -1,5 +1,5 @@
 
-SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthSymbology)
+LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthSymbology osgTerrain osgGA)
 
 SET(TARGET_SRC
     CustomPagedLOD.cpp
@@ -15,7 +15,7 @@ SET(TARGET_SRC
     TileModelFactory.cpp
 )
 
-SET(TARGET_H
+SET(TARGET_PUBLIC_H
     Common
     CustomPagedLOD
     DynamicLODScaleCallback
@@ -34,10 +34,5 @@ SET(TARGET_H
     TileModelFactory
 )
 
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_quadtree)
 SETUP_PLUGIN(osgearth_engine_quadtree)
-
-# to install public driver includes:
-SET(LIB_NAME engine_quadtree)
-SET(LIB_PUBLIC_HEADERS ${TARGET_H})
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
-

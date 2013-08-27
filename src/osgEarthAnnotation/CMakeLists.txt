@@ -4,12 +4,8 @@ ELSE (DYNAMIC_OSGEARTH)
     ADD_DEFINITIONS(-DOSGEARTHANNO_LIBRARY_STATIC)
 ENDIF(DYNAMIC_OSGEARTH)
 
-set(LIB_NAME osgEarthAnnotation)
-
-set(HEADER_PATH ${OSGEARTH_SOURCE_DIR}/include/${LIB_NAME})
-
-set(LIB_PUBLIC_HEADERS  
-    AnnotationSettings
+SET(TARGET_PUBLIC_H
+	AnnotationSettings
     AnnotationEditing
     AnnotationData
     AnnotationNode
@@ -30,12 +26,12 @@ set(LIB_PUBLIC_HEADERS
     ModelNode
     OrthoNode
     PlaceNode
-    RectangleNode
+	RectangleNode
     ScaleDecoration
     TrackNode
 )
 
-set(LIB_COMMON_FILES
+SET(TARGET_SRC
     AnnotationEditing.cpp
     AnnotationSettings.cpp
     AnnotationData.cpp
@@ -59,45 +55,36 @@ set(LIB_COMMON_FILES
     TrackNode.cpp
 )
 
-if( NOT ${OPENSCENEGRAPH_VERSION} VERSION_LESS "2.9.6" )
-
-    set(LIB_PUBLIC_HEADERS ${LIB_PUBLIC_HEADERS}
-        AnnotationEditing
-        FeatureEditing
-        ImageOverlayEditor
-    )
-        
-    set(LIB_COMMON_FILES ${LIB_COMMON_FILES} 
-        AnnotationEditing.cpp
-        FeatureEditing.cpp
-        ImageOverlayEditor.cpp
-    )
-        
-endif()
-
-
-ADD_LIBRARY( ${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
-    ${LIB_PUBLIC_HEADERS}  
-    ${LIB_COMMON_FILES}
+LIST(APPEND TARGET_PUBLIC_H
+	AnnotationEditing
+	FeatureEditing
+	ImageOverlayEditor
+)
+    
+LIST(APPEND TARGET_SRC
+	AnnotationEditing.cpp
+	FeatureEditing.cpp
+    ImageOverlayEditor.cpp
 )
 
+INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})
 
-
-INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR} ${GDAL_INCLUDE_DIR})
-
-IF (WIN32)
-  LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
-ELSE(WIN32)
-  LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
-ENDIF(WIN32)
-
-LINK_INTERNAL(${LIB_NAME}
+SET(TARGET_ADDED_LIBRARIES
     osgEarth
     osgEarthFeatures
     osgEarthSymbology
-)
+    osg
+    osgUtil
+    osgSim
+    osgTerrain
+    osgDB
+    osgFX
+    osgViewer
+    osgWidget
+	osgText
+	osgGA
+	osgManipulator
+    OpenThreads
+    )
 
-LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGTERRAIN_LIBRARY OSGDB_LIBRARY OSGFX_LIBRARY OSGMANIPULATOR_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OPENTHREADS_LIBRARY GDAL_LIBRARY)
-LINK_CORELIB_DEFAULT(${LIB_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
-
-INCLUDE(ModuleInstall OPTIONAL)
+SETUP_OSG_LIB(osgEarthAnnotation)

@@ -4,6 +4,8 @@ SET(TARGET_SRC ElevationProxyImageLayer.cpp
                OceanSurfaceContainer.cpp
                ReaderWriterOceanSurface.cpp
 )
+
+SET(TARGET_PUBLIC_H OceanSurface)
                
 SET(TARGET_H   ElevationProxyImageLayer
                OceanCompositor
@@ -13,10 +15,5 @@ SET(TARGET_H   ElevationProxyImageLayer
 )
 
 SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthSymbology)
-
+SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/ocean_surface)
 SETUP_PLUGIN(osgearth_ocean_surface)
-
-# to install public driver includes:
-SET(LIB_NAME ocean_surface)
-SET(LIB_PUBLIC_HEADERS OceanSurface)
-INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)

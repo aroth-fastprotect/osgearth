@@ -38,8 +38,8 @@ SET(TARGET_PUBLIC_H
     SpatialData
     StarData
     TerrainProfile
-	TileIndex
-	TileIndexBuilder
+    TileIndex
+    TileIndexBuilder
     TFS
     TFSPackager
     TMS
@@ -62,7 +62,7 @@ SET(TARGET_SRC
     Controls.cpp
     ContourMap.cpp
     DataScanner.cpp
-    DateTime.cpp
+    #DateTime.cpp #moved to osgEarth namespace
     DetailTexture.cpp
     EarthManipulator.cpp
     ExampleResources.cpp
@@ -84,8 +84,8 @@ SET(TARGET_SRC
     SpatialData.cpp
     SkyNode.cpp
     TerrainProfile.cpp
-	TileIndex.cpp
-	TileIndexBuilder.cpp
+    TileIndex.cpp
+    TileIndexBuilder.cpp
     TFS.cpp
     TFSPackager.cpp
     TMS.cpp

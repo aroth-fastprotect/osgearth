@@ -384,13 +384,14 @@ HTTPClient::initializeImpl()
     curl_easy_setopt( _curl_handle, CURLOPT_FOLLOWLOCATION, (void*)1 );
     curl_easy_setopt( _curl_handle, CURLOPT_MAXREDIRS, (void*)5 );
     curl_easy_setopt( _curl_handle, CURLOPT_PROGRESSFUNCTION, &CurlProgressCallback);
-    curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);    
+    curl_easy_setopt( _curl_handle, CURLOPT_NOPROGRESS, (void*)0 ); //FALSE);
+    curl_easy_setopt( _curl_handle, CURLOPT_FILETIME, true );
     curl_easy_setopt( _curl_handle, CURLOPT_MAX_SEND_SPEED_LARGE, limitRateSend );
     curl_easy_setopt( _curl_handle, CURLOPT_MAX_RECV_SPEED_LARGE, limitRateRecv );
     // don't let curl install any signal handlers which cause serious trouble in multi-thread environments.
     // see http://stackoverflow.com/questions/9191668/error-longjmp-causes-uninitialized-stack-frame
     curl_easy_setopt( _curl_handle, CURLOPT_NOSIGNAL, 1);
-    
+
     long timeout = s_timeout;
     const char* timeoutEnv = getenv("OSGEARTH_HTTP_TIMEOUT");
     if (timeoutEnv)
@@ -697,7 +698,7 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
         }
     }
 
-    const char* proxyEnvAuth = getenv("OSGEARTH_CURL_PROXYAUTH");	
+    const char* proxyEnvAuth = getenv("OSGEARTH_CURL_PROXYAUTH");
     if (proxyEnvAuth)
     {
         proxy_auth = std::string(proxyEnvAuth);
@@ -844,15 +845,12 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
             << request.getURL() << "\"" << std::endl;
     }
 
-
-    if ( /*response_code == 200L &&*/ res != CURLE_ABORTED_BY_CALLBACK && res != CURLE_OPERATION_TIMEDOUT )
+    // upon success, parse the data:
+    if ( res != CURLE_ABORTED_BY_CALLBACK && res != CURLE_OPERATION_TIMEDOUT )
     {
-        // check for multipart content:
-        //char* content_type_cp;
-        //curl_easy_getinfo( _curl_handle, CURLINFO_CONTENT_TYPE, &content_type_cp );
-
         std::string content_type( content_type_cp );
 
+        // check for multipart content
         if (response._mimeType.length() > 9 && 
             ::strstr( response._mimeType.c_str(), "multipart" ) == response._mimeType.c_str() )
         {
@@ -865,7 +863,6 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
         {
             // store headers that we care about
             part->_headers[IOMetadata::CONTENT_TYPE] = response._mimeType;
-
             response._parts.push_back( part.get() );
         }
     }
@@ -874,14 +871,6 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
         //If we were aborted by a callback, then it was cancelled by a user
         response._cancelled = true;
     }
-
-    // Store the mime-type, if any. (Note: CURL manages the buffer returned by
-    // this call.)
-    //char* ctbuf = NULL;
-    //if ( curl_easy_getinfo(_curl_handle, CURLINFO_CONTENT_TYPE, &ctbuf) == 0 && ctbuf )
-    //{
-    //    response._mimeType = ctbuf;
-    //}
 
     return response;
 }
@@ -999,6 +988,11 @@ HTTPClient::doReadImage(const std::string&    location,
                 result = ReadResult(ReadResult::RESULT_READER_ERROR);
             }
         }
+        
+        // last-modified (file time)
+        TimeStamp filetime;
+        if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
+          result.setLastModifiedTime( filetime );
     }
     else
     {
@@ -1062,6 +1056,11 @@ HTTPClient::doReadNode(const std::string&    location,
                 result = ReadResult(ReadResult::RESULT_READER_ERROR);
             }
         }
+        
+        // last-modified (file time)
+        TimeStamp filetime;
+        if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
+          result.setLastModifiedTime( filetime );
     }
     else
     {
@@ -1121,6 +1120,11 @@ HTTPClient::doReadObject(const std::string&    location,
                 result = ReadResult(ReadResult::RESULT_READER_ERROR);
             }
         }
+        
+        // last-modified (file time)
+        TimeStamp filetime;
+        if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
+          result.setLastModifiedTime( filetime );
     }
     else
     {
@@ -1188,6 +1192,11 @@ HTTPClient::doReadString(const std::string&    location,
             }
         }
     }
+
+    // last-modified (file time)
+    TimeStamp filetime;
+    if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
+      result.setLastModifiedTime( filetime );
 
     return result;
 }

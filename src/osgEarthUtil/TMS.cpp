@@ -70,8 +70,9 @@ _maxY(0.0),
 _minLevel(0),
 _maxLevel(0),
 _numTilesWide(-1),
-_numTilesHigh(-1)
-{
+_numTilesHigh(-1),
+_timestamp(0)
+{   
 }
 
 void TileMap::setOrigin(double x, double y)

@@ -840,9 +840,13 @@ HTTPClient::doGet( const HTTPRequest& request, const osgDB::Options* options, Pr
 
     if ( s_HTTP_DEBUG )
     {
+        TimeStamp filetime = 0;
+        if (CURLE_OK != curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime))
+            filetime = 0;
+
         OE_NOTICE << LC 
             << "GET(" << response_code << ", " << response._mimeType << ") : \"" 
-            << request.getURL() << "\"" << std::endl;
+            << request.getURL() << "\" (" << DateTime(filetime).asRFC1123() << ")"<< std::endl;
     }
 
     // upon success, parse the data:
@@ -990,9 +994,11 @@ HTTPClient::doReadImage(const std::string&    location,
         }
         
         // last-modified (file time)
-        TimeStamp filetime;
+        TimeStamp filetime = 0;
         if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
-          result.setLastModifiedTime( filetime );
+        {
+            result.setLastModifiedTime( filetime );
+        }
     }
     else
     {
@@ -1058,9 +1064,11 @@ HTTPClient::doReadNode(const std::string&    location,
         }
         
         // last-modified (file time)
-        TimeStamp filetime;
+        TimeStamp filetime = 0;
         if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
-          result.setLastModifiedTime( filetime );
+        {
+            result.setLastModifiedTime( filetime );
+        }
     }
     else
     {
@@ -1122,9 +1130,11 @@ HTTPClient::doReadObject(const std::string&    location,
         }
         
         // last-modified (file time)
-        TimeStamp filetime;
+        TimeStamp filetime = 0;
         if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
-          result.setLastModifiedTime( filetime );
+        {
+            result.setLastModifiedTime( filetime );
+        }
     }
     else
     {
@@ -1194,9 +1204,11 @@ HTTPClient::doReadString(const std::string&    location,
     }
 
     // last-modified (file time)
-    TimeStamp filetime;
+    TimeStamp filetime = 0;
     if ( CURLE_OK == curl_easy_getinfo(_curl_handle, CURLINFO_FILETIME, &filetime) )
-      result.setLastModifiedTime( filetime );
+    {
+        result.setLastModifiedTime( filetime );
+    }
 
     return result;
 }

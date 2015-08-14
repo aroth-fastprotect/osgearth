@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -47,8 +47,7 @@ osgEarth::TileSource::Status WCS11Source::initialize(const osgDB::Options* dbOpt
 {        
     //TODO: fetch GetCapabilities and set profile from there.
     setProfile( osgEarth::Registry::instance()->getGlobalGeodeticProfile() );
-    _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );
-    CachePolicy::NO_CACHE.apply( _dbOptions.get() );
+    _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );    
 
     return STATUS_OK;
 }
@@ -185,13 +184,10 @@ WCS11Source::createRequest( const TileKey& key ) const
     //    buf << lat_min << "," << lon_min << "," << lat_max << "," << lon_max;
     //buf << ",urn:ogc:def:crs:EPSG::4326";
 
-    double halfLon = lon_interval/2.0;
-    double halfLat = lat_interval/2.0;
-
-    //We need to shift the bounding box out by half a pixel in all directions so that the center of the edge pixels lie on
-    //the edge of this TileKey's extents.  Doing this makes neighboring tiles have the same elevation values so there is no need
-    //to run the tile edge normalization code.
-    buf << lon_min - halfLon << "," << lat_min - halfLat << "," << lon_max + halfLon << "," << lat_max + halfLat << ",EPSG:4326";
+    // there used to be code here to shift the bounding box out by half a pixel in all directions to make sure that neighboring tiles
+    // would have the same elevation values. WCS 1.1, however, samples at the edges of the bounding box, so shifting the bounding box
+    // will produce values that don't match up.
+    buf << lon_min << "," << lat_min << "," << lon_max << "," << lat_max << ",EPSG:4326";
 	std::string bufStr;
 	bufStr = buf.str();
     req.addParameter( "BOUNDINGBOX", bufStr );

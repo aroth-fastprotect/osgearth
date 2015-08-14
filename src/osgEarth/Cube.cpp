@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -299,6 +299,10 @@ _face(face)
     //NOP
 }
 
+CubeFaceLocator::~CubeFaceLocator()
+{
+}
+
 
 bool
 CubeFaceLocator::convertLocalToModel( const osg::Vec3d& local, osg::Vec3d& world ) const
@@ -314,7 +318,8 @@ CubeFaceLocator::convertLocalToModel( const osg::Vec3d& local, osg::Vec3d& world
         osg::Vec3d faceCoord = local * _transform;
 
         double lat_deg, lon_deg;
-        CubeUtils::faceCoordsToLatLon( faceCoord.x(), faceCoord.y(), _face, lat_deg, lon_deg );
+        if ( !CubeUtils::faceCoordsToLatLon( faceCoord.x(), faceCoord.y(), _face, lat_deg, lon_deg ))
+            return false;
 
         //OE_NOTICE << "LatLon=" << latLon <<  std::endl;
 
@@ -357,11 +362,12 @@ CubeFaceLocator::convertModelToLocal(const osg::Vec3d& world, osg::Vec3d& local)
 
             if (!success)
             {
-                OE_NOTICE << LC << "Couldn't convert to face coords " << std::endl;
+                OE_WARN << LC << "Couldn't convert to face coords " << std::endl;
+                return false;
             }
             if ((unsigned)face != _face)
             {
-                OE_NOTICE << LC
+                OE_WARN << LC
                     << "Face should be " << _face << " but is " << face
                     << ", lat = " << lat_deg
                     << ", lon = " << lon_deg
@@ -390,9 +396,13 @@ CubeFaceLocator::convertModelToLocal(const osg::Vec3d& world, osg::Vec3d& local)
 CubeSpatialReference::CubeSpatialReference( void* handle ) :
 SpatialReference( handle, "OSGEARTH" )
 {
-    //nop
-    _key.first = "unified-cube";
-    _name      = "Unified Cube";
+    _key.horiz      = "unified-cube";
+    _key.horizLower = "unified-cube";
+    _name           = "Unified Cube";
+}
+
+CubeSpatialReference::~CubeSpatialReference()
+{
 }
 
 void
@@ -402,10 +412,16 @@ CubeSpatialReference::_init()
 
     _is_user_defined = true;
     _is_cube         = true;
-    _is_contiguous  = false;
-    _is_geographic  = false;
-    _key.first      = "unified-cube";
-    _name           = "Unified Cube";
+    _is_contiguous   = false;
+    _is_geographic   = false;
+    _key.horiz       = "unified-cube";
+    _key.horizLower  = "unified-cube";
+    _name            = "Unified Cube";
+
+    // Custom units. The big number there roughly converts [0..1] to meters
+    // on a spheroid with WGS84-ish radius. Not perfect but close enough for
+    // the purposes of this class
+    _units = Units("Cube face", "cube", Units::TYPE_LINEAR, 42949672.96/4.0);
 }
 
 GeoLocator*
@@ -428,7 +444,7 @@ CubeSpatialReference::createLocator(double xmin, double ymin, double xmax, doubl
     return result;
 }
 
-bool
+const SpatialReference*
 CubeSpatialReference::preTransform( std::vector<osg::Vec3d>& points ) const
 {
     for( unsigned i=0; i<points.size(); ++i )
@@ -440,7 +456,7 @@ CubeSpatialReference::preTransform( std::vector<osg::Vec3d>& points ) const
         if ( !CubeUtils::cubeToFace( p.x(), p.y(), face ) )
         {
             OE_WARN << LC << "Failed to convert (" << p.x() << "," << p.y() << ") into face coordinates." << std::endl;
-            return false;
+            return 0L;
         }
 
         double lat_deg, lon_deg;
@@ -452,15 +468,15 @@ CubeSpatialReference::preTransform( std::vector<osg::Vec3d>& points ) const
                 << "Could not transform face coordinates ["
                 << p.x() << ", " << p.y() << ", " << face << "] to lat lon"
                 << std::endl;
-            return false;
+            return 0L;
         }
         p.x() = lon_deg;
         p.y() = lat_deg;
     }
-    return true;
+    return getGeodeticSRS();
 }
 
-bool
+const SpatialReference*
 CubeSpatialReference::postTransform( std::vector<osg::Vec3d>& points) const
 {
     for( unsigned i=0; i<points.size(); ++i )
@@ -480,7 +496,7 @@ CubeSpatialReference::postTransform( std::vector<osg::Vec3d>& points) const
                 << "Could not transform lat long ["
                 << p.y() << ", " << p.x() << "] coordinates to face" 
                 << std::endl;
-            return false;
+            return 0L;
         }
 
         //TODO: what to do about boundary points?
@@ -488,13 +504,13 @@ CubeSpatialReference::postTransform( std::vector<osg::Vec3d>& points) const
         if ( !CubeUtils::faceToCube( out_x, out_y, face ) )
         {
             OE_WARN << LC << "fromFace(" << out_x << "," << out_y << "," << face << ") failed" << std::endl;
-            return false;
+            return 0L;
         }
         
         p.x() = out_x;
         p.y() = out_y;
     }
-    return true;
+    return getGeodeticSRS();
 }
 
 #define LL 0
@@ -684,13 +700,13 @@ UnifiedCubeProfile::transformGcsExtentOnFace( const GeoExtent& gcsExtent, int fa
 }
 
 void
-UnifiedCubeProfile::getIntersectingTiles(
-    const GeoExtent& remoteExtent,
-    std::vector<TileKey>& out_intersectingKeys ) const
+UnifiedCubeProfile::getIntersectingTiles(const GeoExtent&      remoteExtent,
+                                         unsigned              localLOD,
+                                         std::vector<TileKey>& out_intersectingKeys ) const
 {
-    if ( getSRS()->isEquivalentTo( remoteExtent.getSRS() ) )
+    if ( getSRS()->isHorizEquivalentTo( remoteExtent.getSRS() ) )
     {
-        addIntersectingTiles( remoteExtent, out_intersectingKeys );
+        addIntersectingTiles( remoteExtent, localLOD, out_intersectingKeys );
     }
     else
     {
@@ -710,8 +726,19 @@ UnifiedCubeProfile::getIntersectingTiles(
             if ( partExtent_gcs.isValid() )
             {
                 GeoExtent partExtent = transformGcsExtentOnFace( partExtent_gcs, face );
-                addIntersectingTiles( partExtent, out_intersectingKeys );
+                addIntersectingTiles( partExtent, localLOD, out_intersectingKeys );
             }
-        }
+        }        
     }
+}
+
+unsigned
+UnifiedCubeProfile::getEquivalentLOD(const Profile* rhsProfile, unsigned rhsLOD) const
+{    
+    return rhsLOD;
+}
+
+
+UnifiedCubeProfile::~UnifiedCubeProfile()
+{
 }

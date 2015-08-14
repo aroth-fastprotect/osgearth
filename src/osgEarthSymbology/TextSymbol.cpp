@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -21,6 +24,29 @@
 
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
+
+OSGEARTH_REGISTER_SIMPLE_SYMBOL(text, TextSymbol);
+
+TextSymbol::TextSymbol(const TextSymbol& rhs,const osg::CopyOp& copyop):
+Symbol(rhs, copyop),
+_fill(rhs._fill),
+_halo(rhs._halo),
+_haloOffset(rhs._haloOffset),
+_font(rhs._font),
+_size(rhs._size),
+_content(rhs._content),
+_priority(rhs._priority),
+_removeDuplicateLabels(rhs._removeDuplicateLabels),
+_pixelOffset(rhs._pixelOffset),
+_provider(rhs._provider),
+_encoding(rhs._encoding),
+_alignment(rhs._alignment),
+_layout(rhs._layout),
+_declutter(rhs._declutter),
+_occlusionCull(rhs._occlusionCull),
+_occlusionCullAltitude(rhs._occlusionCullAltitude)
+{
+}
 
 TextSymbol::TextSymbol( const Config& conf ) :
 Symbol                ( conf ),
@@ -49,7 +75,7 @@ TextSymbol::getConfig() const
     conf.addObjIfSet( "halo", _halo );
     conf.addIfSet( "halo_offset", _haloOffset );
     conf.addIfSet( "font", _font );
-    conf.addIfSet( "size", _size );
+    conf.addObjIfSet( "size", _size );
     conf.addObjIfSet( "content", _content );
     conf.addObjIfSet( "priority", _priority );
     conf.addIfSet( "remove_duplicate_labels", _removeDuplicateLabels );
@@ -101,7 +127,7 @@ TextSymbol::mergeConfig( const Config& conf )
     conf.getObjIfSet( "halo", _halo );
     conf.getIfSet( "halo_offset", _haloOffset );
     conf.getIfSet( "font", _font );
-    conf.getIfSet( "size", _size );
+    conf.getObjIfSet( "size", _size );
     conf.getObjIfSet( "content", _content );
     conf.getObjIfSet( "priority", _priority );
     conf.getIfSet( "remove_duplicate_labels", _removeDuplicateLabels );
@@ -155,7 +181,7 @@ TextSymbol::parseSLD(const Config& c, Style& style)
         style.getOrCreate<TextSymbol>()->fill()->color().a() = as<float>( c.value(), 1.0f );
     }
     else if ( match(c.key(), "text-size") ) {
-        style.getOrCreate<TextSymbol>()->size() = as<float>(c.value(), 32.0f);
+        style.getOrCreate<TextSymbol>()->size() = NumericExpression( c.value() );
     }
     else if ( match(c.key(), "text-font") ) {
         style.getOrCreate<TextSymbol>()->font() = c.value();
@@ -243,5 +269,8 @@ TextSymbol::parseSLD(const Config& c, Style& style)
     }
     else if ( match(c.key(), "text-occlusion-cull-altitude") ) {
         style.getOrCreate<TextSymbol>()->occlusionCullAltitude() = as<double>(c.value(), 200000.0);
+    }
+    else if ( match(c.key(), "text-script") ) {
+        style.getOrCreate<TextSymbol>()->script() = StringExpression(c.value());
     }
 }

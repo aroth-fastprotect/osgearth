@@ -17,37 +17,23 @@ Common Usage
 How do I place a 3D model on the map?
 .....................................
 
-    One way to position a 3D model is to use the ``ModelNode``. Here is the basic idea::
+    The ``osgEarth::GeoTransform`` class inherits from ``osg::Transform``
+    and will convert map coordinates into OSG world coordinates for you::
 
-        using namespace osgEarth;
-        using namespace osgEarth::Symbology;
+        GeoTransform* xform = new GeoTransform();
         ...
+        xform->setTerrain( mapNode->getTerrain() );
+        ...
+        GeoPoint point(srs, -121.0, 34.0, 1000.0, ALTMODE_ABSOLUTE);
+        xform->setPosition(point);
 
-        // load your model:
-        osg::Node* myModel = osgDB::readNodeFile(...);
-        
-        // establish the coordinate system you wish to use:
-        const SpatialReference* latLong = SpatialReference::get("wgs84");
-        
-        // construct your symbology:
-        Style style;
-        style.getOrCreate<ModelSymbol>()->setModel( myModel );
-        
-        // make a ModelNode:
-        ModelNode* model = new ModelNode( mapNode, style );
-        
-        // Set its location.
-        model->setPosition( GeoPoint(latLong, -121.0, 34.0, 1000.0, ALTMODE_ABSOLUTE) );
-
-    If you just want to make a ``osg::Matrix`` so you can position a model using your own 
-    ``osg::MatrixTransform``, you can use the ``GeoPoint`` class like so::
+    A lower-level approach is to make a ``osg::Matrix`` so you can position
+    a model using your own ``osg::MatrixTransform``::
     
         GeoPoint point(latLong, -121.0, 34.0, 1000.0, ALTMODE_ABSOLUTE);
         osg::Matrix matrix;
         point.createLocalToWorld( matrix );
         myMatrixTransform->setMatrix( matrix );
-
-    Look at the ``osgearth_annotation.cpp`` sample for more inspiration.
     
 
 How do make the terrain transparent?
@@ -64,7 +50,7 @@ How do make the terrain transparent?
     In code, this option is found in the ``MPTerrainEngineOptions`` class::
     
         #include <osgEarthDrivers/engine_mp/MPTerrainEngineOptions>
-        using namespace osgEarth::Drivers;
+        using namespace osgEarth::Drivers::MPTerrainEngine;
         ...
         MPTerrainEngineOptions options;
         options.color() = osg::Vec4(1,1,1,0);
@@ -80,7 +66,7 @@ How do I set the resolution of terrain tiles?
     If you do have elevation data, osgEarth will use the tile size of the first elevation layer 
     to decide on the overall tile size for the terrain.
 
-    You can cotnrol this in a couple ways. If you have elevation data, you can set the
+    You can control this in a couple ways. If you have elevation data, you can set the
     ``tile_size`` property on the elevation layer. For example::
     
         <elevation name="srtm" driver="gdal">
@@ -96,8 +82,9 @@ How do I set the resolution of terrain tiles?
 
         <map>
             <options>
-                <elevation_tile_size>31</elevation_tile_size>
-                ...
+                <terrain>
+                    <tile_size>32</tile_size> 
+                    ...
 
 
 ----
@@ -135,7 +122,7 @@ Does osgEarth work with VirtualPlanetBuilder?
 Can osgEarth load TerraPage or MetaFlight?
 ..........................................
 
-	osgEarth cannot natively load TerraPage (TXP) or MetaFlight. However, osgEarth does have a
+	osgEarth cannot load TerraPage (TXP) or MetaFlight. However, osgEarth does have a
 	"bring your own terrain" plugin that allows you to load an external model and use it as your
 	terrain. The caveat is that since osgEarth doesn't know anything about your terrain model, you
 	will not be able to use some of the features of osgEarth (like being able to add or remove layers).

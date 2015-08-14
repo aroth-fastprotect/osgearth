@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,9 +17,12 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/Utils>
+#include <osgEarth/ECEF>
+#include <osgEarth/CullingUtils>
 #include <osg/Version>
 #include <osg/CoordinateSystemNode>
 #include <osg/MatrixTransform>
+#include <osgUtil/MeshOptimizers>
 
 using namespace osgEarth;
 
@@ -36,30 +39,13 @@ void osgEarth::removeEventHandler(osgViewer::View* view, osgGA::GUIEventHandler*
 
 //------------------------------------------------------------------------
 
-void
-DoNotComputeNearFarCullCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
-{
-    osgUtil::CullVisitor* cv = static_cast< osgUtil::CullVisitor*>( nv );
-    osg::CullSettings::ComputeNearFarMode oldMode;
-    if( cv )
-    {
-        oldMode = cv->getComputeNearFarMode();
-        cv->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
-    }
-    traverse(node, nv);
-    if( cv )
-    {
-        cv->setComputeNearFarMode(oldMode);
-    }
-}
-
-//------------------------------------------------------------------------
-
 #undef LC
 #define LC "[PixelAutoTransform] "
 
 PixelAutoTransform::PixelAutoTransform() :
-osg::AutoTransform()
+osg::AutoTransform         (),
+_rotateInScreenSpace       ( false ),
+_screenSpaceRotationRadians( 0.0 )
 {
     // deactivate culling for the first traversal. We will reactivate it later.
     setCullingActive( false );
@@ -74,24 +60,24 @@ PixelAutoTransform::accept( osg::NodeVisitor& nv )
     {
         // re-activate culling now that the first cull traversal has taken place.
         this->setCullingActive( true );
-        osg::CullStack* cs = dynamic_cast<osg::CullStack*>(&nv);
-        if ( cs )
+        osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
+        if ( cv )
         {
             osg::Viewport::value_type width  = _previousWidth;
             osg::Viewport::value_type height = _previousHeight;
 
-            osg::Viewport* viewport = cs->getViewport();
+            osg::Viewport* viewport = cv->getViewport();
             if (viewport)
             {
                 width = viewport->width();
                 height = viewport->height();
             }
 
-            osg::Vec3d eyePoint = cs->getEyeLocal(); 
-            osg::Vec3d localUp = cs->getUpLocal(); 
+            osg::Vec3d eyePoint = cv->getEyeLocal(); 
+            osg::Vec3d localUp = cv->getUpLocal(); 
             osg::Vec3d position = getPosition();
 
-            const osg::Matrix& projection = *(cs->getProjectionMatrix());
+            const osg::Matrix& projection = *(cv->getProjectionMatrix());
 
             bool doUpdate = _firstTimeToInitEyePoint || _dirty;
             if ( !_firstTimeToInitEyePoint )
@@ -127,7 +113,7 @@ PixelAutoTransform::accept( osg::NodeVisitor& nv )
                         getNumChildren() > 0 ? getChild(0)->getBound().radius() : 
                         0.48;
 
-                    double pixels = cs->pixelSize( getPosition(), radius );
+                    double pixels = cv->pixelSize( getPosition(), radius );
 
                     double scaledMinPixels = _minPixels * _minimumScale;
                     double scale = pixels < scaledMinPixels ? scaledMinPixels / pixels : 1.0;
@@ -147,14 +133,69 @@ PixelAutoTransform::accept( osg::NodeVisitor& nv )
                 _matrixDirty = true;
             }
 
-            if (_autoRotateMode==ROTATE_TO_SCREEN)
+            if (_rotateInScreenSpace==true)
+            {
+                osg::Vec3d translation, scale;
+                osg::Quat  rotation, so;
+                osg::RefMatrix& mvm = *(cv->getModelViewMatrix());
+
+                mvm.decompose( translation, rotation, scale, so );
+
+                // this will rotate the object into screen space.
+                osg::Quat toScreen( rotation.inverse() );
+
+                // we need to compensate for the "heading" of the camera, so compute that.
+                // From (http://goo.gl/9bjM4t).
+                // GEOCENTRIC ONLY!
+
+                const osg::Matrixd& view = cv->getCurrentCamera()->getViewMatrix();
+                osg::Matrixd viewInverse;
+                viewInverse.invert(view);
+
+                osg::Vec3d N(0, 0, 6356752); // north pole, more or less
+                osg::Vec3d b( -view(0,2), -view(1,2), -view(2,2) ); // look vector
+                osg::Vec3d E = osg::Vec3d(0,0,0)*viewInverse;
+                osg::Vec3d u = E; u.normalize();
+
+                // account for looking straight downish
+                if ( osg::equivalent(b*u, -1.0, 1e-4) )
+                {
+                    // up vec becomes the look vec.
+                    b = osg::Matrixd::transform3x3(view, osg::Vec3f(0.0,1.0,0.0));
+                    b.normalize();
+                }
+
+                osg::Vec3d proj_d = b - u*(b*u);
+                osg::Vec3d n = N - E;
+                osg::Vec3d proj_n = n - u*(n*u);
+                osg::Vec3d proj_e = proj_n^u;
+
+                double cameraHeading = atan2(proj_e*proj_d, proj_n*proj_d);
+
+                //OE_NOTICE << "h=" << osg::RadiansToDegrees(cameraHeading) << std::endl;
+
+                while (cameraHeading < 0.0)
+                    cameraHeading += osg::PI*2.0;
+                double objHeading = _screenSpaceRotationRadians;
+                while ( objHeading < 0.0 )
+                    objHeading += osg::PI*2.0;
+                double finalRot = cameraHeading - objHeading;
+                while( finalRot > osg::PI )
+                    finalRot -= osg::PI*2.0;
+
+                osg::Quat toRotation( finalRot, osg::Vec3(0,0,1) );
+
+                setRotation( toRotation * toScreen );
+            }
+
+            else if (_autoRotateMode==ROTATE_TO_SCREEN)
             {
                 osg::Vec3d translation;
                 osg::Quat rotation;
                 osg::Vec3d scale;
                 osg::Quat so;
 
-                cs->getModelViewMatrix()->decompose( translation, rotation, scale, so );
+                cv->getModelViewMatrix()->decompose( translation, rotation, scale, so );
 
                 setRotation(rotation.inverse());
             }
@@ -168,7 +209,6 @@ PixelAutoTransform::accept( osg::NodeVisitor& nv )
                 setRotation(q);
             }
 
-#if OSG_MIN_VERSION_REQUIRED(3,0,0)
             else if (_autoRotateMode==ROTATE_TO_AXIS)
             {
                 osg::Matrix matrix;
@@ -243,15 +283,17 @@ PixelAutoTransform::accept( osg::NodeVisitor& nv )
                 q.set(matrix);
                 setRotation(q);
             }
-#endif
 
             _dirty = false;
-        }
-    }
+
+            // update the LOD Scale based on the auto-scale.
+            cv->setLODScale( 1.0/getScale().x() );
+
+        } // if (cv)
+    } // if is cull visitor
 
     // finally, skip AT's accept and do Transform.
     Transform::accept(nv);
-
 }
 
 void
@@ -259,4 +301,316 @@ PixelAutoTransform::dirty()
 {
     _dirty = true;
     setCullingActive( false );
+}
+
+//-----------------------------------------------------------------------------
+
+#undef  LC
+#define LC "[VertexCacheOptimizer] "
+
+VertexCacheOptimizer::VertexCacheOptimizer() :
+osg::NodeVisitor( TRAVERSE_ALL_CHILDREN ) 
+{
+    //nop
+}
+
+void
+VertexCacheOptimizer::apply(osg::Geode& geode)
+{
+    if (geode.getDataVariance() == osg::Object::DYNAMIC)
+        return;
+
+    for(unsigned i=0; i<geode.getNumDrawables(); ++i )
+    {
+        osg::Geometry* geom = geode.getDrawable(i)->asGeometry();
+
+        if ( geom )
+        {
+            if ( geom->getDataVariance() == osg::Object::DYNAMIC )
+                return;
+
+            // vertex cache optimizations currently only support surface geometries.
+            // all or nothing in the geode.
+            osg::Geometry::PrimitiveSetList& psets = geom->getPrimitiveSetList();
+            for( osg::Geometry::PrimitiveSetList::iterator i = psets.begin(); i != psets.end(); ++i )
+            {
+                switch( (*i)->getMode() )
+                {
+                case GL_TRIANGLES:
+                case GL_TRIANGLE_FAN:
+                case GL_TRIANGLE_STRIP:
+                case GL_QUADS:
+                case GL_QUAD_STRIP:
+                case GL_POLYGON:
+                    break;
+
+                default:
+                    return;
+                }
+            }
+        }
+    }
+
+    //OE_NOTICE << LC << "VC optimizing..." << std::endl;
+
+    // passed the test; run the optimizer.
+    osgUtil::VertexCacheVisitor vcv;
+    geode.accept( vcv );
+    vcv.optimizeVertices();
+
+    osgUtil::VertexAccessOrderVisitor vaov;
+    geode.accept( vaov );
+    vaov.optimizeOrder();
+
+    traverse( geode );
+}
+
+//-----------------------------------------------------------------------------
+
+#undef  LC
+#define LC "[SetDataVarianceVisitor] "
+
+SetDataVarianceVisitor::SetDataVarianceVisitor(osg::Object::DataVariance value) :
+osg::NodeVisitor( TRAVERSE_ALL_CHILDREN ),
+_value( value )
+{
+    //nop
+}
+
+void
+SetDataVarianceVisitor::apply(osg::Geode& geode)
+{
+    for(unsigned i=0; i<geode.getNumDrawables(); ++i)
+    {
+        osg::Drawable* d = geode.getDrawable(i);
+        if ( d )
+            d->setDataVariance( _value );
+    }
+
+    traverse(geode);
+}
+
+//-----------------------------------------------------------------------------
+
+#undef  LC
+#define LC "[GeometryValidator] "
+
+namespace
+{
+    template<typename DE>
+    void validateDE( DE* de, unsigned maxIndex, unsigned numVerts )
+    {
+        for( unsigned i=0; i<de->getNumIndices(); ++i )
+        {
+            typename DE::value_type index = de->getElement(i);
+            if ( index > maxIndex )
+            {
+                OE_WARN << "MAXIMUM Index exceeded in DrawElements" << std::endl;
+                break;
+            }
+            else if ( index > numVerts-1 )
+            {
+                OE_WARN << "INDEX OUT OF Range in DrawElements" << std::endl;
+            }
+        }
+    }
+}
+
+
+GeometryValidator::GeometryValidator()
+{
+    setVisitorType(this->NODE_VISITOR);
+    setTraversalMode(this->TRAVERSE_ALL_CHILDREN);
+    setNodeMaskOverride(~0);
+}
+
+void
+GeometryValidator::apply(osg::Geometry& geom)
+{
+    if ( geom.getVertexArray() == 0L )
+    {
+        OE_NOTICE << LC << "NULL vertex array!!\n";
+        return;
+    }
+
+    unsigned numVerts = geom.getVertexArray()->getNumElements();
+    if ( numVerts == 0 )
+    {
+        OE_NOTICE << LC << "No verts!! name=" << geom.getName() << "\n";
+        return;
+    }
+
+#if OSG_VERSION_GREATER_OR_EQUAL(3,1,9)
+
+    std::set<osg::BufferObject*> _vbos;
+
+    osg::Geometry::ArrayList arrays;
+    geom.getArrayList(arrays);
+    for(unsigned i=0; i<arrays.size(); ++i)
+    {
+        osg::Array* a = arrays[i].get();
+        if ( a == NULL )
+        {
+            OE_NOTICE << LC << "Found a NULL array\n";
+        }
+        else if ( a->getBinding() == a->BIND_OVERALL && a->getNumElements() != 1 )
+        {
+            OE_NOTICE << LC << "Found an array with BIND_OVERALL and size <> 1\n";
+        }
+        else if ( a->getBinding() == a->BIND_PER_VERTEX && a->getNumElements() != numVerts )
+        {
+            OE_NOTICE << LC << "Found BIND_PER_VERTEX with wrong number of elements (expecting " << numVerts << "; found " << a->getNumElements() << ")\n";
+        }
+
+        _vbos.insert( a->getVertexBufferObject() );
+    }
+
+    if ( _vbos.size() != 1 )
+    {
+        OE_NOTICE << LC << "Found a Geometry that uses more than one VBO (non-optimal sharing)\n";
+    }
+
+#else // pre-3.1.9 ... phase out.
+
+    if ( geom.getColorArray() )
+    {
+        if ( geom.getColorBinding() == osg::Geometry::BIND_OVERALL && geom.getColorArray()->getNumElements() != 1 )
+        {
+            OE_NOTICE << "Color: BIND_OVERALL with wrong number of elements" << std::endl;
+        }
+        else if ( geom.getColorBinding() == osg::Geometry::BIND_PER_VERTEX && geom.getColorArray()->getNumElements() != numVerts )
+        {
+            OE_NOTICE << "Color: BIND_PER_VERTEX with colors.size != verts.size" << std::endl;
+        }
+    }
+
+    if ( geom.getNormalArray() )
+    {
+        if ( geom.getNormalBinding() == osg::Geometry::BIND_OVERALL && geom.getNormalArray()->getNumElements() != 1 )
+        {
+            OE_NOTICE << "Normal: BIND_OVERALL with wrong number of elements" << std::endl;
+        }
+        else if ( geom.getNormalBinding() == osg::Geometry::BIND_PER_VERTEX && geom.getNormalArray()->getNumElements() != numVerts )
+        {
+            OE_NOTICE << "Normal: BIND_PER_VERTEX with normals.size != verts.size" << std::endl;
+        }
+    }
+
+#endif
+
+    const osg::Geometry::PrimitiveSetList& plist = geom.getPrimitiveSetList();
+    
+    std::set<osg::BufferObject*> _ebos;
+
+    for( osg::Geometry::PrimitiveSetList::const_iterator p = plist.begin(); p != plist.end(); ++p )
+    {
+        osg::PrimitiveSet* pset = p->get();
+
+        osg::DrawArrays* da = dynamic_cast<osg::DrawArrays*>(pset);
+        if ( da )
+        {
+            if ( da->getFirst() >= numVerts )
+            {
+                OE_NOTICE << LC << "DrawArrays: first > numVerts\n";
+            }
+            if ( da->getFirst()+da->getCount() > numVerts )
+            {
+                OE_NOTICE << LC << "DrawArrays: first/count out of bounds\n";
+            }
+            if ( da->getCount() < 1 )
+            {
+                OE_NOTICE << LC << "DrawArrays: count is zero\n";
+            }
+        }
+
+        bool isDe = pset->getDrawElements() != 0L;
+
+        osg::DrawElementsUByte* de_byte = dynamic_cast<osg::DrawElementsUByte*>(pset);
+        if ( de_byte )
+        {
+            validateDE(de_byte, 0xFF, numVerts );
+            _ebos.insert( de_byte->getElementBufferObject() );
+        }
+
+        osg::DrawElementsUShort* de_short = dynamic_cast<osg::DrawElementsUShort*>(pset);
+        if ( de_short )
+        {
+            validateDE(de_short, 0xFFFF, numVerts );
+            _ebos.insert( de_short->getElementBufferObject() );
+        }
+
+        osg::DrawElementsUInt* de_int = dynamic_cast<osg::DrawElementsUInt*>(pset);
+        if ( de_int )
+        {
+            validateDE(de_int, 0xFFFFFFFF, numVerts );
+            _ebos.insert( de_int->getElementBufferObject() );
+        }
+
+        if ( pset->getNumIndices() == 0 )
+        {
+            OE_NOTICE << LC << "Primset: num elements = 0; class=" << pset->className() << ", name=" << pset->getName() << "\n";
+        }
+        else if ( pset->getType() >= GL_TRIANGLES && pset->getNumIndices() < 3 )
+        {
+            OE_NOTICE << LC << "Primset: not enough indicies for surface prim type\n";
+        }
+        else if ( pset->getType() >= GL_LINE_STRIP && pset->getNumIndices() < 2 )
+        {
+            OE_NOTICE << LC << "Primset: not enough indicies for linear prim type\n";
+        }
+        else if ( isDe && pset->getType() == GL_LINES && pset->getNumIndices() % 2 != 0 )
+        {
+            OE_NOTICE << LC << "Primset: non-even index count for GL_LINES\n";
+        }
+    }
+
+    if ( _ebos.size() != 1 )
+    {
+        OE_NOTICE << LC << "Found a Geometry that uses more than one EBO (non-optimal sharing)\n";
+    }
+}
+
+void
+GeometryValidator::apply(osg::Geode& geode)
+{
+    for(unsigned i=0; i<geode.getNumDrawables(); ++i)
+    {
+        osg::Geometry* geom = geode.getDrawable(i)->asGeometry();
+        if ( geom )
+        {
+            apply( *geom );
+
+            if ( geom->getVertexArray() == 0L )
+            {
+                OE_NOTICE << "removing " << geom->getName() << " b/c of null vertex array\n";
+                geode.removeDrawable( geom );
+                --i;
+            }
+        }
+    }
+}
+//------------------------------------------------------------------------
+
+AllocateAndMergeBufferObjectsVisitor::AllocateAndMergeBufferObjectsVisitor()
+{
+    setVisitorType(NODE_VISITOR);
+    setTraversalMode(TRAVERSE_ALL_CHILDREN);
+    setNodeMaskOverride(~0);
+}
+
+void
+AllocateAndMergeBufferObjectsVisitor::apply(osg::Geode& geode)
+{
+    for(unsigned i=0; i<geode.getNumDrawables(); ++i)
+    {
+        osg::Geometry* geom = geode.getDrawable(i)->asGeometry();
+        if ( geom )
+        {
+            // We disable vbo's and then re-enable them to enable sharing of all the arrays.
+            geom->setUseDisplayList( false );
+            geom->setUseVertexBufferObjects( false );
+            geom->setUseVertexBufferObjects( true );
+        }
+    }
+    traverse(geode);
 }

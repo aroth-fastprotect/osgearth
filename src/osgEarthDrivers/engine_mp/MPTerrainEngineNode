@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -16,14 +16,15 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
-#ifndef OSGEARTH_ENGINE_MP_ENGINE_NODE_H
-#define OSGEARTH_ENGINE_MP_ENGINE_NODE_H 1
+#ifndef OSGEARTH_DRIVERS_MP_TERRAIN_ENGINE_ENGINE_NODE_H
+#define OSGEARTH_DRIVERS_MP_TERRAIN_ENGINE_ENGINE_NODE_H 1
 
 #include <osgEarth/TerrainEngineNode>
 #include <osgEarth/TextureCompositor>
 #include <osgEarth/Map>
 #include <osgEarth/Revisioning>
 #include <osgEarth/ThreadingUtils>
+#include <osgEarth/Containers>
 
 #include "MPTerrainEngineOptions"
 #include "KeyNodeFactory"
@@ -34,10 +35,11 @@
 #include <osg/Geode>
 #include <osg/NodeCallback>
 #include <osg/Uniform>
+#include <osgUtil/RenderBin>
 
 using namespace osgEarth;
 
-namespace osgEarth_engine_mp
+namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
 {
     class MPTerrainEngineNode : public TerrainEngineNode
     {
@@ -47,24 +49,43 @@ namespace osgEarth_engine_mp
         virtual ~MPTerrainEngineNode();
 
     public:
+        /** Creates a tile node that is set up to page in subtiles. */
         osg::Node* createNode(const TileKey& key, ProgressCallback* progress =0L);
 
-        osg::Node* createUpsampledNode(const TileKey& key, ProgressCallback* progress =0L);
+        /** Creates a tile node with no support for paging in subtiles. */
+        osg::Node* createStandaloneNode(const TileKey& key, ProgressCallback* progress =0L);
 
     public: // TerrainEngineNode
 
         // for standalone tile creation outside of a terrain
         osg::Node* createTile(const TileKey& key);
+        
+        // when incremental update is enabled, forces regeneration of tiles
+        // in the given region.
+        void invalidateRegion(
+            const GeoExtent& extent,
+            unsigned         minLevel,
+            unsigned         maxLevel);
+
+        /** Access the stateset used to render the terrain. */
+        osg::StateSet* getTerrainStateSet();
+
+        /** Access the stateset used to render payload data. */
+        osg::StateSet* getPayloadStateSet();
 
     public: // internal TerrainEngineNode
 
         virtual void preInitialize( const Map* map, const TerrainOptions& options );
         virtual void postInitialize( const Map* map, const TerrainOptions& options );
-        virtual void validateTerrainOptions( TerrainOptions& options );
         virtual const TerrainOptions& getTerrainOptions() const { return _terrainOptions; }
         virtual osg::BoundingSphere computeBound() const;
 
+    public: // osg::Node
+
+        void traverse(osg::NodeVisitor& nv);
+
     public: // MapCallback adapter functions
+
         void onMapInfoEstablished( const MapInfo& mapInfo ); // not virtual!
         void onMapModelChanged( const MapModelChange& change ); // not virtual!
 
@@ -88,39 +109,45 @@ namespace osgEarth_engine_mp
         };
 
     protected:
-        //virtual void onVerticalScaleChanged();
-
         // override from TerrainEngineNode
-        virtual void updateTextureCombining() { updateShaders(); }
+        virtual void updateTextureCombining() { updateState(); }
+        
+        virtual void notifyExistingNodes(TerrainTileNodeCallback* cb);
 
     private:
         void init();
         void syncMapModel();
 
         // Reloads all the tiles in the terrain due to a data model change
-        void refresh();
-        void createTerrain();
+        void refresh(bool force =false);
+        virtual void dirtyTerrain();
 
         void addImageLayer( ImageLayer* layer );
         void addElevationLayer( ElevationLayer* layer );
 
         void removeImageLayer( ImageLayer* layerRemoved );
         void removeElevationLayer( ElevationLayer* layerRemoved );
+        void toggleElevationLayer( ElevationLayer* layer );
 
         void moveImageLayer( unsigned int oldIndex, unsigned int newIndex );
         void moveElevationLayer( unsigned int oldIndex, unsigned int newIndex );
         
-        void updateShaders(); 
+        void updateState(); 
+
 
     private:
-        osgEarth::Drivers::MPTerrainEngineOptions _terrainOptions;
+        MPTerrainEngineOptions _terrainOptions;
 
         class TerrainNode* _terrain;
         UID                _uid;
+        Revision           _mapModelRev;  // tracks revision changes int the map model
+        Revision           _terrainRev;   // the revisinon of the rendered terrain (slightly different)
         Revision           _shaderLibRev;
         bool               _batchUpdateInProgress;
         bool               _refreshRequired;
-        bool               _shaderUpdateRequired;
+        bool               _stateUpdateRequired;
+        bool               _rootTilesRegistered;
+        Threading::Mutex   _rootTilesRegisteredMutex;
 
         osg::ref_ptr< ElevationChangedCallback > _elevationCallback;
 
@@ -130,7 +157,7 @@ namespace osgEarth_engine_mp
         osg::ref_ptr<TileNodeRegistry> _liveTiles;      // tiles in the scene graph.
         osg::ref_ptr<TileNodeRegistry> _deadTiles;        // tiles that used to be in the scene graph.
 
-        Threading::PerThread< osg::ref_ptr<KeyNodeFactory> > _perThreadKeyNodeFactories;
+        PerThread< osg::ref_ptr<KeyNodeFactory> > _perThreadKeyNodeFactories;
         KeyNodeFactory* getKeyNodeFactory();
 
         osg::Timer _timer;
@@ -138,14 +165,19 @@ namespace osgEarth_engine_mp
         double     _tileCreationTime;
         int        _primaryUnit;
         int        _secondaryUnit;
+        int        _elevationTextureUnit;
 
         osg::Uniform* _verticalScaleUniform;
 
         osg::ref_ptr< TileModelFactory > _tileModelFactory;
 
+        Threading::Mutex _renderBinMutex;
+        osg::ref_ptr<osgUtil::RenderBin> _terrainRenderBinPrototype;
+        osg::ref_ptr<osgUtil::RenderBin> _payloadRenderBinPrototype;
+
         MPTerrainEngineNode( const MPTerrainEngineNode& rhs, const osg::CopyOp& op =osg::CopyOp::DEEP_COPY_ALL ) { }
     };
 
-} // namespace osgEarth_engine_mp
+} } } // namespace osgEarth::Drivers::MPTerrainEngine
 
-#endif // OSGEARTH_ENGINE_MP_ENGINE_NODE_H
+#endif // OSGEARTH_DRIVERS_MP_TERRAIN_ENGINE_ENGINE_NODE_H

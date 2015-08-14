@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -23,9 +26,11 @@
 #include <osgEarthSymbology/TextSymbol>
 #include <osgEarthSymbology/Style>
 #include <osg/AutoTransform>
+#include <osg/CullStack>
 #include <osg/Drawable>
 #include <osg/Geometry>
 #include <osgText/TextBase>
+#include <osgUtil/CullVisitor>
 
 namespace osgEarth { namespace Annotation
 {
@@ -45,8 +50,10 @@ namespace osgEarth { namespace Annotation
 
         static const std::string& PROGRAM_NAME();
 
-		static osgText::String::Encoding convertTextSymbolEncoding (
-			const osgEarth::Symbology::TextSymbol::Encoding encoding );
+        /**
+         * Convert a symbology encoding enum to an osgText enum
+         */
+        static osgText::String::Encoding convertTextSymbolEncoding(const TextSymbol::Encoding encoding);
 
         /**
          * Creates a drawable representing a symbolized text label in
@@ -64,8 +71,9 @@ namespace osgEarth { namespace Annotation
         static osg::Geometry* createImageGeometry(
             osg::Image*       image,
             const osg::Vec2s& pixelOffsets,
-            unsigned          textureUnit       =0,
-            double            heading = 0.0);
+            unsigned          textureUnit,
+            double            heading,
+            double            scale );
 
         /**
          * Creates a fading uniform that the decluttering engine can use
@@ -97,7 +105,8 @@ namespace osgEarth { namespace Annotation
          */
         struct OrthoNodeAutoTransform : public osg::AutoTransform
         {
-            void acceptCullNoTraverse( osg::CullStack* cs );
+            /** override */
+            virtual void accept(osg::NodeVisitor& nv);
 
             bool okToIntersect() const { return !_firstTimeToInitEyePoint; }
         };
@@ -126,26 +135,6 @@ namespace osgEarth { namespace Annotation
         static osg::Node* createHemisphere( float r, const osg::Vec4& color, float maxAngle =15.0f );
 
         /**
-         * Builds an ellipsoid geometry.
-         * @param xr       X-axis radius
-         * @param yr       Y-axis radius
-         * @param zr       Z-axis radius
-         * @param color    Color
-         * @param maxAngle Maximum angle between verts (controls tessellation)
-         */
-#if 0
-        static osg::Node* createEllipsoid( float xr, float yr, float zr, const osg::Vec4& color, float maxAngle =15.0f );
-
-        static osg::Node* createEllipsoid( 
-            float xr, float yr, const osg::Vec4& color, float maxAngle =15.0f,
-            float minLat =-90.0, float maxLat=90.0, float minLon=-180.0, float maxLon=180.0);
-
-        static osg::Geometry* createEllipsoidGeometry( 
-            float major, float minor, const osg::Vec4& color, float maxAngle =15.0f,
-            float minLat =-90.0, float maxLat=90.0, float minLon=-180.0, float maxLon=180.0);
-#endif
-
-        /**
          * Builds the geometry for an ellipsoid.
          */
         static osg::Geometry* createEllipsoidGeometry( 
@@ -168,6 +157,22 @@ namespace osgEarth { namespace Annotation
 
     private:
         AnnotationUtils() { }
+    };
+
+    
+    /**
+     * A bounding sphere calculator that forces the center point
+     * to (0,0,0) and adjusts the radius accordingly. This forces the bounding
+     * center to the "control point" of the annotation - useful for culling.
+     */
+    class ControlPointCallback : public osg::Node::ComputeBoundingSphereCallback
+    {
+    public:
+        osg::BoundingSphere computeBound(const osg::Node& node) const
+        {
+            osg::BoundingSphere nodebs = node.computeBound();
+            return osg::BoundingSphere(osg::Vec3(0,0,0), nodebs.center().length() + nodebs.radius());
+        }
     };
 
 } } // namespace osgEarth::Annotation

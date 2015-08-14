@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -26,6 +26,8 @@
 #include <osg/Light>
 #include <osg/Material>
 #include <osg/observer_ptr>
+#include <osgDB/Options>
+#include <map>
 
 namespace osgEarth
 {
@@ -39,7 +41,6 @@ namespace osgEarth
         SHADERPOLICY_GENERATE,
         SHADERPOLICY_INHERIT
     };
-
 
     /**
     * Container for light uniforms
@@ -121,7 +122,7 @@ namespace osgEarth
         bool  _useUpdateTrav;
         OpenThreads::Mutex _stateSetMutex;
 
-        osg::ref_ptr<osg::Uniform> _lightingEnabledUniform;
+        //osg::ref_ptr<osg::Uniform> _lightingEnabledUniform;
         osg::ref_ptr<osg::Uniform> _lightEnabledUniform;
          
         std::vector<osg_LightSourceParameters>   _osgLightSourceParameters; 
@@ -185,6 +186,40 @@ namespace osgEarth
         osg::observer_ptr<osg::StateSet> _stateSet;
 
         void ensureCapacity( unsigned newSize );
+    };
+
+
+    /**
+     * Cull callback that installs a range (distance to view point) uniform
+     * in the State based on the bounding center of the node being culled.
+     * The actual name of the range uniform can is returned by
+     * ShaderFactory::getRangeUniformName().
+     */
+    class OSGEARTH_EXPORT RangeUniformCullCallback : public osg::NodeCallback
+    {
+    public:
+        RangeUniformCullCallback();
+        void operator()(osg::Node*, osg::NodeVisitor* nv);
+
+        // testing
+        void setDump(bool v) { _dump = true; }
+
+    private:
+        osg::ref_ptr<osg::StateSet> _stateSet;
+        osg::ref_ptr<osg::Uniform>  _uniform;
+        bool                        _dump;
+    };
+
+
+    /**
+     * Shader that will discard fragments whose alpha component falls below
+     * the specified threshold.
+     */
+    class OSGEARTH_EXPORT DiscardAlphaFragments
+    {
+    public:
+        void install(osg::StateSet* ss, float minAlpha) const;
+        void uninstall(osg::StateSet* ss) const;
     };
 }
 

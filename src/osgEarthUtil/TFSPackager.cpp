@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -21,6 +24,7 @@
 #include <osgEarth/Registry>
 #include <osgDB/FileNameUtils>
 #include <osgDB/FileUtils>
+#include <osgEarth/FileUtils>
 
 #define LC "[TFSPackager] "
 
@@ -114,14 +118,14 @@ class AddFeatureVisitor : public FeatureTileVisitor
 {
 public:
     AddFeatureVisitor( Feature* feature, int maxFeatures, int firstLevel, int maxLevel, CropFilter::Method cropMethod):
-          _levelAdded(-1),
-          _added(false),
+      _feature( feature ),
           _maxFeatures( maxFeatures ),      
-          _firstLevel( firstLevel ),
           _maxLevel( maxLevel ),
+          _firstLevel( firstLevel ),
+          _added(false),
           _numAdded( 0 ),
-          _cropMethod( cropMethod ),
-          _feature( feature )
+          _levelAdded(-1),
+          _cropMethod( cropMethod )
       {
 
       }
@@ -133,14 +137,27 @@ public:
           bool traverse = true;
 
           GeoExtent featureExtent(_feature->getSRS(), _feature->getGeometry()->getBounds());
-          if (featureExtent.intersects( tile->getExtent()))
+
+          bool valid = false;
+          // It's a single point, so we do a contains check instead of an intersection check b/c the bounds really aren't valid.
+          if (featureExtent.width() == 0 && featureExtent.height() == 0)
+          {                            
+              valid = tile->getExtent().contains( featureExtent.xMin(), featureExtent.yMin());
+          }
+          else
+          {
+              // Do a normal intersection check
+              valid = featureExtent.intersects( tile->getExtent());
+          }
+
+          if (valid)
           {
               //If the node contains the feature, and it doesn't contain the max number of features add it.  If it's already full then 
               //split it.
               if (tile->getKey().getLevelOfDetail() >= (unsigned int)_firstLevel && 
-                  (tile->getFeatures().size() < (size_t)_maxFeatures || tile->getKey().getLevelOfDetail() == (unsigned int)_maxLevel || tile->getKey().getLevelOfDetail() == (unsigned int)_levelAdded))
+                  (tile->getFeatures().size() < (unsigned int)_maxFeatures || tile->getKey().getLevelOfDetail() == _maxLevel || tile->getKey().getLevelOfDetail() == _levelAdded))
               {
-                  if (_levelAdded < 0 || (unsigned int)_levelAdded == tile->getKey().getLevelOfDetail())
+                  if (_levelAdded < 0 || _levelAdded == tile->getKey().getLevelOfDetail())
                   {
                       osg::ref_ptr< Feature > clone = new Feature( *_feature, osg::CopyOp::DEEP_COPY_ALL );
                       FeatureList features;
@@ -174,9 +191,7 @@ public:
                   tile->traverse( this );
               }
 
-          }
-
-
+          }          
       }
 
       int _levelAdded;
@@ -200,8 +215,8 @@ class WriteFeaturesVisitor : public FeatureTileVisitor
 {
 public:
     WriteFeaturesVisitor(FeatureSource* features, const std::string& dest, CropFilter::Method cropMethod, const SpatialReference* srs):
+      _dest( dest ),
           _features( features ),
-          _dest( dest ),
           _cropMethod( cropMethod ),
           _srs( srs )
       {
@@ -251,7 +266,7 @@ public:
               //OE_NOTICE << "Writing " << features.size() << " features to " << filename << std::endl;
 
               if ( !osgDB::fileExists( osgDB::getFilePath(filename) ) )
-                  osgDB::makeDirectoryForFile( filename );
+                  osgEarth::makeDirectoryForFile( filename );
 
 
               std::fstream output( filename.c_str(), std::ios_base::out );
@@ -296,9 +311,14 @@ void
     {
         _srs = features->getFeatureProfile()->getSRS();
     }
+	
+    //Get the extent of the dataset, or use the custom extent value
+    GeoExtent srsExtent = _customExtent;
+    if (!srsExtent.isValid())
+        srsExtent = features->getFeatureProfile()->getExtent();
 
     //Transform to lat/lon extents
-    GeoExtent extent = features->getFeatureProfile()->getExtent().transform( _srs.get() );
+    GeoExtent extent = srsExtent.transform( _srs.get() );
 
     osg::ref_ptr< const osgEarth::Profile > profile = osgEarth::Profile::create(extent.getSRS(), extent.xMin(), extent.yMin(), extent.xMax(), extent.yMax(), 1, 1);
 
@@ -351,6 +371,16 @@ void
         }
     }   
     OE_NOTICE << "Added=" << added << " Skipped=" << skipped << " Failed=" << failed << std::endl;
+
+#if 1
+    // Print the width of tiles at each level
+    for (int i = 0; i <= highestLevel; ++i)
+    {
+        TileKey tileKey(i, 0, 0, profile);
+        GeoExtent tileExtent = tileKey.getExtent();
+        OE_NOTICE << "Level " << i << " tile size: " << tileExtent.width() << std::endl;
+    }
+#endif
 
     WriteFeaturesVisitor write(features, destination, _method, _srs);
     root->accept( &write );

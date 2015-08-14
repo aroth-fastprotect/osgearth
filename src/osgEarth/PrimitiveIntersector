@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -45,6 +45,8 @@ public:
         Intersection():
             ratio(-1.0),
             primitiveIndex(0) {}
+
+        Intersection(const Intersection &rhs);
 
         bool operator < (const Intersection& rhs) const { return ratio < rhs.ratio; }
 
@@ -108,6 +110,8 @@ protected:
 
     bool intersects(const osg::BoundingSphere& bs);
     bool intersectAndClip(osg::Vec3d& s, osg::Vec3d& e,const osg::BoundingBox& bb);
+
+    unsigned int findPrimitiveIndex(osg::Drawable* drawable, unsigned int index);
 
     PrimitiveIntersector* _parent;
 

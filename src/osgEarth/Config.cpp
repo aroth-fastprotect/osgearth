@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -28,6 +31,10 @@
 #include <iomanip>
 
 using namespace osgEarth;
+
+Config::~Config()
+{
+}
 
 void
 Config::setReferrer( const std::string& referrer )
@@ -145,9 +152,22 @@ Config::find( const std::string& key, bool checkMe )
     return 0L;
 }
 
+/****************************************************************/
+ConfigOptions::~ConfigOptions()
+{
+}
+
+/****************************************************************/
+DriverConfigOptions::~DriverConfigOptions()
+{
+}
+
 namespace
 {
-    Json::Value conf2json( const Config& conf )
+    // Converts a Config to JSON. The "nicer" flag formats the data in a more 
+    // readable way than nicer=false. Nicer=true attempts to create JSON "objects",
+    // whereas nicer=false makes "$key" and "$children" members.
+    Json::Value conf2json(const Config& conf, bool nicer, int depth)
     {
         Json::Value value( Json::objectValue );
 
@@ -157,70 +177,130 @@ namespace
         }
         else
         {
-            if ( !conf.key().empty() )
-                value["$key"] = conf.key();
+            if ( !nicer )
+            {
+                if ( !conf.key().empty() )
+                {
+                    value["$key"] = conf.key();
+                }
+            }
 
             if ( !conf.value().empty() )
+            {
                 value["$value"] = conf.value();
+            }
 
             if ( conf.children().size() > 0 )
             {
-                Json::Value children( Json::arrayValue );
-                unsigned i = 0;
-
-                //bool hasdupes = false;
-                //std::set<std::string> dupes;
-                //for( ConfigSet::const_iterator c = conf.children().begin(); c != conf.children().end(); ++c ) {
-                //    if ( dupes.find( c->key() ) != dupes.end() ) {
-                //        hasdupes = true;
-                //        break;
-                //    }
-                //    else {
-                //        dupes.insert(c->key());
-                //    }
-                //}
-
-                for( ConfigSet::const_iterator c = conf.children().begin(); c != conf.children().end(); ++c )
+                if ( nicer )
                 {
-                    if ( c->isSimple() )
-                        value[c->key()] = c->value();
-                    else
-                        children[i++] = conf2json( *c );
-                    //else if (hasdupes)
-                    //    children[i++] = conf2json( *c );
-                    //else
-                    //    value[c->key()] = conf2json(*c);
-                }
+                    std::map< std::string, std::vector<Config> > sets;
 
-                if ( !children.empty() )
-                    value["$children"] = children;
+                    // sort into bins by name:
+                    for( ConfigSet::const_iterator c = conf.children().begin(); c != conf.children().end(); ++c )
+                    {
+                        sets[c->key()].push_back( *c );
+                    }
+
+                    for( std::map<std::string,std::vector<Config> >::iterator i = sets.begin(); i != sets.end(); ++i )
+                    {
+                        if ( i->second.size() == 1 )
+                        {
+                            Config& c = i->second[0];
+                            if ( c.isSimple() )
+                                value[i->first] = c.value();
+                            else
+                                value[i->first] = conf2json(c, nicer, depth+1);
+                        }
+                        else
+                        {
+                            std::string array_key = Stringify() << i->first << "_$set";
+                            Json::Value array_value( Json::arrayValue );
+                            for( std::vector<Config>::iterator j = i->second.begin(); j != i->second.end(); ++j )
+                            {
+                                array_value.append( conf2json(*j, nicer, depth+1) );
+                            }
+                            value = array_value;
+                            //value[array_key] = array_value;
+                        }
+                    }
+                }
+                else
+                {
+                    Json::Value children( Json::arrayValue );
+                    unsigned i = 0;
+
+                    for( ConfigSet::const_iterator c = conf.children().begin(); c != conf.children().end(); ++c )
+                    {
+                        if ( c->isSimple() )
+                            value[c->key()] = c->value();
+                        else
+                            children[i++] = conf2json(*c, nicer, depth+1);
+                    }
+
+                    if ( !children.empty() )
+                    {
+                        value["$children"] = children;
+                    }
+                }
+            }
+
+            // At the root, embed the Config in a single JSON object.
+            if ( depth == 0 )
+            {
+                Json::Value root;
+                root[conf.key()] = value;
+                value = root;
             }
         }
 
         return value;
     }
 
-    void json2conf( const Json::Value& json, Config& conf )
+    void json2conf(const Json::Value& json, Config& conf, int depth)
     {
         if ( json.type() == Json::objectValue )
         {
             Json::Value::Members members = json.getMemberNames();
 
-            if ( members.size() == 1 )
-            {
-                const Json::Value& value = json[members[0]];
-                if ( value.type() != Json::nullValue && value.type() != Json::objectValue && value.type() != Json::arrayValue )
-                {
-                    conf.key() = members[0];
-                    conf.value() = value.asString();
-                    return;
-                }
-            }
-
             for( Json::Value::Members::const_iterator i = members.begin(); i != members.end(); ++i )
             {
                 const Json::Value& value = json[*i];
-                if ( (*i) == "$key" )
+
+                if ( value.isObject() )
+                {
+                    if (depth == 0 && members.size() == 1)
+                    {
+                        conf.key() = *i;
+                        json2conf(value, conf, depth+1);
+                    }
+                    else
+                    {
+                        Config element( *i );
+                        json2conf( value, element, depth+1 );
+                        conf.add( element );
+                    }
+                }
+                else if ( value.isArray() )
+                {
+                    if ( endsWith(*i, "_$set") )
+                    {
+                        std::string key = i->substr(0, i->length()-5);
+                        for( Json::Value::const_iterator j = value.begin(); j != value.end(); ++j )
+                        {
+                            Config child( key );
+                            json2conf( *j, child, depth+1 );
+                            conf.add( child );
+                        }
+                    }
+                    else
+                    {
+                        Config element( *i );
+                        json2conf( value, element, depth+1 );
+                        conf.add( element );
+                    }
+                }
+                else if ( (*i) == "$key" )
                 {
                     conf.key() = value.asString();
                 }
@@ -230,13 +310,7 @@ namespace
                 }
                 else if ( (*i) == "$children" && value.isArray() )
                 {
-                    json2conf( value, conf );
-                }
-                else if ( value.isArray() )
-                {
-                    Config element( *i );
-                    json2conf( value, element );
-                    conf.add( element );
+                    json2conf( value, conf, depth+1 );
                 }
                 else
                 {
@@ -249,7 +323,7 @@ namespace
             for( Json::Value::const_iterator j = json.begin(); j != json.end(); ++j )
             {
                 Config child;
-                json2conf( *j, child );
+                json2conf( *j, child, depth+1 );
                 if ( !child.empty() )
                     conf.add( child );
             }
@@ -264,7 +338,7 @@ namespace
 std::string
 Config::toJSON( bool pretty ) const
 {
-    Json::Value root = conf2json( *this );
+    Json::Value root = conf2json( *this, true, 0 );
     if ( pretty )
         return Json::StyledWriter().write( root );
     else
@@ -278,8 +352,15 @@ Config::fromJSON( const std::string& input )
     Json::Value root( Json::objectValue );
     if ( reader.parse( input, root ) )
     {
-        json2conf( root, *this );
+        json2conf( root, *this, 0 );
         return true;
+    }
+    else
+    {
+        OE_WARN 
+            << "JSON decoding error: "
+            << reader.getFormatedErrorMessages() 
+            << std::endl;
     }
     return false;
 }

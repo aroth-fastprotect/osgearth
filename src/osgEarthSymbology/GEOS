@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -31,14 +31,21 @@ namespace osgEarth { namespace Symbology
 {
     using namespace osgEarth;
 
-    class GEOSUtils // not exported
+    class GEOSContext
     {
     public:
+        GEOSContext();
+        ~GEOSContext();
 
-        static Symbology::Geometry* exportGeometry( const geos::geom::Geometry* input );
+    public:
+        Symbology::Geometry* exportGeometry(const geos::geom::Geometry* input);
 
-        static geos::geom::Geometry* importGeometry( const Symbology::Geometry* input );
+        geos::geom::Geometry* importGeometry( const Symbology::Geometry* input );
 
+        void disposeGeometry(geos::geom::Geometry* input);
+
+    protected:
+        geos::geom::GeometryFactory* _factory;
     };
 
 } } // namespace osgEarth::Features

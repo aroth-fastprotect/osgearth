@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -211,7 +211,7 @@ GeodeticGraticule::rebuild()
     if ( _options->levels().size() < 1 )
         return;
 
-    //const GeodeticGraticuleOptions::Level& level0 = _options->levels()[0];
+    const GeodeticGraticuleOptions::Level& level0 = _options->levels()[0];
 
     // build the top level cell grid.
     unsigned tilesX, tilesY;
@@ -292,7 +292,7 @@ GeodeticGraticule::buildTile( const TileKey& key, Map* map ) const
                 LabelNode* label = new LabelNode( 
                     _mapNode.get(),
                     GeoPoint(geoSRS, clon, clat),
-                    s_llf.format(clon),
+                    s_llf.format(clon, false),
                     textStyle );
                 labels->addChild( label );
             }
@@ -319,7 +319,7 @@ GeodeticGraticule::buildTile( const TileKey& key, Map* map ) const
                 LabelNode* label = new LabelNode( 
                     _mapNode.get(), 
                     GeoPoint(geoSRS, clon, clat),
-                    s_llf.format(clat),
+                    s_llf.format(clat, true),
                     textStyle );
                 labels->addChild( label );
             }
@@ -422,57 +422,6 @@ GeodeticGraticule::buildChildren( unsigned level, unsigned x, unsigned y ) const
     else return 0L;
 }
 
-#if 0
-void
-GeodeticGraticule::addLevel(float        maxRange,
-                            float        minRange,
-                            unsigned     subdivFactor,
-                            const Style& style)
-{
-    if ( _autoLevels )
-    {
-        _autoLevels = false;
-        _levels.clear();
-    }
-
-    // the "-2" here is because normal tile paging gives you one subdivision already,
-    // so we only need to account for > 1 subdivision factor.
-    unsigned cellsPerTile = subdivFactor <= 2u ? 1u : 1u << (subdivFactor-2u);
-
-    Level level;
-    level._maxRange = maxRange;
-    level._minRange = minRange;
-    _profile->getNumTiles( _levels.size(), level._tilesX, level._tilesY );
-    level._cellsPerTileX = std::max(1u, cellsPerTile);
-    level._cellsPerTileY = std::max(1u, cellsPerTile);
-
-    if ( !style.empty() )
-    {
-        level._style = style;
-    }
-    else
-    {
-        level._style = _levels.size() > 0 ? _levels[_levels.size()-1]._style : _defaultLineStyle;
-    }
-
-    _levels.push_back( level );
-}
-
-bool
-GeodeticGraticule::getLevel( unsigned level, GeodeticGraticule::Level& out_level ) const
-{
-    if ( level < _levels.size() )
-    {
-        out_level = _levels[level];
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-#endif
-
 void
 GeodeticGraticule::traverse( osg::NodeVisitor& nv )
 {
@@ -527,24 +476,6 @@ namespace osgEarth { namespace Util
 
             osg::Node* result = graticule->buildChildren( levelNum, x, y );
             return result ? ReadResult(result) : ReadResult::ERROR_IN_READING_FILE;
-
-#if 0
-            if ( marker == GRID_MARKER )
-            {
-                osg::Node* result = graticule->createGridLevel( levelNum );
-                return result ? ReadResult( result ) : ReadResult::ERROR_IN_READING_FILE;
-            }
-            else if ( marker == TEXT_MARKER )
-            {
-                osg::Node* result = graticule->createTextLevel( levelNum );
-                return result ? ReadResult( result ) : ReadResult::ERROR_IN_READING_FILE;
-            }
-            else
-            {
-                OE_NOTICE << "oh no! no markers" << std::endl;
-                return ReadResult::FILE_NOT_HANDLED;
-            }
-#endif
         }
     };
     REGISTER_OSGPLUGIN(GRATICULE_EXTENSION, GeodeticGraticuleFactory)

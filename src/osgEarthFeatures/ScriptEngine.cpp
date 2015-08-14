@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -88,26 +88,26 @@ ScriptEngineFactory::instance()
 }
 
 ScriptEngine*
-ScriptEngineFactory::create( const std::string& language, const std::string& engineName )
+ScriptEngineFactory::create( const std::string& language, const std::string& engineName, bool quiet)
 {
   ScriptEngineOptions opts;
   opts.setDriver(language + (engineName.empty() ? "" : (std::string("_") + engineName)));
 
-  return create(opts);
+  return create(opts, quiet);
 }
 
 ScriptEngine*
-ScriptEngineFactory::create( const Script& script, const std::string& engineName )
+ScriptEngineFactory::create( const Script& script, const std::string& engineName, bool quiet)
 {
   ScriptEngineOptions opts;
   opts.setDriver(script.getLanguage() + (engineName.empty() ? "" : (std::string("_") + engineName)));
   opts.script() = script;
 
-  return create(opts);
+  return create(opts, quiet);
 }
 
 ScriptEngine*
-ScriptEngineFactory::create( const ScriptEngineOptions& options )
+ScriptEngineFactory::create( const ScriptEngineOptions& options, bool quiet)
 {
     ScriptEngine* scriptEngine = 0L;
 
@@ -123,22 +123,25 @@ ScriptEngineFactory::create( const ScriptEngineOptions& options )
             scriptEngine = dynamic_cast<ScriptEngine*>( osgDB::readObjectFile( driverExt, rwopts.get() ) );
             if ( scriptEngine )
             {
-                OE_INFO << "Loaded ScriptEngine driver \"" << options.getDriver() << "\" OK" << std::endl;
+                OE_DEBUG << "Loaded ScriptEngine driver \"" << options.getDriver() << "\" OK" << std::endl;
             }
             else
             {
-                OE_WARN << "FAIL, unable to load ScriptEngine driver for \"" << options.getDriver() << "\"" << std::endl;
+                if (!quiet)
+                    OE_WARN << "FAIL, unable to load ScriptEngine driver for \"" << options.getDriver() << "\"" << std::endl;
+
                 instance()->_failedDrivers.push_back(options.getDriver());
             }
         }
         else
         {
-            OE_WARN << "Skipping previously failed ScriptEngine driver \"" << options.getDriver() << "\"" << std::endl;
+            //OE_WARN << "Skipping previously failed ScriptEngine driver \"" << options.getDriver() << "\"" << std::endl;
         }
     }
     else
     {
-        OE_WARN << LC << "FAIL, illegal null driver specification" << std::endl;
+        if (!quiet)
+            OE_WARN << LC << "FAIL, illegal null driver specification" << std::endl;
     }
 
     return scriptEngine;

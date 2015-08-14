@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -38,9 +41,7 @@
 #include <osgDB/ReaderWriter>
 
 #include <osg/Version>
-#if OSG_MIN_VERSION_REQUIRED(2,9,5)
 #include <osgDB/Options>
-#endif
 
 namespace osgEarth 
 {   
@@ -453,6 +454,41 @@ namespace osgEarth { namespace Util { namespace TMS
 
         /** dtor */
         virtual ~TileMapReaderWriter() { }
+    };
+
+
+    /**
+     * An entry in a TileMapService's list of TileMaps.
+     */
+    struct OSGEARTHUTIL_EXPORT TileMapEntry
+    {
+        TileMapEntry( const std::string& _title, const std::string& _href, const std::string& _srs, const std::string& _profile);
+
+        std::string title;
+        std::string href;
+        std::string srs;
+        std::string profile;
+    };
+
+    typedef std::list< TileMapEntry > TileMapEntryList;
+
+    /**
+     * Reads a list of TileMapEntry's from a server.  Useful for displaying a list of layers to the user
+     */
+    class OSGEARTHUTIL_EXPORT TileMapServiceReader
+    {
+    public:
+        /**
+         * Reads a list of TileMapEntry's from a server
+         * @param location
+         *    A URL to the TMS service URL like http://server.com/tiles/1.0.0/
+         */
+        static bool read( const std::string &location, const osgDB::ReaderWriter::Options* options, TileMapEntryList& tileMaps );    
+        static bool read( const Config& conf, TileMapEntryList& tileMaps);
+
+    private:
+        TileMapServiceReader();
+        TileMapServiceReader( const TileMapServiceReader& rhs );
     };
 
 } } } // namespace osgEarth::Util::TMS

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -31,13 +34,9 @@
 
 #include <osg/ImageStream>
 #include <osgDB/FileNameUtils>
-#include <osg/Version>
-#include <osgEarth/Version>
 
 #include <osgEarthAnnotation/ImageOverlay>
-#if OSG_MIN_VERSION_REQUIRED(2,9,6)
 #include <osgEarthAnnotation/ImageOverlayEditor>
-#endif
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
@@ -49,7 +48,7 @@ static Grid* s_layerBox = NULL;
 osg::Node*
 createControlPanel( osgViewer::View* view )
 {
-    ControlCanvas* canvas = ControlCanvas::get( view );
+    ControlCanvas* canvas = ControlCanvas::getOrCreate( view );
 
     // the outer container:
     s_layerBox = new Grid();
@@ -107,7 +106,6 @@ struct EditHandler : public ControlEventHandler
       _editor(editor){ }
 
     void onClick( Control* control, int mouseButtonMask ) {        
-#if OSG_MIN_VERSION_REQUIRED(2,9,6)
         if (_editor->getNodeMask() != ~0)
         {
             static_cast<LabelControl*>(control)->setText( "Finish" );
@@ -118,11 +116,8 @@ struct EditHandler : public ControlEventHandler
             static_cast<LabelControl*>(control)->setText( "Edit" );
             _editor->setNodeMask(0);
         }
-
-#else
-        OE_NOTICE << "Use OSG 2.9.6 or greater to use editing" << std::endl;
-#endif
     }
+
     ImageOverlay* _overlay;
     osgViewer::Viewer* _viewer;
     osg::Node* _editor;
@@ -246,12 +241,7 @@ main(int argc, char** argv)
 
 
             //Create a new ImageOverlayEditor and set it's node mask to 0 to hide it initially
-#if OSG_MIN_VERSION_REQUIRED(2,9,6)
             osg::Node* editor = new ImageOverlayEditor( overlay, moveVert);
-#else
-            //Just make an empty group for pre-2.9.6
-            osg::Node* editor = new osg::Group;
-#endif
             editor->setNodeMask( 0 );
             root->addChild( editor );      
             

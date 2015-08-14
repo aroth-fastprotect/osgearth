@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -22,7 +22,9 @@
 
 #include <osgEarth/Common>
 #include <osg/Image>
+#include <osg/Texture>
 #include <osg/GL>
+#include <vector>
 
 //These formats were not added to OSG until after 2.8.3 so we need to define them to use them.
 #ifndef GL_EXT_texture_compression_rgtc
@@ -60,19 +62,41 @@ namespace osgEarth
          * array compositor) rely on the internal texture format being correct.
          * (http://http.download.nvidia.com/developer/Papers/2005/Fast_Texture_Transfers/Fast_Texture_Transfers.pdf)
          */
-        static void normalizeImage( osg::Image* image );
+        static void fixInternalFormat(osg::Image* image);
+
+        /**
+         * Marks an image as containing un-normalized data values.
+         *
+         * Normally the values in an image are "normalized", i.e. scaled so they are in the
+         * range [0..1]. This is normal for color values. But when the image is being used
+         * for coverage data (a value lookup table) it is desireable to store the raw 
+         * values instead.
+         */
+        static void markAsUnNormalized(osg::Image* image, bool value);
+
+        /** Inverse of above. */
+        static void markAsNormalized(osg::Image* image, bool value) { markAsUnNormalized(image, !value); }
+
+        /**
+         * Whether the image has been marked as containing un-normalized values.
+         */
+        static bool isUnNormalized(const osg::Image* image);
+
+        /**
+         * Whether the image has been marked as containing normalized values.
+         */
+        static bool isNormalized(const osg::Image* image) { return !isUnNormalized(image); }
 
         /**
          * Copys a portion of one image into another.
          */
         static bool copyAsSubImage(
             const osg::Image* src, 
-            osg::Image* dst, 
-            int dst_start_col, int dst_start_row, int dst_start_img=0 );
+            osg::Image*       dst, 
+            int dst_start_col, int dst_start_row);
 
         /**
-         * Resizes an image using nearest-neighbor resampling. Returns a new image, leaving
-         * the input image unaltered.
+         * Resizes an image. Returns a new image, leaving the input image unaltered.
          *
          * Note. If the output parameter is NULL, this method will allocate a new image and
          * resize into that new image. If the output parameter is non-NULL, this method will
@@ -87,7 +111,7 @@ namespace osgEarth
             const osg::Image* input, 
             unsigned int new_s, unsigned int new_t,
             osg::ref_ptr<osg::Image>& output,
-            unsigned int mipmapLevel =0 );
+            unsigned int mipmapLevel =0, bool bilinear=true );
 
         /**
          * Crops the input image to the dimensions provided and returns a
@@ -127,6 +151,13 @@ namespace osgEarth
         static osg::Image* createMipmapBlendedImage(
             const osg::Image* primary,
             const osg::Image* secondary );
+        
+        /**
+         * Creates a new image containing mipmaps built with nearest-neighbor
+         * sampling.
+         */
+        static osg::Image* buildNearestNeighborMipmaps(
+            const osg::Image* image);
 
         /**
          * Blends the "src" image into the "dest" image, based on the "a" value.
@@ -139,6 +170,14 @@ namespace osgEarth
          * sharpening filter. Returns a new image, leaving the input image unaltered.
          */
         static osg::Image* createSharpenedImage( const osg::Image* image );
+
+        /**
+         * For each "layer" in the input image (each bitmap in the "r" dimension),
+         * create a new, separate image with r=1. If the input image is r=1, it is
+         * simply placed onto the output vector (no copy).
+         * Returns true upon sucess, false upon failure
+         */
+        static bool flattenImage(osg::Image* image, std::vector<osg::ref_ptr<osg::Image> >& output);
 
         /**
          * Gets whether the input image's dimensions are powers of 2.
@@ -192,6 +231,18 @@ namespace osgEarth
          *Converts the given image to RGBA8
          */
         static osg::Image* convertToRGBA8(const osg::Image* image);
+
+        /**
+         * True if the two images are of the same format (pixel format, data type, etc.)
+         * though not necessarily the same size, depth, etc.
+         */
+        static bool sameFormat(const osg::Image* lhs, const osg::Image* rhs);
+
+        /**
+         * True if the two images have the same format AND size, and can therefore
+         * be used together in a texture array.
+         */
+        static bool textureArrayCompatible(const osg::Image* lhs, const osg::Image* rhs);
 
         /**
          *Compares the image data of two images and determines if they are equivalent
@@ -248,11 +299,32 @@ namespace osgEarth
         static osg::Image* createBumpMap( const osg::Image* input );
 
         /**
+         * Is it a floating-point texture format?
+         */
+        static bool isFloatingPointInternalFormat( GLint internalFormat );
+
+        /**
+         * Compute a texture compression format suitable for the image.
+         */
+        static bool computeTextureCompressionMode(
+            const osg::Image* image,
+            osg::Texture::InternalFormatMode& out_mode);
+
+        /**
+         * 
+         */
+        static osg::Image* upSampleNN(const osg::Image* src, int quadrant);
+
+        /**
          * Reads color data out of an image, regardles of its internal pixel format.
          */
         class OSGEARTH_EXPORT PixelReader
         {
         public:
+            /**
+             * Constructs a pixel reader. "Normalized" means that the values in the source
+             * image have been scaled to [0..1] and should be denormalized upon reading.
+             */
             PixelReader(const osg::Image* image);
 
             /** Whether PixelReader supports a given format/datatype combiniation. */
@@ -268,6 +340,19 @@ namespace osgEarth
                 return (*_reader)(this, s, t, r, m);
             }
 
+            /** Reads a color from the image */
+            osg::Vec4 operator()(unsigned s, unsigned t, unsigned r=0, int m=0) const {
+                return (*_reader)(this, s, t, r, m);
+            }
+
+            /** Reads a color from the image by unit coords [0..1] */
+            osg::Vec4 operator()(float s, float t, int r=0, int m=0) const {
+                return (*_reader)(this,
+                    (int)(s * (float)(_image->s()-1)),
+                    (int)(t * (float)(_image->t()-1)),
+                    r, m);
+            }
+
             // internals:
             const unsigned char* data(int s=0, int t=0, int r=0, int m=0) const {
                 return m == 0 ?
@@ -281,6 +366,7 @@ namespace osgEarth
             unsigned _colMult;
             unsigned _rowMult;
             unsigned _imageSize;
+            bool     _normalized;
         };
         
         /**
@@ -289,6 +375,10 @@ namespace osgEarth
         class OSGEARTH_EXPORT PixelWriter
         {
         public:
+            /**
+             * Constructs a pixel writer. "Normalized" means the values are scaled to [0..1]
+             * before writing.
+             */
             PixelWriter(osg::Image* image);
 
             /** Whether PixelWriter can write to an image with the given format/datatype combo. */
@@ -304,11 +394,19 @@ namespace osgEarth
                 (*_writer)(this, c, s, t, r, m );
             }
 
+            void f(const osg::Vec4& c, float s, float t, int r=0, int m=0) {
+                this->operator()( c,
+                    (int)(s * (float)(_image->s()-1)),
+                    (int)(t * (float)(_image->t()-1)),
+                    r, m);
+            }
+
             // internals:
             osg::Image* _image;
             unsigned _colMult;
             unsigned _rowMult;
             unsigned _imageSize;
+            bool     _normalized;
 
             unsigned char* data(int s=0, int t=0, int r=0, int m=0) const {
                 return m == 0 ?

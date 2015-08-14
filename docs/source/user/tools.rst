@@ -13,33 +13,42 @@ used to control the camera and is optimized for viewing geospatial data.
     osgearth_viewer earthfile.earth [options]
 
 
-+----------------------------+--------------------------------------------------------------------+
-| Option                     | Description                                                        |
-+============================+====================================================================+
-| ``--sky``                  | Installs a SkyNode (sun, moon, stars and atmosphere..globe only)   |
-+----------------------------+--------------------------------------------------------------------+
-| ``--ocean``                | Installs a sample ocean surface node                               |
-+----------------------------+--------------------------------------------------------------------+
-| ``--kml [file.kml]``       | Loads a KML or KMZ file                                            |
-+----------------------------+--------------------------------------------------------------------+
-| ``--coords``               | Displays map coords under mouse                                    |
-+----------------------------+--------------------------------------------------------------------+
-| ``--dms``                  | Displays map coords as degrees/mins/seconds                        |
-+----------------------------+--------------------------------------------------------------------+
-| ``--dd``                   | Displays map coords as decimal degrees                             |
-+----------------------------+--------------------------------------------------------------------+
-| ``--mgrs``                 | Displays map coords as MGRS                                        |
-+----------------------------+--------------------------------------------------------------------+
-| ``--ortho``                | Installs an orthographic camera projection                         |
-+----------------------------+--------------------------------------------------------------------+
-| ``--autoclip``             | Installs an automatic clip plane handler                           |
-+----------------------------+--------------------------------------------------------------------+
-| ``--images [path]``        | Finds images in [path] and loads them as image layers              |
-+----------------------------+--------------------------------------------------------------------+
-| ``--image-extensions [*]`` | With ``--images``, only considers the listed extensions            |
-+----------------------------+--------------------------------------------------------------------+
-| ``--out-earth [out.earth]``| With ``--images``, writes out an earth file                        |
-+----------------------------+--------------------------------------------------------------------+
++----------------------------------+--------------------------------------------------------------------+
+| Option                           | Description                                                        |
++==================================+====================================================================+
+| ``--sky``                        | Installs a SkyNode (sun, moon, stars and atmosphere..globe only)   |
++----------------------------------+--------------------------------------------------------------------+
+| ``--kml [file.kml]``             | Loads a KML or KMZ file                                            |
++----------------------------------+--------------------------------------------------------------------+
+| ``--kmlui``                      | Displays a limited UI for toggling KML placemarks and folders      |
++----------------------------------+--------------------------------------------------------------------+
+| ``--coords``                     | Displays map coords under mouse                                    |
++----------------------------------+--------------------------------------------------------------------+
+| ``--dms``                        | Displays map coords as degrees/mins/seconds                        |
++----------------------------------+--------------------------------------------------------------------+
+| ``--dd``                         | Displays map coords as decimal degrees                             |
++----------------------------------+--------------------------------------------------------------------+
+| ``--mgrs``                       | Displays map coords as MGRS                                        |
++----------------------------------+--------------------------------------------------------------------+
+| ``--ortho``                      | Installs an orthographic camera projection                         |
++----------------------------------+--------------------------------------------------------------------+
+| ``--images [path]``              | Finds images in [path] and loads them as image layers              |
++----------------------------------+--------------------------------------------------------------------+
+| ``--image-extensions [*]``       | With ``--images``, only considers the listed extensions            |
++----------------------------------+--------------------------------------------------------------------+
+| ``--out-earth [out.earth]``      | With ``--images``, writes out an earth file                        |
++----------------------------------+--------------------------------------------------------------------+
+| ``--logdepth``                   | Activates the logarithmic depth buffer in high-speed mode.         |
++----------------------------------+--------------------------------------------------------------------+
+| ``--logdepth2``                  | Activates the logarithmic depth buffer in high-precision mode.     |
++----------------------------------+--------------------------------------------------------------------+
+| ``--uniform [name] [min] [max]`` | Installs a uniform and displays an on-screen slider to control its |
+|                                  | value. Helpful for debugging.                                      |
++----------------------------------+--------------------------------------------------------------------+
+| ``--ico``                        | Activates OSG's IncrementalCompileOperation, which will compile    |
+|                                  | paged objects over a series of frames (reducing frame breaks).     |
+|                                  | This is actually an OpenSceneGraph option, but useful for osgEarth |
++----------------------------------+--------------------------------------------------------------------+
 
 
 osgearth_version
@@ -81,7 +90,13 @@ The most common usage of osgearth_cache is to populate a cache in a non-interact
 | ``--estimate``                      | Print out an estimation of the number of tiles, disk space and     |
 |                                     | time it will take to perform this seed operation                   |
 +-------------------------------------+--------------------------------------------------------------------+
-| ``--threads``                       |The number of threads to use for the seed operation (default=1)     |
+| ``--mp``                            | Use multiprocessing to process the tiles.  Useful for GDAL         |
+|                                     | sources as this avoids the global GDAL lock                        |
++-------------------------------------+--------------------------------------------------------------------+
+| ``--mt``                            | Use multithreading to process the tiles.                           |
++-------------------------------------+--------------------------------------------------------------------+
+| ``--concurrency``                   | The number of threads or proceses to use if --mp or --mt           |
+|                                     | are provided                                                       | 
 +-------------------------------------+--------------------------------------------------------------------+
 | ``--min-level level``               | Lowest LOD level to seed (default=0)                               |
 +-------------------------------------+--------------------------------------------------------------------+
@@ -120,7 +135,11 @@ osgearth_package creates a redistributable `TMS`_ based package from an earth fi
 | ``--bounds xmin ymin xmax ymax``   | bounds to package (in map coordinates; default=entire map)         |
 |                                    | You can provide multiple bounds                                    |
 +------------------------------------+--------------------------------------------------------------------+
-| ``--max-level level``              | max LOD level for tiles (all layers; default=inf)                  |
+| ``--max-level level``              | max LOD level for tiles (all layers; default=5). Note: you can set |
+|                                    | this to a large number to get all available data (e.g., 99). This  |
+|                                    | works fine for files (like a GeoTIFF). But some data sources do    |
+|                                    | not report (or have) a maximum data level, so it's better to       |
+|                                    | specify a specific maximum.                                        |
 +------------------------------------+--------------------------------------------------------------------+
 | ``--out-earth earthfile``          | export an earth file referencing the new repo                      |
 +------------------------------------+--------------------------------------------------------------------+
@@ -135,6 +154,46 @@ osgearth_package creates a redistributable `TMS`_ based package from an earth fi
 +------------------------------------+--------------------------------------------------------------------+
 | ``--db-options``                   | db options string to pass to the image writer                      |
 |                                    | in quotes (e.g., "JPEG_QUALITY 60")                                |
++------------------------------------+--------------------------------------------------------------------+
+| ``--mp``                           | Use multiprocessing to process the tiles.  Useful for GDAL         |
+|                                    | sources as this avoids the global GDAL lock                        |
++------------------------------------+--------------------------------------------------------------------+
+| ``--mt``                           | Use multithreading to process the tiles.                           |
++------------------------------------+--------------------------------------------------------------------+
+| ``--concurrency``                  | The number of threads or proceses to use if --mp or --mt           |
+|                                    | are provided                                                       | 
++------------------------------------+--------------------------------------------------------------------+
+| ``--alpha-mask``                   | Mask out imagery that isn't in the provided extents.               |
++------------------------------------+--------------------------------------------------------------------+
+| ``--verbose``                      | Displays progress of the operation                                 |
++------------------------------------+--------------------------------------------------------------------+
+
+osgearth_conv
+----------------
+osgearth_conv copies the contents of one TileSource to another. All arguments are Config name/value pairs,
+so you need to look in the header file for each driver's Options structure for options. Of course, the output
+driver must support writing (by implementing the ReadWriteTileSource interface). The "in" properties come
+from the GDALOptions getConfig method. The "out" properties come from the MBTilesOptions getConfig method.
+
+**Sample Usage**
+::
+    osgearth_conv --in driver gdal --in url world.tif --out driver mbtiles --out filename world.db
+
++------------------------------------+--------------------------------------------------------------------+
+| Argument                           | Description                                                        |
++====================================+====================================================================+
+| ``--elevation``                    | convert as elevation data (instead of image data)                  |
++------------------------------------+--------------------------------------------------------------------+
+| ``--profile [profile]``            | reproject to the target profile, e.g. "wgs84"                      |
++------------------------------------+--------------------------------------------------------------------+
+| ``--min-level [int]``              | min level of detail to copy                                        |
++------------------------------------+--------------------------------------------------------------------+
+| ``--max-level [int]``              | max level of detail to copy                                        |
++------------------------------------+--------------------------------------------------------------------+
+| ``--threads [n]``                  | threads to use (Careful, may crash. Doesn't help with GDAL inputs) |
++------------------------------------+--------------------------------------------------------------------+
+| ``--extents [minLat] [minLong]``   | Lat/Long extends to copy                                           |
+| ``[maxLat] [maxLong]``             |                                                                    |
 +------------------------------------+--------------------------------------------------------------------+
 
 osgearth_tfs
@@ -157,6 +216,9 @@ In addition, the TFS package generated can be served by any standard web server,
 | ``--max-level level``            | The maximum level of the feature quadtree                          | 
 +----------------------------------+--------------------------------------------------------------------+
 | ``--max-features``               | The maximum number of features per tile                            |
++----------------------------------+--------------------------------------------------------------------+
+| ``--grid``                       | Generate a single level grid with the specified resolution.        |
+|                                  | Default units are meters. (ex. 50, 100km, 200mi)                   |
 +----------------------------------+--------------------------------------------------------------------+
 | ``--out``                        | The destination directory                                          |
 +----------------------------------+--------------------------------------------------------------------+
@@ -207,18 +269,18 @@ a specified higher level of detail.  For example, you can specify a max level of
 
 
 osgearth_boundarygen
------------------
+--------------------
 osgearth_boundarygen generates boundary geometry that you can use with an osgEarth <mask> layer in order to 
 stich an external model into the terrain.
 
 **Sample Usage**
 ::
-    osgearth_boundarygen model_file
+    osgearth_boundarygen model_file [options]
 
 +----------------------------------+--------------------------------------------------------------------+
 | Argument                         | Description                                                        |
 +==================================+====================================================================+
-| ``--out file_name``              | output file for boundary geometry( default is boundary.txt)        |
+| ``--out file_name``              | output file for boundary geometry (default is boundary.txt)        |
 +----------------------------------+--------------------------------------------------------------------+
 | ``--no-geocentric``              | Skip geocentric reprojection (for flat databases)                  |
 +----------------------------------+--------------------------------------------------------------------+
@@ -227,6 +289,10 @@ stich an external model into the terrain.
 | ``--verbose``                    | print progress to console                                          |
 +----------------------------------+--------------------------------------------------------------------+
 | ``--view``                       | show result in 3D window                                           |
++----------------------------------+--------------------------------------------------------------------+
+| ``--tolerance`` N                | vertices less than this distance apart will be coalesced (0.005)   |
++----------------------------------+--------------------------------------------------------------------+
+| ``--precision`` N                | output coordinates will have this many significant digits (12)     |
 +----------------------------------+--------------------------------------------------------------------+
 
 
@@ -237,7 +303,4 @@ osgearth_overlayviewer
 view of the map and another that shows the bounding frustums that are used for the overlay computations.
 
 .. _TMS: http://en.wikipedia.org/wiki/Tile_Map_Service
-
-
-
 

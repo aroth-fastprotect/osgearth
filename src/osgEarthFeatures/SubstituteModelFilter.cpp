@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,10 +18,12 @@
  */
 #include <osgEarthFeatures/SubstituteModelFilter>
 #include <osgEarthFeatures/FeatureSourceIndexNode>
+#include <osgEarthFeatures/Session>
+#include <osgEarthFeatures/GeometryUtils>
 #include <osgEarthSymbology/MeshConsolidator>
+#include <osgEarthSymbology/MeshFlattener>
 #include <osgEarth/ECEF>
 #include <osgEarth/VirtualProgram>
-#include <osgEarth/ShaderGenerator>
 #include <osgEarth/DrawInstanced>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
@@ -34,9 +36,14 @@
 #include <osg/MatrixTransform>
 #include <osg/NodeVisitor>
 #include <osg/ShapeDrawable>
+#include <osg/AlphaFunc>
+#include <osg/Billboard>
+
+#include <osgSim/LightPointNode>
 
 #include <osgDB/FileNameUtils>
 #include <osgDB/Registry>
+#include <osgDB/WriteFile>
 
 #include <osgUtil/Optimizer>
 #include <osgUtil/MeshOptimizers>
@@ -136,6 +143,9 @@ SubstituteModelFilter::process(const FeatureList&           features,
     // factor to any AutoTransforms directly (cloning them as necessary)
     std::map< std::pair<URI, float>, osg::ref_ptr<osg::Node> > uniqueModels;
 
+    // URI cache speeds up URI creation since it can be slow.
+    osgEarth::fast_map<std::string, URI> uriCache;
+
     // keep track of failed URIs so we don't waste time or warning messages on them
     std::set< URI > missing;
 
@@ -153,9 +163,20 @@ SubstituteModelFilter::process(const FeatureList&           features,
     {
         Feature* input = f->get();
 
-        // evaluate the instance URI expression:
-        StringExpression uriEx = *symbol->url();
-        URI instanceURI( input->eval(uriEx, &context), uriEx.uriContext() );
+        // Run a feature pre-processing script.
+        if ( symbol->script().isSet() )
+        {
+            StringExpression scriptExpr(symbol->script().get());
+            input->eval( scriptExpr, &context );
+        }
+
+		// evaluate the instance URI expression:
+		const std::string& st = input->eval(uriEx, &context);
+		URI& instanceURI = uriCache[st];
+		if(instanceURI.empty()) // Create a map, to reuse URI's, since they take a long time to create
+		{
+			instanceURI = URI( st, uriEx.uriContext() );
+		}
 
         // find the corresponding marker in the cache
         osg::ref_ptr<InstanceResource> instance;
@@ -165,7 +186,6 @@ SubstituteModelFilter::process(const FeatureList&           features,
         // evalute the scale expression (if there is one)
         float scale = 1.0f;
         osg::Matrixd scaleMatrix;
-
         if ( symbol->scale().isSet() )
         {
             scale = input->eval( scaleEx, &context );
@@ -177,21 +197,22 @@ SubstituteModelFilter::process(const FeatureList&           features,
         }
         
         osg::Matrixd rotationMatrix;
-
         if ( modelSymbol && modelSymbol->heading().isSet() )
         {
             float heading = input->eval(headingEx, &context);
             rotationMatrix.makeRotate( osg::Quat(osg::DegreesToRadians(heading), osg::Vec3(0,0,1)) );
         }
 
-        // how that we have a marker source, create a node for it
-        std::pair<URI,float> key( instanceURI, scale );
+		// how that we have a marker source, create a node for it
+		std::pair<URI,float> key( instanceURI, iconSymbol? scale : 1.0f );//use 1.0 for models, since we don't want unique models based on scaling
 
         // cache nodes per instance.
         osg::ref_ptr<osg::Node>& model = uniqueModels[key];
         if ( !model.valid() )
         {
-            context.resourceCache()->getInstanceNode( instance.get(), model );
+            // Always clone the cached instance so we're not processing data that's
+            // already in the scene graph. -gw
+            context.resourceCache()->cloneOrCreateInstanceNode(instance.get(), model);
 
             // if icon decluttering is off, install an AutoTransform.
             if ( iconSymbol )
@@ -209,23 +230,6 @@ SubstituteModelFilter::process(const FeatureList&           features,
                     model = at;
                 }
             }
-
-#if 0
-            if ( scale != 1.0f && dynamic_cast<osg::AutoTransform*>( model.get() ) )
-            {
-                // clone the old AutoTransform, set the new scale, and copy over its children.
-                osg::AutoTransform* oldAT = dynamic_cast<osg::AutoTransform*>(model.get());
-                osg::AutoTransform* newAT = osg::clone( oldAT );
-
-                // make a scaler and put it between the new AutoTransform and its kids
-                osg::MatrixTransform* scaler = new osg::MatrixTransform(osg::Matrix::scale(scale,scale,scale));
-                for( unsigned i=0; i<newAT->getNumChildren(); ++i )
-                    scaler->addChild( newAT->getChild(0) );
-                newAT->removeChildren(0, newAT->getNumChildren());
-                newAT->addChild( scaler );
-                model = newAT;
-            }
-#endif
         }
 
         if ( model.valid() )
@@ -244,6 +248,23 @@ SubstituteModelFilter::process(const FeatureList&           features,
                 for( unsigned i=0; i<geom->size(); ++i )
                 {
                     osg::Matrixd mat;
+
+                    // need to recalcluate expression-based data per-point, not just per-feature!
+                    if ( symbol->scale().isSet() )
+                    {
+                        scale = input->eval(scaleEx, &context);
+                        if ( scale == 0.0 )
+                            scale = 1.0;
+                        if ( scale != 1.0 )
+                            _normalScalingRequired = true;
+                        scaleMatrix = osg::Matrix::scale( scale, scale, scale );
+                    }
+
+                    if ( modelSymbol->heading().isSet() )
+                    {
+                        float heading = input->eval(headingEx, &context);
+                        rotationMatrix.makeRotate( osg::Quat(osg::DegreesToRadians(heading), osg::Vec3(0,0,1)) );
+                    }
 
                     osg::Vec3d point = (*geom)[i];
                     if ( makeECEF )
@@ -266,7 +287,8 @@ SubstituteModelFilter::process(const FeatureList&           features,
                     xform->addChild( model.get() );
                     attachPoint->addChild( xform );
 
-                    if ( context.featureIndex() && !_useDrawInstanced )
+                    // Only tag nodes if we aren't using clustering.
+                    if ( context.featureIndex() && !_cluster)
                     {
                         context.featureIndex()->tagNode( xform, input );
                     }
@@ -294,6 +316,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
         // activate horizon culling if we are in geocentric space
         if ( context.getSession() && context.getSession()->getMapInfo().isGeocentric() )
         {
+            //TODO: re-evaluate this; use Horizon?
             HorizonCullingProgram::install( attachPoint->getOrCreateStateSet() );
         }
     }
@@ -307,244 +330,56 @@ SubstituteModelFilter::process(const FeatureList&           features,
         DrawInstanced::install( attachPoint->getOrCreateStateSet() );
     }
 
-#if 0 // now called from GeometryCompiler
-
-    // Generate shader code to render the models
-    StateSetCache* cache = context.getSession() ? context.getSession()->getStateSetCache() : 0L;
-    ShaderGenerator gen( cache );
-    attachPoint->accept( gen );
-
-#endif
     return true;
 }
 
 
 
 
-struct ClusterVisitor : public osg::NodeVisitor
+namespace
 {
-    ClusterVisitor( const FeatureList& features, const InstanceSymbol* symbol, FeaturesToNodeFilter* f2n, FilterContext& cx )
-        : osg::NodeVisitor( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
-          _features   ( features ),
-          _cx         ( cx ),
-          _symbol     ( symbol ),
-          _f2n        ( f2n )
+    /**
+     * Extracts unclusterable things like lightpoints and billboards from the given scene graph and copies them into a cloned scene graph
+     * This actually just removes all geodes from the scene graph, so this could be applied to any other type of node that you want to keep
+     * The geodes will be clustered together in the flattened graph.
+     */
+    osg::Node* extractUnclusterables(osg::Node* node)
     {
-        _modelSymbol = dynamic_cast<const ModelSymbol*>( symbol );
-        if ( _modelSymbol )
-            _headingExpr = *_modelSymbol->heading();
-
-        _scaleExpr = *_symbol->scale();
-
-        _makeECEF  = _cx.getSession()->getMapInfo().isGeocentric();
-        _srs       = _cx.profile()->getSRS();
-        _targetSRS = _cx.getSession()->getMapInfo().getSRS();
-    }
-
-    void apply( osg::Geode& geode )
-    {
-        // save the geode's drawables..
-        osg::Geode::DrawableList old_drawables = geode.getDrawableList();
-
-        //OE_DEBUG << "ClusterVisitor geode " << &geode << " featureNode=" << _featureNode << " drawables=" << old_drawables.size() << std::endl;
-
-        // ..and clear out the drawables list.
-        geode.removeDrawables( 0, geode.getNumDrawables() );
-
-#if 0
-        // ... and remove all drawables from the feature node
-        for( osg::Geode::DrawableList::iterator i = old_drawables.begin(); i != old_drawables.end(); i++ )
-            _featureNode->removeDrawable(i->get());
-#endif
-
-        // foreach each drawable that was originally in the geode...
-        for( osg::Geode::DrawableList::iterator i = old_drawables.begin(); i != old_drawables.end(); i++ )
+        // Clone the scene graph
+        osg::ref_ptr< osg::Node > clone = (osg::Node*)node->clone(osg::CopyOp::DEEP_COPY_NODES);
+       
+        // Now remove any geodes
+        FindNodesVisitor<osg::Geode> findGeodes;
+        clone->accept(findGeodes);
+        for (unsigned int i = 0; i < findGeodes._results.size(); i++)
         {
-            osg::Geometry* originalDrawable = dynamic_cast<osg::Geometry*>( i->get() );
-            if ( !originalDrawable )
-                continue;
+            osg::ref_ptr< osg::Geode > geode = findGeodes._results[i];
+            
 
-            // go through the list of input features...
-            for( FeatureList::const_iterator j = _features.begin(); j != _features.end(); j++ )
+            // Special check for billboards.  Me want to keep them in this special graph of 
+            // unclusterable stuff.
+            osg::Billboard* billboard = dynamic_cast< osg::Billboard* >( geode.get() );
+            
+
+            if (geode->getNumParents() > 0 && !billboard)
             {
-                Feature* feature = j->get();
-
-                osg::Matrixd scaleMatrix;
-
-                if ( _symbol->scale().isSet() )
+                // Get all the parents for the geode and remove it from them.
+                std::vector< osg::ref_ptr< osg::Group > > parents;
+                for (unsigned int j = 0; j < geode->getNumParents(); j++)
                 {
-                    double scale = feature->eval( _scaleExpr, &_cx );
-                    scaleMatrix.makeScale( scale, scale, scale );
+                    parents.push_back(geode->getParent(j));
                 }
 
-                osg::Matrixd rotationMatrix;
-#if 0
-                if ( _symbol->orientation().isSet() )
+                for (unsigned int j = 0; j < parents.size(); j++)
                 {
-                    osg::Vec3d hpr = *_symbol->orientation();
-                    //Rotation in HPR
-                    //Apply the rotation            
-                    rotationMatrix.makeRotate( 
-                        osg::DegreesToRadians(hpr.y()), osg::Vec3(1,0,0),
-                        osg::DegreesToRadians(hpr.x()), osg::Vec3(0,0,1),
-                        osg::DegreesToRadians(hpr.z()), osg::Vec3(0,1,0) );            
-                }
-#endif
-                if ( _modelSymbol && _modelSymbol->heading().isSet() )
-                {
-                    float heading = feature->eval( _headingExpr, &_cx );
-                    rotationMatrix.makeRotate( osg::Quat(osg::DegreesToRadians(heading), osg::Vec3(0,0,1)) );
-                }
-
-                GeometryIterator gi( feature->getGeometry(), false );
-                while( gi.hasMore() )
-                {
-                    Geometry* geom = gi.next();
-
-                    // if necessary, transform the points to the target SRS:
-                    if ( !_makeECEF && !_targetSRS->isEquivalentTo(_srs) )
-                    {
-                        _srs->transform( geom->asVector(), _targetSRS );
-                    }
-
-                    for( Geometry::const_iterator k = geom->begin(); k != geom->end(); ++k )
-                    {
-                        osg::Vec3d   point = *k;
-                        osg::Matrixd mat;
-
-                        if ( _makeECEF )
-                        {
-                            osg::Matrixd rotation;
-                            ECEF::transformAndGetRotationMatrix( point, _srs, point, _targetSRS, rotation );
-                            mat = rotationMatrix * rotation * scaleMatrix * osg::Matrixd::translate(point) * _f2n->world2local();
-                        }
-                        else
-                        {
-                            mat = rotationMatrix * scaleMatrix * osg::Matrixd::translate(point) * _f2n->world2local();
-                        }
-
-                        // clone the source drawable once for each input feature.
-                        osg::ref_ptr<osg::Geometry> newDrawable = osg::clone( 
-                            originalDrawable, 
-                            osg::CopyOp::DEEP_COPY_ARRAYS | osg::CopyOp::DEEP_COPY_PRIMITIVES );
-
-                        osg::Vec3Array* verts = dynamic_cast<osg::Vec3Array*>( newDrawable->getVertexArray() );
-                        if ( verts )
-                        {
-                            for( osg::Vec3Array::iterator v = verts->begin(); v != verts->end(); ++v )
-                            {
-                                (*v).set( (*v) * mat );
-                            }
-
-                            // add the new cloned, translated drawable back to the geode.
-                            geode.addDrawable( newDrawable.get() );
-
-                            if ( _cx.featureIndex() )
-                                _cx.featureIndex()->tagPrimitiveSets( newDrawable.get(), feature );
-                        }
-                    }
-
+                    parents[j]->removeChild(geode);
                 }
             }
+            
         }
 
-        geode.dirtyBound();
-
-        MeshConsolidator::run( geode );
-
-        osg::NodeVisitor::apply( geode );
-    }
-
-private:
-    const FeatureList&      _features;
-    FilterContext&          _cx;
-    const InstanceSymbol*   _symbol;
-    const ModelSymbol*      _modelSymbol;
-    FeaturesToNodeFilter*   _f2n;
-    NumericExpression       _scaleExpr;
-    NumericExpression       _headingExpr;
-    bool                    _makeECEF;
-    const SpatialReference* _srs;
-    const SpatialReference* _targetSRS;
-};
-
-
-//typedef std::map< osg::Node*, FeatureList > MarkerToFeatures;
-typedef std::map< osg::ref_ptr<osg::Node>, FeatureList > ModelBins;
-
-//clustering:
-//  troll the external model for geodes. for each geode, create a geode in the target
-//  model. then, for each geometry in that geode, replicate it once for each instance of
-//  the model in the feature batch and transform the actual verts to a local offset
-//  relative to the tile centroid. Finally, reassemble all the geodes and optimize. 
-//  hopefully stateset sharing etc will work out. we may need to strip out LODs too.
-bool
-SubstituteModelFilter::cluster(const FeatureList&           features,
-                               const InstanceSymbol*        symbol, 
-                               Session*                     session,
-                               osg::Group*                  attachPoint,
-                               FilterContext&               context )
-{
-    ModelBins modelBins;
-
-    std::set<URI> missing;
-
-    // first, sort the features into buckets, each bucket corresponding to a
-    // unique marker.
-    for (FeatureList::const_iterator i = features.begin(); i != features.end(); ++i)
-    {
-        Feature* f = i->get();
-
-        // resolve the URI for the marker:
-        StringExpression uriEx( *symbol->url() );
-        URI instanceURI( f->eval( uriEx, &context ), uriEx.uriContext() );
-
-        // find and load the corresponding marker model. We're using the session-level
-        // object store to cache models. This is thread-safe sine we are always going
-        // to CLONE the model before using it.
-        osg::ref_ptr<osg::Node> model = context.getSession()->getObject<osg::Node>( instanceURI.full() );
-        if ( !model.valid() )
-        {
-            osg::ref_ptr<InstanceResource> instance;
-            if ( !findResource( instanceURI, symbol, context, missing, instance) )
-                continue;
-
-            model = instance->createNode( context.getSession()->getDBOptions() );
-            if ( model.valid() )
-            {
-                model = context.getSession()->putObject( instanceURI.full(), model.get(), false );
-            }
-        }
-
-        if ( model.valid() )
-        {
-            ModelBins::iterator itr = modelBins.find( model.get() );
-            if (itr == modelBins.end())
-                modelBins[ model.get() ].push_back( f );
-            else
-                itr->second.push_back( f );
-        }
-    }
-
-    // For each model, cluster the features that use that marker
-    for (ModelBins::iterator i = modelBins.begin(); i != modelBins.end(); ++i)
-    {
-        osg::Node* prototype = i->first.get();
-
-        // we're using the Session cache since we know we'll be cloning.
-        if ( prototype )
-        {
-            osg::Node* clone = osg::clone( prototype, osg::CopyOp::DEEP_COPY_ALL );
-
-            // ..and apply the clustering to the copy.
-            ClusterVisitor cv( i->second, symbol, this, context );
-            clone->accept( cv );
-
-            attachPoint->addChild( clone );
-        }
-    }
-
-    return true;
+        return clone.release();
+    };
 }
 
 osg::Node*
@@ -582,13 +417,13 @@ SubstituteModelFilter::push(FeatureList& features, FilterContext& context)
 
     const StyleSheet* sheet = context.getSession() ? context.getSession()->styles() : 0L;
 
-    if ( symbol->libraryName().isSet() )
+    if ( symbol->library().isSet() )
     {
-        _resourceLib = sheet->getResourceLibrary( symbol->libraryName()->expr() );
+        _resourceLib = sheet->getResourceLibrary( symbol->library()->expr() );
 
         if ( !_resourceLib.valid() )
         {
-            OE_WARN << LC << "Unable to load resource library '" << symbol->libraryName()->expr() << "'"
+            OE_WARN << LC << "Unable to load resource library '" << symbol->library()->expr() << "'"
                 << "; may not find instance models." << std::endl;
         }
     }
@@ -603,30 +438,48 @@ SubstituteModelFilter::push(FeatureList& features, FilterContext& context)
 
     osg::Group* group = createDelocalizeGroup();
 
+    osg::ref_ptr< osg::Group > attachPoint = new osg::Group;
+    group->addChild(attachPoint.get());
+
     // Process the feature set, using clustering if requested
     bool ok = true;
-    if ( _cluster )
+
+    process( features, symbol, context.getSession(), attachPoint.get(), newContext );
+    if (_cluster)
     {
-        ok = cluster( features, symbol, context.getSession(), group, newContext );
+        // Extract the unclusterable things
+        osg::ref_ptr< osg::Node > unclusterables = extractUnclusterables(attachPoint);
+
+        // We run on the attachPoint instead of the main group so that we don't lose the double precision declocalizer transform.
+        MeshFlattener::run(attachPoint);
+
+        // Add the unclusterables back to the attach point after the rest of the graph was flattened.
+        if (unclusterables.valid())
+        {
+            attachPoint->addChild(unclusterables);
+        }
     }
 
-    else
-    {
-        process( features, symbol, context.getSession(), group, newContext );
-    }
+    // return proper context
+    context = newContext;
 
+#if 0
+    // TODO: OBE due to shader pipeline
     // see if we need normalized normals
     if ( _normalScalingRequired )
     {
         // TODO: carefully test for this, since GL_NORMALIZE hurts performance in 
         // FFP mode (RESCALE_NORMAL is faster for uniform scaling); and I think auto-normal-scaling
         // is disabled entirely when using shaders. For now I believe we are dropping to FFP
-        // when not using instancing...so just check for that
+        // when not using instancing ...so just check for that
         if ( !_useDrawInstanced )
         {
             group->getOrCreateStateSet()->setMode( GL_NORMALIZE, osg::StateAttribute::ON );
         }
     }
+#endif
+
+    //osgDB::writeNodeFile(*group, "c:/temp/clustered.osg");
 
     return group;
 }

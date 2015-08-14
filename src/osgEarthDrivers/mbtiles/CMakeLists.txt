@@ -1,3 +1,5 @@
+IF(SQLITE3_FOUND)
+
 INCLUDE_DIRECTORIES( ${SQLITE3_INCLUDE_DIR} )
 
 #SET(TARGET_COMMON_LIBRARIES
@@ -6,15 +8,24 @@ INCLUDE_DIRECTORIES( ${SQLITE3_INCLUDE_DIR} )
 #)
 
 SET(TARGET_SRC
-    ReaderWriterMBTiles.cpp    
+    MBTilesPlugin.cpp
+	MBTilesTileSource.cpp
 )
 
 # headers to show in IDE
-SET(TARGET_PUBLIC_H    
+SET(TARGET_H    
     MBTilesOptions
+	MBTilesTileSource
 )
 
 SET(TARGET_LIBRARIES_VARS SQLITE3_LIBRARY)
 
-SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/mbtiles)
 SETUP_PLUGIN(osgearth_mbtiles)
+
+
+# to install public driver includes:
+SET(LIB_NAME mbtiles)
+SET(LIB_PUBLIC_HEADERS MBTilesOptions)
+INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
+
+ENDIF(SQLITE3_FOUND)

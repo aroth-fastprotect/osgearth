@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -29,9 +29,9 @@ using namespace std;
 
 
 TFSLayer::TFSLayer():
-_title("layer"),
-_maxLevel(8),
 _firstLevel(0),
+_maxLevel(8),
+_title("layer"),
 _srs( SpatialReference::create("EPSG:4326") )
 {
 }

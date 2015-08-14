@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -25,19 +28,20 @@
 #include <osgEarth/Map>
 #include <osgEarth/MapNode>
 #include <osgEarth/Progress>
-#include <osgEarth/TaskService>
+#include "ExportProgress.h"
 
 namespace PackageQt
 {
-  class PackageLayerProgressCallback;
-
+  /**
+   * Shim between the QT exporter and the TMSPackager
+   */
   class TMSExporter
   {
-  public:
+  public:    
 
-    TMSExporter(const std::string& log="log.txt");
+    TMSExporter();    
 
-    int exportTMS(osgEarth::MapNode* mapNode, const std::string& path, std::vector< osgEarth::Bounds >& bounds, const std::string& outEarth="", bool overwrite=false, const std::string& extension="");
+    int exportTMS(osgEarth::MapNode* mapNode, const std::string& earthFilePath, const std::string& path, std::vector< osgEarth::Bounds >& bounds, const std::string& outEarth="", bool overwrite=false, const std::string& extension="");
 
     std::string getDBOptions() { return _dbOptions; }
     void setDBOptions(const std::string& options) { _dbOptions = options; }
@@ -46,46 +50,52 @@ namespace PackageQt
 
     bool getKeepEmpties() { return _keepEmpties; }
     void setKeepEmpties(bool keep) { _keepEmpties = keep; }
+  
+    ExportProgressCallback* getProgressCallback() const { return _progress; }
+    void setProgressCallback(ExportProgressCallback* progress) { _progress = progress; }
 
-    std::string getErrorMessage() { return _errorMessage; }
+    unsigned int getConcurrency() const;
+    void setConcurrency(unsigned int concurrency);
 
-    void setProgressCallback(osgEarth::ProgressCallback* progress) { _progress = progress ? progress : new osgEarth::ProgressCallback; }
+    double getExportTime();
 
-  protected:
-    friend class PackageLayerProgressCallback;
+    enum ProcessingMode {
+        MODE_SINGLE,
+        MODE_MULTITHREADED,
+        MODE_MULTIPROCESS        
+    };
 
-    void packageTaskProgress(int id, double percentComplete);
-    void packageTaskComplete(int id);
+    ProcessingMode getProcessingMode() const { return _mode;}
+    void setProcessingMode(ProcessingMode mode) { _mode = mode; }
 
   private:
 
     std::string _dbOptions;
     unsigned _maxLevel;
     bool _keepEmpties;
-    std::string _errorMessage;
+    unsigned int _concurrency;
+    ProcessingMode _mode;
 
-    OpenThreads::Mutex _m;
+    OpenThreads::Mutex _mutex;       
 
-    osg::ref_ptr<osgEarth::TaskService> _taskService;
-    int _totalTasks;
-    double _percentComplete;
-    std::vector<double> _taskProgress;
-    osg::ref_ptr<osgEarth::ProgressCallback> _progress;
+    osg::ref_ptr<ExportProgressCallback> _progress;
+
+    double _totalTimeS;
   };
 
 
   class TMSExporterWorkerThread : public osg::Referenced, public OpenThreads::Thread
   {
   public:
-    TMSExporterWorkerThread(TMSExporter* exporter, osgEarth::MapNode* mapNode, const std::string& path, std::vector< osgEarth::Bounds >& bounds, const std::string& outEarth="", bool overwrite=false, const std::string& extension="")
-      : OpenThreads::Thread(), _exporter(exporter), _mapNode(mapNode), _path(path), _bounds(bounds), _outEarth(outEarth), _overwrite(overwrite), _extension(extension)
+    TMSExporterWorkerThread(TMSExporter* exporter, osgEarth::MapNode* mapNode, const std::string& earthFilePath, const std::string& path, std::vector< osgEarth::Bounds >& bounds, const std::string& outEarth="", bool overwrite=false, const std::string& extension="")
+      : OpenThreads::Thread(), _exporter(exporter), _mapNode(mapNode), _earthFilePath(earthFilePath), _path(path), _bounds(bounds), _outEarth(outEarth), _overwrite(overwrite), _extension(extension)
     { }
 
     void run()
     {
       if (_exporter)
       {
-        _exporter->exportTMS(_mapNode, _path, _bounds, _outEarth, _overwrite, _extension);
+        _exporter->exportTMS(_mapNode, _earthFilePath, _path, _bounds, _outEarth, _overwrite, _extension);        
       }
     }
 
@@ -97,37 +107,9 @@ namespace PackageQt
     std::string _outEarth;
     bool _overwrite;
     std::string _extension;
-  };
-
-
-  class PackageLayerProgressCallback : public osgEarth::ProgressCallback
-  {
-  public:
-    PackageLayerProgressCallback(TMSExporter* exporter, int id)
-      : _exporter(exporter), _id(id)
-    {
-    }
-
-    virtual ~PackageLayerProgressCallback() { }
-
-    bool reportProgress(double current, double total, unsigned currentStage, unsigned totalStages, const std::string& msg)
-    {
-      if (_exporter)
-        _exporter->packageTaskProgress(_id, current / total);
-
-      return false;
-    }
-
-    void onCompleted()
-    {
-      if (_exporter)
-        _exporter->packageTaskComplete(_id);
-    }
-
-  private:
-    TMSExporter* _exporter;
-    int _id;
+    std::string _earthFilePath;
   };
 }
 
 #endif //TILER_TOOL_TMSEXPORTER_H
+

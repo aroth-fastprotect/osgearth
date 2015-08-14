@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,22 +21,29 @@
 #include <osgEarth/Cube>
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/ShaderFactory>
+#include <osgEarth/ShaderGenerator>
 #include <osgEarth/TaskService>
 #include <osgEarth/IOTypes>
 #include <osgEarth/ColorFilter>
 #include <osgEarth/StateSetCache>
 #include <osgEarth/HTTPClient>
-#include <osgEarthDrivers/cache_filesystem/FileSystemCache>
+#include <osgEarth/StringUtils>
+#include <osgEarth/TerrainEngineNode>
+#include <osgEarth/ObjectIndex>
+
+#include <osgEarth/Units>
 #include <osg/Notify>
 #include <osg/Version>
 #include <osgDB/Registry>
+#include <osgDB/Options>
+#include <osgText/Font>
+
 #include <gdal_priv.h>
 #include <ogr_api.h>
 #include <stdlib.h>
 #include <locale>
 
 using namespace osgEarth;
-using namespace osgEarth::Drivers;
 using namespace OpenThreads;
 
 #define STR_GLOBAL_GEODETIC    "global-geodetic"
@@ -47,8 +54,6 @@ using namespace OpenThreads;
 
 #define LC "[Registry] "
 
-// from MimeTypes.cpp
-extern const char* builtinMimeTypeExtMappings[];
 
 Registry::Registry() :
 osg::Referenced     ( true ),
@@ -57,11 +62,16 @@ _numGdalMutexGets   ( 0 ),
 _uidGen             ( 0 ),
 _caps               ( 0L ),
 _defaultFont        ( 0L ),
-_terrainEngineDriver( "mp" )
+_terrainEngineDriver( "mp" ),
+_cacheDriver        ( "filesystem" )
 {
     // set up GDAL and OGR.
     OGRRegisterAll();
     GDALAllRegister();
+    
+    // support Chinese character in the file name and attributes in ESRI's shapefile
+    CPLSetConfigOption("GDAL_FILENAME_IS_UTF8","NO");
+    CPLSetConfigOption("SHAPE_ENCODING","");
 
     // global initialization for CURL (not thread safe)
     HTTPClient::globalInit();
@@ -69,12 +79,21 @@ _terrainEngineDriver( "mp" )
     // generates the basic shader code for the terrain engine and model layers.
     _shaderLib = new ShaderFactory();
 
+    // shader generator used internally by osgEarth. Can be replaced.
+    _shaderGen = new ShaderGenerator();
+
     // thread pool for general use
     _taskServiceManager = new TaskServiceManager();
 
     // optimizes sharing of state attributes and state sets for
     // performance boost
     _stateSetCache = new StateSetCache();
+
+    // Default unref-after apply policy:
+    _unRefImageDataAfterApply = true;
+
+    // Default object index for tracking scene object by UID.
+    _objectIndex = new ObjectIndex();
 
     // activate KMZ support
     osgDB::Registry::instance()->addArchiveExtension  ( "kmz" );
@@ -88,6 +107,7 @@ _terrainEngineDriver( "mp" )
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/json",                            "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "text/x-json",                          "osgb" );
     osgDB::Registry::instance()->addMimeTypeExtensionMapping( "image/jpg",                            "jpg" );
+    osgDB::Registry::instance()->addMimeTypeExtensionMapping( "image/dds",                            "dds" );
     
     // pre-load OSG's ZIP plugin so that we can use it in URIs
     std::string zipLib = osgDB::Registry::instance()->createLibraryNameForExtension( "zip" );
@@ -97,53 +117,61 @@ _terrainEngineDriver( "mp" )
     // set up our default r/w options to NOT cache archives!
     _defaultOptions = new osgDB::Options();
     _defaultOptions->setObjectCacheHint( osgDB::Options::CACHE_NONE );
-    //_defaultOptions->setObjectCacheHint( (osgDB::Options::CacheHintOptions)
-    //    ((int)_defaultOptions->getObjectCacheHint() & ~osgDB::Options::CACHE_ARCHIVES) );
-
-    // see if there's a cache in the envvar
-    const char* cachePath = ::getenv("OSGEARTH_CACHE_PATH");
-    if ( cachePath )
-    {
-        FileSystemCacheOptions options;
-        options.rootPath() = std::string(cachePath);
-
-        osg::ref_ptr<Cache> cache = CacheFactory::create(options);
-        if ( cache->isOK() )
-        {
-            setCache( cache.get() );
-            OE_INFO << LC << "CACHE PATH set from environment variable: \"" << cachePath << "\"" << std::endl;
-        }
-        else
-        {
-            OE_WARN << LC << "FAILED to initialize cache from env.var." << std::endl;
-        }
-    }
-
-    // activate cache-only mode from the environment
-    if ( ::getenv("OSGEARTH_CACHE_ONLY") )
-    {
-        _overrideCachePolicy->usage() = CachePolicy::USAGE_CACHE_ONLY;
-        //setOverrideCachePolicy( CachePolicy::CACHE_ONLY );
-        OE_INFO << LC << "CACHE-ONLY MODE set from environment variable" << std::endl;
-    }
-
+    
     // activate no-cache mode from the environment
-    else if ( ::getenv("OSGEARTH_NO_CACHE") )
+    if ( ::getenv(OSGEARTH_ENV_NO_CACHE) )
     {
-        _overrideCachePolicy->usage() = CachePolicy::USAGE_NO_CACHE;
-        //setOverrideCachePolicy( CachePolicy::NO_CACHE );
-        OE_INFO << LC << "NO-CACHE MODE set from environment variable" << std::endl;
+        _overrideCachePolicy = CachePolicy::NO_CACHE;
+        OE_INFO << LC << "NO-CACHE MODE set from environment" << std::endl;
+    }
+    else
+    {
+        // activate cache-only mode from the environment
+        if ( ::getenv(OSGEARTH_ENV_CACHE_ONLY) )
+        {
+            _overrideCachePolicy->usage() = CachePolicy::USAGE_CACHE_ONLY;
+            OE_INFO << LC << "CACHE-ONLY MODE set from environment" << std::endl;
+        }
+
+        // see if the environment specifies a default caching driver.
+        const char* cacheDriver = ::getenv(OSGEARTH_ENV_CACHE_DRIVER);
+        if ( cacheDriver )
+        {
+            setDefaultCacheDriverName( cacheDriver );
+            OE_INFO << LC << "Cache driver set from environment: "
+                << getDefaultCacheDriverName() << std::endl;
+        }        
+
+        // cache max age?
+        const char* cacheMaxAge = ::getenv(OSGEARTH_ENV_CACHE_MAX_AGE);
+        if ( cacheMaxAge )
+        {
+            TimeSpan maxAge = osgEarth::as<long>( std::string(cacheMaxAge), INT_MAX );
+            _overrideCachePolicy->maxAge() = maxAge;
+        }
+
+        // see if there's a cache in the envvar; if so, create a cache.
+        // Note: the value of the OSGEARTH_CACHE_PATH is not used here; rather
+        // it's used in the driver(s) itself.
+        const char* cachePath = ::getenv(OSGEARTH_ENV_CACHE_PATH);
+        if ( cachePath )
+        {
+            CacheOptions options;
+            options.setDriver( getDefaultCacheDriverName() );
+
+            osg::ref_ptr<Cache> cache = CacheFactory::create(options);
+            if ( cache->isOK() )
+            {
+                setCache( cache.get() );
+            }
+            else
+            {
+                OE_WARN << LC << "FAILED to initialize cache from environment" << std::endl;
+            }
+        }
     }
 
-    // cache max age?
-    const char* cacheMaxAge = ::getenv("OSGEARTH_CACHE_MAX_AGE");
-    if ( cacheMaxAge )
-    {
-        TimeSpan maxAge = osgEarth::as<long>( std::string(cacheMaxAge), INT_MAX );
-        _overrideCachePolicy->maxAge() = maxAge;
-    }
-
-    const char* teStr = ::getenv("OSGEARTH_TERRAIN_ENGINE");
+    const char* teStr = ::getenv(OSGEARTH_ENV_TERRAIN_ENGINE_DRIVER);
     if ( teStr )
     {
         _terrainEngineDriver = std::string(teStr);
@@ -162,6 +190,12 @@ _terrainEngineDriver( "mp" )
 #else
         _defaultFont = osgText::readFontFile("ttf-dejavu/DejaVuSans.ttf");
 #endif
+    }
+    if ( _defaultFont.valid() )
+    {
+        // mitigates mipmapping issues that cause rendering artifacts
+        // for some fonts/placement
+        _defaultFont->setGlyphImageMargin( 2 );
     }
 
     // register the system stock Units.
@@ -268,26 +302,6 @@ const Profile*
 Registry::getGlobalMercatorProfile() const
 {
     return getSphericalMercatorProfile();
-#if 0
-    if ( !_global_mercator_profile.valid() )
-    {
-        GDAL_SCOPED_LOCK;
-
-        if ( !_global_mercator_profile.valid() ) // double-check pattern
-        {
-            // automatically figure out proper mercator extents:
-            const SpatialReference* srs = SpatialReference::create( "world-mercator" );
-
-            //double e, dummy;
-            //srs->getGeographicSRS()->transform2D( 180.0, 0.0, srs, e, dummy );
-            //const_cast<Registry*>(this)->_global_mercator_profile = Profile::create(
-            //    srs, -e, -e, e, e, 1, 1 );
-            const_cast<Registry*>(this)->_global_mercator_profile = Profile::create(
-                srs, MERC_MINX, MERC_MINY, MERC_MAXX, MERC_MAXY, 1, 1 );
-        }
-    }
-    return _global_mercator_profile.get();
-#endif
 }
 
 
@@ -362,27 +376,26 @@ Registry::setOverrideCachePolicy( const CachePolicy& value )
 }
 
 bool
-Registry::getCachePolicy( optional<CachePolicy>& cp, const osgDB::Options* options ) const
+Registry::resolveCachePolicy(optional<CachePolicy>& cp) const
 {
+    optional<CachePolicy> new_cp;
+
+    // start with the defaults
+    if ( defaultCachePolicy().isSet() )
+        new_cp = defaultCachePolicy();
+
+    // merge in any set properties from the caller's CP, since they override
+    // the defaults:
+    if ( cp.isSet() )
+        new_cp->mergeAndOverride( cp );
+
+    // finally, merge in any set props from the OVERRIDE CP, which take
+    // priority over everything else.
     if ( overrideCachePolicy().isSet() )
-    {
-        // if there is a system-wide override in place, use it.
-        cp = overrideCachePolicy().value();
-    }
-    else 
-    {
-        // Try to read the cache policy from the db-options
-        CachePolicy::fromOptions( options, cp );
+        new_cp->mergeAndOverride( overrideCachePolicy() );
 
-        if ( !cp.isSet() )
-        {
-            if ( defaultCachePolicy().isSet() )
-            {
-                cp = defaultCachePolicy().value();
-            }
-        }
-    }
-
+    // return the new composited cache policy.
+    cp = new_cp;
     return cp.isSet();
 }
 
@@ -466,6 +479,19 @@ Registry::setShaderFactory( ShaderFactory* lib )
     if ( lib != 0L && lib != _shaderLib.get() )
         _shaderLib = lib;
 }
+
+ShaderGeneratorProxy
+Registry::getShaderGenerator() const
+{
+    return ShaderGeneratorProxy(_shaderGen.get());
+}
+
+void
+Registry::setShaderGenerator(ShaderGenerator* shaderGen)
+{
+    if ( shaderGen != 0L && shaderGen != _shaderGen.get() )
+        _shaderGen = shaderGen;
+}
         
 void
 Registry::setURIReadCallback( URIReadCallback* callback ) 
@@ -501,8 +527,14 @@ Registry::createUID()
     return (UID)( _uidGen++ );
 }
 
+const osgDB::Options*
+Registry::getDefaultOptions() const 
+{
+    return _defaultOptions.get();
+}
+
 osgDB::Options*
-Registry::cloneOrCreateOptions( const osgDB::Options* input ) const
+Registry::cloneOrCreateOptions(const osgDB::Options* input)
 {
     osgDB::Options* newOptions = 
         input ? static_cast<osgDB::Options*>(input->clone(osg::CopyOp::SHALLOW_COPY)) : 
@@ -549,6 +581,12 @@ Registry::setDefaultTerrainEngineDriverName(const std::string& name)
 }
 
 void
+Registry::setDefaultCacheDriverName(const std::string& name)
+{
+    _cacheDriver = name;
+}
+
+void
 Registry::setStateSetCache( StateSetCache* cache )
 {
     _stateSetCache = cache;
@@ -558,6 +596,87 @@ StateSetCache*
 Registry::getStateSetCache() const
 {
     return _stateSetCache.get();
+}
+
+ProgramSharedRepo*
+Registry::getProgramSharedRepo()
+{
+    return &_programRepo;
+}
+
+ObjectIndex*
+Registry::getObjectIndex() const
+{
+    return _objectIndex.get();
+}
+
+void
+Registry::startActivity(const std::string& activity)
+{
+    Threading::ScopedMutexLock lock(_activityMutex);
+    _activities.insert(Activity(activity,std::string()));
+}
+
+void
+Registry::startActivity(const std::string& activity,
+                        const std::string& value)
+{
+    Threading::ScopedMutexLock lock(_activityMutex);
+    _activities.insert(Activity(activity,value));
+}
+
+void
+Registry::endActivity(const std::string& activity)
+{
+    Threading::ScopedMutexLock lock(_activityMutex);
+    _activities.erase(Activity(activity,std::string()));
+}
+
+void
+Registry::getActivities(std::set<std::string>& output)
+{
+    Threading::ScopedMutexLock lock(_activityMutex);
+    for(std::set<Activity,ActivityLess>::const_iterator i = _activities.begin();
+        i != _activities.end();
+        ++i)
+    {
+        if ( ! i->second.empty() )
+            output.insert( i->first + ": " + i->second );
+        else
+            output.insert( i->first );
+    }
+}
+
+std::string 
+Registry::getExtensionForMimeType(const std::string& mt)
+{            
+    std::string mt_lower = osgEarth::toLower(mt);
+
+    const osgDB::Registry::MimeTypeExtensionMap& exmap = osgDB::Registry::instance()->getMimeTypeExtensionMap();
+    for( osgDB::Registry::MimeTypeExtensionMap::const_iterator i = exmap.begin(); i != exmap.end(); ++i )
+    {
+        if ( i->first == mt_lower )
+        {
+            return i->first;
+        }
+    }
+    return std::string();
+}
+
+std::string 
+Registry::getMimeTypeForExtension(const std::string& ext)
+{            
+    std::string ext_lower = osgEarth::toLower(ext);
+
+    const osgDB::Registry::MimeTypeExtensionMap& exmap = osgDB::Registry::instance()->getMimeTypeExtensionMap();
+    for( osgDB::Registry::MimeTypeExtensionMap::const_iterator i = exmap.begin(); i != exmap.end(); ++i )
+    {
+        if ( i->second == ext_lower )
+        {
+            return i->first;
+        }
+    }
+    return std::string();
 }
 
 

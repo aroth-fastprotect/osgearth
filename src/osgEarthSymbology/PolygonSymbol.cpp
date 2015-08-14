@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,6 +21,14 @@
 
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
+
+OSGEARTH_REGISTER_SIMPLE_SYMBOL(polygon, PolygonSymbol);
+
+PolygonSymbol::PolygonSymbol(const PolygonSymbol& rhs,const osg::CopyOp& copyop):
+Symbol(rhs, copyop),
+_fill(rhs._fill)
+{
+}
 
 PolygonSymbol::PolygonSymbol( const Config& conf ) :
 Symbol( conf ),
@@ -52,5 +60,8 @@ PolygonSymbol::parseSLD(const Config& c, Style& style)
     }
     else if ( match(c.key(), "fill-opacity") ) {
         style.getOrCreate<PolygonSymbol>()->fill()->color().a() = as<float>( c.value(), 1.0f );
+    }
+    else if ( match(c.key(), "fill-script") ) {
+        style.getOrCreate<PolygonSymbol>()->script() = StringExpression(c.value());
     }
 }

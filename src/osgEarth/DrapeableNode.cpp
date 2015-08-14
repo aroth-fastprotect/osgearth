@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -44,3 +44,10 @@ OverlayNode( mapNode, draped, &getTechniqueGroup )
     //nop
 }
 
+void
+DrapeableNode::setRenderOrder(int order)
+{
+    _renderOrder = order;
+    osg::StateSet* s = _overlayProxyContainer->getOrCreateStateSet();
+    s->setRenderBinDetails(order, "RenderBin");
+}

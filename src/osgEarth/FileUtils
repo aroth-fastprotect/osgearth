@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -53,6 +53,13 @@ namespace osgEarth
     extern OSGEARTH_EXPORT bool isArchive(const std::string& path);
 
     /**
+     * whether the given path refers to a file contained inside an
+     * archive.
+     */
+    extern OSGEARTH_EXPORT bool isPathToArchivedFile(const std::string& path);
+
+    /**
+     * @deprecated Please use isPathToArchivedFile instead
      * Gets whether or not the given path contains a zip file within the path
      */
     extern OSGEARTH_EXPORT bool isZipPath(const std::string& path);
@@ -80,6 +87,16 @@ namespace osgEarth
      *        The suffix of the temporary filename
      */
      extern OSGEARTH_EXPORT std::string getTempName(const std::string& prefix="", const std::string& suffix="");
+
+     /** Make a new directory.  Returns true if directory exists or was created.
+      * Note:  This is adapted from osg's makeDirectory function to ensure that it works with concurrent create attempts.
+     */
+     extern OSGEARTH_EXPORT bool makeDirectory( const std::string &directoryPath );
+
+     /** Make a new directory for a given file.
+      * Note:  This is adapted from osg's makeDirectoryForFile to call our custom makeDirectory function.
+     */
+     extern OSGEARTH_EXPORT bool makeDirectoryForFile( const std::string &filePath );
 
      /**
       * Utility class that processes files and directories recursively.

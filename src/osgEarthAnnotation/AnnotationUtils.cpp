@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -24,7 +27,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/Capabilities>
-
+#include <osgEarth/CullingUtils>
 
 #include <osgText/Text>
 #include <osg/Depth>
@@ -32,6 +35,7 @@
 #include <osg/CullFace>
 #include <osg/MatrixTransform>
 #include <osg/LightModel>
+#include <osg/Projection>
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
@@ -97,7 +101,7 @@ AnnotationUtils::createTextDrawable(const std::string& text,
 
     t->setText( text, text_encoding );
 
-    // osgText::Text turns on depth writing by default, even if you turned it off..
+    // osgText::Text turns on depth writing by default, even if you turned it off.
     t->setEnableDepthWrites( false );
 
     if ( symbol && symbol->layout().isSet() )
@@ -105,10 +109,12 @@ AnnotationUtils::createTextDrawable(const std::string& text,
         if(symbol->layout().value() == TextSymbol::LAYOUT_RIGHT_TO_LEFT)
         {
             t->setLayout(osgText::TextBase::RIGHT_TO_LEFT);
-        }else if(symbol->layout().value() == TextSymbol::LAYOUT_LEFT_TO_RIGHT)
+        }
+        else if(symbol->layout().value() == TextSymbol::LAYOUT_LEFT_TO_RIGHT)
         {
             t->setLayout(osgText::TextBase::LEFT_TO_RIGHT);
-        }else if(symbol->layout().value() == TextSymbol::LAYOUT_VERTICAL)
+        }
+        else if(symbol->layout().value() == TextSymbol::LAYOUT_VERTICAL)
         {
             t->setLayout(osgText::TextBase::VERTICAL);
         }
@@ -127,12 +133,17 @@ AnnotationUtils::createTextDrawable(const std::string& text,
 
     t->setAutoRotateToScreen( false );
     t->setCharacterSizeMode( osgText::Text::OBJECT_COORDS );
-    t->setCharacterSize( symbol && symbol->size().isSet() ? *symbol->size() : 16.0f );
+    t->setCharacterSize( symbol && symbol->size().isSet() ? (float)(symbol->size()->eval()) : 16.0f );
     t->setColor( symbol && symbol->fill().isSet() ? symbol->fill()->color() : Color::White );
 
     osgText::Font* font = 0L;
     if ( symbol && symbol->font().isSet() )
+    {
         font = osgText::readFontFile( *symbol->font() );
+        // mitigates mipmapping issues that cause rendering artifacts for some fonts/placement
+        if ( font )
+          font->setGlyphImageMargin( 2 );
+    }
     if ( !font )
         font = Registry::instance()->getDefaultFont();
     if ( font )
@@ -176,7 +187,8 @@ osg::Geometry*
 AnnotationUtils::createImageGeometry(osg::Image*       image,
                                      const osg::Vec2s& pixelOffset,
                                      unsigned          textureUnit,
-                                     double            heading)
+                                     double            heading,
+                                     double            scale)
 {
     if ( !image )
         return 0L;
@@ -191,23 +203,24 @@ AnnotationUtils::createImageGeometry(osg::Image*       image,
     osg::StateSet* dstate = new osg::StateSet;
     dstate->setMode(GL_CULL_FACE,osg::StateAttribute::OFF);
     dstate->setMode(GL_LIGHTING,osg::StateAttribute::OFF);
-    //dstate->setMode(GL_BLEND, 1); // redundant. AnnotationNode sets blending.
-    dstate->setTextureAttributeAndModes(0, texture,osg::StateAttribute::ON);   
+    dstate->setTextureAttributeAndModes(0, texture,osg::StateAttribute::ON);
 
     // set up the geoset.
     osg::Geometry* geom = new osg::Geometry();
-    geom->setUseVertexBufferObjects(true);
-    
+    geom->setUseVertexBufferObjects(true);    
     geom->setStateSet(dstate);
 
-    float x0 = (float)pixelOffset.x() - image->s()/2.0;
-    float y0 = (float)pixelOffset.y() - image->t()/2.0;
+    float s = scale * image->s();
+    float t = scale * image->t();
+
+    float x0 = (float)pixelOffset.x() - s/2.0;
+    float y0 = (float)pixelOffset.y() - t/2.0;
 
     osg::Vec3Array* verts = new osg::Vec3Array(4);
-    (*verts)[0].set( x0, y0, 0 );
-    (*verts)[1].set( x0 + image->s(), y0, 0 );
-    (*verts)[2].set( x0 + image->s(), y0 + image->t(), 0 );
-    (*verts)[3].set( x0, y0 + image->t(), 0 );
+    (*verts)[0].set( x0,     y0,     0 );
+    (*verts)[1].set( x0 + s, y0,     0 );
+    (*verts)[2].set( x0 + s, y0 + t, 0 );
+    (*verts)[3].set( x0,     y0 + t, 0 );
 
     if (heading != 0.0)
     {
@@ -219,8 +232,6 @@ AnnotationUtils::createImageGeometry(osg::Image*       image,
         }
     }
     geom->setVertexArray(verts);
-    if ( verts->getVertexBufferObject() )
-        verts->getVertexBufferObject()->setUsage(GL_STATIC_DRAW_ARB);
 
     osg::Vec2Array* tcoords = new osg::Vec2Array(4);
     (*tcoords)[0].set(0, 0);
@@ -235,14 +246,6 @@ AnnotationUtils::createImageGeometry(osg::Image*       image,
     geom->setColorBinding(osg::Geometry::BIND_OVERALL);
 
     geom->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::QUADS,0,4));
-
-#if 0
-    // add the static "isText=true" uniform; this is a hint for the annotation shaders
-    // if they get installed.
-    static osg::ref_ptr<osg::Uniform> s_isNotTextUniform = new osg::Uniform(osg::Uniform::BOOL, UNIFORM_IS_TEXT());
-    s_isNotTextUniform->set( false );
-    dstate->addUniform( s_isNotTextUniform.get() );
-#endif
 
     return geom;
 }
@@ -270,120 +273,147 @@ AnnotationUtils::createHighlightUniform()
 // Transform::accept since we don't want to traverse the child graph from
 // this call.
 void
-AnnotationUtils::OrthoNodeAutoTransform::acceptCullNoTraverse( osg::CullStack* cs )
+AnnotationUtils::OrthoNodeAutoTransform::accept(osg::NodeVisitor& nv)
 {
-    osg::Viewport::value_type width = _previousWidth;
-    osg::Viewport::value_type height = _previousHeight;
-
-    osg::Viewport* viewport = cs->getViewport();
-    if (viewport)
+    if ( nv.validNodeMask(*this) )
     {
-        width = viewport->width();
-        height = viewport->height();
-    }
-
-    osg::Vec3d eyePoint = cs->getEyeLocal(); 
-    osg::Vec3d localUp = cs->getUpLocal(); 
-    osg::Vec3d position = getPosition();
-
-    const osg::Matrix& projection = *(cs->getProjectionMatrix());
-
-    bool doUpdate = _firstTimeToInitEyePoint;
-    if (!_firstTimeToInitEyePoint)
-    {
-        osg::Vec3d dv = _previousEyePoint-eyePoint;
-        if (dv.length2()>getAutoUpdateEyeMovementTolerance()*(eyePoint-getPosition()).length2())
+        if ( nv.getVisitorType() == nv.CULL_VISITOR )
         {
-            doUpdate = true;
-        }
-        osg::Vec3d dupv = _previousLocalUp-localUp;
-        // rotating the camera only affects ROTATE_TO_*
-        if (_autoRotateMode &&
-            dupv.length2()>getAutoUpdateEyeMovementTolerance())
-        {
-            doUpdate = true;
-        }
-        else if (width!=_previousWidth || height!=_previousHeight)
-        {
-            doUpdate = true;
-        }
-        else if (projection != _previousProjection) 
-        {
-            doUpdate = true;
-        }                
-        else if (position != _previousPosition) 
-        { 
-            doUpdate = true; 
-        } 
-    }
-    _firstTimeToInitEyePoint = false;
+            osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
 
-    if (doUpdate)
-    {            
-        if (getAutoScaleToScreen())
-        {
-            double size = 1.0/cs->pixelSize(getPosition(),0.48f);
-
-            if (_autoScaleTransitionWidthRatio>0.0)
+            // check for a reference camera for size scaling.
+            osg::Vec3f refCamScale(1,1,1);
+            osg::Camera* cam = cv->getCurrentCamera();
+            if ( cam && cam->isRenderToTextureCamera() )
             {
-                if (_minimumScale>0.0)
+                const osg::Viewport* vp = cam->getViewport();
+                if ( vp )
                 {
-                    double j = _minimumScale;
-                    double i = (_maximumScale<DBL_MAX) ? 
-                        _minimumScale+(_maximumScale-_minimumScale)*_autoScaleTransitionWidthRatio :
-                    _minimumScale*(1.0+_autoScaleTransitionWidthRatio);
-                    double c = 1.0/(4.0*(i-j));
-                    double b = 1.0 - 2.0*c*i;
-                    double a = j + b*b / (4.0*c);
-                    double k = -b / (2.0*c);
-
-                    if (size<k) size = _minimumScale;
-                    else if (size<i) size = a + b*size + c*(size*size);
+                    osg::Camera* refCam = dynamic_cast<osg::Camera*>(cam->getUserData());
+                    if ( refCam && refCam->getViewport() )
+                    {
+                        refCamScale.set(
+                            vp->width() / refCam->getViewport()->width(),
+                            vp->height() / refCam->getViewport()->height(),
+                            1.0f );
+                    }
                 }
-
-                if (_maximumScale<DBL_MAX)
-                {
-                    double n = _maximumScale;
-                    double m = (_minimumScale>0.0) ?
-                        _maximumScale+(_minimumScale-_maximumScale)*_autoScaleTransitionWidthRatio :
-                    _maximumScale*(1.0-_autoScaleTransitionWidthRatio);
-                    double c = 1.0 / (4.0*(m-n));
-                    double b = 1.0 - 2.0*c*m;
-                    double a = n + b*b/(4.0*c);
-                    double p = -b / (2.0*c);
-
-                    if (size>p) size = _maximumScale;
-                    else if (size>m) size = a + b*size + c*(size*size);
-                }        
             }
 
-            setScale(size);
+            osg::Viewport::value_type width = _previousWidth;
+            osg::Viewport::value_type height = _previousHeight;
+
+            osg::Viewport* viewport = cv->getViewport();
+            if (viewport)
+            {
+                width = viewport->width();
+                height = viewport->height();
+            }
+
+            osg::Vec3d eyePoint = cv->getEyeLocal(); 
+            osg::Vec3d localUp = cv->getUpLocal(); 
+            osg::Vec3d position = getPosition();
+
+            const osg::Matrix& projection = *(cv->getProjectionMatrix());
+
+            bool doUpdate = _firstTimeToInitEyePoint;
+            if (!_firstTimeToInitEyePoint)
+            {
+                osg::Vec3d dv = _previousEyePoint-eyePoint;
+                if (dv.length2()>getAutoUpdateEyeMovementTolerance()*(eyePoint-getPosition()).length2())
+                {
+                    doUpdate = true;
+                }
+                osg::Vec3d dupv = _previousLocalUp-localUp;
+                // rotating the camera only affects ROTATE_TO_*
+                if (_autoRotateMode &&
+                    dupv.length2()>getAutoUpdateEyeMovementTolerance())
+                {
+                    doUpdate = true;
+                }
+                else if (width!=_previousWidth || height!=_previousHeight)
+                {
+                    doUpdate = true;
+                }
+                else if (projection != _previousProjection) 
+                {
+                    doUpdate = true;
+                }                
+                else if (position != _previousPosition) 
+                { 
+                    doUpdate = true; 
+                } 
+            }
+            _firstTimeToInitEyePoint = false;
+
+            if (doUpdate)
+            {            
+                if (getAutoScaleToScreen())
+                {
+                    double size = 1.0/cv->pixelSize(getPosition(),0.48f);
+
+                    if (_autoScaleTransitionWidthRatio>0.0)
+                    {
+                        if (_minimumScale>0.0)
+                        {
+                            double j = _minimumScale;
+                            double i = (_maximumScale<DBL_MAX) ? 
+                                _minimumScale+(_maximumScale-_minimumScale)*_autoScaleTransitionWidthRatio :
+                            _minimumScale*(1.0+_autoScaleTransitionWidthRatio);
+                            double c = 1.0/(4.0*(i-j));
+                            double b = 1.0 - 2.0*c*i;
+                            double a = j + b*b / (4.0*c);
+                            double k = -b / (2.0*c);
+
+                            if (size<k) size = _minimumScale;
+                            else if (size<i) size = a + b*size + c*(size*size);
+                        }
+
+                        if (_maximumScale<DBL_MAX)
+                        {
+                            double n = _maximumScale;
+                            double m = (_minimumScale>0.0) ?
+                                _maximumScale+(_minimumScale-_maximumScale)*_autoScaleTransitionWidthRatio :
+                            _maximumScale*(1.0-_autoScaleTransitionWidthRatio);
+                            double c = 1.0 / (4.0*(m-n));
+                            double b = 1.0 - 2.0*c*m;
+                            double a = n + b*b/(4.0*c);
+                            double p = -b / (2.0*c);
+
+                            if (size>p) size = _maximumScale;
+                            else if (size>m) size = a + b*size + c*(size*size);
+                        }        
+                    }
+
+                    setScale(size * refCamScale.x());
+                }
+
+                if (_autoRotateMode==ROTATE_TO_SCREEN)
+                {
+                    osg::Vec3d translation;
+                    osg::Quat rotation;
+                    osg::Vec3d scale;
+                    osg::Quat so;
+
+                    cv->getModelViewMatrix()->decompose( translation, rotation, scale, so );
+
+                    setRotation(rotation.inverse());
+                }
+                // GW: removed other unused auto-rotate modes
+
+                _previousEyePoint = eyePoint;
+                _previousLocalUp = localUp;
+                _previousWidth = width;
+                _previousHeight = height;
+                _previousProjection = projection;
+                _previousPosition = position;
+
+                _matrixDirty = true;
+            }
         }
 
-        if (_autoRotateMode==ROTATE_TO_SCREEN)
-        {
-            osg::Vec3d translation;
-            osg::Quat rotation;
-            osg::Vec3d scale;
-            osg::Quat so;
-
-            cs->getModelViewMatrix()->decompose( translation, rotation, scale, so );
-
-            setRotation(rotation.inverse());
-        }
-        // GW: removed other unused auto-rotate modes
-
-        _previousEyePoint = eyePoint;
-        _previousLocalUp = localUp;
-        _previousWidth = width;
-        _previousHeight = height;
-        _previousProjection = projection;
-        _previousPosition = position;
-
-        _matrixDirty = true;
+        osg::Transform::accept( nv );
     }
-
-    // GW: the stock AutoTransform calls Transform::accept here; we do NOT
 }
 
 osg::Node* 
@@ -438,7 +468,11 @@ AnnotationUtils::createSphere( float r, const osg::Vec4& color, float maxAngle )
     osg::Geode* geode = new osg::Geode();
     geode->addDrawable( geom );
 
-    return geode;
+    // need 2-pass alpha so you can view it properly from below.
+    if ( color.a() < 1.0f )
+      return installTwoPassAlpha( geode );
+    else
+      return geode;
 }
 
 osg::Node* 
@@ -459,7 +493,7 @@ AnnotationUtils::createHemisphere( float r, const osg::Vec4& color, float maxAng
        v->getVertexBufferObject()->setUsage(GL_STATIC_DRAW_ARB);
 
     osg::DrawElementsUByte* b = new osg::DrawElementsUByte(GL_TRIANGLES);
-    b->reserve(24);
+    b->reserve(12);
     b->push_back(0); b->push_back(2); b->push_back(3);
     b->push_back(0); b->push_back(3); b->push_back(1);
     b->push_back(0); b->push_back(1); b->push_back(4);
@@ -488,10 +522,13 @@ AnnotationUtils::createHemisphere( float r, const osg::Vec4& color, float maxAng
     geode->addDrawable( geom );
 
     // need 2-pass alpha so you can view it properly from below.
-    return installTwoPassAlpha( geode );
+    if ( color.a() < 1.0f )
+      return installTwoPassAlpha( geode );
+    else
+      return geode;
 }
 
-// constucts an ellipsoidal mesh
+// constructs an ellipsoidal mesh
 osg::Geometry*
 AnnotationUtils::createEllipsoidGeometry(float xRadius, 
                                          float yRadius,
@@ -550,9 +587,9 @@ AnnotationUtils::createEllipsoidGeometry(float xRadius,
             float sin_v = sinf(v);
             
             verts->push_back(osg::Vec3(
-                xRadius * cos_u * sin_v,
-                yRadius * sin_u * sin_v,
-                zRadius * cos_v ));
+                xRadius * cos_u * cos_v,
+                yRadius * sin_u * cos_v,
+                zRadius * sin_v ));
 
             if (genTexCoords)
             {
@@ -626,52 +663,6 @@ AnnotationUtils::createEllipsoid(float xRadius,
 
     return geode;
 }
-
-#if 0
-osg::Node* 
-AnnotationUtils::createEllipsoid( float xr, float yr, float zr, const osg::Vec4& color, float maxAngle )
-{
-    osg::Geometry* geom = new osg::Geometry();
-    geom->setUseVertexBufferObjects(true);
-
-    osg::Vec3Array* v = new osg::Vec3Array();
-    v->reserve(6);
-    v->push_back( osg::Vec3(0,0, zr) ); // top
-    v->push_back( osg::Vec3(0,0,-zr) ); // bottom
-    v->push_back( osg::Vec3(-xr,0,0) ); // left
-    v->push_back( osg::Vec3( xr,0,0) ); // right
-    v->push_back( osg::Vec3(0, yr,0) ); // back
-    v->push_back( osg::Vec3(0,-yr,0) ); // front
-    geom->setVertexArray(v);
-    if ( v->getVertexBufferObject() )
-        v->getVertexBufferObject()->setUsage(GL_STATIC_DRAW_ARB);
-
-    osg::DrawElementsUByte* b = new osg::DrawElementsUByte(GL_TRIANGLES);
-    b->reserve(24);
-    b->push_back(0); b->push_back(3); b->push_back(4);
-    b->push_back(0); b->push_back(4); b->push_back(2);
-    b->push_back(0); b->push_back(2); b->push_back(5);
-    b->push_back(0); b->push_back(5); b->push_back(3);
-    b->push_back(1); b->push_back(3); b->push_back(5);
-    b->push_back(1); b->push_back(4); b->push_back(3);
-    b->push_back(1); b->push_back(2); b->push_back(4);
-    b->push_back(1); b->push_back(5); b->push_back(2);
-    geom->addPrimitiveSet( b );
-
-    MeshSubdivider ms;
-    ms.run( *geom, osg::DegreesToRadians(15.0f), GEOINTERP_GREAT_CIRCLE );
-
-    osg::Vec4Array* c = new osg::Vec4Array(1);
-    (*c)[0] = color;
-    geom->setColorArray( c );
-    geom->setColorBinding( osg::Geometry::BIND_OVERALL );
-
-    osg::Geode* geode = new osg::Geode();
-    geode->addDrawable( geom );
-
-    return geode;
-}
-#endif
 
 osg::Node* 
 AnnotationUtils::createFullScreenQuad( const osg::Vec4& color )

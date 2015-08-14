@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,7 +21,7 @@
 
 #include <osgEarthQt/Common>
 
-#include <osgEarth/Draggers>
+#include <osgEarthAnnotation/Draggers>
 #include <osgEarth/GeoMath>
 #include <osgEarthAnnotation/AnnotationEditing>
 #include <osgEarthAnnotation/EllipseNode>
@@ -283,11 +283,14 @@ namespace osgEarth { namespace QtGui
         ls->stroke()->stipple() = 0x0F0F;
         ls->tessellation() = 20;
         _lineStyle.getOrCreate<osgEarth::Symbology::AltitudeSymbol>()->clamping() = osgEarth::Symbology::AltitudeSymbol::CLAMP_TO_TERRAIN;
+        _lineStyle.getOrCreate<osgEarth::Symbology::AltitudeSymbol>()->technique() = osgEarth::Symbology::AltitudeSymbol::TECHNIQUE_GPU;
       }
     }
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
+      osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
+
       if ( ea.getEventType() == osgGA::GUIEventAdapter::PUSH  && _mouseDown == -1)
       {
         _mouseDown = ea.getButton();
@@ -392,14 +395,14 @@ namespace osgEarth { namespace QtGui
     osg::Vec3d _currentPoint;
   };
 
-  struct PointDraggerCallback : public osgEarth::Dragger::PositionChangedCallback
+  struct PointDraggerCallback : public osgEarth::Annotation::Dragger::PositionChangedCallback
   {
     PointDraggerCallback(int index, BaseAnnotationDialog* dialog)
       : _index(index), _dialog(dialog)
     {
     }
 
-    void onPositionChanged(const Dragger* sender, const osgEarth::GeoPoint& position)
+    void onPositionChanged(const osgEarth::Annotation::Dragger* sender, const osgEarth::GeoPoint& position)
     {
       _dialog->movePoint(_index, position);
     }
@@ -413,7 +416,7 @@ namespace osgEarth { namespace QtGui
   struct AddEllipseMouseHandler : public osgGA::GUIEventHandler
   {
     AddEllipseMouseHandler(AddEllipseDialog* dialog, osgEarth::MapNode* mapNode, osg::Group* root)
-      : _dialog(dialog), _mapNode(mapNode), _root(root), _rotationAngle(0, osgEarth::Units::DEGREES), _capturing(true), _mouseDown(false)
+      : _dialog(dialog), _mapNode(mapNode), _root(root), _mouseDown(false), _capturing(true), _rotationAngle(0, osgEarth::Units::DEGREES)
     {
       //Define a style for the ellipse outline
       _ellipseStyle.getOrCreate<LineSymbol>()->stroke()->color() = Color(Color::White, 0.75);
@@ -431,6 +434,8 @@ namespace osgEarth { namespace QtGui
     {
       if (!_capturing)
         return false;
+
+      osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
 
       if (ea.getEventType() == osgGA::GUIEventAdapter::PUSH && ea.getButton() == osgGA::GUIEventAdapter::LEFT_MOUSE_BUTTON)
       {

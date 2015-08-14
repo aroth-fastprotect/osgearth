@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -40,11 +43,11 @@ namespace osgEarth
         StringObject( const std::string& in ) : osg::Object(), _str(in) { }
 
         /** dtor */
-        virtual ~StringObject() { }
+        virtual ~StringObject();
         META_Object( osgEarth, StringObject );
 
-        void setString( const std::string& value ) { _str = value; }
-        const std::string& getString() const { return _str; }
+        void setString( const std::string& value );
+        const std::string& getString() const;
     private:
         std::string _str;
     };
@@ -65,7 +68,7 @@ namespace osgEarth
     /**
      * Return value from a read* method
      */
-    struct /*no-export*/ ReadResult
+    struct OSGEARTH_EXPORT ReadResult
     {
         /** Read result codes. */
         enum Code
@@ -79,24 +82,29 @@ namespace osgEarth
             RESULT_NO_READER,
             RESULT_READER_ERROR,
             RESULT_UNKNOWN_ERROR,
-            RESULT_NOT_IMPLEMENTED
+            RESULT_NOT_IMPLEMENTED,
+            RESULT_NOT_MODIFIED
         };
 
         /** Construct a result with no object */
         ReadResult( Code code =RESULT_NOT_FOUND )
             : _code(code), _fromCache(false), _lmt(0) { }
 
-        /** Construct a successful result */
+        /** Construct a result with code and data */
+        ReadResult( Code code, osg::Object* result )
+            : _code(code), _result(result), _fromCache(false), _lmt(0) { }
+
+        /** Construct a result with data, possible with an error code */
+        ReadResult( Code code, osg::Object* result, const Config& meta )
+            : _code(code), _result(result), _meta(meta), _fromCache(false), _lmt(0) { }
+
+        /** Construct a successful result (implicit OK code) */
         ReadResult( osg::Object* result )
             : _code(RESULT_OK), _result(result), _fromCache(false), _lmt(0) { }
 
         /** Construct a successful result with metadata */
         ReadResult( osg::Object* result, const Config& meta )
             : _code(RESULT_OK), _result(result), _meta(meta), _fromCache(false), _lmt(0) { }
-
-        /** Construct a result with data, possible with an error code */
-        ReadResult( Code code, osg::Object* result, const Config& meta )
-            : _code(code), _result(result), _meta(meta), _fromCache(false), _lmt(0) { }
 
         /** Copy construct */
         ReadResult( const ReadResult& rhs )
@@ -114,11 +122,17 @@ namespace osgEarth
         /** Whether the result contains an object */
         bool empty() const { return !_result.valid(); }
 
+        /** Detail message, sometimes set upon error */
+        const std::string& errorDetail() const { return _detail; }
+
         /** The result code */
         const Code& code() const { return _code; }
 
         /** Last modified timestamp */
         TimeStamp lastModifiedTime() const { return _lmt; }
+
+        /** Duration of request/response in seconds */
+        double duration() const { return _duration_s; }
 
         /** True if the object came from the cache */
         bool isFromCache() const { return _fromCache; }
@@ -159,7 +173,7 @@ namespace osgEarth
                 code == RESULT_NO_READER       ? "No suitable ReaderWriter found" :
                 code == RESULT_READER_ERROR    ? "ReaderWriter error" :
                 code == RESULT_NOT_IMPLEMENTED ? "Not implemented" :
-                "Unknown error";
+                                                 "Unknown error";
         }
 
         std::string getResultCodeString() const
@@ -172,6 +186,12 @@ namespace osgEarth
 
         void setLastModifiedTime(TimeStamp t) { _lmt = t; }
 
+        void setDuration(double s) { _duration_s = s; }
+
+        void setMetadata(const Config& meta) { _meta = meta; }
+
+        void setErrorDetail(const std::string& value) { _detail = value; }
+
     protected:
         Code                      _code;
         osg::ref_ptr<osg::Object> _result;
@@ -180,6 +200,8 @@ namespace osgEarth
         Config                    _emptyConfig;
         bool                      _fromCache;
         TimeStamp                 _lmt;
+        double                    _duration_s;
+        std::string               _detail;
     };
 
 //--------------------------------------------------------------------
@@ -214,23 +236,23 @@ namespace osgEarth
     public:
 
         /** Override the readObject() implementation */
-        virtual osgEarth::ReadResult readObject( const std::string& /*uri*/, const osgDB::Options* /*options*/ ) {
+        virtual osgEarth::ReadResult readObject( const std::string& uri, const osgDB::Options* options ) {
             return osgEarth::ReadResult::RESULT_NOT_IMPLEMENTED; }
 
         /** Override the readNode() implementation */
-        virtual osgEarth::ReadResult readNode( const std::string& /*uri*/, const osgDB::Options* /*options*/ ) {
+        virtual osgEarth::ReadResult readNode( const std::string& uri, const osgDB::Options* options ) {
             return osgEarth::ReadResult::RESULT_NOT_IMPLEMENTED; }
 
         /** Override the readImage() implementation */
-        virtual osgEarth::ReadResult readImage( const std::string& /*uri*/, const osgDB::Options* /*options*/ ) {
+        virtual osgEarth::ReadResult readImage( const std::string& uri, const osgDB::Options* options ) {
             return osgEarth::ReadResult::RESULT_NOT_IMPLEMENTED; }
 
         /** Override the readString() implementation */
-        virtual osgEarth::ReadResult readString( const std::string& /*uri*/, const osgDB::Options* /*options*/ ) {
+        virtual osgEarth::ReadResult readString( const std::string& uri, const osgDB::Options* options ) {
             return osgEarth::ReadResult::RESULT_NOT_IMPLEMENTED; }
 
         /** Override the readConfig() implementation */
-        virtual osgEarth::ReadResult readConfig( const std::string& /*uri*/, const osgDB::Options* /*options*/ ) {
+        virtual osgEarth::ReadResult readConfig( const std::string& uri, const osgDB::Options* options ) {
             return osgEarth::ReadResult::RESULT_NOT_IMPLEMENTED; }
 
     protected:
@@ -238,7 +260,7 @@ namespace osgEarth
         URIReadCallback();
 
         /** dtor */
-        virtual ~URIReadCallback() { }
+        virtual ~URIReadCallback();
     };
 
 }

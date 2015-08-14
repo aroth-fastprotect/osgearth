@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -67,8 +67,6 @@ void
 FeatureTileSourceOptions::fromConfig( const Config& conf )
 {
     conf.getObjIfSet( "features", _featureOptions );
-    //if ( conf.hasChild("features") )
-    //    _featureOptions->merge( ConfigOptions(conf.child("features")) );
 
     conf.getObjIfSet( "styles", _styles );
     
@@ -114,20 +112,29 @@ FeatureTileSource::initialize(const osgDB::Options* dbOptions)
     {
         _features->initialize( dbOptions );
 
-#if 0 // removed this as it was screwing up the rasterizer (agglite plugin).. not sure there's any reason to do this anyway
-        if (_features->getFeatureProfile())
+        // Try to fill the DataExtent list using the FeatureProfile
+        const FeatureProfile* featureProfile = _features->getFeatureProfile();
+        if (featureProfile != NULL)
         {
-            setProfile( Profile::create(_features->getFeatureProfile()->getSRS(),
-                                    _features->getFeatureProfile()->getExtent().xMin(), _features->getFeatureProfile()->getExtent().yMin(),
-                                    _features->getFeatureProfile()->getExtent().xMax(), _features->getFeatureProfile()->getExtent().yMax()));
-
+            if (featureProfile->getProfile() != NULL)
+            {
+                // Use specified profile's GeoExtent
+                getDataExtents().push_back(DataExtent(featureProfile->getProfile()->getExtent()));
+            }
+            else if (featureProfile->getExtent().isValid() == true)
+            {
+                // Use FeatureProfile's GeoExtent
+                getDataExtents().push_back(DataExtent(featureProfile->getExtent()));
+            }
         }
-#endif
     }
     else
     {
         return Status::Error("No FeatureSource provided; nothing will be rendered");
     }
+
+    // Create a session for feature processing. No map.
+    _session = new Session( 0L, _options.styles().get(), _features.get(), dbOptions );
 
     _initialized = true;
     return STATUS_OK;
@@ -158,9 +165,13 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
     // implementation-specific data
     osg::ref_ptr<osg::Referenced> buildData = createBuildData();
 
-	// allocate the image.
-	osg::ref_ptr<osg::Image> image = new osg::Image();
-	image->allocateImage( getPixelsPerTile(), getPixelsPerTile(), 1, GL_RGBA, GL_UNSIGNED_BYTE );
+    // allocate the image.
+    osg::ref_ptr<osg::Image> image = allocateImage();
+    if ( !image.valid() )
+    {
+        image = new osg::Image();
+        image->allocateImage( getPixelsPerTile(), getPixelsPerTile(), 1, GL_RGBA, GL_UNSIGNED_BYTE );
+    }
 
     preProcess( image.get(), buildData.get() );
 
@@ -171,14 +182,19 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
         osg::ref_ptr<FeatureCursor> cursor = _features->createFeatureCursor( Query() );
         while( cursor.valid() && cursor->hasMore() )
         {
-            Feature* feature = cursor->nextFeature();
+            osg::ref_ptr< Feature > feature = cursor->nextFeature();
             if ( feature )
             {
                 FeatureList list;
                 list.push_back( feature );
-                renderFeaturesForStyle( 
-                    *feature->style(), list, buildData.get(),
-                    key.getExtent(), image.get() );
+
+                renderFeaturesForStyle(
+                    _session.get(),
+                    *feature->style(),
+                    list,
+                    buildData.get(),
+                    key.getExtent(),
+                    image.get() );
             }
         }
     }
@@ -207,7 +223,7 @@ FeatureTileSource::createImage( const TileKey& key, ProgressCallback* progress )
     // final tile processing after all styles are done
     postProcess( image.get(), buildData.get() );
 
-	return image.release();
+    return image.release();
 }
 
 
@@ -229,11 +245,11 @@ FeatureTileSource::queryAndRenderFeaturesForStyle(const Style&     style,
     {
         GeoExtent queryExtent = queryExtentWGS84.transform( featuresExtent.getSRS() );
 
-	    // incorporate the image extent into the feature query for this style:
+        // incorporate the image extent into the feature query for this style:
         Query localQuery = query;
-        localQuery.bounds() = query.bounds().isSet()?
-		    query.bounds()->unionWith( queryExtent.bounds() ) :
-		    queryExtent.bounds();
+        localQuery.bounds() = 
+            query.bounds().isSet() ? query.bounds()->unionWith( queryExtent.bounds() ) :
+            queryExtent.bounds();
 
         // query the feature source:
         osg::ref_ptr<FeatureCursor> cursor = _features->createFeatureCursor( localQuery );
@@ -269,7 +285,7 @@ FeatureTileSource::queryAndRenderFeaturesForStyle(const Style&     style,
         //    << queryExtent.toString() << ")"
         //    << std::endl;
 
-	    return renderFeaturesForStyle( style, cellFeatures, data, imageExtent, out_image );
+        return renderFeaturesForStyle( _session.get(), style, cellFeatures, data, imageExtent, out_image );
     }
     else
     {

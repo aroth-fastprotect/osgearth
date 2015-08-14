@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,6 +21,15 @@
 
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
+
+OSGEARTH_REGISTER_SIMPLE_SYMBOL(point, PointSymbol);
+
+PointSymbol::PointSymbol(const PointSymbol& rhs,const osg::CopyOp& copyop):
+Symbol(rhs, copyop),
+_fill(rhs._fill),
+_size(rhs._size)
+{
+}
 
 PointSymbol::PointSymbol( const Config& conf ) :
 Symbol( conf ),
@@ -60,4 +69,8 @@ PointSymbol::parseSLD(const Config& c, Style& style)
     else if ( match(c.key(), "point-size") ) {
         style.getOrCreate<PointSymbol>()->size() = as<float>(c.value(), 1.0f);
     }
+    else if ( match(c.key(), "point-script") ) {
+        style.getOrCreate<PointSymbol>()->script() = StringExpression(c.value());
+    }
 }
+

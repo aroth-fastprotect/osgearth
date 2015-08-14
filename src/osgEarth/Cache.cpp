@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -30,6 +30,10 @@ using namespace osgEarth::Threading;
 
 #define LC "[Cache] "
 
+CacheOptions::~CacheOptions()
+{
+}
+
 //------------------------------------------------------------------------
 
 Cache::Cache( const CacheOptions& options ) :
@@ -37,6 +41,10 @@ _ok     ( true ),
 _options( options )
 {
     //nop
+}
+
+Cache::~Cache()
+{
 }
 
 Cache::Cache( const Cache& rhs, const osg::CopyOp& op ) :
@@ -79,13 +87,9 @@ CacheFactory::create( const CacheOptions& options )
     {
         OE_WARN << LC << "Sorry, but TMS caching is no longer supported; try \"filesystem\" instead" << std::endl;
     }
-//    else if ( options.getDriver() == "tilecache" )
-//    {
-////        result = new DiskCache( options );
-//    }
     else // try to load from a plugin
     {
-        osg::ref_ptr<osgDB::Options> rwopt = Registry::instance()->cloneOrCreateOptions();
+        osg::ref_ptr<osgDB::Options> rwopt = Registry::cloneOrCreateOptions();
         rwopt->setPluginData( CACHE_OPTIONS_TAG, (void*)&options );
 
         std::string driverExt = std::string(".osgearth_cache_") + options.getDriver();
@@ -105,4 +109,8 @@ const CacheOptions&
 CacheDriver::getCacheOptions( const osgDB::ReaderWriter::Options* rwopt ) const 
 {
     return *static_cast<const CacheOptions*>( rwopt->getPluginData( CACHE_OPTIONS_TAG ) );
+}
+
+CacheDriver::~CacheDriver()
+{
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 
 #include <osgEarth/Registry>
 #include <osgEarth/FileUtils>
+#include <osgEarth/StringUtils>
 #include <osgEarthFeatures/FeatureSource>
 #include <osgEarthFeatures/Filter>
 #include <osgEarthFeatures/BufferFilter>
@@ -42,6 +43,22 @@ using namespace osgEarth::Drivers;
 
 #define OGR_SCOPED_LOCK GDAL_SCOPED_LOCK
 
+namespace
+{
+    // helper function.
+    OGRLayerH openLayer(OGRDataSourceH ds, const std::string& layer)
+    {
+        OGRLayerH h = OGR_DS_GetLayerByName(ds, layer.c_str());
+        if ( !h )
+        {
+            unsigned index = osgEarth::as<unsigned>(layer, 0);
+            h = OGR_DS_GetLayer(ds, index);
+        }
+        return h;
+    }
+}
+
+
 /**
  * A FeatureSource that reads features from an OGR driver.
  *
@@ -53,7 +70,6 @@ public:
     OGRFeatureSource( const OGRFeatureOptions& options ) : FeatureSource( options ),
       _dsHandle( 0L ),
       _layerHandle( 0L ),
-      _layerIndex( 0 ),
       _ogrDriverHandle( 0L ),
       _options( options ),
       _featureCount(-1),
@@ -97,6 +113,11 @@ public:
         if ( _options.url().isSet() )
         {
             _source = _options.url()->full();
+            if (osgEarth::endsWith(_source, ".zip", false) ||
+                _source.find(".zip/") != std::string::npos)
+            {
+                _source = Stringify() << "/vsizip/" << _source;
+            }
         }
         else if ( _options.connection().isSet() )
         {
@@ -126,11 +147,13 @@ public:
 
         if ( _geometry.valid() )
         {
-            // if the user specified explicit geometry/profile, use that:
+            // if the user specified explicit geometry, use that and the calculated
+            // extent of the geometry to derive a profile.
             GeoExtent ex;
             if ( profile.valid() )
-            {
-                ex = profile->getExtent();
+            {                
+                //ex = profile->getExtent();
+                ex = GeoExtent(profile->getSRS(), _geometry->getBounds());
             }
 
             if ( !ex.isValid() )
@@ -160,12 +183,8 @@ public:
             {
                 if (openMode == 1) _writable = true;
                 
-                if ( _options.layer().isSet() )
-                {
-                    _layerIndex = _options.layer().value();
-                }                
+                _layerHandle = openLayer(_dsHandle, _options.layer().value());
 
-                _layerHandle = OGR_DS_GetLayer( _dsHandle, _layerIndex );
                 if ( _layerHandle )
                 {                                     
                     GeoExtent extent;
@@ -190,9 +209,15 @@ public:
                                 if ( OGR_L_GetExtent( _layerHandle, &env, 1 ) == OGRERR_NONE )
                                 {
                                     GeoExtent extent( srs.get(), env.MinX, env.MinY, env.MaxX, env.MaxY );
-                                    
-                                    // got enough info to make the profile!
-                                    result = new FeatureProfile( extent );
+                                    if ( extent.isValid() )
+                                    {                                    
+                                        // got enough info to make the profile!
+                                        result = new FeatureProfile( extent );
+                                    }
+                                    else
+                                    {
+                                        OE_WARN << LC << "Extent returned from OGR was invalid.\n";
+                                    }
                                 }
                             }
                         }
@@ -201,14 +226,21 @@ public:
                     // assuming we successfully opened the layer, build a spatial index if requested.
                     if ( _options.buildSpatialIndex() == true )
                     {
-                        OE_INFO << LC << "Building spatial index for " << getName() << std::endl;
-                        std::stringstream buf;
-                        const char* name = OGR_FD_GetName( OGR_L_GetLayerDefn( _layerHandle ) );
-                        buf << "CREATE SPATIAL INDEX ON " << name; 
-                        std::string bufStr;
-                        bufStr = buf.str();
-                        OE_DEBUG << LC << "SQL: " << bufStr << std::endl;
-                        OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
+                        if ( (_options.forceRebuildSpatialIndex() == true) || (OGR_L_TestCapability(_layerHandle, OLCFastSpatialFilter) == 0) )
+                        {
+                            OE_INFO << LC << "Building spatial index for " << getName() << std::endl;
+                            std::stringstream buf;
+                            const char* name = OGR_FD_GetName( OGR_L_GetLayerDefn( _layerHandle ) );
+                            buf << "CREATE SPATIAL INDEX ON " << name;
+                            std::string bufStr;
+                            bufStr = buf.str();
+                            OE_DEBUG << LC << "SQL: " << bufStr << std::endl;
+                            OGR_DS_ExecuteSQL( _dsHandle, bufStr.c_str(), 0L, 0L );
+                        }
+                        else
+                        {
+                            OE_INFO << LC << "Use existing spatial index for " << getName() << std::endl;
+                        }
                     }
 
                     //Get the feature count
@@ -265,6 +297,14 @@ public:
                 << "Feature Source: no valid source data available" << std::endl;
         }
 
+        if ( result )
+        {
+            if ( _options.geoInterp().isSet() )
+            {
+                result->geoInterp() = _options.geoInterp().get();
+            }
+        }
+
         return result;
     }
 
@@ -278,30 +318,44 @@ public:
                 _geometry.get(),
                 getFeatureProfile(),
                 _options.filters() );
-                //getFilters() );
         }
         else
         {
-            OGR_SCOPED_LOCK;
+            OGRDataSourceH dsHandle = 0L;
+            OGRLayerH layerHandle = 0L;
 
-            // Each cursor requires its own DS handle so that multi-threaded access will work.
-            // The cursor impl will dispose of the new DS handle.
-
-            OGRDataSourceH dsHandle = OGROpenShared( _source.c_str(), 0, &_ogrDriverHandle );
-            if ( dsHandle )
+            // open the handles safely:
             {
-                OGRLayerH layerHandle = OGR_DS_GetLayer( dsHandle, _layerIndex );
+                OGR_SCOPED_LOCK;
 
+                // Each cursor requires its own DS handle so that multi-threaded access will work.
+                // The cursor impl will dispose of the new DS handle.
+                dsHandle = OGROpenShared( _source.c_str(), 0, &_ogrDriverHandle );
+                if ( dsHandle )
+                {
+                    layerHandle = openLayer(dsHandle, _options.layer().get());
+                }
+            }
+
+            if ( dsHandle && layerHandle )
+            {
+                // cursor is responsible for the OGR handles.
                 return new FeatureCursorOGR( 
                     dsHandle,
                     layerHandle, 
                     this,
                     getFeatureProfile(),
-                    query, 
+                    query,
                     _options.filters() );
             }
             else
             {
+                if ( dsHandle )
+                {
+                    OGR_SCOPED_LOCK;
+                    OGRReleaseDataSource( dsHandle );
+                }
+
                 return 0L;
             }
         }
@@ -311,6 +365,7 @@ public:
     {
         if (_writable && _layerHandle)
         {
+            OGR_SCOPED_LOCK;
             if (OGR_L_DeleteFeature( _layerHandle, fid ) == OGRERR_NONE)
             {
                 _needsSync = true;
@@ -325,6 +380,11 @@ public:
         return _featureCount;
     }
 
+    bool supportsGetFeature() const
+    {
+        return true;
+    }
+
     virtual Feature* getFeature( FeatureID fid )
     {
         Feature* result = NULL;
@@ -335,9 +395,7 @@ public:
             OGRFeatureH handle = OGR_L_GetFeature( _layerHandle, fid);
             if (handle)
             {
-                const FeatureProfile* p = getFeatureProfile();
-                const SpatialReference* srs = p ? p->getSRS() : 0L;
-                result = OgrUtils::createFeature( handle, srs );
+                result = OgrUtils::createFeature( handle, getFeatureProfile() );
                 OGR_F_Destroy( handle );
             }
         }
@@ -469,7 +527,6 @@ private:
     std::string _source;
     OGRDataSourceH _dsHandle;
     OGRLayerH _layerHandle;
-    unsigned int _layerIndex;
     OGRSFDriverH _ogrDriverHandle;
     osg::ref_ptr<Symbology::Geometry> _geometry; // explicit geometry.
     const OGRFeatureOptions _options;

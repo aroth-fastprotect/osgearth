@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -33,6 +36,7 @@
 #include <osgGA/GUIEventHandler>
 #include <osgViewer/Viewer>
 #include <osgViewer/ViewerEventHandlers>
+#include <osgUtil/Optimizer>
 
 
 int usage( char** argv, const std::string& msg )
@@ -43,11 +47,13 @@ int usage( char** argv, const std::string& msg )
     << "Generates boundary geometry that you can use with an osgEarth <mask> layer in order\n"
     << "to stitch an external model into the terrain.\n\n"
     << "USAGE: " << argv[0] << " [options] model_file\n"
-    << "           --out file_name     : output file for boundary geometry (default is boundary.txt)\n"
-    << "           --no-geocentric     : skip geocentric reprojection (for flat databases)\n"
-    << "           --convex-hull       : calculate a convex hull instead of a full boundary\n"
-    << "           --verbose           : print progress to console\n"
-    << "           --view              : show result in 3D window\n"
+    << "           --out <file_name>    : output file for boundary geometry (default is boundary.txt)\n"
+    << "           --tolerance <meters> : tolerance for combining similar verts along a boundary (default = 0.005)\n"
+    << "           --precision <n>      : output precision of boundary coords (default=12)\n"
+    << "           --no-geocentric      : skip geocentric reprojection (for flat databases)\n"
+    << "           --convex-hull        : calculate a convex hull instead of a full boundary\n"
+    << "           --verbose            : print progress to console\n"
+    << "           --view               : show result in 3D window\n"
     << std::endl;
 
   
@@ -61,6 +67,13 @@ int main(int argc, char** argv)
     std::string outFile;
     if (!arguments.read("--out", outFile))
       outFile = "boundary.txt";
+
+    double tolerance;
+    if (arguments.read("--tolerance", tolerance))
+        BoundaryUtil::setTolerance(tolerance);
+
+    int precision = 12;
+    arguments.read("--precision", precision);
 
     bool geocentric = !arguments.read("--no-geocentric");
     bool verbose = arguments.read("--verbose");
@@ -104,7 +117,10 @@ int main(int argc, char** argv)
             if (verbose)
               std::cout << "  hull[" << i << "] == " << lon << ", " << lat << ", " << height << std::endl;
 
-            outStream << std::setiosflags(std::ios_base::fixed) << (i > 0 ? ", " : "") << lon << " " << lat << " " << height;
+            outStream
+                //<< std::fixed //std::setiosflags(std::ios_base::fixed)
+                << std::setprecision(precision)
+                << (i > 0 ? ", " : "") << lon << " " << lat << " " << height;
           }
 
           outStream << "))";

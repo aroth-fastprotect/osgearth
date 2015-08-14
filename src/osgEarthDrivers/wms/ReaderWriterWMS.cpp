@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -22,6 +22,8 @@
 #include <osgEarth/Registry>
 #include <osgEarth/TimeControl>
 #include <osgEarth/XmlUtils>
+#include <osgEarth/ImageUtils>
+#include <osgEarth/Containers>
 #include <osgEarthUtil/WMS>
 #include <osgDB/FileNameUtils>
 #include <osgDB/FileUtils>
@@ -119,13 +121,13 @@ public:
         }
         else
         {
-            OE_INFO << "[osgEarth::WMS] Got capabilities from " << capUrl.full() << std::endl;
+            OE_INFO << LC << "Got capabilities from " << capUrl.full() << std::endl;
         }
 
         if ( _formatToUse.empty() && capabilities.valid() )
         {
             _formatToUse = capabilities->suggestExtension();
-            OE_INFO << "[osgEarth::WMS] No format specified, capabilities suggested extension " << _formatToUse << std::endl;
+            OE_INFO << LC << "No format specified, capabilities suggested extension " << _formatToUse << std::endl;
         }
 
         if ( _formatToUse.empty() )
@@ -233,11 +235,11 @@ public:
             tsUrl = URI(_options.url()->full() + sep + std::string("request=GetTileService") );
         }
 
-        OE_INFO << "[osgEarth::WMS] Testing for JPL/TileService at " << tsUrl.full() << std::endl;
+        OE_INFO << LC << "Testing for JPL/TileService at " << tsUrl.full() << std::endl;
         _tileService = TileServiceReader::read(tsUrl.full(), dbOptions);
         if (_tileService.valid())
         {
-            OE_INFO << "[osgEarth::WMS] Found JPL/TileService spec" << std::endl;
+            OE_INFO << LC << "Found JPL/TileService spec" << std::endl;
             TileService::TilePatternList patterns;
             _tileService->getMatchingPatterns(
                 _options.layers().value(),
@@ -256,7 +258,7 @@ public:
         }
         else
         {
-            OE_INFO << "[osgEarth::WMS] No JPL/TileService spec found; assuming standard WMS" << std::endl;
+            OE_INFO << LC << "No JPL/TileService spec found; assuming standard WMS" << std::endl;
         }
 
         // Use the override profile if one is passed in.
@@ -267,11 +269,10 @@ public:
 
         if ( getProfile() )
         {
-            OE_NOTICE << "[osgEarth::WMS] Profile=" << getProfile()->toString() << std::endl;
+            OE_INFO << LC << "Profile=" << getProfile()->toString() << std::endl;
 
             // set up the cache options properly for a TileSource.
-            _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );
-            CachePolicy::NO_CACHE.apply( _dbOptions.get() );
+            _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );            
 
             return STATUS_OK;
         }
@@ -308,11 +309,19 @@ public:
 
         // Try to get the image first
         out_response = URI( uri ).readImage( _dbOptions.get(), progress);
+
+        if ( out_response.succeeded() )
+        {
+            image = out_response.getImage();
+        }
         
-        
+#if 0
         if ( !out_response.succeeded() )
         {
-            // If it failed, try to read it again as a string to get the exception.
+            // If it failed, see whether there's any info in the response.
+            OE_WARN << LC << "Failed, response:\n" << out_response.metadata().toJSON(true);
+            
+            // BAD: caches string data in an image cache. -gw
             out_response = URI( uri ).readString( _dbOptions.get(), progress );      
 
             // get the mime type:
@@ -329,23 +338,25 @@ public:
                     Config ex = se.child("serviceexceptionreport").child("serviceexception");
                     if ( !ex.empty() )
                     {
-                        OE_NOTICE << "WMS Service Exception: " << ex.toJSON(true) << std::endl;
+                        OE_INFO << LC << "WMS Service Exception: " << ex.toJSON(true) << std::endl;
                     }
                     else
                     {
-                        OE_NOTICE << "WMS Response: " << se.toJSON(true) << std::endl;
+                        OE_INFO << LC << "WMS Response: " << se.toJSON(true) << std::endl;
                     }
                 }
                 else
                 {
-                    OE_NOTICE << "WMS: unknown error." << std::endl;
+                    OE_INFO << LC << "WMS: unknown error." << std::endl;
                 }
-            }            
+            }     
         }
         else
         {
             image = out_response.getImage();
         }
+#endif
+
         return image.release();
     }
 
@@ -406,7 +417,7 @@ public:
     /** creates a 3D image from timestamped data. */
     osg::Image* createImageSequence( const TileKey& key, ProgressCallback* progress )
     {
-        osg::ImageSequence* seq = new SyncImageSequence();
+        osg::ref_ptr< osg::ImageSequence > seq = new SyncImageSequence();
         
         seq->setLoopingMode( osg::ImageStream::LOOPING );
         seq->setLength( _options.secondsPerFrame().value() * (double)_timesVec.size() );
@@ -425,8 +436,20 @@ public:
             }
         }
 
+        // Just return an empty image if we didn't get any images
+#if OSG_VERSION_LESS_THAN(3,1,4)
+        unsigned size = seq->getNumImages();
+#else
+        unsigned size = seq->getNumImageData();
+#endif
+
+        if (size == 0)
+        {
+            return ImageUtils::createEmptyImage();
+        }
+
         _sequenceCache.insert( seq );
-        return seq;
+        return seq.release();
     }
 
 
@@ -547,7 +570,7 @@ private:
     bool                             _isPlaying;
     std::vector<SequenceFrameInfo>   _seqFrameInfoVec;
 
-    mutable Threading::ThreadSafeObserverSet<osg::ImageSequence> _sequenceCache;
+    mutable ThreadSafeObserverSet<osg::ImageSequence> _sequenceCache;
 };
 
 

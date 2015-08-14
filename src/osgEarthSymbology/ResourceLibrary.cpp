@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -42,8 +42,8 @@ _initialized( false )
 
 ResourceLibrary::ResourceLibrary(const std::string&    name,
                                  const URI&            uri) :
-_uri        ( uri, uri ),
 _name       ( name ),
+_uri        ( uri, uri ),
 _initialized( false )
 {
     //nop
@@ -82,7 +82,7 @@ ResourceLibrary::mergeConfig( const Config& conf )
 Config
 ResourceLibrary::getConfig() const
 {
-    Config conf;
+    Config conf("resources");
     {
         Threading::ScopedReadLock shared( const_cast<ResourceLibrary*>(this)->_mutex );
 
@@ -166,19 +166,25 @@ ResourceLibrary::removeResource( Resource* resource )
 
 static Threading::Mutex s_initMutex;
 
-void
+bool
 ResourceLibrary::initialize( const osgDB::Options* dbOptions )
 {
+    bool ok = true;
+
     if ( !_initialized )
     {
         Threading::ScopedMutexLock exclusive(s_initMutex);
         if ( !_initialized )
         {
+            ok = false;
+
             if ( _uri.isSet() )
             {
                 osg::ref_ptr<XmlDocument> xml = XmlDocument::load( *_uri, dbOptions );
                 if ( xml.valid() )
                 {
+                    ok = true;
+
                     Config conf = xml->getConfig();
                     if ( conf.key() == "resources" )
                     {
@@ -195,6 +201,8 @@ ResourceLibrary::initialize( const osgDB::Options* dbOptions )
             _initialized = true;
         }
     }
+
+    return ok;
 }
 
 SkinResource*
@@ -236,6 +244,12 @@ SkinResource*
 ResourceLibrary::getSkin( const SkinSymbol* symbol, Random& prng, const osgDB::Options* dbOptions ) const
 {
     const_cast<ResourceLibrary*>(this)->initialize( dbOptions );
+
+    if (symbol->name().isSet())
+    {
+        return getSkin(symbol->name()->eval(), dbOptions);
+    }
+
     SkinResourceVector candidates;
     getSkins( symbol, candidates );
     unsigned size = candidates.size();
@@ -256,6 +270,11 @@ ResourceLibrary::getSkin( const SkinSymbol* symbol, Random& prng, const osgDB::O
 bool
 ResourceLibrary::matches( const SkinSymbol* q, SkinResource* s ) const
 {
+    if ( q->name().isSet() )
+    {
+        return osgEarth::ciEquals(q->name()->eval(), s->name());
+    }
+
     if (q->objectHeight().isSet())
     {
         if (s->minObjectHeight().isSet() && 

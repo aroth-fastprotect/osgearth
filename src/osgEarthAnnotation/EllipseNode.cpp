@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -22,6 +25,7 @@
 #include <osgEarthSymbology/GeometryFactory>
 #include <osgEarth/DrapeableNode>
 #include <osgEarth/MapNode>
+#include <cmath>
 
 using namespace osgEarth;
 using namespace osgEarth::Annotation;
@@ -187,7 +191,7 @@ EllipseNode::rebuild()
     GeometryFactory factory;
     Geometry* geom = NULL;
 
-    if (abs(_arcEnd.as(Units::DEGREES) - _arcStart.as(Units::DEGREES)) >= 360.0)
+    if (std::abs(_arcEnd.as(Units::DEGREES) - _arcStart.as(Units::DEGREES)) >= 360.0)
     {
         geom = factory.createEllipse(osg::Vec3d(0,0,0), _radiusMajor, _radiusMinor, _rotationAngle, _numSegments);
     }
@@ -224,7 +228,6 @@ EllipseNode::EllipseNode(MapNode*              mapNode,
                          const Config&         conf,
                          const osgDB::Options* dbOptions) :
 LocalizedNode( mapNode, conf ),
-_draped      ( false ),
 _numSegments ( 0 )
 {
     _xform = new osg::MatrixTransform();
@@ -236,15 +239,14 @@ _numSegments ( 0 )
     conf.getIfSet   ( "num_segments", _numSegments );
 
     rebuild();
-
-    if ( conf.hasChild("position") )
-        setPosition( GeoPoint(conf.child("position")) );
 }
 
 Config
 EllipseNode::getConfig() const
 {
-    Config conf( "ellipse" );
+    Config conf = LocalizedNode::getConfig();
+    conf.key() = "ellipse";
+
     conf.addObj( "radius_major", _radiusMajor );
     conf.addObj( "radius_minor", _radiusMinor );
     conf.addObj( "rotation", _rotationAngle );
@@ -252,8 +254,6 @@ EllipseNode::getConfig() const
 
     if ( _numSegments != 0 )
         conf.add( "num_segments", _numSegments );
-
-    conf.addObj( "position", getPosition() );
 
     return conf;
 }

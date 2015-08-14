@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -29,6 +29,7 @@
 #include <osg/MatrixTransform>
 #include <osg/Vec3d>
 #include <osg/Vec3>
+#include <osg/ClipPlane>
 #include <osgUtil/CullVisitor>
 
 namespace osgEarth
@@ -95,25 +96,6 @@ namespace osgEarth
         }
     };
 
-    /**
-     * Culler that tests whether the line-of-sight vector between the camera
-     * and the node intersects the Ellipsoid, and if so, culls the node.
-     */
-    struct OSGEARTH_EXPORT CullNodeByEllipsoid : public osg::NodeCallback {
-        double _minRadius;
-        CullNodeByEllipsoid( const osg::EllipsoidModel* model );
-        void operator()(osg::Node* node, osg::NodeVisitor* nv);
-    };
-
-    struct OSGEARTH_EXPORT CullNodeByHorizon : public osg::NodeCallback {
-        osg::observer_ptr<osg::MatrixTransform> _xform;
-        osg::Vec3d _world;
-        double _r, _r2;
-        CullNodeByHorizon( const osg::Vec3d& world, const osg::EllipsoidModel* model );
-        CullNodeByHorizon( osg::MatrixTransform* xform, const osg::EllipsoidModel* model );
-        void operator()(osg::Node* node, osg::NodeVisitor* nv );
-    };
-
     struct OSGEARTH_EXPORT CullNodeByFrameNumber : public osg::NodeCallback {
         unsigned _frame;
         CullNodeByFrameNumber() : _frame(0) { }
@@ -131,6 +113,13 @@ namespace osgEarth
         osg::BoundingSphere _bs;
         StaticBound(const osg::BoundingSphere& bs) : _bs(bs) { }
         osg::BoundingSphere computeBound(const osg::Node&) const { return _bs; }
+    };
+
+    // a cull callback that prevents objects from being included in the near/fear clip
+    // plane calculates that OSG does.
+    struct OSGEARTH_EXPORT DoNotComputeNearFarCullCallback : public osg::NodeCallback
+    {
+        void operator()(osg::Node* node, osg::NodeVisitor* nv);
     };
 
     /**
@@ -262,6 +251,26 @@ namespace osgEarth
 
     private:
         float _scaleFactor;
+    };
+
+
+    
+    /**
+     * Cull callback that sets a clip plane at the visible horizon
+     * of the Ellipsoid.
+     */
+    class OSGEARTH_EXPORT ClipToGeocentricHorizon : public osg::NodeCallback
+    {
+    public:
+        ClipToGeocentricHorizon(
+            const osgEarth::SpatialReference* srs,
+            osg::ClipPlane*                   clipPlane);
+        
+        void operator()(osg::Node* node, osg::NodeVisitor* nv);
+
+    protected:
+        osg::Vec3d                        _radii;
+        osg::observer_ptr<osg::ClipPlane> _clipPlane;
     };
 }
 

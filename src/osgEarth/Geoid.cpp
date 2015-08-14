@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -46,8 +46,8 @@ Geoid::setHeightField( osg::HeightField* hf )
     _bounds = Bounds(
         _hf->getOrigin().x(),
         _hf->getOrigin().y(),
-        _hf->getOrigin().x() + _hf->getXInterval() * double(_hf->getNumColumns()),
-        _hf->getOrigin().y() + _hf->getYInterval() * double(_hf->getNumRows()) );
+        _hf->getOrigin().x() + _hf->getXInterval() * double(_hf->getNumColumns()-1),
+        _hf->getOrigin().y() + _hf->getYInterval() * double(_hf->getNumRows()-1) );
     validate();
 }
 

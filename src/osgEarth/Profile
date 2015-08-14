@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -139,6 +139,9 @@ namespace osgEarth
         static const Profile* create(
             const ProfileOptions& options );
 
+        static const Profile* createNamed(
+            const std::string& name);
+
         /**
          * Returns true if the profile is properly initialized.
          */
@@ -229,6 +232,7 @@ namespace osgEarth
          */
         virtual void getIntersectingTiles(
             const GeoExtent& extent,
+            unsigned localLOD,
             std::vector<TileKey>& out_intersectingKeys) const;
 
         /** 
@@ -241,7 +245,7 @@ namespace osgEarth
         /**
          * Creates a tile key for a tile that contains the input location at the specified LOD.
          * Express the coordinates in the profile's SRS.
-         * Returns NULL if the point lies outside the profile's extents.
+         * Returns TileKey::INVALID if the point lies outside the profile's extents.
          */
         TileKey createTileKey( double x, double y, unsigned int level ) const;
 
@@ -271,7 +275,7 @@ namespace osgEarth
          * Given another Profile and an LOD in that Profile, determine 
          * the LOD in this Profile that is nearly equivalent.
          */
-        unsigned int getEquivalentLOD( const Profile* profile, unsigned int lod ) const;
+        virtual unsigned getEquivalentLOD(const Profile* profile, unsigned lod) const;
 
     public:
 
@@ -301,6 +305,7 @@ namespace osgEarth
 
         virtual void addIntersectingTiles(
             const GeoExtent& key_ext,
+            unsigned localLOD,
             std::vector<TileKey>& out_intersectingKeys) const;
 
 

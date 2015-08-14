@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 
 #include <osgEarth/ECEF>
 #include <osgEarth/DepthOffset>
+#include <osgEarth/Registry>
 
 #include <osg/BlendFunc>
 #include <osg/PagedLOD>
@@ -79,7 +80,7 @@ UTMGraticule( 0L )
     {
         LineSymbol* line = _options->secondaryStyle()->getOrCreate<LineSymbol>();
         line->stroke()->color() = Color(Color::White, 0.5f);
-        line->stroke()->stipple() = 0x1111;
+        line->stroke()->stipplePattern() = 0x1111;
 
         TextSymbol* text = _options->secondaryStyle()->getOrCreate<TextSymbol>();
         text->fill()->color() = Color(Color::White, 0.3f);
@@ -124,24 +125,25 @@ MGRSGraticule::buildSQIDTiles( const std::string& gzd )
     char letter;
     sscanf( gzd.c_str(), "%u%c", &zone, &letter );
     
-    TextSymbol* textSym = _options->secondaryStyle()->get<TextSymbol>();
-    if ( !textSym )
-        textSym = _options->primaryStyle()->getOrCreate<TextSymbol>();
+    const TextSymbol* textSymFromOptions = _options->secondaryStyle()->get<TextSymbol>();
+    if ( !textSymFromOptions )
+        textSymFromOptions = _options->primaryStyle()->get<TextSymbol>();
 
-    AltitudeSymbol* alt = _options->secondaryStyle()->get<AltitudeSymbol>();
+    // copy it since we intend to alter it
+    osg::ref_ptr<TextSymbol> textSym = 
+        textSymFromOptions ? new TextSymbol(*textSymFromOptions) :
+        new TextSymbol();
+
     double h = 0.0;
 
     TextSymbolizer ts( textSym );
     MGRSFormatter mgrs(MGRSFormatter::PRECISION_100000M);
     osg::Geode* textGeode = new osg::Geode();
-    textGeode->getOrCreateStateSet()->setRenderBinDetails( 9999, "DepthSortedBin" );    
-    textGeode->getOrCreateStateSet()->setAttributeAndModes( _depthAttribute, 1 );
 
     const SpatialReference* ecefSRS = extent.getSRS()->getECEF();
     osg::Vec3d centerMap, centerECEF;
     extent.getCentroid(centerMap.x(), centerMap.y());
     extent.getSRS()->transform(centerMap, ecefSRS, centerECEF);
-    //extent.getSRS()->transformToECEF(centerMap, centerECEF);
 
     osg::Matrix local2world;
     ecefSRS->createLocalToWorld( centerECEF, local2world ); //= ECEF::createLocalToWorld(centerECEF);
@@ -250,7 +252,6 @@ MGRSGraticule::buildSQIDTiles( const std::string& gzd )
                 sqidTextMap.z() += 1000.0;
                 osg::Vec3d sqidTextECEF;
                 extent.getSRS()->transform(sqidTextMap, ecefSRS, sqidTextECEF);
-                //extent.getSRS()->transformToECEF(sqidTextMap, sqidTextECEF);
                 osg::Vec3d sqidLocal;
                 sqidLocal = sqidTextECEF * world2local;
 
@@ -321,7 +322,6 @@ MGRSGraticule::buildSQIDTiles( const std::string& gzd )
                         sqidTextMap.z() += 1000.0;
                         osg::Vec3d sqidTextECEF;
                         extent.getSRS()->transform(sqidTextMap, ecefSRS, sqidTextECEF);
-                        //extent.getSRS()->transformToECEF(sqidTextMap, sqidTextECEF);
                         osg::Vec3d sqidLocal = sqidTextECEF * world2local;
 
                         MGRSCoord mgrsCoord;
@@ -528,7 +528,6 @@ MGRSGraticule::buildSQIDTiles( const std::string& gzd )
 
     Style lineStyle;
     lineStyle.add( _options->secondaryStyle()->get<LineSymbol>() );
-    lineStyle.add( _options->secondaryStyle()->get<AltitudeSymbol>() );
 
     GeometryCompiler compiler;
     osg::ref_ptr<Session> session = new Session( getMapNode()->getMap() );
@@ -544,6 +543,8 @@ MGRSGraticule::buildSQIDTiles( const std::string& gzd )
     osg::MatrixTransform* mt = new osg::MatrixTransform(local2world);
     mt->addChild(textGeode);
     group->addChild( mt );
+
+    Registry::shaderGenerator().run(textGeode, Registry::stateSetCache());
 
     // prep for depth offset:
     //DepthOffsetUtils::prepareGraph( group );

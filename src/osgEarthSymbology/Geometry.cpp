@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -53,6 +56,10 @@ Geometry::Geometry( const Vec3dVector* data )
 {
     reserve( data->size() );
     insert( begin(), data->begin(), data->end() );
+}
+
+Geometry::~Geometry()
+{
 }
 
 int
@@ -149,7 +156,9 @@ Geometry::buffer(double distance,
 {
 #ifdef OSGEARTH_HAVE_GEOS   
 
-    geom::Geometry* inGeom = GEOSUtils::importGeometry( this );
+    GEOSContext gc;
+
+    geom::Geometry* inGeom = gc.importGeometry( this );
     if ( inGeom )
     {
         buffer::BufferParameters::EndCapStyle geosEndCap =
@@ -182,27 +191,34 @@ Geometry::buffer(double distance,
         {
             if (params._singleSided)
             {
-                outGeom = bufBuilder.bufferLineSingleSided(inGeom, distance, params._leftSide );
+                outGeom = bufBuilder.bufferLineSingleSided(inGeom, distance, params._leftSide);
             }
             else
             {
-                outGeom = bufBuilder.buffer(inGeom, distance );
+                outGeom = bufBuilder.buffer(inGeom, distance);
             }
         }
-        catch( const util::TopologyException& ex )
+        catch(const geos::util::GEOSException& ex)
         {
-            OE_WARN << LC << "GEOS buffer: " << ex.what() << std::endl;
+            OE_NOTICE << LC << "buffer(GEOS): "
+                << (ex.what()? ex.what() : " no error message")
+                << std::endl;
             outGeom = 0L;
         }
 
+        bool sharedFactory = 
+            inGeom && outGeom &&
+            inGeom->getFactory() == outGeom->getFactory();
+
         if ( outGeom )
         {
-            output = GEOSUtils::exportGeometry( outGeom );
-            outGeom->getFactory()->destroyGeometry( outGeom );
+            output = gc.exportGeometry( outGeom );
+            gc.disposeGeometry( outGeom );
         }
 
-        inGeom->getFactory()->destroyGeometry( inGeom );
+        gc.disposeGeometry( inGeom );
     }
+
     return output.valid();
 
 #else // OSGEARTH_HAVE_GEOS
@@ -217,43 +233,66 @@ bool
 Geometry::crop( const Polygon* cropPoly, osg::ref_ptr<Geometry>& output ) const
 {
 #ifdef OSGEARTH_HAVE_GEOS
+    bool success = false;
+    output = 0L;
 
-    geom::GeometryFactory* f = new geom::GeometryFactory();
+    GEOSContext gc;
 
     //Create the GEOS Geometries
-    geom::Geometry* inGeom = GEOSUtils::importGeometry( this );
-    geom::Geometry* cropGeom = GEOSUtils::importGeometry( cropPoly );
+    geom::Geometry* inGeom   = gc.importGeometry( this );
+    geom::Geometry* cropGeom = gc.importGeometry( cropPoly );
 
     if ( inGeom )
     {    
         geom::Geometry* outGeom = 0L;
         try {
             outGeom = overlay::OverlayOp::overlayOp(
-                inGeom, cropGeom,
+                inGeom,
+                cropGeom,
                 overlay::OverlayOp::opINTERSECTION );
         }
-        catch( ... ) {
+        catch(const geos::util::GEOSException& ex) {
+            OE_NOTICE << LC << "Crop(GEOS): "
+                << (ex.what()? ex.what() : " no error message")
+                << std::endl;
             outGeom = 0L;
-            OE_NOTICE << LC << "::crop, GEOS overlay op exception, skipping feature" << std::endl;
         }
 
         if ( outGeom )
         {
-            output = GEOSUtils::exportGeometry( outGeom );
-            f->destroyGeometry( outGeom );
-            if ( output.valid() && !output->isValid() )
+            output = gc.exportGeometry( outGeom );
+
+            if ( output.valid())
             {
-                output = 0L;
+                if ( output->isValid() )
+                {
+                    success = true;
+                }
+                else
+                {
+                    // GEOS result is invalid
+                    output = 0L;
+                }
             }
+            else
+            {
+                // set output to empty geometry to indicate the (valid) empty case,
+                // still returning false but allows for check.
+                if (outGeom->getNumPoints() == 0)
+                {
+                    output = new osgEarth::Symbology::Geometry();
+                }
+            }
+
+            gc.disposeGeometry( outGeom );
         }
     }
 
     //Destroy the geometry
-    f->destroyGeometry( cropGeom );
-    f->destroyGeometry( inGeom );
+    gc.disposeGeometry( cropGeom );
+    gc.disposeGeometry( inGeom );
 
-    delete f;
-    return output.valid();
+    return success;
 
 #else // OSGEARTH_HAVE_GEOS
 
@@ -264,33 +303,110 @@ Geometry::crop( const Polygon* cropPoly, osg::ref_ptr<Geometry>& output ) const
 }
 
 bool
-Geometry::difference( const Polygon* diffPolygon, osg::ref_ptr<Geometry>& output ) const
+Geometry::geounion( const Geometry* other, osg::ref_ptr<Geometry>& output ) const
 {
 #ifdef OSGEARTH_HAVE_GEOS
+    bool success = false;
+    output = 0L;
 
-    geom::GeometryFactory* f = new geom::GeometryFactory();
+    GEOSContext gc;
 
     //Create the GEOS Geometries
-    geom::Geometry* inGeom = GEOSUtils::importGeometry( this );
-    geom::Geometry* diffGeom = GEOSUtils::importGeometry( diffPolygon );
+    geom::Geometry* inGeom   = gc.importGeometry( this );
+    geom::Geometry* otherGeom = gc.importGeometry( other );
 
     if ( inGeom )
     {    
         geom::Geometry* outGeom = 0L;
         try {
             outGeom = overlay::OverlayOp::overlayOp(
-                inGeom, diffGeom,
-                overlay::OverlayOp::opDIFFERENCE );
+                inGeom,
+                otherGeom,
+                overlay::OverlayOp::opUNION );
         }
-        catch( ... ) {
+        catch(const geos::util::GEOSException& ex) {
+            OE_NOTICE << LC << "Union(GEOS): "
+                << (ex.what()? ex.what() : " no error message")
+                << std::endl;
             outGeom = 0L;
-            OE_NOTICE << LC << "::difference, GEOS overlay op exception, skipping feature" << std::endl;
         }
 
         if ( outGeom )
         {
-            output = GEOSUtils::exportGeometry( outGeom );
-            f->destroyGeometry( outGeom );
+            output = gc.exportGeometry( outGeom );
+
+            if ( output.valid())
+            {
+                if ( output->isValid() )
+                {
+                    success = true;
+                }
+                else
+                {
+                    // GEOS result is invalid
+                    output = 0L;
+                }
+            }
+            else
+            {
+                // set output to empty geometry to indicate the (valid) empty case,
+                // still returning false but allows for check.
+                if (outGeom->getNumPoints() == 0)
+                {
+                    output = new osgEarth::Symbology::Geometry();
+                }
+            }
+
+            gc.disposeGeometry( outGeom );
+        }
+    }
+
+    //Destroy the geometry
+    gc.disposeGeometry( otherGeom );
+    gc.disposeGeometry( inGeom );
+
+    return success;
+
+#else // OSGEARTH_HAVE_GEOS
+
+    OE_WARN << LC << "Union failed - GEOS not available" << std::endl;
+    return false;
+
+#endif // OSGEARTH_HAVE_GEOS
+}
+
+bool
+Geometry::difference( const Polygon* diffPolygon, osg::ref_ptr<Geometry>& output ) const
+{
+#ifdef OSGEARTH_HAVE_GEOS
+
+    GEOSContext gc;
+
+    //Create the GEOS Geometries
+    geom::Geometry* inGeom   = gc.importGeometry( this );
+    geom::Geometry* diffGeom = gc.importGeometry( diffPolygon );
+
+    if ( inGeom )
+    {    
+        geom::Geometry* outGeom = 0L;
+        try {
+            outGeom = overlay::OverlayOp::overlayOp(
+                inGeom,
+                diffGeom,
+                overlay::OverlayOp::opDIFFERENCE );
+        }
+        catch(const geos::util::GEOSException& ex) {
+            OE_NOTICE << LC << "Diff(GEOS): "
+                << (ex.what()? ex.what() : " no error message")
+                << std::endl;
+            outGeom = 0L;
+        }
+
+        if ( outGeom )
+        {
+            output = gc.exportGeometry( outGeom );
+            gc.disposeGeometry( outGeom );
+
             if ( output.valid() && !output->isValid() )
             {
                 output = 0L;
@@ -299,10 +415,9 @@ Geometry::difference( const Polygon* diffPolygon, osg::ref_ptr<Geometry>& output
     }
 
     //Destroy the geometry
-    f->destroyGeometry( diffGeom );
-    f->destroyGeometry( inGeom );
+    gc.disposeGeometry( diffGeom );
+    gc.disposeGeometry( inGeom );
 
-    delete f;
     return output.valid();
 
 #else // OSGEARTH_HAVE_GEOS
@@ -362,6 +477,26 @@ Geometry::rewind( Orientation orientation )
     }
 }
 
+void Geometry::removeDuplicates()
+{
+    if (size() > 1)
+    {
+        osg::Vec3d v = front();
+        for (Geometry::iterator itr = begin(); itr != end(); )
+        {
+            if (itr != begin() && v == *itr)
+            {
+                itr = erase(itr);
+            }
+            else
+            {
+                v = *itr;
+                itr++;
+            }
+        }
+    }
+}
+
 Geometry::Orientation 
 Geometry::getOrientation() const
 {
@@ -410,12 +545,29 @@ Geometry::getOrientation() const
         Geometry::ORIENTATION_DEGENERATE;
 }
 
+double
+Geometry::getLength() const
+{
+    double length = 0;
+    for (unsigned int i = 0; i < size()-1; ++i)
+    {
+        osg::Vec3d current = (*this)[i];
+        osg::Vec3d next    = (*this)[i+1];
+        length += (next - current).length();
+    }
+    return length;
+}
+
 //----------------------------------------------------------------------------
 
 PointSet::PointSet( const PointSet& rhs ) :
 Geometry( rhs )
 {
     //nop
+}
+
+PointSet::~PointSet()
+{
 }
 
 //----------------------------------------------------------------------------
@@ -432,17 +584,8 @@ Geometry( data )
     //nop
 }
 
-double
-LineString::getLength() const
+LineString::~LineString()
 {
-    double length = 0;
-    for (unsigned int i = 0; i < size()-1; ++i)
-    {
-        osg::Vec3d current = (*this)[i];
-        osg::Vec3d next    = (*this)[i+1];
-        length += (next - current).length();
-    }
-    return length;
 }
 
 bool
@@ -478,6 +621,10 @@ Geometry( data )
     open();
 }
 
+Ring::~Ring()
+{
+}
+
 Geometry*
 Ring::cloneAs( const Geometry::Type& newType ) const
 {
@@ -491,12 +638,38 @@ Ring::cloneAs( const Geometry::Type& newType ) const
     else return Geometry::cloneAs( newType );
 }
 
+double
+Ring::getLength() const
+{
+    double length = Geometry::getLength();
+    if ( isOpen() )
+    {
+        length += (front()-back()).length();
+    }
+    return length;
+}
+
 // ensures that the first and last points are not idential.
 void 
 Ring::open()
 {            
     while( size() > 2 && front() == back() )
         erase( end()-1 );
+}
+
+// ensures that the first and last points are idential.
+void 
+Ring::close()
+{
+    if ( size() > 0 && front() != back() )
+        push_back( front() );
+}
+
+// whether the ring is open.
+bool
+Ring::isOpen() const
+{
+    return size() > 1 && front() != back();
 }
 
 // gets the signed area.
@@ -557,6 +730,10 @@ Ring( data )
     //nop
 }
 
+Polygon::~Polygon()
+{
+}
+
 int
 Polygon::getTotalPointCount() const
 {
@@ -592,6 +769,22 @@ Polygon::open()
         (*i)->open();
 }
 
+void
+Polygon::close() 
+{
+    Ring::close();
+    for( RingCollection::const_iterator i = _holes.begin(); i != _holes.end(); ++i )
+        (*i)->close();
+}
+
+void
+Polygon::removeDuplicates()
+{
+    Ring::removeDuplicates();
+    for( RingCollection::const_iterator i = _holes.begin(); i != _holes.end(); ++i )
+        (*i)->removeDuplicates();
+}
+
 //----------------------------------------------------------------------------
 
 MultiGeometry::MultiGeometry( const MultiGeometry& rhs ) :
@@ -607,6 +800,10 @@ _parts( parts )
     //nop
 }
 
+MultiGeometry::~MultiGeometry()
+{
+}
+
 Geometry::Type
 MultiGeometry::getComponentType() const
 {
@@ -620,6 +817,15 @@ MultiGeometry::getTotalPointCount() const
     int total = 0;
     for( GeometryCollection::const_iterator i = _parts.begin(); i != _parts.end(); ++i )
         total += i->get()->getTotalPointCount();
+    return total;
+}
+
+double
+MultiGeometry::getLength() const
+{
+    double total = 0.0;
+    for( GeometryCollection::const_iterator i = _parts.begin(); i != _parts.end(); ++i )
+        total += i->get()->getLength();
     return total;
 }
 

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -33,8 +33,10 @@ namespace osgEarth { namespace Features
     /**
      * Base class for a filter.
      */
-    class Filter : public osg::Referenced
+    class OSGEARTHFEATURES_EXPORT Filter : public osg::Referenced
     {
+    protected:
+        virtual ~Filter();
     };
 
     /**
@@ -50,7 +52,7 @@ namespace osgEarth { namespace Features
          */
         virtual Config getConfig() const { return Config(); }
 
-        virtual ~FeatureFilter() { }
+        virtual ~FeatureFilter();
     };
 
     typedef std::list< osg::ref_ptr<FeatureFilter> > FeatureFilterList;
@@ -143,18 +145,22 @@ namespace osgEarth { namespace Features
     public:
         const osg::Matrixd& local2world() const { return _local2world; }
         const osg::Matrixd& world2local() const { return _world2local; }
-        
-        virtual ~FeaturesToNodeFilter() { }
-        
+                        
     protected:
+
+        virtual ~FeaturesToNodeFilter();
 
         // computes the matricies required to localizer/delocalize double-precision coords
         void computeLocalizers( const FilterContext& context );
+        void computeLocalizers( const FilterContext& context, const osgEarth::GeoExtent &extent, osg::Matrixd &out_w2l, osg::Matrixd &out_l2w );
 
         /** Parents the node with a localizer group if necessary */
         osg::Node*  delocalize( osg::Node* node ) const;
+        osg::Node*  delocalize( osg::Node* node, const osg::Matrixd &local2World ) const;
         osg::Group* delocalizeAsGroup( osg::Node* node ) const;
+        osg::Group* delocalizeAsGroup( osg::Node* node, const osg::Matrixd &local2World ) const;
         osg::Group* createDelocalizeGroup() const;
+        osg::Group* createDelocalizeGroup( const osg::Matrixd &local2World) const;
 
         void transformAndLocalize(
             const std::vector<osg::Vec3d>& input,
@@ -180,6 +186,9 @@ namespace osgEarth { namespace Features
             const SpatialReference*        outputSRS,
             const osg::Matrixd&            world2local,
             bool                           toECEF );
+
+        void applyLineSymbology(osg::StateSet*, const class LineSymbol*);
+        void applyPointSymbology(osg::StateSet*, const class PointSymbol*);
 
         osg::Matrixd _world2local, _local2world;   // for coordinate localization
     };

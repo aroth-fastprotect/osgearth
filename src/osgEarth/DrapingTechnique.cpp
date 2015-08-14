@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -19,7 +22,9 @@
 #include <osgEarth/DrapingTechnique>
 #include <osgEarth/Capabilities>
 #include <osgEarth/Registry>
+#include <osgEarth/ShaderFactory>
 #include <osgEarth/VirtualProgram>
+#include <osgEarth/Shaders>
 
 #include <osg/BlendFunc>
 #include <osg/TexGen>
@@ -40,8 +45,7 @@ namespace
     // Additional per-view data stored by the draping technique.
     struct LocalPerViewData : public osg::Referenced
     {
-        osg::ref_ptr<osg::Uniform> _texGenUniform;  // when shady
-        osg::ref_ptr<osg::TexGen>  _texGen;         // when not shady
+        osg::ref_ptr<osg::Uniform> _texGenUniform;
     };
 }
 
@@ -126,9 +130,13 @@ namespace
             if ( eyeClip.y() >= -1.0 && eyeClip.y() <= 1.0 )
                 return;
 
+            // sanity check. 6 faces requires since we need near and far
+            if ( params._visibleFrustumPH._faces.size() < 6 )
+                return;
+
             // discover the max near-plane width.
             double halfWidthNear = 0.0;
-            osgShadow::ConvexPolyhedron::Faces::iterator f = params._frustumPH._faces.begin();
+            osgShadow::ConvexPolyhedron::Faces::iterator f = params._visibleFrustumPH._faces.begin();
             f++; f++; f++; f++; // the near plane Face
             // f->vertices.size() should always be 4, I would think.. but it's not..
             for(unsigned i=0; i<f->vertices.size(); ++i)
@@ -173,9 +181,11 @@ namespace
 
             Line2d farLine( osg::Vec3d(-1,1,0), osg::Vec3d(1,1,0) );
 
+            int iterations = 0;
             while(
                 (aspectRatio > maxApsectRatio || farNearRatio > maxFarNearRatio) &&
-                (halfWidthFar > halfWidthNear) )
+                (halfWidthFar > halfWidthNear) &&
+                (iterations++ < 10) )
             {
                 // make sure all the far-clip verts are inside our polygon.
                 // stretch out the far line to accomodate them.
@@ -195,6 +205,7 @@ namespace
                 if ( farNearRatio > maxFarNearRatio )
                 {
                     halfWidthNear = halfWidthFar / maxFarNearRatio;
+                    //break;
                 }
 
                 halfWidthNear = std::max(halfWidthNear, minHalfWidthNear);
@@ -286,20 +297,17 @@ namespace
 DrapingTechnique::DrapingTechnique() :
 _textureUnit     ( 1 ),
 _textureSize     ( 1024 ),
-_useShaders      ( false ),
 _mipmapping      ( false ),
 _rttBlending     ( true ),
-_attachStencil   ( true ),
-_maxFarNearRatio ( 0.0 )
+_attachStencil   ( false ),
+_maxFarNearRatio ( 5.0 )
 {
-    // cap the ratio of far plane width to near plane width, because if this
-    // ratio gets too large it results in mathematical anomolies and ungoodness
-    // at the near plane. (derived empirically)
-    const char* nfr = ::getenv("OSGEARTH_DRAPING_FAR_NEAR_RATIO");
-    if ( nfr )
-    {
-        _maxFarNearRatio = as<double>(nfr, 0.0);
-    }
+    _supported = Registry::capabilities().supportsGLSL();
+
+    // try newer version
+    const char* nfr2 = ::getenv("OSGEARTH_OVERLAY_RESOLUTION_RATIO");
+    if ( nfr2 )
+        _maxFarNearRatio = as<double>(nfr2, 0.0);
 }
 
 
@@ -328,7 +336,7 @@ DrapingTechnique::reestablish(TerrainEngineNode* engine)
         else if ( !_textureUnit.isSet() )
         {
             int texUnit;
-            if ( engine->getTextureCompositor()->reserveTextureImageUnit( texUnit ) )
+            if ( engine->getResources()->reserveTextureImageUnit(texUnit, "DrapingTechnique") )
             {
                 _textureUnit = texUnit;
                 OE_INFO << LC << "Reserved texture image unit " << *_textureUnit << std::endl;
@@ -368,10 +376,13 @@ DrapingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     params._rttCamera->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
     params._rttCamera->setRenderOrder( osg::Camera::PRE_RENDER );
     params._rttCamera->setRenderTargetImplementation( osg::Camera::FRAME_BUFFER_OBJECT );
-    params._rttCamera->attach( osg::Camera::COLOR_BUFFER, projTexture, 0, 0, _mipmapping );
+    params._rttCamera->setImplicitBufferAttachmentMask(0, 0);
+    params._rttCamera->attach( osg::Camera::COLOR_BUFFER0, projTexture, 0, 0, _mipmapping );
 
     if ( _attachStencil )
     {
+        OE_INFO << LC << "Attaching a stencil buffer to the RTT camera" << std::endl;
+
         // try a depth-packed buffer. failing that, try a normal one.. if the FBO doesn't support
         // that (which is doesn't on some GPUs like Intel), it will automatically fall back on 
         // a PBUFFER_RTT impl
@@ -389,35 +400,29 @@ DrapingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
         }
 
         params._rttCamera->setClearStencil( 0 );
-        params._rttCamera->setClearMask( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
+        params._rttCamera->setClearMask( GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT ); //GL_DEPTH_BUFFER_BIT |  );
     }
     else
     {
-        params._rttCamera->setClearMask( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+        params._rttCamera->setClearMask( GL_COLOR_BUFFER_BIT ); //| GL_DEPTH_BUFFER_BIT );
     }
 
     // set up a StateSet for the RTT camera.
     osg::StateSet* rttStateSet = params._rttCamera->getOrCreateStateSet();
 
-    // lighting is off. We don't want draped items to be lit.
-    rttStateSet->setMode( GL_LIGHTING, osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED );
+    osg::StateAttribute::OverrideValue forceOff =
+        osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED | osg::StateAttribute::OVERRIDE;
 
-    // install a new default shader program that replaces anything from above.
-    if ( _useShaders )
-    {
-        VirtualProgram* vp = VirtualProgram::getOrCreate(rttStateSet);
-        vp->setName( "DrapingTechnique RTT" );
-        vp->setInheritShaders( false );
-        //rttStateSet->setAttributeAndModes( vp, osg::StateAttribute::ON );
-    }
+    rttStateSet->addUniform( Registry::shaderFactory()->createUniformForGLMode(GL_LIGHTING, forceOff) );
+    rttStateSet->setMode( GL_LIGHTING, forceOff );
     
-    // active blending within the RTT camera's FBO
+    // activate blending within the RTT camera's FBO
     if ( _rttBlending )
     {
         //Setup a separate blend function for the alpha components and the RGB components.  
         //Because the destination alpha is initialized to 0 instead of 1
         osg::BlendFunc* blendFunc = 0;        
-        if (Registry::capabilities().supportsGLSL(1.4f))
+        if (Registry::capabilities().supportsGLSL(140u))
         {
             //Blend Func Separate is only available on OpenGL 1.4 and above
             blendFunc = new osg::BlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -453,62 +458,23 @@ DrapingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     LocalPerViewData* local = new LocalPerViewData();
     params._techniqueData = local;
     
-    if ( _useShaders )
-    {            
-        // GPU path
 
-        VirtualProgram* vp = VirtualProgram::getOrCreate(params._terrainStateSet);
-        vp->setName( "DrapingTechnique terrain shaders");
-        //params._terrainStateSet->setAttributeAndModes( vp, osg::StateAttribute::ON );
+    // Assemble the terrain shaders that will apply projective texturing.
+    VirtualProgram* terrain_vp = VirtualProgram::getOrCreate(params._terrainStateSet);
+    terrain_vp->setName( "DrapingTechnique terrain shaders");
 
-        // sampler for projected texture:
-        params._terrainStateSet->getOrCreateUniform(
-            "oe_overlay_tex", osg::Uniform::SAMPLER_2D )->set( *_textureUnit );
+    // sampler for projected texture:
+    params._terrainStateSet->getOrCreateUniform(
+        "oe_overlay_tex", osg::Uniform::SAMPLER_2D )->set( *_textureUnit );
 
-        // the texture projection matrix uniform.
-        local->_texGenUniform = params._terrainStateSet->getOrCreateUniform(
-            "oe_overlay_texmatrix", osg::Uniform::FLOAT_MAT4 );
+    // the texture projection matrix uniform.
+    local->_texGenUniform = params._terrainStateSet->getOrCreateUniform(
+        "oe_overlay_texmatrix", osg::Uniform::FLOAT_MAT4 );
 
-        // vertex shader - subgraph
-        std::string vs =
-            "#version " GLSL_VERSION_STR "\n"
-            GLSL_DEFAULT_PRECISION_FLOAT "\n"
-            "uniform mat4 oe_overlay_texmatrix; \n"
-            "varying vec4 oe_overlay_texcoord; \n"
-
-            "void oe_overlay_vertex(inout vec4 VertexVIEW) \n"
-            "{ \n"
-            "    oe_overlay_texcoord = oe_overlay_texmatrix * VertexVIEW; \n"
-            "} \n";
-
-        vp->setFunction( "oe_overlay_vertex", vs, ShaderComp::LOCATION_VERTEX_VIEW );
-
-        // fragment shader - subgraph
-        std::string fs =
-            "#version " GLSL_VERSION_STR "\n"
-            GLSL_DEFAULT_PRECISION_FLOAT "\n"
-            "uniform sampler2D oe_overlay_tex; \n"
-            "varying vec4      oe_overlay_texcoord; \n"
-
-            "void oe_overlay_fragment( inout vec4 color ) \n"
-            "{ \n"
-            "    vec4 texel = texture2DProj(oe_overlay_tex, oe_overlay_texcoord); \n"
-            "    color = vec4( mix( color.rgb, texel.rgb, texel.a ), color.a); \n"
-            "} \n";
-
-        vp->setFunction( "oe_overlay_fragment", fs, ShaderComp::LOCATION_FRAGMENT_COLORING );
-    }
-    else
-    {
-        // FFP path
-        local->_texGen = new osg::TexGen();
-        local->_texGen->setMode( osg::TexGen::EYE_LINEAR );
-        params._terrainStateSet->setTextureAttributeAndModes( *_textureUnit, local->_texGen.get(), 1 );
-
-        osg::TexEnv* env = new osg::TexEnv();
-        env->setMode( osg::TexEnv::DECAL );
-        params._terrainStateSet->setTextureAttributeAndModes( *_textureUnit, env, 1 );
-    }
+    // shaders
+    Shaders pkg;
+    pkg.load( terrain_vp, pkg.DrapingVertex );
+    pkg.load( terrain_vp, pkg.DrapingFragment );
 }
 
 
@@ -519,17 +485,6 @@ DrapingTechnique::preCullTerrain(OverlayDecorator::TechRTTParams& params,
     if ( !params._rttCamera.valid() && params._group->getNumChildren() > 0 && _textureUnit.isSet() )
     {
         setUpCamera( params );
-    }
-
-    if ( params._rttCamera.valid() )
-    {
-        LocalPerViewData& local = *static_cast<LocalPerViewData*>(params._techniqueData.get());
-        if ( local._texGen.valid() )
-        {
-            // FFP path only
-            cv->getCurrentRenderBin()->getStage()->addPositionedTextureAttribute(
-                *_textureUnit, cv->getModelViewMatrix(), local._texGen.get() );
-        }
     }
 }
 
@@ -545,8 +500,8 @@ DrapingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
             osg::Matrix::translate(1.0,1.0,1.0) * 
             osg::Matrix::scale(0.5,0.5,0.5);
 
-        // experimental.
-        if ( _maxFarNearRatio > 0.0 )
+        // resolution weighting based on camera distance.
+        if ( _maxFarNearRatio > 1.0 )
         {
             optimizeProjectionMatrix( params, _maxFarNearRatio );
         }
@@ -560,14 +515,21 @@ DrapingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
 
         if ( local._texGenUniform.valid() )
         {
-            // premultiply the inv view matrix so we don't have
-            // precision problems in the shader (and it's faster too)
-            local._texGenUniform->set( cv->getCurrentCamera()->getInverseViewMatrix() * VPT );
-        }
-        else
-        {
-            // FFP path
-            local._texGen->setPlanesFromMatrix( VPT );
+            // premultiply the inv view matrix so we don't have precision problems in the shader 
+            // (and it's faster too)
+
+            // TODO:
+            // This only works properly if the terrain tiles have a DYNAMIC data variance.
+            // That is because we are setting a Uniform value during the CULL traversal, and
+            // it's possible that the stateset from the previous frame has not yet been
+            // dispatched to render. So we need to come up with a way to address this.
+            // In the meantime, I patched the MP engine to set a DYNAMIC data variance on
+            // terrain tiles to work around the problem.
+            //
+            // Note that we require the InverseViewMatrix, but it is OK to invert the ModelView matrix as the model matrix is identity here.
+            osg::Matrix vm;
+            vm.invert( *cv->getModelViewMatrix() );
+            local._texGenUniform->set( vm * VPT );
         }
 
         // traverse the overlay group (via the RTT camera).
@@ -579,10 +541,7 @@ DrapingTechnique::cullOverlayGroup(OverlayDecorator::TechRTTParams& params,
 void
 DrapingTechnique::setTextureSize( int texSize )
 {
-    if ( texSize != _textureSize.value() )
-    {
-        _textureSize = texSize;
-    }
+    _textureSize = texSize;
 }
 
 void
@@ -631,23 +590,30 @@ DrapingTechnique::setAttachStencil( bool value )
 }
 
 void
+DrapingTechnique::setResolutionRatio(float value)
+{
+    // not a typo. "near/far resolution" is equivalent to "far/near clip plane extent"
+    // with respect to the overlay projection frustum.
+    _maxFarNearRatio = (double)osg::clampAbove(value, 1.0f);
+}
+
+float
+DrapingTechnique::getResolutionRatio() const
+{
+    // not a typo. "near/far resolution" is equivalent to "far/near clip plane extent"
+    // with respect to the overlay projection frustum.
+    return (float)_maxFarNearRatio;
+}
+
+void
 DrapingTechnique::onInstall( TerrainEngineNode* engine )
 {
-    // see whether we want shader support:
-    // TODO: this is not stricty correct; you might still want to use shader overlays
-    // in multipass mode, AND you might want FFP overlays in multitexture-FFP mode.
-    _useShaders = 
-        Registry::capabilities().supportsGLSL() && (
-            !engine->getTextureCompositor() ||
-            engine->getTextureCompositor()->usesShaderComposition() );
-
     if ( !_textureSize.isSet() )
     {
         unsigned maxSize = Registry::capabilities().getMaxFastTextureSize();
-        _textureSize.init( osg::minimum( 4096u, maxSize ) );
-
-        OE_INFO << LC << "Using texture size = " << *_textureSize << std::endl;
+        _textureSize.init( osg::minimum( 2048u, maxSize ) );
     }
+    OE_INFO << LC << "Using texture size = " << *_textureSize << std::endl;
 }
 
 void
@@ -655,7 +621,7 @@ DrapingTechnique::onUninstall( TerrainEngineNode* engine )
 {
     if ( !_explicitTextureUnit.isSet() && _textureUnit.isSet() )
     {
-        engine->getTextureCompositor()->releaseTextureImageUnit( *_textureUnit );
+        engine->getResources()->releaseTextureImageUnit( *_textureUnit );
         _textureUnit.unset();
     }
 }

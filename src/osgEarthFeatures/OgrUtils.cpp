@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -24,7 +27,7 @@ using namespace osgEarth::Features;
 
 
 void
-    OgrUtils::populate( OGRGeometryH geomHandle, Symbology::Geometry* target, int numPoints )
+OgrUtils::populate( OGRGeometryH geomHandle, Symbology::Geometry* target, int numPoints )
 {
     for( int v = numPoints-1; v >= 0; v-- ) // reverse winding.. we like ccw
     {
@@ -37,7 +40,7 @@ void
 }
 
 Symbology::Polygon*
-    OgrUtils::createPolygon( OGRGeometryH geomHandle )
+OgrUtils::createPolygon( OGRGeometryH geomHandle )
 {
     Symbology::Polygon* output = 0L;
 
@@ -76,7 +79,7 @@ Symbology::Polygon*
 }
 
 Symbology::Geometry*
-    OgrUtils::createGeometry( OGRGeometryH geomHandle )
+OgrUtils::createGeometry( OGRGeometryH geomHandle )
 {
     Symbology::Geometry* output = 0L;
 
@@ -141,7 +144,7 @@ Symbology::Geometry*
 }
 
 OGRGeometryH
-    OgrUtils::encodePart( Geometry* geometry, OGRwkbGeometryType part_type )
+OgrUtils::encodePart( const Geometry* geometry, OGRwkbGeometryType part_type )
 {
     OGRGeometryH part_handle = OGR_G_CreateGeometry( part_type );
 
@@ -156,15 +159,15 @@ OGRGeometryH
 
 
 OGRGeometryH
-    OgrUtils::encodeShape( Geometry* geometry, OGRwkbGeometryType shape_type, OGRwkbGeometryType part_type )
+OgrUtils::encodeShape( const Geometry* geometry, OGRwkbGeometryType shape_type, OGRwkbGeometryType part_type )
 {
     OGRGeometryH shape_handle = OGR_G_CreateGeometry( shape_type );
     if ( shape_handle )
     {
-        GeometryIterator itr(geometry, true);
+        ConstGeometryIterator itr(geometry, true);
         while (itr.hasMore())
         {
-            Geometry* geom = itr.next();
+            const Geometry* geom = itr.next();
             OGRGeometryH part_handle = encodePart( geom, part_type );
             if ( part_handle )
             {
@@ -176,7 +179,7 @@ OGRGeometryH
 }
 
 OGRGeometryH
-    OgrUtils::createOgrGeometry(osgEarth::Symbology::Geometry* geometry, OGRwkbGeometryType requestedType)
+OgrUtils::createOgrGeometry(const osgEarth::Symbology::Geometry* geometry, OGRwkbGeometryType requestedType)
 {
     if (!geometry) return NULL;
 
@@ -200,7 +203,7 @@ OGRGeometryH
         case Geometry::TYPE_UNKNOWN: break;
         case Geometry::TYPE_MULTI: 
             {
-                osgEarth::Symbology::MultiGeometry* multi = dynamic_cast<MultiGeometry*>(geometry);
+                const osgEarth::Symbology::MultiGeometry* multi = dynamic_cast<const MultiGeometry*>(geometry);
                 osgEarth::Symbology::Geometry::Type componentType = multi->getComponentType();
                 requestedType = componentType == Geometry::TYPE_POLYGON ? wkbMultiPolygon : 
                     componentType == Geometry::TYPE_POINTSET ? wkbMultiPoint :
@@ -231,13 +234,13 @@ OGRGeometryH
     //OE_NOTICE << "shape_type = " << shape_type << " part_type=" << part_type << std::endl;
 
 
-    osgEarth::Symbology::MultiGeometry* multi = dynamic_cast<MultiGeometry*>(geometry);
+    const osgEarth::Symbology::MultiGeometry* multi = dynamic_cast<const MultiGeometry*>(geometry);
 
     if ( multi )
     {
         OGRGeometryH group_handle = OGR_G_CreateGeometry( wkbGeometryCollection );
 
-        for (GeometryCollection::iterator itr = multi->getComponents().begin(); itr != multi->getComponents().end(); ++itr)
+        for (GeometryCollection::const_iterator itr = multi->getComponents().begin(); itr != multi->getComponents().end(); ++itr)
         {
             OGRGeometryH shape_handle = encodeShape( itr->get(), shape_type, part_type );
             if ( shape_handle )
@@ -261,7 +264,24 @@ OGRGeometryH
 }
 
 Feature*
-    OgrUtils::createFeature( OGRFeatureH handle, const SpatialReference* srs )
+OgrUtils::createFeature(OGRFeatureH handle, const FeatureProfile* profile)
+{
+    Feature* f = 0L;
+    if ( profile )
+    {
+        f = createFeature( handle, profile->getSRS() );
+        if ( f && profile->geoInterp().isSet() )
+            f->geoInterp() = profile->geoInterp().get();
+    }
+    else
+    {
+        f = createFeature( handle, (const SpatialReference*)0L );
+    }
+    return f;
+}            
+
+Feature*
+OgrUtils::createFeature( OGRFeatureH handle, const SpatialReference* srs )
 {
     long fid = OGR_F_GetFID( handle );
 
@@ -283,8 +303,7 @@ Feature*
 
         // get the field name and convert to lower case:
         const char* field_name = OGR_Fld_GetNameRef( field_handle_ref ); 
-        std::string name = std::string( field_name ); 
-        std::transform( name.begin(), name.end(), name.begin(), ::tolower ); 
+        std::string name = osgEarth::toLower( std::string(field_name) );
 
         // get the field type and set the value appropriately
         OGRFieldType field_type = OGR_Fld_GetType( field_handle_ref );        
@@ -334,7 +353,8 @@ Feature*
     return feature;
 }
 
-AttributeType OgrUtils::getAttributeType( OGRFieldType type )
+AttributeType
+OgrUtils::getAttributeType( OGRFieldType type )
 {
     switch (type)
     {

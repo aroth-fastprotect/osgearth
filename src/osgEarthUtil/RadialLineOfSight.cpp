@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -28,46 +31,6 @@ using namespace osgEarth::Util;
 
 namespace
 {
-#if 0
-    bool getRelativeWorld(double x, double y, double relativeHeight, MapNode* mapNode, osg::Vec3d& world )
-    {
-        GeoPoint mapPoint(mapNode->getMapSRS(), x, y);
-        osg::Vec3d pos;
-        mapPoint.toWorld( pos, mapNode->getTerrain() );
-        //mapNode->getMap()->toWorldPoint(mapPoint, pos);
-
-        osg::Vec3d up(0,0,1);
-        const osg::EllipsoidModel* em = mapNode->getMap()->getProfile()->getSRS()->getEllipsoid();
-        if (em)
-        {
-            up = em->computeLocalUpVector( world.x(), world.y(), world.z());
-        }    
-        up.normalize();
-
-        double segOffset = 50000;
-
-        osg::Vec3d start = pos + (up * segOffset);
-        osg::Vec3d end = pos - (up * segOffset);
-        
-        osgUtil::LineSegmentIntersector* i = new osgUtil::LineSegmentIntersector( start, end );
-        
-        osgUtil::IntersectionVisitor iv;    
-        iv.setIntersector( i );
-        mapNode->getTerrainEngine()->accept( iv );
-
-        osgUtil::LineSegmentIntersector::Intersections& results = i->getIntersections();
-        if ( !results.empty() )
-        {
-            const osgUtil::LineSegmentIntersector::Intersection& result = *results.begin();
-            world = result.getWorldIntersectPoint();
-            world += up * relativeHeight;
-            return true;
-        }
-        return false;    
-    }
-#endif
-
-
     osg::Vec3d getNodeCenter(osg::Node* node)
     {
         osg::NodePathList nodePaths = node->getParentalNodePaths();
@@ -116,19 +79,19 @@ namespace
 
 
 RadialLineOfSightNode::RadialLineOfSightNode( MapNode* mapNode):
+_mapNode( mapNode ),
 _numSpokes(20),
 _radius(500),
-_displayMode( LineOfSight::MODE_SPLIT ),
-_fill(false),
+//_center(0,0,0),
 _goodColor(0.0f, 1.0f, 0.0f, 1.0f),
 _badColor(1.0f, 0.0f, 0.0f, 1.0f),
 _outlineColor( 1.0f, 1.0f, 1.0f, 1.0f),
-//_center(0,0,0),
-_mapNode( mapNode ),
+_displayMode( LineOfSight::MODE_SPLIT ),
 //_altitudeMode( ALTMODE_ABSOLUTE ),
+_fill(false),
 _terrainOnly( false )
 {
-    compute(getNode());
+    //compute(getNode());
     _terrainChangedCallback = new RadialLineOfSightNodeTerrainChangedCallback( this );
     _mapNode->getTerrain()->addTerrainCallback( _terrainChangedCallback.get() );        
     setNumChildrenRequiringUpdateTraversal( 1 );
@@ -263,30 +226,24 @@ void
 RadialLineOfSightNode::terrainChanged( const osgEarth::TileKey& tileKey, osg::Node* terrain )
 {
     OE_DEBUG << "RadialLineOfSightNode::terrainChanged" << std::endl;
-    //Make a temporary group that contains both the old MapNode as well as the new incoming terrain.
-    //Because this function is called from the database pager thread we need to include both b/c 
-    //the new terrain isn't yet merged with the new terrain.
-    osg::ref_ptr < osg::Group > group = new osg::Group;
-    group->addChild( terrain );
-    group->addChild( getNode() );
-    compute( group, true );
+    compute( getNode() );    
 }
 
 void
-RadialLineOfSightNode::compute(osg::Node* node, bool backgroundThread)
+RadialLineOfSightNode::compute(osg::Node* node )
 {
     if (_fill)
     {
-        compute_fill( node, backgroundThread );
+        compute_fill( node );
     }
     else
     {
-        compute_line( node, backgroundThread );
+        compute_line( node );
     }
 }
 
 void
-RadialLineOfSightNode::compute_line(osg::Node* node, bool backgroundThread)
+RadialLineOfSightNode::compute_line(osg::Node* node)
 {    
     if ( !getMapNode() )
         return;
@@ -417,16 +374,9 @@ RadialLineOfSightNode::compute_line(osg::Node* node, bool backgroundThread)
     mt->setMatrix(osg::Matrixd::translate(_centerWorld));
     mt->addChild(geode);
     
-    if (!backgroundThread)
-    {
-        //Remove all the children
-        removeChildren(0, getNumChildren());
-        addChild( mt );  
-    }
-    else
-    {
-        _pendingNode = mt;
-    }
+    //Remove all the children
+    removeChildren(0, getNumChildren());
+    addChild( mt );  
 
     for( LOSChangedCallbackList::iterator i = _changedCallbacks.begin(); i != _changedCallbacks.end(); i++ )
     {
@@ -435,7 +385,7 @@ RadialLineOfSightNode::compute_line(osg::Node* node, bool backgroundThread)
 }
 
 void
-RadialLineOfSightNode::compute_fill(osg::Node* node, bool backgroundThread)
+RadialLineOfSightNode::compute_fill(osg::Node* node)
 {
     if ( !getMapNode() )
         return;
@@ -497,7 +447,7 @@ RadialLineOfSightNode::compute_fill(osg::Node* node, bool backgroundThread)
 
         //Get the next hit
         unsigned int nextIndex = i + 1;
-        if (nextIndex == (unsigned int)_numSpokes) nextIndex = 0;
+        if (nextIndex == _numSpokes) nextIndex = 0;
         DPLineSegmentIntersector* losNext = static_cast<DPLineSegmentIntersector*>(ivGroup->getIntersectors()[nextIndex].get());
         DPLineSegmentIntersector::Intersections& hitsNext = losNext->getIntersections();
 
@@ -611,37 +561,15 @@ RadialLineOfSightNode::compute_fill(osg::Node* node, bool backgroundThread)
     osg::MatrixTransform* mt = new osg::MatrixTransform;
     mt->setMatrix(osg::Matrixd::translate(_centerWorld));
     mt->addChild(geode);
-    
-    if (!backgroundThread)
-    {
-        //Remove all the children
-        removeChildren(0, getNumChildren());
-        addChild( mt );  
-    }
-    else
-    {
-        _pendingNode = mt;
-    }
+        
+    //Remove all the children
+    removeChildren(0, getNumChildren());
+    addChild( mt );  
 
     for( LOSChangedCallbackList::iterator i = _changedCallbacks.begin(); i != _changedCallbacks.end(); i++ )
     {
         i->get()->onChanged();
     }	
-}
-
-void
-RadialLineOfSightNode::traverse(osg::NodeVisitor& nv)
-{
-    if (nv.getVisitorType() == osg::NodeVisitor::UPDATE_VISITOR)
-    {
-        if (_pendingNode.valid())
-        {
-            removeChildren(0, getNumChildren());
-            addChild( _pendingNode.get());
-            _pendingNode = 0;            
-        }
-    }
-    osg::Group::traverse(nv);
 }
 
 
@@ -777,7 +705,7 @@ namespace
     };
 
         
-    class RadialLOSDraggerCallback : public Dragger::PositionChangedCallback
+    class RadialLOSDraggerCallback : public osgEarth::Annotation::Dragger::PositionChangedCallback
     {
     public:
         RadialLOSDraggerCallback(RadialLineOfSightNode* los):
@@ -785,7 +713,7 @@ namespace
           {
           }
 
-          virtual void onPositionChanged(const Dragger* sender, const osgEarth::GeoPoint& position)
+          virtual void onPositionChanged(const osgEarth::Annotation::Dragger* sender, const osgEarth::GeoPoint& position)
           {
               _los->setCenter( position );
 
@@ -811,9 +739,9 @@ RadialLineOfSightEditor::RadialLineOfSightEditor(RadialLineOfSightNode* los):
 _los(los)
 {
 
-    _dragger  = new SphereDragger(_los->getMapNode());
+    _dragger  = new osgEarth::Annotation::SphereDragger(_los->getMapNode());
     _dragger->addPositionChangedCallback(new RadialLOSDraggerCallback(_los ) );    
-    static_cast<SphereDragger*>(_dragger)->setColor(osg::Vec4(0,0,1,0));
+    static_cast<osgEarth::Annotation::SphereDragger*>(_dragger)->setColor(osg::Vec4(0,0,1,0));
     addChild(_dragger);    
 
     _callback = new RadialUpdateDraggersCallback( this );

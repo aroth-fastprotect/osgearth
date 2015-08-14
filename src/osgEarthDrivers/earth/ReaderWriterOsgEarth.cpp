@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -28,12 +28,55 @@
 #include <sstream>
 #include <osgEarthUtil/Common>
 
-#include "osgEarthUtilLibraryName.h"
-
 using namespace osgEarth_osgearth;
 using namespace osgEarth;
 
 #define LC "[ReaderWriterEarth] "
+
+// Macros to determine the filename for dependent libs.
+#define Q2(x) #x
+#define Q(x)  Q2(x)
+
+#if (defined(_DEBUG) || defined(QT_DEBUG)) && defined(OSGEARTH_DEBUG_POSTFIX)
+#   define LIBNAME_UTIL_POSTFIX Q(OSGEARTH_DEBUG_POSTFIX)
+#elif defined(OSGEARTH_RELEASE_POSTFIX)
+#   define LIBNAME_UTIL_POSTFIX Q(OSGEARTH_RELEASE_POSTFIX)
+#else
+#   define LIBNAME_UTIL_POSTFIX ""
+#endif
+
+#if defined(WIN32)
+#   define LIBNAME_UTIL "osgEarthUtil"
+#   define LIBNAME_UTIL_EXTENSION ".dll"
+#else
+#   define LIBNAME_UTIL "libosgEarthUtil"
+#   if defined(__APPLE__)
+#       define LIBNAME_UTIL_EXTENSION ".dylib"
+#   else
+#       define LIBNAME_UTIL_EXTENSION ".so"
+#   endif
+#endif
+
+namespace
+{
+    void recursiveUniqueKeyMerge(Config& lhs, const Config& rhs)
+    {
+        if ( rhs.value() != lhs.value() )
+        {
+            lhs.value() = rhs.value();
+        }
+
+        for(ConfigSet::const_iterator rhsChild = rhs.children().begin(); rhsChild != rhs.children().end(); ++rhsChild)
+        {
+            Config* lhsChild = lhs.mutable_child(rhsChild->key());
+            if ( lhsChild )
+                recursiveUniqueKeyMerge( *lhsChild, *rhsChild );
+            else
+                lhs.add( *rhsChild );
+        }
+    }
+}
+
 
 class ReaderWriterEarth : public osgDB::ReaderWriter
 {
@@ -43,8 +86,8 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
             // force the loading of other osgEarth libraries that might be needed to 
             // deserialize an earth file. 
             // osgEarthUtil: contains ColorFilter implementations
-            OE_DEBUG << LC << "Forced load: " << LIBNAME_UTIL << std::endl;
-            osgDB::Registry::instance()->loadLibrary( LIBNAME_UTIL );
+            OE_DEBUG << LC << "Forced load: " << LIBNAME_UTIL LIBNAME_UTIL_POSTFIX LIBNAME_UTIL_EXTENSION << std::endl;
+            osgDB::Registry::instance()->loadLibrary( LIBNAME_UTIL LIBNAME_UTIL_POSTFIX LIBNAME_UTIL_EXTENSION );
         }
 
         virtual const char* className()
@@ -116,16 +159,16 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
                 return ReadResult( new MapNode() );
             }
 
-            else if ( fileName == "__cube.earth" )
-            {
-                MapOptions options;
-                options.coordSysType() = MapOptions::CSTYPE_GEOCENTRIC_CUBE;
-                return ReadResult( new MapNode( new Map(options) ) );
-            }
-
             else
             {
-                osgEarth::ReadResult r = URI(fileName).readString( options );
+                std::string fullFileName = fileName;
+                if ( !osgDB::containsServerAddress( fileName ) )
+                {
+                    fullFileName = osgDB::findDataFile( fileName, options );
+                    if (fullFileName.empty()) return ReadResult::FILE_NOT_FOUND;
+                }
+
+                osgEarth::ReadResult r = URI(fullFileName).readString( options );
                 if ( r.failed() )
                     return ReadResult::ERROR_IN_READING_FILE;
 
@@ -133,7 +176,7 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
                 // reference URI as well..
                 osg::ref_ptr<osgDB::Options> myOptions = Registry::instance()->cloneOrCreateOptions(options);
 
-                URIContext( fileName ).apply( myOptions.get() );
+                URIContext( fullFileName ).apply( myOptions.get() );
 
                 std::stringstream in( r.getString() );
                 return readNode( in, myOptions.get() );
@@ -175,7 +218,32 @@ class ReaderWriterEarth : public osgDB::ReaderWriter
                 else
                 {
                     if ( conf.value("version") != "2" )
-                        OE_INFO << LC << "No valid earth file version; assuming version='2'" << std::endl;
+                        OE_DEBUG << LC << "No valid earth file version; assuming version='2'" << std::endl;
+
+                    // attempt to parse a "default options" JSON string:
+                    std::string defaultConfStr;
+                    if ( options )
+                    {
+                        defaultConfStr = options->getPluginStringData("osgEarth.defaultOptions");
+                        if ( !defaultConfStr.empty() )
+                        {
+                            Config optionsConf("options");
+                            if (optionsConf.fromJSON(defaultConfStr))
+                            {
+                                //OE_NOTICE << "\n\nOriginal = \n" << conf.toJSON(true) << "\n";
+                                Config* original = conf.mutable_child("options");
+                                if ( original )
+                                {
+                                    recursiveUniqueKeyMerge(optionsConf, *original);
+                                }
+                                if ( !optionsConf.empty() )
+                                {
+                                    conf.set("options", optionsConf);
+                                }
+                                //OE_NOTICE << "\n\nMerged = \n" << conf.toJSON(true) << "\n";
+                            }
+                        }
+                    }
 
                     EarthFileSerializer2 ser;
                     mapNode = ser.deserialize( conf, refURI );

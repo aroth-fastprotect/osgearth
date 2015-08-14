@@ -1,5 +1,6 @@
+/* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -82,12 +83,6 @@ namespace osgEarth
         const optional<osg::Vec4ub>& transparentColor() const { return _transparentColor; }
         
         /**
-         * Whether LOD blending is enabled for this layer
-         */
-        optional<bool>& lodBlending() { return _lodBlending; }
-        const optional<bool>& lodBlending() const { return _lodBlending; }
-
-        /**
          * Filters attached to this layer.
          */
         ColorFilterChain& colorFilters() { return _colorFilters; }
@@ -100,10 +95,13 @@ namespace osgEarth
         optional<bool>& shared() { return _shared; }
         const optional<bool>& shared() const { return _shared; }
 
-        /*
-        optional<int>& sharedUnitBinding() { return _sharedUnitBinding; }
-        const optional<int>& sharedUnitBinding() const { return _sharedUnitBinding; }
-        */
+        /**
+         * Whether this is a "coverage" layer, i.e a layer that conveys discrete semantic
+         * values rather than color data. This is a hint to disable any features that would
+         * corrupt the data, like filtering, interpolation, or lossy compression.
+         */
+        optional<bool>& coverage() { return _coverage; }
+        const optional<bool>& coverage() const { return _coverage; }
 
         /**
          * Whether to feather out alpha regions for this image layer with the featherAlphaRegions function.
@@ -111,6 +109,35 @@ namespace osgEarth
          */
         optional<bool>& featherPixels() { return _featherPixels; }
         const optional<bool>& featherPixels() const { return _featherPixels; }
+
+        /**
+         * The minification filter to be applied to textures. This is the interpolation
+         * mechanism to use when the texture uses fewer screen pixels than are available.
+         */
+        optional<osg::Texture::FilterMode>& minFilter() { return _minFilter; }
+        const optional<osg::Texture::FilterMode>& minFilter() const { return _minFilter; }
+
+        /**
+         * The magnification filter to be applied to textures. This is the interpolation
+         * mechanism to use when the texture uses more screen pixels than are available.
+         */
+        optional<osg::Texture::FilterMode>& magFilter() { return _magFilter; }
+        const optional<osg::Texture::FilterMode>& magFilter() const { return _magFilter; }
+
+        /**
+         * Texture compression mode to use. Default is "unset", which means to 
+         * automatically compute the best compression mode to use.
+         */
+        optional<osg::Texture::InternalFormatMode>& textureCompression() { return _texcomp; }
+        const optional<osg::Texture::InternalFormatMode>& textureCompression() const { return _texcomp; }
+
+        /** For shared layer, name of hte texture sampler uniform. */
+        optional<std::string>& shareTexUniformName() { return _shareTexUniformName; }
+        const optional<std::string>& shareTexUniformName() const { return _shareTexUniformName; }
+
+        /** For shared layer, name of hte texture sampler matrix uniform. */
+        optional<std::string>& shareTexMatUniformName() { return _shareTexMatUniformName; }
+        const optional<std::string>& shareTexMatUniformName() const { return _shareTexMatUniformName; }
 
     public:
 
@@ -127,10 +154,15 @@ namespace osgEarth
         optional<float>       _maxRange;
         optional<osg::Vec4ub> _transparentColor;
         optional<URI>         _noDataImageFilename;
-        optional<bool>        _lodBlending;
         ColorFilterChain      _colorFilters;
         optional<bool>        _shared;
+        optional<bool>        _coverage;
         optional<bool>        _featherPixels;
+        optional<osg::Texture::FilterMode> _minFilter;
+        optional<osg::Texture::FilterMode> _magFilter;
+        optional<osg::Texture::InternalFormatMode> _texcomp;
+        optional<std::string> _shareTexUniformName;
+        optional<std::string> _shareTexMatUniformName;
     };
 
     //--------------------------------------------------------------------
@@ -243,22 +275,43 @@ namespace osgEarth
 
         float getOpacity() const { return *_runtimeOptions.opacity(); }
 
-        void disableLODBlending();
-        bool isLODBlendingEnabled() const { return *_runtimeOptions.lodBlending(); }
-
         float getMinVisibleRange() const { return *_runtimeOptions.minVisibleRange();}
         void setMinVisibleRange( float minVisibleRange );
 
         float getMaxVisibleRange() const { return *_runtimeOptions.maxVisibleRange();}
         void setMaxVisibleRange( float maxVisibleRange );
 
-        // whether this layer is marked for render sharing
+        /**
+         * Whether this layer is marked for render sharing
+         */
         bool isShared() const { return *_runtimeOptions.shared() == true; }
 
-        // when isShared() == true, the engine will call this function to bind the
-        // shared layer to a texture image unit.
+        /**
+         * Whether this layer represents coverage data that should not be subject
+         * to color-space filtering, interpolation, or compression.
+         */
+        bool isCoverage() const { return *_runtimeOptions.coverage() == true; }
+
+        /**
+         * When isShared() == true, the engine will call this function to bind the
+         * shared layer to a texture image unit.
+         */
         optional<int>& shareImageUnit() { return _shareImageUnit; }
         const optional<int>& shareImageUnit() const { return _shareImageUnit; }
+
+        /**
+         * When isShared() == true, this will return the name of the uniform holding the
+         * image's texture. 
+         */
+        optional<std::string>& shareTexUniformName() { return _shareTexUniformName; }
+        const optional<std::string>& shareTexUniformName() const { return _shareTexUniformName; }
+
+        /**
+         * When isShared() == true, this will return the name of the uniform holding the
+         * image's texture matrix. 
+         */
+        optional<std::string>& shareTexMatUniformName() { return _shareTexMatUniformName; }
+        const optional<std::string>& shareTexMatUniformName() const { return _shareTexMatUniformName; }
 
 
     public: // methods
@@ -268,47 +321,53 @@ namespace osgEarth
          * image is in the profile of the key and will be reprojected, mosaiced and
          * cropped automatically.
          */
-        virtual GeoImage createImage( const TileKey& key, ProgressCallback* progress = 0, bool forceFallback =false);
+        virtual GeoImage createImage( const TileKey& key, ProgressCallback* progress = 0);
 
         /**
          * Creates an image that is in the image layer's native profile.
          */
-        GeoImage createImageInNativeProfile(const TileKey& key, ProgressCallback* progress, bool forceFallback, bool& out_isFallback);
+        GeoImage createImageInNativeProfile(const TileKey& key, ProgressCallback* progress);
+
+        /**
+         * Applies the texture compression options to a texture.
+         */
+        void applyTextureCompressionMode(osg::Texture* texture) const;
 
     public: // TerrainLayer override
 
         CacheBin* getCacheBin( const Profile* profile );
 
-
     protected:
 
         // Creates an image that's in the same profile as the provided key.
-        GeoImage createImageInKeyProfile(const TileKey& key, ProgressCallback* progress, bool forceFallback, bool& out_isFallback);
+        GeoImage createImageInKeyProfile(const TileKey& key, ProgressCallback* progress);
 
         // Fetches an image from the underlying TileSource whose data matches that of the
         // key extent.
-        GeoImage createImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool forceFallback, bool& out_isFallback);
+        GeoImage createImageFromTileSource(const TileKey& key, ProgressCallback* progress);
 
         // Fetches multiple images from the TileSource; mosaics/reprojects/crops as necessary, and
         // returns a single tile. This is called by createImageFromTileSource() if the key profile
         // doesn't match the layer profile.
-        GeoImage assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress, bool& out_isFallback);
+        GeoImage assembleImageFromTileSource(const TileKey& key, ProgressCallback* progress);
 
-
-        virtual void initTileSource();
 
     protected:
         ImageLayerOptions                        _runtimeOptions;
         osg::ref_ptr<TileSource::ImageOperation> _preCacheOp;
+        Threading::Mutex                         _mutex;
         osg::ref_ptr<osg::Image>                 _emptyImage;
         ImageLayerCallbackList                   _callbacks;
         optional<int>                            _shareImageUnit;
+        optional<std::string>                    _shareTexUniformName;
+        optional<std::string>                    _shareTexMatUniformName;
 
         virtual void fireCallback( TerrainLayerCallbackMethodPtr method );
         virtual void fireCallback( ImageLayerCallbackMethodPtr method );
 
         void init();
-        void initPreCacheOp();
+
+        TileSource::ImageOperation* getOrCreatePreCacheOp();
     };
 
     typedef std::vector< osg::ref_ptr<ImageLayer> > ImageLayerVector;

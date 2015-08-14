@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,16 +8,20 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 
 #include <osg/Notify>
+#include <osg/Version>
 #include <osgEarth/ImageUtils>
 #include <osgEarth/MapNode>
 #include <osgEarthAnnotation/AnnotationData>
@@ -26,7 +30,6 @@
 #include <osgEarthAnnotation/ScaleDecoration>
 #include <osgEarthAnnotation/TrackNode>
 #include <osgEarthQt/ViewerWidget>
-#include <osgEarthQt/MultiViewerWidget>
 #include <osgEarthQt/LayerManagerWidget>
 #include <osgEarthQt/MapCatalogWidget>
 #include <osgEarthQt/DataManager>
@@ -35,15 +38,15 @@
 #include <osgEarthQt/TerrainProfileWidget>
 #include <osgEarthUtil/AnnotationEvents>
 #include <osgEarthUtil/AutoClipPlaneHandler>
-#include <osgEarthUtil/SkyNode>
 #include <osgEarthUtil/EarthManipulator>
-#include <osgEarthDrivers/ocean_surface/OceanSurface>
+#include <osgEarthUtil/Sky>
+#include <osgEarthUtil/Ocean>
 
 #include <QAction>
 #include <QDockWidget>
 #include <QMainWindow>
 #include <QToolBar>
-#include <QtGui/QApplication>
+#include <QApplication>
 
 #include "DemoMainWindow"
 
@@ -60,7 +63,7 @@ using namespace osgEarth::Util;
 
 static osg::ref_ptr<osg::Group> s_annoGroup;
 static osgEarth::Util::SkyNode* s_sky=0L;
-static osgEarth::Drivers::OceanSurfaceNode* s_ocean=0L;
+static osgEarth::Util::OceanNode* s_ocean=0L;
 
 //------------------------------------------------------------------
 
@@ -179,7 +182,7 @@ TrackNode* createTrack(TrackNodeFieldSchema& schema, osg::Image* image, const st
 
   AnnotationData* data = new AnnotationData();
   data->setName(name);
-  data->setViewpoint(osgEarth::Viewpoint(center, 0.0, -90.0, 1e5));
+  data->setViewpoint(osgEarth::Viewpoint(0L, center.x(), center.y(), center.z(), 0.0, -90.0, 1e5));
   track->setAnnotationData( data );
 
   trackSims.push_back(new TrackSim(track, center, radius, time, mapNode));
@@ -204,10 +207,6 @@ main(int argc, char** argv)
 {
     osg::ArgumentParser arguments(&argc,argv);
     osg::DisplaySettings::instance()->setMinimumNumStencilBits(8);
-
-    std::string compNum;
-    bool composite = arguments.read("--multi", compNum);
-    int numViews = composite ? osgEarth::as<int>(compNum, 4) : 1;
 
     std::string stylesheet;
     bool styled = arguments.read("--stylesheet", stylesheet);
@@ -249,87 +248,70 @@ main(int argc, char** argv)
     osgEarth::QtGui::ViewVector views;
     osg::ref_ptr<osgViewer::ViewerBase> viewer;
 
-    // create viewer widget
-    if (composite)
+    osgEarth::QtGui::ViewerWidget* viewerWidget = 0L;
+
+    if ( testUseExistingViewer )
     {
-      osgEarth::QtGui::MultiViewerWidget* viewerWidget = new osgEarth::QtGui::MultiViewerWidget(root);
-
-      osgViewer::View* primary = viewerWidget->createViewWidget(root);
-      primary->getCamera()->addCullCallback(new osgEarth::Util::AutoClipPlaneCullCallback(mapNode));
-      views.push_back(primary);
-
-      for (int i=0; i < numViews - 1; i++)
-      {
-        osgViewer::View* view = viewerWidget->createViewWidget(root, primary);
-        view->getCamera()->addCullCallback(new osgEarth::Util::AutoClipPlaneCullCallback(mapNode));
-        views.push_back(view);
-      }
-
-      //viewerWidget->setGeometry(50, 50, 1024, 768);
-      appWin.setViewerWidget(viewerWidget, views);
-
-      viewer = viewerWidget;
+        // tests: create a pre-existing viewer and install that in the widget.
+        osgViewer::Viewer* v = new osgViewer::Viewer();
+        v->setSceneData(root);
+        v->setThreadingModel(osgViewer::Viewer::DrawThreadPerContext);
+        v->setCameraManipulator(new osgEarth::Util::EarthManipulator());
+        viewerWidget = new osgEarth::QtGui::ViewerWidget(v);
     }
 
     else
     {
-        osgEarth::QtGui::ViewerWidget* viewerWidget = 0L;
+        // tests: implicity creating a viewer.
+        viewerWidget = new osgEarth::QtGui::ViewerWidget( root );
+    }
 
-        if ( testUseExistingViewer )
-        {
-            // tests: create a pre-existing viewer and install that in the widget.
-            osgViewer::Viewer* v = new osgViewer::Viewer();
-            v->setSceneData(root);
-            v->setThreadingModel(osgViewer::Viewer::DrawThreadPerContext);
-            v->setCameraManipulator(new osgEarth::Util::EarthManipulator());
-            viewerWidget = new osgEarth::QtGui::ViewerWidget(v);
-        }
+#if OSG_MIN_VERSION_REQUIRED(3,3,2)
+    // Enable touch events on the viewer
+    viewerWidget->getGraphicsWindow()->setTouchEventsEnabled(true);
+#endif
 
-        else
-        {
-            // tests: implicity creating a viewer.
-            viewerWidget = new osgEarth::QtGui::ViewerWidget( root );
-        }
+    //osgEarth::QtGui::ViewerWidget* viewerWidget = new osgEarth::QtGui::ViewerWidget(root);
+    //viewerWidget->setGeometry(50, 50, 1024, 768);
 
-      //osgEarth::QtGui::ViewerWidget* viewerWidget = new osgEarth::QtGui::ViewerWidget(root);
-      //viewerWidget->setGeometry(50, 50, 1024, 768);
+    viewerWidget->getViews( views );
 
-      viewerWidget->getViews( views );
+    for(osgEarth::QtGui::ViewVector::iterator i = views.begin(); i != views.end(); ++i )
+    {
+        i->get()->getCamera()->addCullCallback(new osgEarth::Util::AutoClipPlaneCullCallback(mapNode));
+    }
+    appWin.setViewerWidget(viewerWidget);
 
-      for(osgEarth::QtGui::ViewVector::iterator i = views.begin(); i != views.end(); ++i )
-      {
-          i->get()->getCamera()->addCullCallback(new osgEarth::Util::AutoClipPlaneCullCallback(mapNode));
-      }
-      appWin.setViewerWidget(viewerWidget);
-
-      if (mapNode.valid())
-      {
+    if (mapNode.valid())
+    {
         const Config& externals = mapNode->externalConfig();
 
         if (mapNode->getMap()->isGeocentric())
         {
-          // Sky model.
-          Config skyConf = externals.child("sky");
+            // Sky model.
+            Config skyConf = externals.child("sky");
 
-          double hours = skyConf.value("hours", 12.0);
-          s_sky = new osgEarth::Util::SkyNode(mapNode->getMap());
-          s_sky->setDateTime( DateTime(2011, 3, 6, hours) );
-          for(osgEarth::QtGui::ViewVector::iterator i = views.begin(); i != views.end(); ++i )
-              s_sky->attach( *i );
-          root->addChild(s_sky);
+            double hours = skyConf.value("hours", 12.0);
+            s_sky = osgEarth::Util::SkyNode::create(mapNode);
+            s_sky->setDateTime( DateTime(2011, 3, 6, hours) );
+            for(osgEarth::QtGui::ViewVector::iterator i = views.begin(); i != views.end(); ++i )
+                s_sky->attach( *i, 0 );
+            root->addChild(s_sky);
 
-          // Ocean surface.
-          if (externals.hasChild("ocean"))
-          {
-            s_ocean = new osgEarth::Drivers::OceanSurfaceNode(mapNode.get(), externals.child("ocean"));
-            if (s_ocean)
-              root->addChild(s_ocean);
-          }
+            // Ocean surface.
+            if (externals.hasChild("ocean"))
+            {
+                s_ocean = osgEarth::Util::OceanNode::create(
+                    osgEarth::Util::OceanOptions(externals.child("ocean")),
+                    mapNode.get());
+
+                if (s_ocean)
+                    root->addChild(s_ocean);
+            }
         }
-      }
-
-      viewer = viewerWidget->getViewer();
     }
+
+    viewer = viewerWidget->getViewer();
 
     // activate "on demand" rendering if requested:
     if ( on_demand )
@@ -355,6 +337,9 @@ main(int argc, char** argv)
 
         viewer->addUpdateOperation(new TrackSimUpdate(trackSims));
     }
+
+    if(viewer.valid())
+      viewer->setThreadingModel(osgViewer::ViewerBase::SingleThreaded);
 
 
     // create catalog widget and add as a docked widget to the main window

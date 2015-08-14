@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -58,14 +58,12 @@ XmlElement::XmlElement( const Config& conf )
 
     for( ConfigSet::const_iterator j = conf.children().begin(); j != conf.children().end(); j++ )
     {
-        if ( j->isSimple() )
-        {
-            attrs[j->key()] = j->value();
-        }
-        else if ( j->children().size() > 0 )
-        {
-            children.push_back( new XmlElement(*j) );
-        }
+        //if ( j->isSimple() )
+        //{
+        //    attrs[j->key()] = j->value();
+        //}
+
+        children.push_back( new XmlElement(*j) );
     }
 }
 
@@ -115,23 +113,59 @@ XmlElement::getChildren() const
 XmlElement*
 XmlElement::getSubElement( const std::string& name ) const
 {
-    std::string name_lower = name;
-    std::transform( name_lower.begin(), name_lower.end(), name_lower.begin(), tolower );
-
     for( XmlNodeList::const_iterator i = getChildren().begin(); i != getChildren().end(); i++ )
     {
         if ( i->get()->isElement() )
         {
             XmlElement* e = (XmlElement*)i->get();
-            std::string name = e->getName();
-            std::transform( name.begin(), name.end(), name.begin(), tolower );
-            if ( name == name_lower )
+            if (osgEarth::ciEquals(name, e->getName()))
                 return e;
         }
     }
     return NULL;
 }
 
+const XmlElement*
+XmlElement::findElement(const std::string& name) const
+{
+    const XmlElement* result = 0L;
+
+    if ( this->getName() == name )
+    {
+        result = this;
+    }
+    else
+    {
+        // first check the subelements (breadth first search)
+        for(XmlNodeList::const_iterator i = getChildren().begin();
+            i != getChildren().end() && result == 0L;
+            i++ )
+        {
+            if ( i->get()->isElement() )
+            {
+                XmlElement* e = (XmlElement*)i->get();
+                if (osgEarth::ciEquals(name, e->getName()))
+                {
+                    result = e;
+                }
+            }
+        }
+
+        // not found? traverse the subelements.
+        if ( result == 0L )
+        {
+            for(XmlNodeList::const_iterator i = getChildren().begin();
+                i != getChildren().end() && result == 0L;
+                i++ )
+            {
+                XmlElement* e = (XmlElement*)i->get();
+                result = e->findElement( name );
+            }
+        }
+    }
+
+    return result;
+}
 
 std::string
 XmlElement::getText() const
@@ -166,17 +200,12 @@ XmlElement::getSubElements( const std::string& name ) const
 {
     XmlNodeList results;
 
-    std::string name_lower = name;
-    std::transform( name_lower.begin(), name_lower.end(), name_lower.begin(), tolower );
-
     for( XmlNodeList::const_iterator i = getChildren().begin(); i != getChildren().end(); i++ )
     {
         if ( i->get()->isElement() )
         {
             XmlElement* e = (XmlElement*)i->get();
-            std::string name = e->getName();
-            std::transform( name.begin(), name.end(), name.begin(), tolower );
-            if ( name == name_lower )
+            if ( osgEarth::ciEquals(name, e->getName()) )
                 results.push_back( e );
         }
     }
@@ -236,16 +265,6 @@ XmlText::getValue() const
     return value;
 }
 
-
-#if 0
-XmlDocument::XmlDocument( const std::string& _source_uri ) :
-XmlElement( "Document" ),
-source_uri( _source_uri )
-{
-    //NOP
-}
-#endif
-
 XmlDocument::XmlDocument() :
 XmlElement( "Document" )
 {
@@ -273,9 +292,8 @@ namespace
         while( *ptr != NULL )
         {
             std::string name = *ptr++;
-            std::string value = *ptr++;
-            std::transform( name.begin(), name.end(), name.begin(), tolower );
-            map[name] = value;
+            std::string value = *ptr++;            
+            map[osgEarth::toLower(name)] = value;
         }
         return map;
     }
@@ -288,17 +306,15 @@ namespace
         case TiXmlNode::TINYXML_ELEMENT:
             {
                 TiXmlElement* element = node->ToElement();
-                std::string tag = element->Value();
-                std::transform( tag.begin(), tag.end(), tag.begin(), tolower);
+                std::string tag = osgEarth::toLower(element->Value());
 
                 //Get all the attributes
                 XmlAttributes attrs;
                 TiXmlAttribute* attr = element->FirstAttribute();
                 while (attr)
                 {
-                    std::string name  = attr->Name();
+                    std::string name  = osgEarth::toLower(attr->Name());
                     std::string value = attr->Value();
-                    std::transform( name.begin(), name.end(), name.begin(), tolower);
                     attrs[name] = value;
                     attr = attr->Next();
                 }

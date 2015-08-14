@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -90,6 +90,10 @@ namespace osgEarth { namespace Features
         optional<FadeOptions>& fading() { return _fading; }
         const optional<FadeOptions>& fading() const { return _fading; }
 
+        /** Debug: whether to enable a session-wide resource cache (default=true) */
+        optional<bool>& sessionWideResourceCache() { return _sessionWideResourceCache; }
+        const optional<bool>& sessionWideResourceCache() const { return _sessionWideResourceCache; }
+
     public:
         /** A live feature source instance to use. Note, this does not serialize. */
         osg::ref_ptr<FeatureSource>& featureSource() { return _featureSource; }
@@ -123,6 +127,7 @@ namespace osgEarth { namespace Features
         optional<CachePolicy>               _cachePolicy;
         optional<FadeOptions>               _fading;
         optional<FeatureSourceIndexOptions> _featureIndexing;
+        optional<bool>                      _sessionWideResourceCache;
 
         osg::ref_ptr<StyleSheet>            _styles;
         osg::ref_ptr<FeatureSource>         _featureSource;
@@ -194,9 +199,8 @@ namespace osgEarth { namespace Features
         virtual void initialize( const osgDB::Options* dbOptions =0L );
 
         virtual osg::Node* createNodeImplementation(
-            const Map*            map,
-            const osgDB::Options* dbOptions,
-            ProgressCallback*     progress );
+            const Map*        map,
+            ProgressCallback* progress );
     
 
     public:
@@ -207,12 +211,6 @@ namespace osgEarth { namespace Features
          */
         virtual FeatureNodeFactory* createFeatureNodeFactory() =0;
 
-
-        /**
-         * Creates an implementation-specific data object to be passed to buildNodeForStyle
-         * @deprecated
-         */
-        //virtual osg::Referenced* createBuildData() { return NULL; }
 
     public: // properties:
 

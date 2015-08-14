@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -52,9 +52,8 @@ namespace
 {
     const char* FadeEffectVertexShader =
         "#version " GLSL_VERSION_STR "\n"
-#ifdef OSG_GLES2_AVAILABLE
-        "precision mediump float; \n"
-#endif
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
+
         "uniform float oe_fadeeffect_duration; \n"
         "uniform float oe_fadeeffect_startTime; \n"
         "uniform float oe_fadeeffect_maxRange; \n"
@@ -72,9 +71,8 @@ namespace
 
     const char* FadeEffectFragmentShader = 
         "#version " GLSL_VERSION_STR "\n"
-#ifdef OSG_GLES2_AVAILABLE
-        "precision mediump float; \n"
-#endif
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
+
         "varying float oe_fadeeffect_opacity; \n"
 
         "void oe_fragFadeEffect( inout vec4 color ) \n"
@@ -99,8 +97,8 @@ FadeEffect::FadeEffect()
     {
         VirtualProgram* vp = new VirtualProgram();
 
-        vp->setFunction( "oe_vertFadeEffect", FadeEffectVertexShader,   ShaderComp::LOCATION_VERTEX_VIEW );
-        vp->setFunction( "oe_fragFadeEffect", FadeEffectFragmentShader, ShaderComp::LOCATION_FRAGMENT_COLORING );
+        vp->setFunction( "oe_vertFadeEffect", FadeEffectVertexShader,   ShaderComp::LOCATION_VERTEX_VIEW, 0.5f );
+        vp->setFunction( "oe_fragFadeEffect", FadeEffectFragmentShader, ShaderComp::LOCATION_FRAGMENT_COLORING, 0.5f );
 
         ss->setAttributeAndModes( vp, osg::StateAttribute::ON );
 
@@ -165,9 +163,8 @@ namespace
 {
     const char* FadeLODFragmentShader = 
         "#version " GLSL_VERSION_STR "\n"
-#ifdef OSG_GLES_AVAILABLE
-        "precision mediump float; \n"
-#endif
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
+
         "varying float oe_FadeLOD_opacity; \n"
         "void oe_fragFadeLOD( inout vec4 color ) \n"
         "{ \n"
@@ -193,7 +190,8 @@ _maxFadeExtent ( 0.0f )
         vp->setFunction(
             "oe_fragFadeLOD",
             FadeLODFragmentShader,
-            ShaderComp::LOCATION_FRAGMENT_COLORING );
+            osgEarth::ShaderComp::LOCATION_FRAGMENT_COLORING,
+            0.5f );
 
         osg::StateSet* ss = getOrCreateStateSet();
 
@@ -245,73 +243,3 @@ FadeLOD::traverse( osg::NodeVisitor& nv )
     }
 }
 
-
-#if 0
-void 
-FadeLOD::setMinPixelExtent( float value )
-{
-    osg::Vec4f value;
-    _params->get( value );
-    value[0] = value;
-    _params->set( value );
-}
-
-float 
-FadeLOD::getMinPixelExtent() const
-{
-    osg::Vec4f value;
-    _params->get( value );
-    return value[0];
-}
-
-void 
-FadeLOD::setMaxPixelExtent( float value )
-{
-    osg::Vec4f value;
-    _params->get( value );
-    value[1] = value;
-    _params->set( value );
-}
-
-float 
-FadeLOD::getMaxPixelExtent() const
-{
-    osg::Vec4f value;
-    _params->get( value );
-    return value[1];
-}
-
-void
-FadeLOD::setMinFadeExtent( float value )
-{
-    osg::Vec4f value;
-    _params->get( value );
-    value[2] = value;
-    _params->set( value );
-}
-
-float
-FadeLOD::getMinFadeExtent() const
-{
-    osg::Vec4f value;
-    _params->get( value );
-    return value[2];
-}
-
-void
-FadeLOD::setMaxFadeExtent( float value )
-{
-    osg::Vec4f value;
-    _params->get( value );
-    value[3] = value;
-    _params->set( value );
-}
-
-float
-FadeLOD::getMaxFadeExtent() const
-{
-    osg::Vec4f value;
-    _params->get( value );
-    return value[3];
-}
-#endif

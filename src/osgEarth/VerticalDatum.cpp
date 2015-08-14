@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -98,17 +98,17 @@ VerticalDatum::transform(const VerticalDatum* from,
 
     if ( from )
     {
-        in_out_z = from->msl2hae( lat_deg, lon_deg, INTERP_BILINEAR );
+        in_out_z = from->msl2hae( lat_deg, lon_deg, in_out_z );
     }
 
     Units fromUnits = from ? from->getUnits() : Units::METERS;
-    Units toUnits = to ? to->getUnits() : fromUnits;
+    Units toUnits = to ? to->getUnits() : Units::METERS;
 
     in_out_z = fromUnits.convertTo(toUnits, in_out_z);
 
     if ( to )
     {
-        in_out_z = to->hae2msl( lat_deg, lon_deg, INTERP_BILINEAR );
+        in_out_z = to->hae2msl( lat_deg, lon_deg, in_out_z );
     }
 
     return true;
@@ -138,20 +138,20 @@ VerticalDatum::transform(const VerticalDatum* from,
 
     unsigned cols = hf->getNumColumns();
     unsigned rows = hf->getNumRows();
-    osg::Vec3d sw = hf->getOrigin();
-    osg::Vec3d ne;
-    ne.x() = sw.x() + hf->getXInterval()*double(rows);
-    ne.y() = sw.y() + hf->getYInterval()*double(cols);
-    double xstep = hf->getXInterval();
-    double ystep = hf->getYInterval();
+    
+    osg::Vec3d sw(extent.west(), extent.south(), 0.0);
+    osg::Vec3d ne(extent.east(), extent.north(), 0.0);
+    
+    double xstep = abs(extent.east() - extent.west()) / double(cols-1);
+    double ystep = abs(extent.north() - extent.south()) / double(rows-1);
 
     if ( !extent.getSRS()->isGeographic() )
     {
         const SpatialReference* geoSRS = extent.getSRS()->getGeographicSRS();
         extent.getSRS()->transform(sw, geoSRS, sw);
         extent.getSRS()->transform(ne, geoSRS, ne);
-        xstep = (ne.x()-sw.x()) / double(cols);
-        ystep = (ne.y()-sw.y()) / double(rows);
+        xstep = (ne.x()-sw.x()) / double(cols-1);
+        ystep = (ne.y()-sw.y()) / double(rows-1);
     }
 
     for( unsigned c=0; c<cols; ++c)
@@ -160,8 +160,11 @@ VerticalDatum::transform(const VerticalDatum* from,
         for( unsigned r=0; r<rows; ++r)
         {
             double lat = sw.y() + ystep*double(r);
-            float& h = hf->getHeight(r, c);
-            VerticalDatum::transform( from, to, lat, lon, h );
+            float& h = hf->getHeight(c, r);
+            if (h != NO_DATA_VALUE)
+            {
+                VerticalDatum::transform( from, to, lat, lon, h );
+            }
         }
     }
 
@@ -185,6 +188,12 @@ VerticalDatum::isEquivalentTo( const VerticalDatum* rhs ) const
 {
     if ( this == rhs )
         return true;
+
+    if ( rhs == 0L && !_geoid.valid() )
+        return true;
+
+    if ( rhs == 0L )
+        return false;
 
     if ( _units != rhs->_units )
         return false;

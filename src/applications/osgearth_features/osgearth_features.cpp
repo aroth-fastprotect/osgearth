@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -68,14 +71,14 @@ int main(int argc, char** argv)
     if ( arguments.read("--help") )
         return usage( argv[0] );
 
-    if ( arguments.read("--stencil") )
-        osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
-
     bool useRaster  = arguments.read("--rasterize");
     bool useOverlay = arguments.read("--overlay");
     bool useStencil = arguments.read("--stencil");
     bool useMem     = arguments.read("--mem");
     bool useLabels  = arguments.read("--labels");
+
+    if ( useStencil )
+        osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
 
     osgViewer::Viewer viewer(arguments);
 
@@ -155,7 +158,6 @@ int main(int argc, char** argv)
         geomOptions.enableLighting() = false;
 
         ModelLayerOptions layerOptions( "my features", geomOptions );
-        layerOptions.overlay() = useOverlay;
         map->addModelLayer( new ModelLayer(layerOptions) );
     }
 

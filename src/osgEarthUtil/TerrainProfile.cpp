@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -110,6 +113,19 @@ TerrainProfileCalculator::~TerrainProfileCalculator()
     _mapNode->getTerrain()->removeTerrainCallback( this );
 }
 
+void TerrainProfileCalculator::setMapNode( osgEarth::MapNode* mapNode )
+{
+  if (_mapNode.valid())
+      _mapNode->getTerrain()->removeTerrainCallback( this );
+
+  _mapNode = mapNode;
+  if (_mapNode.valid())
+  {
+      _mapNode->getTerrain()->addTerrainCallback( this );
+      recompute();
+  }
+}
+
 void TerrainProfileCalculator::addChangedCallback( ChangedCallback* callback )
 {
     _changedCallbacks.push_back( callback );
@@ -134,8 +150,30 @@ const GeoPoint& TerrainProfileCalculator::getStart() const
     return _start;
 }
 
+GeoPoint TerrainProfileCalculator::getStart(AltitudeMode altMode) const
+{
+    if( _start.altitudeMode() != altMode )
+    {
+        double newAlt = 0.0;
+        _start.transformZ(altMode, _mapNode->getTerrain(), newAlt);
+        return GeoPoint(_start.getSRS(), _start.x(), _start.y(), newAlt);
+    }
+    return _start;
+}
+
 const GeoPoint& TerrainProfileCalculator::getEnd() const
 {
+    return _end;
+}
+
+GeoPoint TerrainProfileCalculator::getEnd(AltitudeMode altMode) const
+{
+    if( _end.altitudeMode() != altMode )
+    {
+        double newAlt = 0.0;
+        _end.transformZ(altMode, _mapNode->getTerrain(), newAlt);
+        return GeoPoint(_end.getSRS(), _end.x(), _end.y(), newAlt);
+    }
     return _end;
 }
 
@@ -168,20 +206,7 @@ void TerrainProfileCalculator::recompute()
 {
     if (_start.isValid() && _end.isValid())
     {
-        //computeTerrainProfile( _mapNode.get(), _start, _end, _numSamples, _profile);
-        osg::Vec3d start, end;
-        _start.toWorld( start, _mapNode->getTerrain() );
-        _end.toWorld( end, _mapNode->getTerrain() );
-        osgSim::ElevationSlice slice;
-        slice.setStartPoint( start );
-        slice.setEndPoint( end );
-        slice.setDatabaseCacheReadCallback( 0 );
-        slice.computeIntersections( _mapNode->getTerrainEngine());
-        _profile.clear();
-        for (unsigned int i = 0; i < slice.getDistanceHeightIntersections().size(); i++)
-        {
-            _profile.addElevation( slice.getDistanceHeightIntersections()[i].first, slice.getDistanceHeightIntersections()[i].second);
-        }
+        computeTerrainProfile( _mapNode.get(), _start, _end, _profile);
 
         for( ChangedCallbackList::iterator i = _changedCallbacks.begin(); i != _changedCallbacks.end(); i++ )
         {
@@ -189,34 +214,26 @@ void TerrainProfileCalculator::recompute()
                 i->get()->onChanged(this);
         }
     }
+    else
+    {
+        _profile.clear();
+    }
 }
 
-void TerrainProfileCalculator::computeTerrainProfile( osgEarth::MapNode* mapNode, const GeoPoint& start, const GeoPoint& end, unsigned int numSamples, TerrainProfile& profile)
+void TerrainProfileCalculator::computeTerrainProfile( osgEarth::MapNode* mapNode, const GeoPoint& start, const GeoPoint& end, TerrainProfile& profile)
 {
-    GeoPoint geoStart(start);
-    geoStart.makeGeographic();
+    osg::Vec3d startvec, endvec;
+    start.toWorld( startvec, mapNode->getTerrain() );
+    end.toWorld( endvec, mapNode->getTerrain() );
+    osgSim::ElevationSlice slice;
+    slice.setStartPoint( startvec );
+    slice.setEndPoint( endvec );
+    slice.setDatabaseCacheReadCallback( 0 );
+    slice.computeIntersections( mapNode->getTerrainEngine());
 
-    GeoPoint geoEnd(end);
-    geoEnd.makeGeographic();
-
-    double startXRad = osg::DegreesToRadians( geoStart.x() );
-    double startYRad = osg::DegreesToRadians( geoStart.y() );
-    double endXRad = osg::DegreesToRadians( geoEnd.x() );
-    double endYRad = osg::DegreesToRadians( geoEnd.y() );
-
-    double distance = osgEarth::GeoMath::distance(startYRad, startXRad, endYRad, endXRad );
-
-    double spacing = distance / ((double)numSamples - 1.0);
-    
     profile.clear();
-
-    for (unsigned int i = 0; i < numSamples; i++)
+    for (unsigned int i = 0; i < slice.getDistanceHeightIntersections().size(); i++)
     {
-        double t = (double)i / (double)numSamples;
-        double lat, lon;
-        GeoMath::interpolate( startYRad, startXRad, endYRad, endXRad, t, lat, lon );
-        double hamsl;
-        mapNode->getTerrain()->getHeight( geoStart.getSRS(), osg::RadiansToDegrees(lon), osg::RadiansToDegrees(lat), &hamsl );
-        profile.addElevation( spacing * (double)i, hamsl );
+        profile.addElevation( slice.getDistanceHeightIntersections()[i].first, slice.getDistanceHeightIntersections()[i].second);
     }
 }

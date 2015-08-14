@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -84,17 +87,26 @@ PlaceNode::init()
     getAttachPoint()->removeChildren(0, getAttachPoint()->getNumChildren());
 
     _geode = new osg::Geode();
+
+    // ensure that (0,0,0) is the bounding sphere control/center point.
+    // useful for things like horizon culling.
+    _geode->setComputeBoundingSphereCallback(new ControlPointCallback());
+
     osg::Drawable* text = 0L;
 
     // If there's no explicit text, look to the text symbol for content.
     if ( _text.empty() && _style.has<TextSymbol>() )
+    {
         _text = _style.get<TextSymbol>()->content()->eval();
+    }
 
     osg::ref_ptr<const InstanceSymbol> instance = _style.get<InstanceSymbol>();
 
     // backwards compability, support for deprecated MarkerSymbol
     if ( !instance.valid() && _style.has<MarkerSymbol>() )
+    {
         instance = _style.get<MarkerSymbol>()->convertToInstanceSymbol();
+    }
 
     const IconSymbol* icon = instance->asIcon();
 
@@ -108,6 +120,10 @@ PlaceNode::init()
             {
                 imageURI = URI( icon->url()->eval(), icon->url()->uriContext() );
             }
+            else if (icon->getImage())
+            {
+                _image = icon->getImage();
+            }
         }
 
         if ( !imageURI.empty() )
@@ -119,44 +135,54 @@ PlaceNode::init()
     // found an image; now format it:
     if ( _image.get() )
     {
+        // Scale the icon if necessary
+        double scale = 1.0;
+        if ( icon && icon->scale().isSet() )
+        {
+            scale = icon->scale()->eval();
+        }
+
+        double s = scale * _image->s();
+        double t = scale * _image->t();
+
         // this offset anchors the image at the bottom
         osg::Vec2s offset;
         if ( !icon || !icon->alignment().isSet() )
         {	
             // default to bottom center
-            offset.set(0.0, (_image->t() / 2.0));
+            offset.set(0.0, t / 2.0);
         }
         else
         {	// default to bottom center
             switch (icon->alignment().value())
             {
             case IconSymbol::ALIGN_LEFT_TOP:
-                offset.set((_image->s() / 2.0), -(_image->t() / 2.0));
+                offset.set((s / 2.0), -(t / 2.0));
                 break;
             case IconSymbol::ALIGN_LEFT_CENTER:
-                offset.set((_image->s() / 2.0), 0.0);
+                offset.set((s / 2.0), 0.0);
                 break;
             case IconSymbol::ALIGN_LEFT_BOTTOM:
-                offset.set((_image->s() / 2.0), (_image->t() / 2.0));
+                offset.set((s / 2.0), (t / 2.0));
                 break;
             case IconSymbol::ALIGN_CENTER_TOP:
-                offset.set(0.0, -(_image->t() / 2.0));
+                offset.set(0.0, -(t / 2.0));
                 break;
             case IconSymbol::ALIGN_CENTER_CENTER:
                 offset.set(0.0, 0.0);
                 break;
             case IconSymbol::ALIGN_CENTER_BOTTOM:
             default:
-                offset.set(0.0, (_image->t() / 2.0));
+                offset.set(0.0, (t / 2.0));
                 break;
             case IconSymbol::ALIGN_RIGHT_TOP:
-                offset.set(-(_image->s() / 2.0), -(_image->t() / 2.0));
+                offset.set(-(s / 2.0), -(t / 2.0));
                 break;
             case IconSymbol::ALIGN_RIGHT_CENTER:
-                offset.set(-(_image->s() / 2.0), 0.0);
+                offset.set(-(s / 2.0), 0.0);
                 break;
             case IconSymbol::ALIGN_RIGHT_BOTTOM:
-                offset.set(-(_image->s() / 2.0), (_image->t() / 2.0));
+                offset.set(-(s / 2.0), (t / 2.0));
                 break;
             }
         }
@@ -170,14 +196,16 @@ PlaceNode::init()
 
         //We must actually rotate the geometry itself and not use a MatrixTransform b/c the 
         //decluttering doesn't respect Transforms above the drawable.
-        osg::Geometry* imageGeom = AnnotationUtils::createImageGeometry( _image.get(), offset, 0, heading );
+        osg::Geometry* imageGeom = AnnotationUtils::createImageGeometry( _image.get(), offset, 0, heading, scale );
         if ( imageGeom )
+        {
             _geode->addDrawable( imageGeom );
+        }
 
         text = AnnotationUtils::createTextDrawable(
             _text,
             _style.get<TextSymbol>(),
-            osg::Vec3( (offset.x() + (_image->s() / 2.0) + 2), offset.y(), 0 ) );
+            osg::Vec3( (offset.x() + (s / 2.0) + 2), offset.y(), 0 ) );
     }
     else
     {
@@ -200,9 +228,12 @@ PlaceNode::init()
     applyStyle( _style );
 
     setLightingIfNotSet( false );
-
-    ShaderGenerator gen( Registry::stateSetCache() );
-    this->accept( gen );
+    
+    // generate shaders:
+    Registry::shaderGenerator().run(
+        this,
+        "osgEarth.PlaceNode",
+        Registry::stateSetCache() );
 
     // re-apply annotation drawable-level stuff as neccesary.
     AnnotationData* ad = getAnnotationData();
@@ -225,10 +256,9 @@ PlaceNode::setText( const std::string& text )
 
     _text = text;
 
-    const osg::Geode::DrawableList& list = _geode->getDrawableList();
-    for( osg::Geode::DrawableList::const_iterator i = list.begin(); i != list.end(); ++i )
+    for(unsigned i=0; i<_geode->getNumDrawables(); ++i)
     {
-        osgText::Text* d = dynamic_cast<osgText::Text*>( i->get() );
+        osgText::Text* d = dynamic_cast<osgText::Text*>( _geode->getDrawable(i) );
         if ( d )
         {
 			TextSymbol* symbol =  _style.getOrCreate<TextSymbol>();
@@ -269,10 +299,9 @@ PlaceNode::setAnnotationData( AnnotationData* data )
     OrthoNode::setAnnotationData( data );
 
     // override this method so we can attach the anno data to the drawables.
-    const osg::Geode::DrawableList& list = _geode->getDrawableList();
-    for( osg::Geode::DrawableList::const_iterator i = list.begin(); i != list.end(); ++i )
+    for(unsigned i=0; i<_geode->getNumDrawables(); ++i)
     {
-        i->get()->setUserData( data );
+        _geode->getDrawable(i)->setUserData( data );
     }
 }
 
@@ -281,11 +310,11 @@ void
 PlaceNode::setDynamic( bool value )
 {
     OrthoNode::setDynamic( value );
-
-    const osg::Geode::DrawableList& list = _geode->getDrawableList();
-    for( osg::Geode::DrawableList::const_iterator i = list.begin(); i != list.end(); ++i )
+    
+    for(unsigned i=0; i<_geode->getNumDrawables(); ++i)
     {
-        i->get()->setDataVariance( value ? osg::Object::DYNAMIC : osg::Object::STATIC );
+        _geode->getDrawable(i)->setDataVariance( 
+            value ? osg::Object::DYNAMIC : osg::Object::STATIC );
     }
 }
 

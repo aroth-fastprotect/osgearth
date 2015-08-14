@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,6 +18,7 @@
  */
 #include <osgEarthFeatures/LabelSource>
 #include <osgEarth/Registry>
+#include <osgDB/ReadFile>
 
 using namespace osgEarth;
 using namespace osgEarth::Features;
@@ -27,6 +28,10 @@ using namespace osgEarth::Symbology;
 
 
 //------------------------------------------------------------------------
+
+LabelSourceOptions::~LabelSourceOptions()
+{
+}
 
 void
 LabelSourceOptions::fromConfig( const Config& conf )
@@ -46,6 +51,11 @@ LabelSourceOptions::getConfig() const
 {
     Config conf = DriverConfigOptions::getConfig();
     return conf;
+}
+
+//------------------------------------------------------------------------
+LabelSource::~LabelSource()
+{
 }
 
 //------------------------------------------------------------------------

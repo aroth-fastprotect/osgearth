@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,27 +18,115 @@
  */
 #include <osgEarth/DrawInstanced>
 #include <osgEarth/CullingUtils>
+#include <osgEarth/ShaderGenerator>
 #include <osgEarth/ShaderUtils>
+#include <osgEarth/StateSetCache>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
+#include <osgEarth/ImageUtils>
+#include <osgEarth/Utils>
+#include <osgEarth/Shaders>
+#include <osgEarth/ObjectIndex>
 
 #include <osg/ComputeBoundsVisitor>
 #include <osg/MatrixTransform>
-#include <osg/BufferIndexBinding>
+#include <osg/UserDataContainer>
+#include <osg/LOD>
+#include <osg/TextureBuffer>
 #include <osgUtil/MeshOptimizers>
 
-#define MAX_COUNT_UBO   (Registry::capabilities().getMaxUniformBlockSize()/64)
-#define MAX_COUNT_ARRAY 128 // max size of a mat4 uniform array...how to query?
+#define LC "[DrawInstanced] "
 
 using namespace osgEarth;
 using namespace osgEarth::DrawInstanced;
 
+// Ref: http://sol.gfxile.net/instancing.html
+
+#define POSTEX_TBO_UNIT 5
+#define TAG_MATRIX_VECTOR "osgEarth::DrawInstanced::MatrixRefVector"
+
+//Uncomment to experiment with instance count adjustment
+//#define USE_INSTANCE_LODS
 
 //----------------------------------------------------------------------
 
 namespace
 {
-    typedef std::map< osg::ref_ptr<osg::Node>, std::vector<osg::Matrix> > ModelNodeMatrices;
+#ifdef USE_INSTANCE_LODS
+
+    struct LODCallback : public osg::Drawable::DrawCallback
+    {
+        LODCallback() : _first(true), _maxInstances(0) { }
+
+        void drawImplementation(osg::RenderInfo& ri, const osg::Drawable* drawable) const
+        {
+            const osg::Geometry* geom = drawable->asGeometry();
+
+            if ( _first && geom->getNumPrimitiveSets() > 0 )
+            {
+                _maxInstances = geom->getPrimitiveSet(0)->getNumInstances();
+                _first = false;
+            }
+
+            const osg::BoundingBox bbox = Utils::getBoundingBox(geom);
+            float radius = bbox.radius();
+
+            osg::Vec3d centerView = bbox.center() * ri.getState()->getModelViewMatrix();
+            float rangeToBS = (float)-centerView.z() - radius;
+
+#if OSG_MIN_VERSION_REQUIRED(3,3,0)
+            // check for inherit mode (3.3.0+ only)
+            osg::Camera* cam = ri.getCurrentCamera();
+
+            // Problem: the camera stack is *always* size=1. So no access to the ref cam.
+            if (cam->getReferenceFrame() == cam->ABSOLUTE_RF_INHERIT_VIEWPOINT &&
+                ri.getCameraStack().size() > 1)
+            {
+                osg::Camera* refCam = *(ri.getCameraStack().end()-2);
+                if ( refCam )
+                {
+                    osg::Vec3d centerWorld = centerView * cam->getInverseViewMatrix();
+                    osg::Vec3d centerRefView = centerWorld * refCam->getViewMatrix();
+                    rangeToBS = (float)(-centerRefView.z() - radius);
+                }
+            }
+#endif
+
+            // these should obviously be programmable
+            const float maxDistance = 2000.0f;
+            const float minDistance = 100.0f;
+
+            float ratio = (rangeToBS-minDistance)/(maxDistance-minDistance);
+            ratio = 1.0 - osg::clampBetween(ratio, 0.0f, 1.0f);
+            // 1 = closest, 0 = farthest
+
+            unsigned instances = (unsigned)(ratio*(float)_maxInstances);
+
+            if ( instances > 0 )
+            {
+                for(unsigned i=0; i<geom->getNumPrimitiveSets(); ++i)
+                {
+                    const osg::PrimitiveSet* ps = geom->getPrimitiveSet(i);
+                    const_cast<osg::PrimitiveSet*>(ps)->setNumInstances(instances);
+                }
+
+                drawable->drawImplementation(ri);
+            }
+        }
+
+        mutable bool     _first;
+        mutable unsigned _maxInstances;
+    };
+#endif // USE_INSTANCE_LODS
+
+    struct ModelInstance
+    {
+        ModelInstance() : objectID( OSGEARTH_OBJECTID_EMPTY ) { }
+        osg::Matrix matrix;
+        ObjectID    objectID;
+    };
+
+    typedef std::map< osg::ref_ptr<osg::Node>, std::vector<ModelInstance> > ModelInstanceMap;
     
     /**
      * Simple bbox callback to return a static bbox.
@@ -49,6 +137,18 @@ namespace
         StaticBoundingBox( const osg::BoundingBox& bbox ) : _bbox(bbox) { }
         osg::BoundingBox computeBound(const osg::Drawable&) const { return _bbox; }
     };
+
+    // assume x is positive
+    static int nextPowerOf2(int x)
+    {
+        --x;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x |= x >> 8;
+        x |= x >> 16;
+        return x+1;
+    }
 }
 
 //----------------------------------------------------------------------
@@ -57,10 +157,12 @@ namespace
 ConvertToDrawInstanced::ConvertToDrawInstanced(unsigned                numInstances,
                                                const osg::BoundingBox& bbox,
                                                bool                    optimize ) :
-osg::NodeVisitor ( osg::NodeVisitor::TRAVERSE_ALL_CHILDREN ),
 _numInstances    ( numInstances ),
 _optimize        ( optimize )
 {
+    setTraversalMode( TRAVERSE_ALL_CHILDREN );
+    setNodeMaskOverride( ~0 );
+
     _staticBBoxCallback = new StaticBoundingBox(bbox);
 }
 
@@ -75,27 +177,58 @@ ConvertToDrawInstanced::apply( osg::Geode& geode )
         {
             if ( _optimize )
             {
-                // convert to triangles
-                osgUtil::IndexMeshVisitor imv;
-                imv.makeMesh( *geom );
-
                 // activate VBOs
                 geom->setUseDisplayList( false );
                 geom->setUseVertexBufferObjects( true );
             }
 
-            geom->setComputeBoundingBoxCallback( _staticBBoxCallback.get() ); 
-            geom->dirtyBound();
+            if ( _staticBBoxCallback.valid() )
+            {
+                geom->setComputeBoundingBoxCallback( _staticBBoxCallback.get() ); 
+                geom->dirtyBound();
+            }
 
             // convert to use DrawInstanced
             for( unsigned p=0; p<geom->getNumPrimitiveSets(); ++p )
             {
-                geom->getPrimitiveSet(p)->setNumInstances( _numInstances );
+                osg::PrimitiveSet* ps = geom->getPrimitiveSet(p);
+                ps->setNumInstances( _numInstances );
+                _primitiveSets.push_back( ps );
             }
+
+#ifdef USE_INSTANCE_LODS
+            geom->setDrawCallback( new LODCallback() );
+#endif
         }
     }
 
     traverse(geode);
+}
+
+
+void
+ConvertToDrawInstanced::apply(osg::LOD& lod)
+{
+    // find the highest LOD:
+    int   minIndex = 0;
+    float minRange = FLT_MAX;
+    for(unsigned i=0; i<lod.getNumRanges(); ++i)
+    {
+        if ( lod.getRangeList()[i].first < minRange )
+        {
+            minRange = lod.getRangeList()[i].first;
+            minIndex = i;
+        }
+    }
+
+    // remove all but the highest:
+    osg::ref_ptr<osg::Node> highestLOD = lod.getChild( minIndex );
+    lod.removeChildren( 0, lod.getNumChildren() );
+
+    // add it back with a full range.
+    lod.addChild( highestLOD.get(), 0.0f, FLT_MAX );
+
+    traverse(lod);
 }
 
 
@@ -105,40 +238,13 @@ DrawInstanced::install(osg::StateSet* stateset)
     if ( !stateset )
         return;
 
+
     VirtualProgram* vp = VirtualProgram::getOrCreate(stateset);
+    
+    osgEarth::Shaders pkg;
+    pkg.load( vp, pkg.InstancingVertex );
 
-    std::stringstream buf;
-
-    buf << "#version 120 \n"
-        << "#extension GL_EXT_gpu_shader4 : enable \n";
-        //<< "#extension GL_EXT_draw_instanced : enable\n";
-
-    if ( Registry::capabilities().supportsUniformBufferObjects() )
-    {
-        // note: no newlines in the layout() line, please
-        buf << "#extension GL_ARB_uniform_buffer_object : enable\n"
-            << "layout(std140) uniform oe_di_modelData { "
-            <<     "mat4 oe_di_modelMatrix[" << MAX_COUNT_UBO << "]; } ;\n";
-
-        vp->getTemplate()->addBindUniformBlock( "oe_di_modelData", 0 );
-    }
-    else
-    {
-        buf << "uniform mat4 oe_di_modelMatrix[" << MAX_COUNT_ARRAY << "];\n";
-    }
-
-    buf << "void oe_di_setPosition(inout vec4 VertexModel)\n"
-        << "{\n"
-        << "    VertexModel = oe_di_modelMatrix[gl_InstanceID] * VertexModel; \n"
-        << "}\n";
-
-    std::string src;
-    src = buf.str();
-
-    vp->setFunction(
-        "oe_di_setPosition",
-        src,
-        ShaderComp::LOCATION_VERTEX_MODEL );
+    stateset->getOrCreateUniform("oe_di_postex_TBO", osg::Uniform::SAMPLER_BUFFER)->set(POSTEX_TBO_UNIT);
 }
 
 
@@ -152,8 +258,11 @@ DrawInstanced::remove(osg::StateSet* stateset)
     if ( !vp )
         return;
 
-    vp->removeShader( "oe_di_setPosition" );
-    vp->getTemplate()->removeBindUniformBlock( "oe_di_modelData" );
+    Shaders pkg;
+    pkg.unload( vp, pkg.InstancingVertex );
+
+    stateset->removeUniform("oe_di_postex_TBO");
+    stateset->removeUniform("oe_di_postex_TBO_size");
 }
 
 
@@ -166,7 +275,7 @@ DrawInstanced::convertGraphToUseDrawInstanced( osg::Group* parent )
     parent->setComputeBoundingSphereCallback( new StaticBound(bs) );
     parent->dirtyBound();
 
-    ModelNodeMatrices models;
+    ModelInstanceMap models;
 
     // collect the matrices for all the MT's under the parent. Obviously this assumes
     // a particular scene graph structure.
@@ -177,26 +286,41 @@ DrawInstanced::convertGraphToUseDrawInstanced( osg::Group* parent )
         if ( mt )
         {
             osg::Node* n = mt->getChild(0);
-            models[n].push_back( mt->getMatrix() );
+            //models[n].push_back( mt->getMatrix() );
+
+            ModelInstance instance;
+            instance.matrix = mt->getMatrix();
+
+            // See whether the ObjectID is encoded in a uniform on the MT.
+            osg::StateSet* stateSet = mt->getStateSet();
+            if ( stateSet )
+            {
+                osg::Uniform* uniform = stateSet->getUniform( Registry::objectIndex()->getObjectIDUniformName() );
+                if ( uniform )
+                {
+                    uniform->get( (unsigned&)instance.objectID );
+                }
+            }
+
+            models[n].push_back( instance );
         }
     }
 
     // get rid of the old matrix transforms.
     parent->removeChildren(0, parent->getNumChildren());
 
-    // whether to use UBOs.
-    bool useUBO = Registry::capabilities().supportsUniformBufferObjects();
-
-    // maximum size of a slice.
-    // for UBOs, assume 64K / sizeof(mat4) = 1024.
-    // for uniform array, assume 8K / sizeof(mat4) = 128.
-    unsigned maxSliceSize = useUBO ? MAX_COUNT_UBO : MAX_COUNT_ARRAY;
+	// This is the maximum size of the tbo 
+	int maxTBOSize = Registry::capabilities().getMaxTextureBufferSize();
+	// This is the total number of instances it can store
+	// We will iterate below. If the number of instances is larger than the buffer can store
+	// we make more tbos
+	int maxTBOInstancesSize = maxTBOSize/4;// 4 vec4s per matrix.
 
     // For each model:
-    for( ModelNodeMatrices::iterator i = models.begin(); i != models.end(); ++i )
+    for( ModelInstanceMap::iterator i = models.begin(); i != models.end(); ++i )
     {
-        osg::Node*                node     = i->first.get();
-        std::vector<osg::Matrix>& matrices = i->second;
+        osg::Node*                  node      = i->first.get();
+        std::vector<ModelInstance>& instances = i->second;
 
         // calculate the overall bounding box for the model:
         osg::ComputeBoundsVisitor cbv;
@@ -204,91 +328,118 @@ DrawInstanced::convertGraphToUseDrawInstanced( osg::Group* parent )
         const osg::BoundingBox& nodeBox = cbv.getBoundingBox();
 
         osg::BoundingBox bbox;
-        for( std::vector<osg::Matrix>::iterator m = matrices.begin(); m != matrices.end(); ++m )
+        for( std::vector<ModelInstance>::iterator m = instances.begin(); m != instances.end(); ++m )
         {
-            osg::Matrix& matrix = *m;
-            bbox.expandBy(nodeBox.corner(0) * matrix);
-            bbox.expandBy(nodeBox.corner(1) * matrix);
-            bbox.expandBy(nodeBox.corner(2) * matrix);
-            bbox.expandBy(nodeBox.corner(3) * matrix);
-            bbox.expandBy(nodeBox.corner(4) * matrix);
-            bbox.expandBy(nodeBox.corner(5) * matrix);
-            bbox.expandBy(nodeBox.corner(6) * matrix);
-            bbox.expandBy(nodeBox.corner(7) * matrix);
+            bbox.expandBy(nodeBox.corner(0) * m->matrix);
+            bbox.expandBy(nodeBox.corner(1) * m->matrix);
+            bbox.expandBy(nodeBox.corner(2) * m->matrix);
+            bbox.expandBy(nodeBox.corner(3) * m->matrix);
+            bbox.expandBy(nodeBox.corner(4) * m->matrix);
+            bbox.expandBy(nodeBox.corner(5) * m->matrix);
+            bbox.expandBy(nodeBox.corner(6) * m->matrix);
+            bbox.expandBy(nodeBox.corner(7) * m->matrix);
         }
 
-        // calculate slice count and sizes:
-        unsigned sliceSize = std::min(matrices.size(), (size_t)maxSliceSize);
-        unsigned numSlices = matrices.size() / maxSliceSize;
-        unsigned lastSliceSize = matrices.size() % maxSliceSize;
-        if ( lastSliceSize == 0 )
-            lastSliceSize = sliceSize;
-        else
-            ++numSlices;
+		unsigned tboSize = 0;
+		unsigned numInstancesToStore = 0;
 
+		if (instances.size()<maxTBOInstancesSize)
+		{
+			tboSize = nextPowerOf2(instances.size());
+			numInstancesToStore = instances.size();
+		}
+		else
+		{
+			OE_WARN << "Number of Instances: " << instances.size() << " exceeds Number of instances TBO can store: " << maxTBOInstancesSize << std::endl;
+			OE_WARN << "Storing maximum possible instances in TBO, and skipping the rest"<<std::endl;
+			tboSize = maxTBOInstancesSize;
+			numInstancesToStore = maxTBOInstancesSize;
+		}
+		
         // Convert the node's primitive sets to use "draw-instanced" rendering; at the
         // same time, assign our computed bounding box as the static bounds for all
         // geometries. (As DI's they cannot report bounds naturally.)
-        ConvertToDrawInstanced cdi(sliceSize, bbox, true);
+        ConvertToDrawInstanced cdi(numInstancesToStore, bbox, true);
         node->accept( cdi );
+		
+        // Assign matrix vectors to the node, so the application can easily retrieve
+        // the original position data if necessary.
+        MatrixRefVector* nodeMats = new MatrixRefVector();
+        nodeMats->setName(TAG_MATRIX_VECTOR);
+        nodeMats->reserve(numInstancesToStore);
+        node->getOrCreateUserDataContainer()->addUserObject(nodeMats);
 
-        // If we don't have an even number of instance groups, make a smaller last one.
-        osg::Node* lastNode = node;
-        if ( numSlices > 1 && lastSliceSize < sliceSize )
-        {
-            // clone, but only make copies of necessary things
-            lastNode = osg::clone( 
-                node, 
-                osg::CopyOp::DEEP_COPY_NODES | osg::CopyOp::DEEP_COPY_DRAWABLES | osg::CopyOp::DEEP_COPY_PRIMITIVES );
+        // this group is simply a container for the uniform:
+        osg::Group* instanceGroup = new osg::Group();
 
-            ConvertToDrawInstanced cdi(lastSliceSize, bbox, false);
-            lastNode->accept( cdi );
-        }
+        // sampler that will hold the instance matrices:
+        osg::Image* image = new osg::Image();
+        image->setName("osgearth.drawinstanced.postex");
+		image->allocateImage( tboSize*4, 1, 1, GL_RGBA, GL_FLOAT );
 
-        // Next, break the rendering down into "slices". GLSL will only support a limited
-        // amount of pre-instance uniform data, so we have to portion the graph out into
-        // slices of no more than this chunk size.
-        for( unsigned slice = 0; slice < numSlices; ++slice )
-        {
-            unsigned   offset      = slice * sliceSize;
-            unsigned   currentSize = slice == numSlices-1 ? lastSliceSize : sliceSize;
-            osg::Node* currentNode = slice == numSlices-1 ? lastNode      : node;
+		// could use PixelWriter but we know the format.
+		// Note: we are building a transposed matrix because it makes the decoding easier in the shader.
+		GLfloat* ptr = reinterpret_cast<GLfloat*>( image->data() );
+		for(unsigned m=0; m<numInstancesToStore; ++m)
+		{
+			ModelInstance& i = instances[m];
+			const osg::Matrixf& mat = i.matrix;
 
-            // this group is simply a container for the uniform:
-            osg::Group* sliceGroup = new osg::Group();
+			// copy the first 3 columns:
+			for(int col=0; col<3; ++col)
+			{
+				for(int row=0; row<4; ++row)
+				{
+					*ptr++ = mat(row,col);
+				}
+			}
 
-            if ( useUBO ) // uniform buffer object:
-            {
-                osg::MatrixfArray* mats = new osg::MatrixfArray();
-                mats->setBufferObject( new osg::UniformBufferObject() );
-                // 64 = sizeof(mat4)
-                osg::UniformBufferBinding* ubb = new osg::UniformBufferBinding( 0, mats->getBufferObject(), 0, currentSize * 64 );
-                sliceGroup->getOrCreateStateSet()->setAttribute( ubb, osg::StateAttribute::ON );
-                for( unsigned m=0; m < currentSize; ++m )
-                {
-                    mats->push_back( matrices[offset + m] );
-                }
-                ubb->setDataVariance( osg::Object::DYNAMIC );
-            }
-            else // just use a uniform array
-            {
-                // assign the matrices to the uniform array:
-                ArrayUniform uniform(
-                    "oe_di_modelMatrix", 
-                    osg::Uniform::FLOAT_MAT4,
-                    sliceGroup->getOrCreateStateSet(),
-                    currentSize );
+			// encode the ObjectID in the last column, which is always (0,0,0,1)
+			// in a standard scale/rot/trans matrix. We will reinstate it in the 
+			// shader after extracting the object ID.
+			*ptr++ = (float)((i.objectID      ) & 0xff);
+			*ptr++ = (float)((i.objectID >>  8) & 0xff);
+			*ptr++ = (float)((i.objectID >> 16) & 0xff);
+			*ptr++ = (float)((i.objectID >> 24) & 0xff);
 
-                for( unsigned m=0; m < currentSize; ++m )
-                {
-                    uniform.setElement( m, matrices[offset + m] );
-                }
-            }
+			// store them int the metadata as well
+			nodeMats->push_back(mat);
+		}
 
-            // add the node as a child:
-            sliceGroup->addChild( currentNode );
+        osg::TextureBuffer* posTBO = new osg::TextureBuffer;
+		posTBO->setImage(image);
+        posTBO->setInternalFormat( GL_RGBA32F_ARB );
+        posTBO->setUnRefImageDataAfterApply( true );
 
-            parent->addChild( sliceGroup );
-        }
+        // Tell the SG to skip the positioning texture.
+        ShaderGenerator::setIgnoreHint(posTBO, true);
+
+        osg::StateSet* stateset = instanceGroup->getOrCreateStateSet();
+        stateset->setTextureAttribute(POSTEX_TBO_UNIT, posTBO);
+        stateset->getOrCreateUniform("oe_di_postex_TBO_size", osg::Uniform::INT)->set((int)tboSize);
+
+		// add the node as a child:
+        instanceGroup->addChild( node );
+
+        parent->addChild( instanceGroup );
     }
+}
+
+
+const DrawInstanced::MatrixRefVector*
+DrawInstanced::getMatrixVector(osg::Node* node)
+{
+    if ( !node )
+        return 0L;
+
+    osg::UserDataContainer* udc = node->getUserDataContainer();
+    if ( !udc )
+        return 0L;
+
+    osg::Object* obj = udc->getUserObject(TAG_MATRIX_VECTOR);
+    if ( !obj )
+        return 0L;
+
+    // cast is safe because of our unique tag
+    return static_cast<const MatrixRefVector*>( obj );
 }

@@ -1,6 +1,6 @@
 /* --*-c++-*-- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -28,6 +28,7 @@
 #include <osgEarth/NodeUtils>
 #include <osgEarth/ThreadingUtils>
 #include <osgEarth/DepthOffset>
+#include <osgDB/Callbacks>
 #include <osg/Node>
 #include <set>
 
@@ -59,11 +60,27 @@ namespace osgEarth { namespace Features
          *      Node factory that will be invoked to compile feature data into nodes
          * @param session
          *      Session under which to create elements in this graph
+         * @param preMergeOperations
+         *      Node operations that will execute in the pager thread after it finishes
+         *      building a node
+         * @param postMergeOperations
+         *      Node operations that will execute after merging a node into the graph
          */
         FeatureModelGraph(
             Session*                         session,
             const FeatureModelSourceOptions& options,
-            FeatureNodeFactory*              factory );
+            FeatureNodeFactory*              factory,
+            ModelSource*                     modelSource,
+            RefNodeOperationVector*          preMergeOperations,
+            RefNodeOperationVector*          postMergeOperations);
+        
+        /* @deprecated */
+        FeatureModelGraph(
+            Session*                         session,
+            const FeatureModelSourceOptions& options,
+            FeatureNodeFactory*              factory,
+            RefNodeOperationVector*          preMergeOperations,
+            RefNodeOperationVector*          postMergeOperations);
 
         /**
          * Loads and returns a subnode. Used internally for paging.
@@ -85,7 +102,7 @@ namespace osgEarth { namespace Features
          */
         Session* getSession() { return _session; }
 
-		/**
+        /**
          * UID given to this feature graph when registered with the pseudo-loader
          */
         UID getUID() const { return _uid; }
@@ -94,13 +111,6 @@ namespace osgEarth { namespace Features
          * Mark the feature graph dirty and in need of regeneration 
          */
         void dirty();
-
-        /**
-         * Adds an operation that will run on new nodes that are added by the
-         * paging system. Note, the operation only runs after the pager actually
-         * added the node to the live scene graph.
-         */
-        void addPostMergeOperation( NodeOperation* op );
 
         /**
          * Access to the features levels
@@ -123,18 +133,20 @@ namespace osgEarth { namespace Features
             const TileKey*      key);
 
         osg::Group* build( 
-            const Style&        baseStyle, 
-            const Query&        baseQuery, 
-            const GeoExtent&    extent, 
-            FeatureSourceIndex* index);
+            const Style&         baseStyle, 
+            const Query&         baseQuery, 
+            const GeoExtent&     extent, 
+            FeatureIndexBuilder* index);
 
 
     private:
+
+        void ctor();
         
         osg::Group* createStyleGroup(
-            const Style&        style, 
-            const Query&        query, 
-            FeatureSourceIndex* index);
+            const Style&         style, 
+            const Query&         query, 
+            FeatureIndexBuilder* index);
 
         osg::Group* createStyleGroup(
             const Style&         style, 
@@ -144,13 +156,13 @@ namespace osgEarth { namespace Features
         void buildStyleGroups(
             const StyleSelector* selector,
             const Query&         baseQuery,
-            FeatureSourceIndex*  index,
+            FeatureIndexBuilder* index,
             osg::Group*          parent);
 
         void queryAndSortIntoStyleGroups(
             const Query&            query,
             const StringExpression& styleExpr,
-            FeatureSourceIndex*     index,
+            FeatureIndexBuilder*    index,
             osg::Group*             parent);
 
         osg::Group* getOrCreateStyleGroupFromFactory(
@@ -178,7 +190,7 @@ namespace osgEarth { namespace Features
         GeoExtent                        _usableMapExtent;
         osg::BoundingSphered             _fullWorldBound;
         bool                             _useTiledSource;
-        osgEarth::Revision               _revision;
+        osgEarth::Revision               _featureSourceRev, _modelSourceRev;
         bool                             _dirty;
         bool                             _pendingUpdate;
         std::vector<const FeatureLevel*> _lodmap;
@@ -197,8 +209,16 @@ namespace osgEarth { namespace Features
         };
         OverlayChange                    _overlayChange;
 
+        osg::ref_ptr<osgDB::FileLocationCallback> _defaultFileLocationCallback;
+
+        osg::ref_ptr<RefNodeOperationVector> _preMergeOperations;
         osg::ref_ptr<RefNodeOperationVector> _postMergeOperations;
 
+        osg::observer_ptr<ModelSource> _modelSource;
+
+        osg::ref_ptr<FeatureSourceIndex> _featureIndex;
+
+        void runPreMergeOperations(osg::Node* node);
         void runPostMergeOperations(osg::Node* node);
         void checkForGlobalStyles(const Style& style);
         void changeOverlay();

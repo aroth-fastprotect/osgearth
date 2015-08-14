@@ -29,11 +29,11 @@ osgEarth Sample - Annotations
         <annotations>
         
             <label text="Los Angeles">
-                <position lat="34.051" long="-117.974" alt="100" mode="relative"/>
+                <position lat="35.051" long="-117.974" alt="100" mode="relative"/>
                 <style type="text/css">
                     text-align:     center_center;
                     text-size:      20;
-                    text-declutter: true;
+                    text-declutter: false;
                 </style>
             </label>
             
@@ -91,11 +91,12 @@ osgEarth Sample - Annotations
                     LINESTRING(-120.37 34.039, -120.09 33.96, -119.75 34, -118.43 33.37, -118.48 32.88)
                 </geometry>
                 <style type="text/css">
-                    fill:             #ff00ff7f;
-                    stroke:           #ffff00;
-                    stroke-width:     3;
-                    extrusion-height: 30000;
-                    render-lighting:  false;
+                    fill:                #ff00ff7f;
+                    stroke:              #ffff00;
+                    stroke-width:        3;
+					stroke-crease-angle: 45.0;
+                    extrusion-height:    30000;
+                    render-lighting:     false;
                 </style>
             </feature>
 
@@ -149,6 +150,21 @@ osgEarth Sample - Annotations
                     render-lighting: false;
                 </style>
             </circle>
+
+            <feature name="Long Line">
+                <srs>wgs84</srs>
+                <geometry>
+                    LINESTRING(0 0, 0 65)
+                </geometry>
+                <style type="text/css">
+                    stroke:              #ffff00;
+                    stroke-width:        3;
+                    stroke-tessellation: 90;
+                    altitude-clamping:   relative;
+					altitude-technique:  scene;
+                    render-lighting:     false;
+                </style>
+            </feature>
             
         </annotations>
         

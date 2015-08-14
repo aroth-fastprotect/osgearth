@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -29,7 +32,7 @@
 #include <osgEarthQt/DataManager>
 #include <osgEarthUtil/EarthManipulator>
 
-#include <QtGui/QApplication>
+#include <QApplication>
 
 #include "PackageQtMainWindow"
 #include "SceneController.h"
@@ -62,16 +65,22 @@ int main(int argc, char** argv)
   HTTPClient::setUserAgent( "osgearth_package_qt/1.0" );
 
   //setup log file
-  char *appData = getenv("APPDATA");
+#ifdef _WIN32
+  const char *appData = getenv("APPDATA");
+#else
+  const char *appData = "/tmp";
+#endif
 
-  std::string logDir = std::string(appData) + "\\osgEarthPackageQt";
+  std::string logDir = std::string(appData) + "/osgEarthPackageQt";
   if (!osgDB::fileExists(logDir))
     osgDB::makeDirectory(logDir);
 
-  std::string logPath = logDir + "\\log.txt";
+  /*
+  std::string logPath = logDir + "/log.txt";
   std::ofstream* log = new std::ofstream( logPath.c_str() );
   std::cout.rdbuf( log->rdbuf() );
   std::cerr.rdbuf( log->rdbuf() );
+
 
   if (getenv("OSGEARTH_PACKAGE_LOGGING") != 0)
   {
@@ -85,6 +94,7 @@ int main(int argc, char** argv)
   {
     osgEarth::setNotifyLevel( osg::INFO );
   }
+  */
 
   osg::DisplaySettings::instance()->setMinimumNumStencilBits(8);
 
@@ -110,6 +120,11 @@ int main(int argc, char** argv)
     mainView->getCamera()->setNearFarRatio(0.00002);
     mainView->addEventHandler( new osgGA::StateSetManipulator(mainView->getCamera()->getOrCreateStateSet()) );
     mainView->addEventHandler( new osgViewer::StatsHandler() );
+
+    osgViewer::Viewer* viewer = dynamic_cast<osgViewer::Viewer*>(mainView.get());
+    if(viewer)
+      viewer->setThreadingModel(osgViewer::ViewerBase::SingleThreaded);
+
   }
 
   //create the SceneController, if no earth file is specified a blank
@@ -128,11 +143,13 @@ int main(int argc, char** argv)
   int ret = app.exec();
 
   //TODO: move somewhere smarter
+  /*
   if (log)
   {
       log->close();
       delete log;
   }
+  */
 
   return ret;
 }

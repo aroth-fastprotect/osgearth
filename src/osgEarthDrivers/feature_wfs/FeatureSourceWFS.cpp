@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -83,6 +83,7 @@ public:
 
                 std::string binId = Stringify() << std::hex << hashString(optionsConf.toJSON()) << "_wfs";
                 _cacheBin = cache->addBin( binId );
+                _cacheBin->setHashKeys(true);
                 
                 // write a metadata record just for reference purposes.. we don't actually use it
                 Config metadata = _cacheBin->readMetadata();
@@ -176,6 +177,11 @@ public:
             }
         }
 
+        if ( _featureProfile.valid() && _options.geoInterp().isSet() )
+        {
+            _featureProfile->geoInterp() = _options.geoInterp().get();
+        }
+
         return _featureProfile.get();
     }
 
@@ -239,16 +245,13 @@ public:
         OGRLayerH layer = OGR_DS_GetLayer(ds, 0);
         if ( layer )
         {
-            FeatureProfile* fp = getFeatureProfile();
-            const SpatialReference* srs = fp ? fp->getSRS() : 0L;
-
             OGR_L_ResetReading(layer);                                
             OGRFeatureH feat_handle;
             while ((feat_handle = OGR_L_GetNextFeature( layer )) != NULL)
             {
                 if ( feat_handle )
                 {
-                    osg::ref_ptr<Feature> f = OgrUtils::createFeature( feat_handle, srs );
+                    osg::ref_ptr<Feature> f = OgrUtils::createFeature( feat_handle, getFeatureProfile() );
                     if ( f.valid() && !isBlacklisted(f->getFID()) )
                     {
                         features.push_back( f.release() );
@@ -321,14 +324,28 @@ public:
 
         if (query.tileKey().isSet())
         {
-            buf << "&Z=" << query.tileKey().get().getLevelOfDetail() << 
-                   "&X=" << query.tileKey().get().getTileX() <<
-                   "&Y=" << query.tileKey().get().getTileY();
+
+            unsigned int tileX = query.tileKey().get().getTileX();
+            unsigned int tileY = query.tileKey().get().getTileY();
+            unsigned int level = query.tileKey().get().getLevelOfDetail();
+#if 0
+            unsigned int numRows, numCols;
+            query.tileKey().get().getProfile()->getNumTiles(level, numCols, numRows);
+            tileY  = numRows - tileY - 1;
+#endif
+
+            buf << "&Z=" << level << 
+                   "&X=" << tileX <<
+                   "&Y=" << tileY;
         }
         else if (query.bounds().isSet())
-        {
-            buf << "&BBOX=" << query.bounds().get().xMin() << "," << query.bounds().get().yMin() << ","
-                            << query.bounds().get().xMax() << "," << query.bounds().get().yMax();
+        {            
+            double buffer = *_options.buffer();            
+            buf << "&BBOX=" << std::setprecision(16)
+                            << query.bounds().get().xMin() - buffer << ","
+                            << query.bounds().get().yMin() - buffer << ","
+                            << query.bounds().get().xMax() + buffer << ","
+                            << query.bounds().get().yMax() + buffer;
         }
         std::string str;
         str = buf.str();
@@ -375,7 +392,7 @@ public:
             if ( features.size() > 0 )
             {
                 FilterContext cx;
-                cx.profile() = getFeatureProfile();
+                cx.setProfile( getFeatureProfile() );
 
                 for( FeatureFilterList::const_iterator i = _options.filters().begin(); i != _options.filters().end(); ++i )
                 {
@@ -394,13 +411,14 @@ public:
         return result;
     }
 
-    /**
-    * Gets the Feature with the given FID
-    * @returns
-    *     The Feature with the given FID or NULL if not found.
-    */
+    virtual bool supportsGetFeature() const
+    {
+        return false;
+    }
+
     virtual Feature* getFeature( FeatureID fid )
     {
+        // not supported for WFS
         return 0;
     }
 

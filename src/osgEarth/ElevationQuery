@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,9 +21,34 @@
 
 #include <osgEarth/MapFrame>
 #include <osgEarth/Containers>
+#include <osgEarth/DPLineSegmentIntersector>
 
 namespace osgEarth
 {
+    class OSGEARTH_EXPORT ElevationQueryCacheReadCallback : public osgUtil::IntersectionVisitor::ReadCallback
+    {
+        public:
+            ElevationQueryCacheReadCallback();
+
+            void setMaximumNumOfFilesToCache(unsigned int maxNumFilesToCache) { _maxNumFilesToCache = maxNumFilesToCache; }
+            unsigned int  getMaximumNumOfFilesToCache() const { return _maxNumFilesToCache; }
+
+            void clearDatabaseCache();
+
+            void pruneUnusedDatabaseCache();
+
+            virtual osg::Node* readNodeFile(const std::string& filename);
+
+        protected:
+
+            typedef std::map<std::string, osg::ref_ptr<osg::Node> > FileNameSceneMap;
+
+            unsigned int _maxNumFilesToCache;
+            OpenThreads::Mutex  _mutex;
+            FileNameSceneMap    _filenameSceneMap;
+    };
+
+
     /**
      * ElevationQuery (EQ) lets you query the elevation at any point on a map.
      * 
@@ -35,6 +60,9 @@ namespace osgEarth
      * NOTE: EQ does NOT take into account rendering properties like vertical scale or
      * skirts. If you need a vertical scale, for example, simply scale the resulting
      * elevation value.
+     *
+     * ElevationQuery is not thread-safe. So not use the same instance of ElevationQuery
+     * from multiple threads without mutexing.
      */
     class OSGEARTH_EXPORT ElevationQuery
     {
@@ -77,7 +105,7 @@ namespace osgEarth
             const GeoPoint& point,
             double&         out_elevation,
             double          desiredResolution    =0.0,
-            double*         out_actualResolution =0L );
+            double*         out_actualResolution =0L );      
 
         /** 
          * Gets elevations for a whole array of points, storing the result in the
@@ -99,6 +127,13 @@ namespace osgEarth
             const SpatialReference*        pointsSRS,
             std::vector<double>&           out_elevations,
             double                         desiredResolution = 0.0 );
+
+        /**
+         * Whether a query should fall back on lower resolution data if no results
+         * are available at the requested resolution. Default is true.
+         */
+        void setFallBackOnNoData(bool value) { _fallBackOnNoData = value; }
+        bool getFallBackOnNoData() const { return _fallBackOnNoData; }
 
         /**
          * Sets the maximum cache size for elevation tiles.
@@ -130,26 +165,43 @@ namespace osgEarth
          * Gets the maximum level of data available at the given point.  If the layers have DataExtents provided they
          * will be queried.  This allows certain areas on the earth to have higher levels of detail
          * than others and avoids unnecessary queries where there isn't high resolution data available.
+         * Negative return value means there was no data available at the location.
          */
-        unsigned int getMaxLevel(double x, double y, const SpatialReference* srs, const Profile* profile ) const;
+        int getMaxLevel(double x, double y, const SpatialReference* srs, const Profile* profile, unsigned tileSize) const;
+
+        /** Clear the database cache.*/
+        void clearDatabaseCache() { if (_eqcrc.valid()) _eqcrc->clearDatabaseCache(); }
+
+        /** Set the ReadCallback that does the reading of external PagedLOD models, and caching of loaded subgraphs.
+          * Note, if you have multiple LineOfSight or HeightAboveTerrain objects in use at one time then you should share a single
+          * DatabaseCacheReadCallback between all of them. */
+        void setElevationQueryCacheReadCallback(ElevationQueryCacheReadCallback* eqcrc);
+
+        /** Get the ReadCallback that does the reading of external PagedLOD models, and caching of loaded subgraphs.*/
+        ElevationQueryCacheReadCallback* getElevationQueryCacheReadCallback() { return _eqcrc.get(); }
 
     private:
-        MapFrame  _mapf;
-        unsigned  _maxCacheSize;
-        int       _tileSize;        
-        int       _maxLevelOverride;
+        MapFrame     _mapf;
+        unsigned     _maxCacheSize;
+        int          _tileSize;        
+        int          _maxLevelOverride;
+        bool         _fallBackOnNoData;
 
-        typedef LRUCache< TileKey, osg::ref_ptr<osg::HeightField> > TileCache;
-        TileCache _tileCache;
-
+        typedef LRUCache< TileKey, GeoHeightField > TileCache;
+        TileCache _cache;
         double _queries;
         double _totalTime;
+        std::vector<ModelLayer*> _patchLayers;
+        osg::ref_ptr<DPLineSegmentIntersector> _patchLayersLSI;
+
+        osg::ref_ptr<ElevationQueryCacheReadCallback> _eqcrc;
 
     private:
         void postCTOR();
         void sync();
+        void gatherPatchLayers();
 
-        bool getElevationImpl(
+        bool getElevationImpl(            
             const GeoPoint& point,
             double&         out_elevation,
             double          desiredResolution,

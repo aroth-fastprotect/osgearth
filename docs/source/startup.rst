@@ -5,8 +5,7 @@ osgEarth is a cross-platform library. It uses the CMake_ build system.
 You will need **version 2.8** or newer. 
 (This is the same build system that OpenSceneGraph_ uses.)
 
-    NOTE: To build osgEarth for iOS see :doc:`ios`
-    
+    NOTE: To build osgEarth for **iOS** see :doc:`ios`
 
 Get the Source Code
 -------------------
@@ -30,23 +29,41 @@ Get the Source Code
 Get the Dependencies
 --------------------
 
-The following are **required dependencies**:
+**Required dependencies**:
 
     * OpenSceneGraph_ 3.0.1 or later, with the CURL plugin enabled.
     * GDAL_ 1.6 or later - Geospatial Data Abstraction Layer
     * CURL_ - HTTP transfer library (comes with OpenSceneGraph_ 3rd party library distros)
     
-These are the **optional depedencies**. osgEarth will compile without them,
-but some functionality will be missing:
+**Optional depedencies**: osgEarth will compile without them, but some functionality
+will be missing:
 
     * GEOS_ 3.2.0 or later - C++ library for topological operations.
       osgEarth uses GEOS to perform various geometry operations like buffering and intersections.
       If you plan to use vector feature data in osgEarth, you probably want this.
     
     * Minizip_ - ZIP file extractor; include this if you want to read KMZ files.
+      
+    * QT_ - Cross-platform UI framework. Point the ``QT_QMAKE_EXECUTABLE`` CMake variable
+      to the ``qmake.exe`` you want to use and CMake will populate all the other QT variables.
+
+    * LevelDB_ - Google's embedded key/value store. Include this if you want to build
+      osgEarth's optional "leveldb" cache driver.
+	
+	* SQLite_ - Self-contained, serverless, zero-configuration, transactional SQL database engine.
+	  Used for accessing sqlite/mbtiles datasets. You may need these tips to create the necessary
+	  .lib file from the .def and .dll files included in the Windows binaries:
+	  http://eli.thegreenplace.net/2009/09/23/compiling-sqlite-on-windows
     
-    * V8_ - Google's JavaScript engine. Include this if you want to embed JavaScript code
-      in your earth files.
+**Deprecated dependencies**: osgEarth can still use these, but they will probably go away
+in the future:
+
+    * V8_ - Google's JavaScript engine. Include this if you're a Windows user and you want
+      to embed JavaScript code in your earth files. We recommend you use Duktape instead.
+      
+    * JavaScriptCore_ - Apple's JavaScript engine. Include this if you're an OSX or IOS user
+      and you want to embed JavaScript code in your earth files. We receommend you use
+      Duktape instead.
       
 **Optional: get pre-built dependencies**
 
@@ -69,7 +86,7 @@ Here are a few tips.
       that is separate from the source code. This makes it easier to maintain separate
       versions and to keep GIT updates clean.
       
-    * For optional dependencies (like GEOS_ or V8_), just leave the CMake field blank
+    * For optional dependencies (like GEOS_), just leave the CMake field blank
       if you are not using it.
       
     * For the OSG dependencies, just input the **OSG_DIR** variable, and when you generate
@@ -98,4 +115,5 @@ Here are a few tips.
 .. _AlphaPixel:     http://openscenegraph.alphapixel.com/osg/downloads/openscenegraph-third-party-library-downloads
 .. _Mike Weiblen:   http://mew.cx/osg/
 .. _the forum:      http://forum.osgearth.org
-
+.. _LevelDB:        https://github.com/pelicanmapping/leveldb
+.. _SQLite:         http://www.sqlite.org/

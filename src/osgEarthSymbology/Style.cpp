@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -48,19 +51,19 @@ _uri     ( rhs._uri )
     else
     {
         _symbols.clear();
-        mergeConfig( rhs.getConfig(false) );
+        copySymbols(rhs);
     }
 }
 
 Style&
 Style::operator = ( const Style& rhs )
 {
-    _name.clear();
-    _origType.clear();
-    _origData.clear();
-    _uri.unset();
+    _name = rhs._name;
+    _origType = rhs._origType;
+    _origData = rhs._origData;
+    _uri = rhs._uri;
     _symbols.clear();
-    mergeConfig( rhs.getConfig(false) );
+    copySymbols(rhs);
     return *this;
 }
 
@@ -101,12 +104,8 @@ Style
 Style::combineWith( const Style& rhs ) const
 {
     // start by deep-cloning this style.
-    Config conf = getConfig( false );
-    Style newStyle( conf );
-
-    // next, merge in the symbology from the other style.
-    newStyle.mergeConfig( rhs.getConfig(false) );
-
+    Style newStyle(*this);
+    newStyle.copySymbols(rhs);
     if ( !this->empty() && !rhs.empty() )
         newStyle.setName( _name + std::string(":") + rhs.getName() );
     else if ( !this->empty() && rhs.empty() )
@@ -115,8 +114,15 @@ Style::combineWith( const Style& rhs ) const
         newStyle.setName( rhs.getName() );
     else
         newStyle.setName( _name );
-
     return newStyle;
+}
+
+void Style::copySymbols(const Style& style)
+{
+    for (SymbolList::const_iterator itr = style._symbols.begin(); itr != style._symbols.end(); ++itr)
+    {
+        addSymbol(static_cast<Symbol*>(itr->get()->clone(osg::CopyOp::SHALLOW_COPY)));
+    }
 }
 
 void
@@ -127,18 +133,7 @@ Style::fromSLD( const Config& sld )
     for( ConfigSet::const_iterator kid = sld.children().begin(); kid != sld.children().end(); ++kid )
     {
         const Config& p = *kid;
-
-        AltitudeSymbol::parseSLD (p, *this);
-        ExtrusionSymbol::parseSLD(p, *this);
-        IconSymbol::parseSLD     (p, *this);
-        LineSymbol::parseSLD     (p, *this);
-        MarkerSymbol::parseSLD   (p, *this);
-        ModelSymbol::parseSLD    (p, *this);
-        PolygonSymbol::parseSLD  (p, *this);
-        PointSymbol::parseSLD    (p, *this);
-        RenderSymbol::parseSLD   (p, *this);
-        SkinSymbol::parseSLD     (p, *this);
-        TextSymbol::parseSLD     (p, *this);
+		SymbolRegistry::instance()->parseSLD( p, *this );		
     }
 }
 
@@ -181,51 +176,9 @@ Style::mergeConfig( const Config& conf )
             for( ConfigSet::const_iterator i = symbolConf.children().begin(); i != symbolConf.children().end(); ++i )
             {
                 const Config& c = *i;
+				Symbol* symbol = SymbolRegistry::instance()->create( c );
 
-                if ( c.key() == "text" )
-                {
-                    add( new TextSymbol(c) );
-                }
-                else if ( c.key() == "point" )
-                {
-                    add( new PointSymbol(c) );
-                }
-                else if ( c.key() == "line" )
-                {
-                    add( new LineSymbol(c) );
-                }
-                else if ( c.key() == "polygon" )
-                {
-                    add( new PolygonSymbol(c) );
-                }
-                else if ( c.key() == "extrusion" )
-                {
-                    add( new ExtrusionSymbol(c) );
-                }
-                else if ( c.key() == "altitude" )
-                {
-                    add( new AltitudeSymbol(c) );
-                }
-                else if ( c.key() == "marker" )
-                {
-                    add( new MarkerSymbol(c) );
-                }
-                else if ( c.key() == "render" )
-                {
-                    add( new RenderSymbol(c) );
-                }
-                else if ( c.key() == "skin" )
-                {
-                    add( new SkinSymbol(c) );
-                }
-                else if ( c.key() == "model" )
-                {
-                    add( new ModelSymbol(c) );
-                }
-                else if ( c.key() == "icon" )
-                {
-                    add( new IconSymbol(c) );
-                }
+				add(symbol);
             }
         }
     }

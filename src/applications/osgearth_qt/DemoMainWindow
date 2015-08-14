@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -19,7 +22,6 @@
 
 #include <osgEarthQt/AnnotationToolbar>
 #include <osgEarthQt/Common>
-#include <osgEarthQt/MultiViewerWidget>
 #include <osgEarthQt/DataManager>
 #include <osgEarthQt/MapCatalogWidget>
 #include <osgEarthQt/TerrainProfileWidget>
@@ -45,7 +47,7 @@ class DemoMainWindow : public QMainWindow
 public:
 
     DemoMainWindow(osgEarth::QtGui::DataManager* manager, osgEarth::MapNode* mapNode, osg::Group* annotationRoot)
-        : _manager(manager), _mapNode(mapNode), _annoRoot(annotationRoot), _layerAdded(false), _terrainProfileDock(0L), _viewerWidget(0L), _compositeViewerWidget(0L)
+        : _manager(manager), _mapNode(mapNode), _annoRoot(annotationRoot), _layerAdded(false), _terrainProfileDock(0L), _viewerWidget(0L)
     {
         initUi(); 
     }
@@ -57,17 +59,6 @@ public:
 
         _views.clear();
         _viewerWidget->getViews( _views );
-
-        _annotationToolbar->setActiveViews(_views);
-    }
-
-    void setViewerWidget(osgEarth::QtGui::MultiViewerWidget* viewerWidget, const osgEarth::QtGui::ViewVector& views)
-    {
-        setCentralWidget(viewerWidget);
-        _compositeViewerWidget = viewerWidget;
-
-        _views.clear();
-        _views.insert(_views.end(), views.begin(), views.end());
 
         _annotationToolbar->setActiveViews(_views);
     }
@@ -123,7 +114,7 @@ public:
 
         osgEarth::Annotation::AnnotationData* annoData = new osgEarth::Annotation::AnnotationData();
         annoData->setName("New York");
-        annoData->setViewpoint(osgEarth::Viewpoint(osg::Vec3d(-74, 40.714, 0), 0.0, -90.0, 1e5));
+        annoData->setViewpoint(osgEarth::Viewpoint("New Tork", -74, 40.714, 0, 0.0, -90.0, 1e5));
         annotation->setAnnotationData(annoData);
 
         annotation->installDecoration("selected", new osgEarth::Annotation::ScaleDecoration(2.0f));
@@ -145,14 +136,7 @@ protected:
     {
         if (_viewerWidget)
         {
-            //_viewerWidget->getViewer()->setSceneData(0);
-            //_viewerWidget->getViewer()->frame();
             _viewerWidget->getViewer()->setDone(true);
-        }
-
-        if (_compositeViewerWidget)
-        {
-            _compositeViewerWidget/*->getViewer()*/->setDone(true);
         }
 
         event->accept();
@@ -206,9 +190,6 @@ private:
     osg::ref_ptr<osg::Group> _annoRoot;
     osg::ref_ptr<osgEarth::ImageLayer> _testLayer;
     osgEarth::QtGui::ViewerWidget* _viewerWidget;
-    osgEarth::QtGui::MultiViewerWidget* _compositeViewerWidget;
-    //osg::ref_ptr<osgEarth::QtGui::ViewerWidget> _viewerWidget;
-    //osg::ref_ptr<osgEarth::QtGui::MultiViewerWidget> _compositeViewerWidget;
     osgEarth::QtGui::AnnotationToolbar* _annotationToolbar;
     osgEarth::QtGui::ViewVector _views;
     bool _layerAdded;

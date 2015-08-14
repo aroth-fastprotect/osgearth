@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,9 +17,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/ShaderUtils>
+#include <osgEarth/ShaderFactory>
+#include <osgEarth/VirtualProgram>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
 #include <osgEarth/CullingUtils>
+#include <osgEarth/URI>
+#include <osg/ComputeBoundsVisitor>
+#include <osgDB/FileUtils>
 #include <list>
 
 using namespace osgEarth;
@@ -50,6 +55,7 @@ namespace
 
             if ( (val & osg::StateAttribute::INHERIT) == 0 )
             {
+
                 if ((val & osg::StateAttribute::PROTECTED)!=0 ||
                     (base_val & osg::StateAttribute::OVERRIDE)==0)
                 {
@@ -127,12 +133,13 @@ namespace
     }
 }
 
-//------------------------------------------------------------------------
+#undef LC
+#define LC "[ShaderUtils] "
 
-namespace State_Utils
+namespace
 {
     // Code borrowed from osg::State.cpp
-    bool replace(std::string& str, const std::string& original_phrase, const std::string& new_phrase)
+    static bool replace(std::string& str, const std::string& original_phrase, const std::string& new_phrase)
     {
         bool replacedStr = false;
         std::string::size_type pos = 0;
@@ -158,7 +165,7 @@ namespace State_Utils
         return replacedStr;
     }
 
-    void replaceAndInsertDeclaration(std::string& source, std::string::size_type declPos, const std::string& originalStr, const std::string& newStr, const std::string& declarationPrefix, const std::string& declarationSuffix ="")
+    static void replaceAndInsertDeclaration(std::string& source, std::string::size_type declPos, const std::string& originalStr, const std::string& newStr, const std::string& declarationPrefix, const std::string& declarationSuffix ="")
     {
         if (replace(source, originalStr, newStr))
         {
@@ -194,7 +201,7 @@ ShaderPreProcessor::run(osg::Shader* shader)
 
         for( int i=0; i<maxLights; ++i )
         {
-            State_Utils::replaceAndInsertDeclaration(
+            replaceAndInsertDeclaration(
                 source, declPos,
                 Stringify() << "gl_LightSource[" << i << "]",
                 Stringify() << "osg_LightSource" << i,
@@ -202,7 +209,7 @@ ShaderPreProcessor::run(osg::Shader* shader)
                     << osg_LightSourceParameters::glslDefinition() << "\n"
                     << "uniform osg_LightSourceParameters " );
 
-            State_Utils::replaceAndInsertDeclaration(
+            replaceAndInsertDeclaration(
                 source, declPos,
                 Stringify() << "gl_FrontLightProduct[" << i << "]", 
                 Stringify() << "osg_FrontLightProduct" << i,
@@ -310,6 +317,22 @@ void osg_LightSourceParameters::setUniformsFromOsgLight(const osg::Light* light,
                                                       light->getSpecular().z() * frontSpecular.z(),
                                                       light->getSpecular().w() * frontSpecular.w()));
         }
+        else {
+            _frontLightProduct.ambient->set(osg::Vec4(light->getAmbient().x(),
+                                                      light->getAmbient().y(),
+                                                      light->getAmbient().z(),
+                                                      light->getAmbient().w()));
+            
+            _frontLightProduct.diffuse->set(osg::Vec4(light->getDiffuse().x(),
+                                                      light->getDiffuse().y(),
+                                                      light->getDiffuse().z(),
+                                                      light->getDiffuse().w()));
+            
+            _frontLightProduct.specular->set(osg::Vec4(light->getSpecular().x(),
+                                                      light->getSpecular().y(),
+                                                      light->getSpecular().z(),
+                                                      light->getSpecular().w()));
+        }
     }
 }
 
@@ -363,39 +386,20 @@ osg_LightSourceParameters::glslDefinition()
 #define LC "[UpdateLightingUniformHelper] "
 
 UpdateLightingUniformsHelper::UpdateLightingUniformsHelper( bool useUpdateTrav ) :
-_lightingEnabled( true ),
 _dirty          ( true ),
 _applied        ( false ),
 _useUpdateTrav  ( useUpdateTrav )
 {
     _maxLights = Registry::instance()->getCapabilities().getMaxLights();
-
-    _lightEnabled = new bool[ _maxLights ];
-    if ( _maxLights > 0 ){
-        _lightEnabled[0] = true;
-        //allocate light
-        _osgLightSourceParameters.push_back(osg_LightSourceParameters(0));
-    }
-    for(int i=1; i<_maxLights; ++i ){
-        _lightEnabled[i] = true;
-        _osgLightSourceParameters.push_back(osg_LightSourceParameters(i));
-    }
-
-    _lightingEnabledUniform = new osg::Uniform( osg::Uniform::BOOL, "oe_mode_GL_LIGHTING" );
-    _lightEnabledUniform    = new osg::Uniform( osg::Uniform::BOOL, "oe_mode_GL_LIGHT", _maxLights );
-
-    if ( !_useUpdateTrav )
+    for(int i=0; i<_maxLights; ++i )
     {
-        // setting the data variance the DYNAMIC makes it safe to change the uniform values
-        // during the CULL traversal.
-        _lightingEnabledUniform->setDataVariance( osg::Object::DYNAMIC );
-        _lightEnabledUniform->setDataVariance( osg::Object::DYNAMIC );
+        _osgLightSourceParameters.push_back(osg_LightSourceParameters(i));
     }
 }
 
 UpdateLightingUniformsHelper::~UpdateLightingUniformsHelper()
 {
-    delete [] _lightEnabled;
+    //nop
 }
 
 void
@@ -405,6 +409,9 @@ UpdateLightingUniformsHelper::cullTraverse( osg::Node* node, osg::NodeVisitor* n
     if ( cv )
     {
         StateSetStack stateSetStack;
+
+        if ( node->getStateSet() )
+            stateSetStack.push_front( node->getStateSet() );
 
         osgUtil::StateGraph* sg = cv->getCurrentStateGraph();
         while( sg )
@@ -417,6 +424,7 @@ UpdateLightingUniformsHelper::cullTraverse( osg::Node* node, osg::NodeVisitor* n
             sg = sg->_parent;
         }
 
+#if 0
         // Update the overall lighting-enabled value:
         bool lightingEnabled =
             ( getModeValue(stateSetStack, GL_LIGHTING) & osg::StateAttribute::ON ) != 0;
@@ -429,6 +437,7 @@ UpdateLightingUniformsHelper::cullTraverse( osg::Node* node, osg::NodeVisitor* n
             else
                 _lightingEnabledUniform->set( _lightingEnabled );
         }
+#endif
 
         osg::View* view = cv->getCurrentCamera()->getView();
         if ( view )
@@ -441,6 +450,7 @@ UpdateLightingUniformsHelper::cullTraverse( osg::Node* node, osg::NodeVisitor* n
             }
         }
 
+#if 0
         else
         {
             // Update the list of enabled lights:
@@ -474,6 +484,7 @@ UpdateLightingUniformsHelper::cullTraverse( osg::Node* node, osg::NodeVisitor* n
                 }
             }	
         }
+#endif
 
         // apply if necessary:
         if ( !_applied && !_useUpdateTrav )
@@ -481,8 +492,8 @@ UpdateLightingUniformsHelper::cullTraverse( osg::Node* node, osg::NodeVisitor* n
             OpenThreads::ScopedLock<OpenThreads::Mutex> lock( _stateSetMutex );
             if (!_applied)
             {
-                node->getOrCreateStateSet()->addUniform( _lightingEnabledUniform.get() );
-                node->getStateSet()->addUniform( _lightEnabledUniform.get() );
+                //node->getOrCreateStateSet()->addUniform( _lightingEnabledUniform.get() );
+                //node->getStateSet()->addUniform( _lightEnabledUniform.get() );
                 for( int i=0; i < _maxLights; ++i )
                 {
                     _osgLightSourceParameters[i].applyState(node->getStateSet());
@@ -498,18 +509,18 @@ UpdateLightingUniformsHelper::updateTraverse( osg::Node* node )
 {
     if ( _dirty )
     {
-        _lightingEnabledUniform->set( _lightingEnabled );
+        //_lightingEnabledUniform->set( _lightingEnabled );
 
-        for( int i=0; i < _maxLights; ++i )
-            _lightEnabledUniform->setElement( i, _lightEnabled[i] );
+        //for( int i=0; i < _maxLights; ++i )
+            //_lightEnabledUniform->setElement( i, _lightEnabled[i] );
 
         _dirty = false;
 
         if ( !_applied )
         {
             osg::StateSet* stateSet = node->getOrCreateStateSet();
-            stateSet->addUniform( _lightingEnabledUniform.get() );
-            stateSet->addUniform( _lightEnabledUniform.get() );
+            //stateSet->addUniform( _lightingEnabledUniform.get() );
+            //stateSet->addUniform( _lightEnabledUniform.get() );
             for( int i=0; i < _maxLights; ++i )
             {
                 _osgLightSourceParameters[i].applyState(stateSet);
@@ -729,6 +740,80 @@ ArrayUniform::detach()
             _stateSet = 0L;
 
             stateSet_safe.release(); // don't want to unref delete
+        }
+    }
+}
+
+//...................................................................
+
+RangeUniformCullCallback::RangeUniformCullCallback() :
+_dump( false )
+{
+    _uniform = osgEarth::Registry::instance()->shaderFactory()->createRangeUniform();
+
+    _stateSet = new osg::StateSet();
+    _stateSet->addUniform( _uniform.get() );
+}
+
+void
+RangeUniformCullCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
+{
+    osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
+
+    const osg::BoundingSphere& bs = node->getBound();
+
+    float range = nv->getDistanceToViewPoint( bs.center(), true );
+
+    // range = distance from the viewpoint to the outside of the bounding sphere.
+    _uniform->set( range - bs.radius() );
+
+    if ( _dump )
+    {
+        OE_NOTICE
+            << "Range = " << range 
+            << ", center = " << bs.center().x() << "," << bs.center().y()
+            << ", radius = " << bs.radius() << std::endl;
+    }
+    
+    cv->pushStateSet( _stateSet.get() );
+    traverse(node, nv);
+    cv->popStateSet();
+}
+
+//------------------------------------------------------------------------
+
+void
+DiscardAlphaFragments::install(osg::StateSet* ss, float minAlpha) const
+{
+    if ( ss && minAlpha < 1.0f && Registry::capabilities().supportsGLSL() )
+    {
+        VirtualProgram* vp = VirtualProgram::getOrCreate(ss);
+        if ( vp )
+        {
+            std::string code = Stringify()
+                << "#version " GLSL_VERSION_STR "\n"
+                << "void oe_discardalpha_frag(inout vec4 color) { \n"
+                << "    if ( color.a < " << std::setprecision(1) << minAlpha << ") discard;\n"
+                << "} \n";
+
+            vp->setFunction(
+                "oe_discardalpha_frag",
+                code,
+                ShaderComp::LOCATION_FRAGMENT_COLORING,
+                0L, 0.95f);
+        }
+    }
+}
+ 
+void
+DiscardAlphaFragments::uninstall(osg::StateSet* ss) const
+{
+    if ( ss )
+    {
+        VirtualProgram* vp = VirtualProgram::get(ss);
+        if ( vp )
+        {
+            vp->removeShader("oe_discardalpha_frag");
         }
     }
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -71,6 +71,8 @@ namespace osgEarth
         std::string _password;
     };
 
+    typedef std::map<std::string,std::string> Headers;
+
 
     /**
      * An HTTP request for use with the HTTPClient class.
@@ -90,18 +92,29 @@ namespace osgEarth
         /** Adds an HTTP parameter to the request query string. */
         void addParameter( const std::string& name, const std::string& value );
         void addParameter( const std::string& name, int value );
-        void addParameter( const std::string& name, double value );
+        void addParameter( const std::string& name, double value );        
         
         typedef std::map<std::string,std::string> Parameters;
 
         /** Ready-only access to the parameter list (as built with addParameter) */
-        const Parameters& getParameters() const;
+        const Parameters& getParameters() const;        
+
+        void addHeader( const std::string& name, const std::string& value );
+
+        const Headers& getHeaders() const;
+
+        /**
+         * Sets the last modified date of any locally cached data for this request.  This will 
+         * automatically add a If-Modified-Since header to the request
+         */
+        void setLastModified( const DateTime &lastModified );
 
         /** Gets a copy of the complete URL (base URL + query string) for this request */
         std::string getURL() const;
         
     private:
         Parameters _parameters;
+        Headers _headers;
         std::string _url;
     };
 
@@ -115,6 +128,7 @@ namespace osgEarth
         enum Code {
             NONE         = 0,
             OK           = 200,
+            NOT_MODIFIED = 304,
             BAD_REQUEST  = 400,
             NOT_FOUND    = 404,
             CONFLICT     = 409,
@@ -158,11 +172,13 @@ namespace osgEarth
         /** Gets the master mime-type returned by the request */
         const std::string& getMimeType() const;
 
+        /** How long did it take to fetch this response (in seconds) */
+        double getDuration() const { return _duration_s; }        
+
     private:
         struct Part : public osg::Referenced
         {
-            Part() : _size(0) { }
-            typedef std::map<std::string,std::string> Headers;
+            Part() : _size(0) { }            
             Headers _headers;
             unsigned int _size;
             std::stringstream _stream;
@@ -172,6 +188,7 @@ namespace osgEarth
         long        _response_code;
         std::string _mimeType;
         bool        _cancelled;
+        double      _duration_s;
 
         Config getHeadersAsConfig() const;
 
@@ -179,13 +196,31 @@ namespace osgEarth
     };
 
     /**
+     * Object that lets you modify and incoming URL before it's passed to the server
+     */
+    struct OSGEARTH_EXPORT URLRewriter : public osg::Referenced
+    {    
+        virtual std::string rewrite( const std::string& url ) = 0;
+    };
+
+	/**
+	 *
+	 * A CURL configuration handler to apply CURL settings. It can be used for setting client certificates
+	 */
+	struct OSGEARTH_EXPORT CurlConfigHandler : public osg::Referenced
+	{
+		virtual void onInitialize(void* curl_handle) = 0;
+		virtual void onGet(void* curl_handle) = 0;
+	};
+	
+	/**
      * Utility class for making HTTP requests.
      *
      * TODO: This class will actually read data from disk as well, and therefore should
      * probably be renamed. It analyzes the URI and decides whether to make an  HTTP request
      * or to read from disk.
      */
-    class OSGEARTH_EXPORT HTTPClient // : public osg::Referenced
+    class OSGEARTH_EXPORT HTTPClient
     {
     public:
         /**
@@ -195,7 +230,7 @@ namespace osgEarth
         static bool isRecoverable( ReadResult::Code code )
         {
             return
-                code == ReadResult::RESULT_OK ||
+                code == ReadResult::RESULT_OK ||                
                 code == ReadResult::RESULT_SERVER_ERROR ||
                 code == ReadResult::RESULT_TIMEOUT ||
                 code == ReadResult::RESULT_CANCELED;
@@ -211,11 +246,7 @@ namespace osgEarth
 
         /** Sets up proxy info to use in all HTTP requests.
             TODO: This should probably move into the Registry */
-		static void setProxySettings( const optional<ProxySettings> &proxySettings );
-
-        /** Gets up proxy info to use in all HTTP requests.
-            TODO: This should probably move into the Registry */
-        static const optional<ProxySettings> & getProxySettings();
+        static void setProxySettings( const ProxySettings &proxySettings );
 
         /**
            Gets the timeout in seconds to use for HTTP requests.*/
@@ -224,9 +255,35 @@ namespace osgEarth
         /**
            Sets the timeout in seconds to use for HTTP requests.
            Setting to 0 (default) is infinite timeout */
-        void setTimeout( long timeout );
+        static void setTimeout( long timeout );
 
         /**
+           Gets the timeout in seconds to use for HTTP connect requests.*/
+        static long getConnectTimeout();
+
+        /**
+           Sets the timeout in seconds to use for HTTP connect requests.
+           Setting to 0 (default) is infinite timeout */
+        static void setConnectTimeout( long timeout );
+
+        /**
+         * Gets the URLRewriter that is used to modify urls before sending them to the server
+         */
+        static URLRewriter* getURLRewriter();
+
+        /**
+         * Sets the URLRewriter that is used to modify urls before sending them to the server         
+         */
+        static void setURLRewriter( URLRewriter* rewriter );
+
+		static CurlConfigHandler* getCurlConfigHandler();
+
+		/**
+		* Sets the CurlConfigHandler to configurate the CURL library. It can be used for apply client certificates
+		*/
+		static void setCurlConfighandler(CurlConfigHandler* handler);
+		
+		/**
          * One time thread safe initialization. In osgEarth, you don't need
          * to call this directly; osgEarth::Registry will call it at
          * startup.
@@ -239,7 +296,7 @@ namespace osgEarth
          * Reads an image.
          */
         static ReadResult readImage(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions =0L,
             ProgressCallback*     progress  =0L );
 
@@ -247,7 +304,7 @@ namespace osgEarth
          * Reads an osg::Node.
          */
         static ReadResult readNode(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions =0L,
             ProgressCallback*     progress  =0L );
 
@@ -255,7 +312,7 @@ namespace osgEarth
          * Reads an object.
          */
         static ReadResult readObject(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions =0L,
             ProgressCallback*     progress  =0L );
 
@@ -263,7 +320,7 @@ namespace osgEarth
          * Reads a string.
          */
         static ReadResult readString(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions =0L,
             ProgressCallback*     progress  =0L );
 
@@ -298,28 +355,24 @@ namespace osgEarth
         HTTPResponse doGet( const HTTPRequest&    request,
                             const osgDB::Options* options  =0L,
                             ProgressCallback*     callback =0L ) const;
-
-        HTTPResponse doGet( const std::string&    url,
-                            const osgDB::Options* options  =0L,
-                            ProgressCallback*     callback =0L ) const;
-
+        
         ReadResult doReadObject(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions,
             ProgressCallback*     progress );
 
         ReadResult doReadImage(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions,
             ProgressCallback*     progress );
 
         ReadResult doReadNode(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions,
             ProgressCallback*     progress );
 
         ReadResult doReadString(
-            const std::string&    location,
+            const HTTPRequest&    request,
             const osgDB::Options* dbOptions,
             ProgressCallback*     progress );
 
@@ -342,7 +395,7 @@ namespace osgEarth
         static HTTPClient& getClient();
 
     private:
-        void decodeMultipartStream(
+        bool decodeMultipartStream(
             const std::string&   boundary,
             HTTPResponse::Part*  input,
             HTTPResponse::Parts& output) const;

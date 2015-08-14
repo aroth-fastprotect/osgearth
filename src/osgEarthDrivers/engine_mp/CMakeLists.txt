@@ -1,13 +1,28 @@
 
-LIST(APPEND TARGET_ADDED_LIBRARIES osgEarthSymbology osgTerrain)
+SET(TARGET_COMMON_LIBRARIES ${TARGET_COMMON_LIBRARIES} osgEarthSymbology)
+
+set(TARGET_GLSL
+    MPEngine.vert.model.glsl
+    MPEngine.vert.view.glsl
+    MPEngine.frag.glsl)
+
+set(TARGET_IN
+    MPShaders.cpp.in)
+
+set(SHADERS_CPP "${CMAKE_CURRENT_BINARY_DIR}/AutoGenShaders.cpp")
+
+configure_shaders(
+    MPShaders.cpp.in
+    ${SHADERS_CPP}
+    ${TARGET_GLSL} )
 
 SET(TARGET_SRC
-    TilePagedLOD.cpp
+    HeightFieldCache.cpp
     KeyNodeFactory.cpp
     MPGeometry.cpp
     MPTerrainEngineNode.cpp
     MPTerrainEngineDriver.cpp
-    SerialKeyNodeFactory.cpp
+    SingleKeyNodeFactory.cpp
     TerrainNode.cpp
     TileGroup.cpp
     TileModel.cpp
@@ -15,21 +30,22 @@ SET(TARGET_SRC
     TileNode.cpp
     TileNodeRegistry.cpp
     TileModelFactory.cpp
-)
-SET(TARGET_PUBLIC_H
-    MPTerrainEngineOptions
+    TilePagedLOD.cpp
+    ${SHADERS_CPP}
 )
 
 SET(TARGET_H
     Common
-    TilePagedLOD
     DynamicLODScaleCallback
+    HeightFieldCache
     FileLocationCallback
     KeyNodeFactory
     MPGeometry
+    MPShaders
     MPTerrainEngineNode
+    MPTerrainEngineOptions
     QuickReleaseGLObjects
-    SerialKeyNodeFactory
+    SingleKeyNodeFactory
     TerrainNode
     TileGroup
     TileModel
@@ -37,12 +53,13 @@ SET(TARGET_H
     TileNode
     TileNodeRegistry
     TileModelFactory
+    TilePagedLOD
 )
-IF(WIN32)
-	LIST(APPEND TARGET_ADDED_LIBRARIES opengl32.lib)
-ELSEIF(UNIX)
-    LIST(APPEND TARGET_ADDED_LIBRARIES OPENGL_gl_LIBRARY)
-ENDIF()
 
-SET(TARGET_INSTALL_INCLUDE_DIR osgEarthDrivers/engine_mp)
-SETUP_PLUGIN(osgearth_engine_mp)
+setup_plugin(osgearth_engine_mp)
+
+# to install public driver includes:
+SET(LIB_NAME engine_mp)
+SET(LIB_PUBLIC_HEADERS ${TARGET_H})
+INCLUDE(ModuleInstallOsgEarthDriverIncludes OPTIONAL)
+

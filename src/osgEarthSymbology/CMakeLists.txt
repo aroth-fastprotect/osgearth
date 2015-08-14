@@ -15,6 +15,7 @@ SET(TARGET_PUBLIC_H
     AltitudeSymbol
     Common
     Color
+    CoverageSymbol
     CssUtils
     Expression
     ExtrusionSymbol
@@ -31,6 +32,7 @@ SET(TARGET_PUBLIC_H
     MarkerResource
     MarkerSymbol
     MeshConsolidator
+    MeshFlattener
     MeshSubdivider
     ModelResource
     ModelSymbol
@@ -55,6 +57,7 @@ SET(TARGET_PUBLIC_H
 SET(TARGET_SRC
     AltitudeSymbol.cpp
     Color.cpp
+    CoverageSymbol.cpp
     CssUtils.cpp
     Expression.cpp
     ExtrusionSymbol.cpp
@@ -71,6 +74,7 @@ SET(TARGET_SRC
     MarkerResource.cpp
     MarkerSymbol.cpp
     MeshConsolidator.cpp
+    MeshFlattener.cpp
     MeshSubdivider.cpp
     ModelResource.cpp
     ModelSymbol.cpp

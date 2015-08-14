@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -44,19 +44,19 @@ _srs         ( rhs._srs.get() )
 }
 
 ElevationLOD::ElevationLOD(const SpatialReference* srs):
-_srs         ( srs ),
 _minElevation( -DBL_MAX ),
 _maxElevation( DBL_MAX ),
 _minRange    ( 0.0f ),
-_maxRange    ( FLT_MAX )
+_maxRange    ( FLT_MAX ),
+_srs         ( srs )
 {
     //nop
 }
 
 ElevationLOD::ElevationLOD(const SpatialReference* srs, double minElevation, double maxElevation):
-_srs         ( srs ),
 _minRange    ( 0.0f ),
-_maxRange    ( FLT_MAX )
+_maxRange    ( FLT_MAX ),
+_srs         ( srs )
 {
     _minElevation = minElevation;
     _maxElevation = maxElevation;

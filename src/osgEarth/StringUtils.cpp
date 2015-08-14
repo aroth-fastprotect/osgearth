@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -19,8 +19,8 @@
 
 #include <osgEarth/StringUtils>
 #include <osgDB/FileNameUtils>
-//#include <ctype.h>
 #include <cctype>
+#include <cstring>
 
 using namespace osgEarth;
 
@@ -79,6 +79,8 @@ StringTokenizer::tokenize( const std::string& input, StringVector& output ) cons
 
     std::stringstream buf;
     bool quoted = false;
+    char lastQuoteChar = '\0';
+
     for( std::string::const_iterator i = input.begin(); i != input.end(); ++i )
     {
         char c = *i;    
@@ -87,9 +89,10 @@ StringTokenizer::tokenize( const std::string& input, StringVector& output ) cons
 
         if ( quoted )
         {
-            if ( q != _quotes.end() )
+            if( q != _quotes.end() && lastQuoteChar == c)
             {
                 quoted = false;
+                lastQuoteChar = '\0';
                 if ( q->second )
                     buf << c;
             }
@@ -103,6 +106,7 @@ StringTokenizer::tokenize( const std::string& input, StringVector& output ) cons
             if ( q != _quotes.end() )
             {
                 quoted = true;
+                lastQuoteChar = c;
                 if ( q->second )
                     buf << c;
             }
@@ -211,8 +215,7 @@ osgEarth::hashString( const std::string& input )
 osg::Vec4f
 osgEarth::htmlColorToVec4f( const std::string& html )
 {
-    std::string t = html;
-    std::transform( t.begin(), t.end(), t.begin(), ::tolower );
+    std::string t = osgEarth::toLower(html);
     osg::Vec4ub c(0,0,0,255);
     if ( t.length() >= 7 ) {
         c.r() |= t[1]<='9' ? (t[1]-'0')<<4 : (10+(t[1]-'a'))<<4;
@@ -388,6 +391,41 @@ osgEarth::toLower( const std::string& input )
     return output;
 }
 
+std::string
+osgEarth::prettyPrintTime( double seconds )
+{
+    int hours = (int)floor(seconds / (3600.0) );
+    seconds -= hours * 3600.0;
+
+    int minutes = (int)floor(seconds/60.0);
+    seconds -= minutes * 60.0;
+
+    std::stringstream buf;
+    buf << hours << ":" << minutes << ":" << seconds;
+    return buf.str();
+}
+
+std::string
+osgEarth::prettyPrintSize( double mb )
+{
+    std::stringstream buf;
+    // Convert to terabytes
+    if ( mb > 1024 * 1024 )
+    {
+        buf << (mb / (1024.0*1024.0)) << " TB";
+    }
+    else if (mb > 1024)
+    {
+        buf << (mb / 1024.0) << " GB";
+    }
+    else 
+    {
+        buf << mb << " MB";
+    }
+    return buf.str();
+}
+
+
 namespace
 {
     template<typename charT>
@@ -413,6 +451,17 @@ osgEarth::ciEquals(const std::string& lhs, const std::string& rhs, const std::lo
     }
 
     return true;
+}
+
+#if defined(WIN32) && !defined(__CYGWIN__)
+#  define STRICMP ::stricmp
+#else
+#  define STRICMP ::strcasecmp
+#endif
+
+bool CIStringComp::operator()(const std::string& lhs, const std::string& rhs) const
+{
+    return STRICMP( lhs.c_str(), rhs.c_str() ) < 0;
 }
 
 bool

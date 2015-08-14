@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -38,6 +41,8 @@
 using namespace osgEarth;
 using namespace osgEarth::Drivers;
 
+#define LC "[ReaderWriterArcGIS] "
+
 //#define PROPERTY_URL        "url"
 //#define PROPERTY_PROFILE    "profile"
 
@@ -51,21 +56,38 @@ public:
     {
         //TODO: allow single layers vs. "fused view"
         if ( _layer.empty() )
+		{
             _layer = "_alllayers"; // default to the AGS "fused view"
+		}
+		else
+		{
+			_layer = *_options.layers();
+		}
 
-        if ( _options.format().isSet() ) 
+        if ( _options.format().isSet() )
+		{
             _format = *_options.format();
+		}
         else
+		{
             _format = _map_service.getTileInfo().getFormat();
+		}
 
-        std::transform( _format.begin(), _format.end(), _format.begin(), tolower );
+        _format = osgEarth::toLower(_format);
+
         if ( _format.length() > 3 && _format.substr( 0, 3 ) == "png" )
+		{
             _format = "png";
+		}
 
         if ( _format == "mixed" )
+		{
             _format = "";
+		}
         if ( !_format.empty() )
+		{
             _dot_format = "." + _format;
+		}
     }
 
     // override
@@ -73,6 +95,10 @@ public:
     {
         // add the security token to the URL if necessary:
         URI url = _options.url().value();
+
+		OE_DEBUG << LC << "Initial URL: " << url.full() << std::endl;
+
+		// append token to url in query string is set
         if (_options.token().isSet())
         {
             std::string token = _options.token().value();
@@ -82,19 +108,40 @@ public:
                 url = url.append( sep + std::string("token=") + token );
             }
         }
+		else
+		{
+			OE_DEBUG << LC << "Token not set" << std::endl;
+		}
+
+		// append layers to url in query string is set .. format is show:1,2,3
+		if (_options.layers().isSet())
+        {
+			std::string layers = _options.layers().value();
+			OE_DEBUG << LC << "_Layers: " << layers << std::endl;
+			if (!layers.empty())
+			{
+				std::string sep = url.full().find( "?" ) == std::string::npos ? "?" : "&";
+				url = url.append( sep + std::string("layers=show:") + layers );
+			}
+		}
+		else
+		{
+			OE_DEBUG << LC << "Layer options not set" << std::endl;
+		}
+
+		OE_DEBUG << LC << "_map_service URL: " << url.full() << std::endl;
 
         // read map service metadata from the server
         if ( !_map_service.init(url, dbOptions) )
         {
+			OE_INFO << LC << "_map_service.init failed: " << _map_service.getError() << std::endl;
+
             return Status::Error( Stringify()
                 << "[osgearth] [ArcGIS] map service initialization failed: "
                 << _map_service.getError() );
         }
 
-        // create a local i/o options with caching disabled (since the TerrainLayer
-        // will implement the caching for us)
-        _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );
-        CachePolicy::NO_CACHE.apply( _dbOptions.get() );
+        _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );        
 
         // establish a profile if we don't already have one:
         if ( !getProfile() )
@@ -167,6 +214,19 @@ public:
                 str = buf.str();
                 std::string sep = str.find( "?" ) == std::string::npos ? "?" : "&";
                 buf << sep << "token=" << token;
+            }
+        }
+
+		//Add the layers if necessary
+        if (_options.layers().isSet())
+        {
+            std::string layers = _options.layers().value();
+            if (!layers.empty())
+            {
+                std::string str;
+                str = buf.str();
+                std::string sep = str.find( "?" ) == std::string::npos ? "?" : "&";
+				buf << sep << "layers=show:" << layers;
             }
         }
 

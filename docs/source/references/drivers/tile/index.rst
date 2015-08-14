@@ -9,10 +9,13 @@ terrain engine. It can produce image tiles, elevation grid tiles, or both.
    agglite
    arcgis
    arcgis_map_cache
+   colorramp
    debug
    gdal
+   mbtiles
    noise
    osg
+   quadkey
    tilecache
    tileservice
    tms

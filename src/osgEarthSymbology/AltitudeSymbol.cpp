@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -22,22 +22,37 @@
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
 
+OSGEARTH_REGISTER_SIMPLE_SYMBOL(altitude, AltitudeSymbol);
+
 AltitudeSymbol::AltitudeSymbol( const Config& conf ) :
 Symbol             ( conf ),
 _clamping          ( CLAMP_NONE ),
 _technique         ( TECHNIQUE_MAP ),
 _binding           ( BINDING_VERTEX ),
-_resolution        ( 0.001f ),
-_verticalOffset    ( NumericExpression(0.0) ),
-_verticalScale     ( NumericExpression(1.0) )
+_resolution        ( 0.0 ), //0.001f ),
+_verticalScale     ( NumericExpression(1.0) ),
+_verticalOffset    ( NumericExpression(0.0) )
 {
     mergeConfig( conf );
+}
+
+AltitudeSymbol::AltitudeSymbol(const AltitudeSymbol& rhs,const osg::CopyOp& copyop):
+Symbol(rhs, copyop),
+_clamping(rhs._clamping),
+_technique(rhs._technique),
+_binding(rhs._binding),
+_resolution(rhs._resolution),
+_verticalOffset(rhs._verticalOffset),
+_verticalScale(rhs._verticalScale)
+{
+
 }
 
 Config 
 AltitudeSymbol::getConfig() const
 {
-    Config conf;
+    Config conf = Symbol::getConfig();
+
     conf.key() = "altitude";
     conf.addIfSet   ( "clamping",  "none",       _clamping, CLAMP_NONE );
     conf.addIfSet   ( "clamping",  "terrain",    _clamping, CLAMP_TO_TERRAIN );
@@ -126,5 +141,8 @@ AltitudeSymbol::parseSLD(const Config& c, Style& style)
     }
     else if ( match(c.key(), "altitude-scale") ) {
         style.getOrCreate<AltitudeSymbol>()->verticalScale() = NumericExpression( c.value() );
+    }
+    else if ( match(c.key(), "altitude-script") ) {
+        style.getOrCreate<AltitudeSymbol>()->script() = StringExpression(c.value());
     }
 }

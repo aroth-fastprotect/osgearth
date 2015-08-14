@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -19,6 +19,10 @@
 #include <osgEarthFeatures/FeatureModelSource>
 #include <osgEarthFeatures/FeatureModelGraph>
 #include <osgEarth/SpatialReference>
+#include <osgEarth/ShaderFactory>
+#include <osgEarth/ShaderUtils>
+#include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osg/Notify>
 
 using namespace osgEarth;
@@ -36,7 +40,8 @@ _maxGranularity_deg( 1.0 ),
 _mergeGeometry     ( false ),
 _clusterCulling    ( true ),
 _backfaceCulling   ( true ),
-_alphaBlending     ( true )
+_alphaBlending     ( true ),
+_sessionWideResourceCache( true )
 {
     fromConfig( _conf );
 }
@@ -61,7 +66,8 @@ FeatureModelSourceOptions::fromConfig( const Config& conf )
     conf.getIfSet( "cluster_culling",  _clusterCulling );
     conf.getIfSet( "backface_culling", _backfaceCulling );
     conf.getIfSet( "alpha_blending",   _alphaBlending );
-
+    
+    conf.getIfSet( "session_wide_resource_cache", _sessionWideResourceCache );
 }
 
 Config
@@ -87,6 +93,8 @@ FeatureModelSourceOptions::getConfig() const
     conf.updateIfSet( "cluster_culling",  _clusterCulling );
     conf.updateIfSet( "backface_culling", _backfaceCulling );
     conf.updateIfSet( "alpha_blending",   _alphaBlending );
+    
+    conf.updateIfSet( "session_wide_resource_cache", _sessionWideResourceCache );
 
     return conf;
 }
@@ -136,6 +144,22 @@ FeatureModelSource::initialize(const osgDB::Options* dbOptions)
     if ( _features.valid() )
     {
         _features->initialize( dbOptions );
+
+        // Try to fill the DataExtent list using the FeatureProfile
+        const FeatureProfile* featureProfile = _features->getFeatureProfile();
+        if (featureProfile != NULL)
+        {
+            if (featureProfile->getProfile() != NULL)
+            {
+                // Use specified profile's GeoExtent
+                getDataExtents().push_back(DataExtent(featureProfile->getProfile()->getExtent()));
+            }
+            else if (featureProfile->getExtent().isValid() == true)
+            {
+                // Use FeatureProfile's GeoExtent
+                getDataExtents().push_back(DataExtent(featureProfile->getExtent()));
+            }
+        }
     }
     else
     {
@@ -144,9 +168,8 @@ FeatureModelSource::initialize(const osgDB::Options* dbOptions)
 }
 
 osg::Node*
-FeatureModelSource::createNodeImplementation(const Map*            map,
-                                             const osgDB::Options* dbOptions,
-                                             ProgressCallback*     progress )
+FeatureModelSource::createNodeImplementation(const Map*        map,
+                                             ProgressCallback* progress )
 {
     // user must provide a valid map.
     if ( !map )
@@ -171,17 +194,25 @@ FeatureModelSource::createNodeImplementation(const Map*            map,
     }
 
     // Session holds data that's shared across the life of the FMG
-    Session* session = new Session( map, _options.styles().get(), _features.get(), dbOptions );
+    Session* session = new Session( 
+        map, 
+        _options.styles().get(), 
+        _features.get(), 
+        _dbOptions.get() );
+
+    // Name the session (for debugging purposes)
+    session->setName( this->getName() );
 
     // Graph that will render feature models. May included paged data.
-    FeatureModelGraph* graph = new FeatureModelGraph( session, _options, factory );
+    FeatureModelGraph* graph = new FeatureModelGraph( 
+       session,
+       _options,
+       factory,
+       this,
+       _preMergeOps.get(),
+       _postMergeOps.get() );
 
-    // install any post-merge operations on the FMG so it can call them during paging:
-    const NodeOperationVector& ops = postProcessors();
-    for( NodeOperationVector::const_iterator i = ops.begin(); i != ops.end(); ++i )
-    {
-        graph->addPostMergeOperation( i->get() );
-    }
+    graph->setName( session->getName() );
 
     // then run the ops on the staring graph:
     firePostProcessors( graph );
@@ -213,9 +244,37 @@ FeatureNodeFactory::getOrCreateStyleGroup(const Style& style,
 
         if ( render->lighting().isSet() )
         {
-            group->getOrCreateStateSet()->setMode(
+            osg::StateSet* stateset = group->getOrCreateStateSet();
+
+            stateset->setMode(
                 GL_LIGHTING,
                 (render->lighting() == true ? osg::StateAttribute::ON : osg::StateAttribute::OFF) | osg::StateAttribute::OVERRIDE );
+
+            if ( Registry::capabilities().supportsGLSL() )
+            {
+                stateset->addUniform( Registry::shaderFactory()->createUniformForGLMode(
+                    GL_LIGHTING, render->lighting().value()));
+            }
+        }
+
+        if ( render->backfaceCulling().isSet() )
+        {
+            group->getOrCreateStateSet()->setMode(
+                GL_CULL_FACE,
+                (render->backfaceCulling() == true ? osg::StateAttribute::ON : osg::StateAttribute::OFF) | osg::StateAttribute::OVERRIDE );
+        }
+
+#ifndef OSG_GLES2_AVAILABLE
+        if ( render->clipPlane().isSet() )
+        {
+            GLenum mode = GL_CLIP_PLANE0 + (render->clipPlane().value());
+            group->getOrCreateStateSet()->setMode(mode, 1);
+        }
+#endif
+
+        if ( render->minAlpha().isSet() )
+        {
+            DiscardAlphaFragments().install( group->getOrCreateStateSet(), render->minAlpha().value() );
         }
     }
 

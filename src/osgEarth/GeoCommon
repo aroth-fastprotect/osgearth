@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -19,8 +19,13 @@
 #ifndef OSGEARTH_GEOCOMMON_H
 #define OSGEARTH_GEOCOMMON_H 1
 
+// For FLT_MAX
+#include <limits.h>
+#include <cfloat>
+
 namespace osgEarth
 {
+    // Default normalized no-data value for elevation
 #define NO_DATA_VALUE -FLT_MAX
 
     /**
@@ -52,6 +57,15 @@ namespace osgEarth
         SAMPLE_HIGHEST,
         SAMPLE_LOWEST,
         SAMPLE_AVERAGE
+    };
+
+    /**
+     * Elevation NO_DATA treatment policy
+     */
+    enum ElevationNoDataPolicy
+    {
+        NODATA_INTERPOLATE,     // interpolate across NO_DATA samples
+        NODATA_MSL              // rewrite NO_DATA samples as MSL
     };
 
     /**

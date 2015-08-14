@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -31,48 +31,47 @@ using namespace osgEarth;
 
 //------------------------------------------------------------------------
 
+Map::ElevationLayerCB::ElevationLayerCB(Map* map) :
+_map(map)
+{
+    //nop
+}
+
+void
+Map::ElevationLayerCB::onVisibleChanged(TerrainLayer* layer)
+{
+    osg::ref_ptr<Map> map;
+    if ( _map.lock(map) )
+    {
+        _map->notifyElevationLayerVisibleChanged(layer);
+    }
+}
+
+//------------------------------------------------------------------------
+
 Map::Map( const MapOptions& options ) :
 osg::Referenced      ( true ),
 _mapOptions          ( options ),
 _initMapOptions      ( options ),
 _dataModelRevision   ( 0 )
 {
+    // Generate a UID.
+    _uid = Registry::instance()->createUID();
+
+    // If the registry doesn't have a default cache policy, but the
+    // map options has one, make the map policy the default.
     if (_mapOptions.cachePolicy().isSet() &&
-        _mapOptions.cachePolicy()->usage() == CachePolicy::USAGE_CACHE_ONLY )
+        !Registry::instance()->defaultCachePolicy().isSet())
     {
-        OE_INFO << LC << "CACHE-ONLY MODE activated from map" << std::endl;
-    }
-
-    // if the map has a cache policy set, make this the system-wide default, UNLESS
-    // there ALREADY IS a registry default, in which case THAT will override THIS one.
-    // (In other words, whichever one is set first wins. And of course, if the registry
-    // has an override set, that will cancel out all of this.)
-    const optional<CachePolicy> regCachePolicy = Registry::instance()->defaultCachePolicy();
-
-    if ( _mapOptions.cachePolicy().isSet() )
-    {
-        if ( !regCachePolicy.isSet() )
-        {
-            Registry::instance()->setDefaultCachePolicy( *_mapOptions.cachePolicy() );
-            OE_INFO << LC 
-                << "Setting default cache policy from map ("
-                << _mapOptions.cachePolicy()->usageString() << ")" << std::endl;
-        }
-        else
-        {
-            _mapOptions.cachePolicy() = *regCachePolicy;
-            OE_INFO << LC
-                << "Settings map caching policy to default ("
-                << _mapOptions.cachePolicy()->usageString() << ")" << std::endl;
-        }
-    }
-    else if ( regCachePolicy.isSet() )
-    {
-        _mapOptions.cachePolicy() = *regCachePolicy;
-        OE_INFO << LC
-            << "Settings map caching policy to default ("
+        Registry::instance()->setDefaultCachePolicy( _mapOptions.cachePolicy().get() );
+        OE_INFO << LC 
+            << "Setting default cache policy from map ("
             << _mapOptions.cachePolicy()->usageString() << ")" << std::endl;
     }
+
+    // Combine the CachePolicy in the map options with the settings in
+    // the registry.
+    Registry::instance()->resolveCachePolicy( _mapOptions.cachePolicy() );
 
     // the map-side dbOptions object holds I/O information for all components.
     _dbOptions = osg::clone( Registry::instance()->getDefaultOptions() );
@@ -89,11 +88,33 @@ _dataModelRevision   ( 0 )
     {
         _elevationLayers.setExpressTileSize( *_mapOptions.elevationTileSize() );
     }
+
+    // set up a callback that the Map will use to detect Elevation Layer
+    // visibility changes
+    _elevationLayerCB = new ElevationLayerCB(this);
 }
 
 Map::~Map()
 {
     OE_DEBUG << "~Map" << std::endl;
+}
+
+void
+Map::notifyElevationLayerVisibleChanged(TerrainLayer* layer)
+{
+    // bump the revision safely:
+    Revision newRevision;
+    {
+        Threading::ScopedWriteLock lock( const_cast<Map*>(this)->_mapDataMutex );
+        newRevision = ++_dataModelRevision;
+    }
+
+    // a separate block b/c we don't need the mutex   
+    for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
+    {
+        i->get()->onMapModelChanged( MapModelChange(
+            MapModelChange::TOGGLE_ELEVATION_LAYER, newRevision, layer) );
+    }
 }
 
 bool
@@ -284,7 +305,8 @@ Map::setName( const std::string& name ) {
 Revision
 Map::getDataModelRevision() const
 {
-    Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
+    //Don't really need this here.
+    //Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
     return _dataModelRevision;
 }
 
@@ -422,8 +444,8 @@ Map::addImageLayer( ImageLayer* layer )
         {
             i->get()->onMapModelChanged( MapModelChange(
                 MapModelChange::ADD_IMAGE_LAYER, newRevision, layer, index) );
-        }   
-    }   
+        }
+    }
 }
 
 
@@ -494,13 +516,16 @@ Map::addElevationLayer( ElevationLayer* layer )
             newRevision = ++_dataModelRevision;
         }
 
+        // listen for changes in the layer.
+        layer->addCallback( _elevationLayerCB.get() );
+
         // a separate block b/c we don't need the mutex   
         for( MapCallbackList::iterator i = _mapCallbacks.begin(); i != _mapCallbacks.end(); i++ )
         {
             i->get()->onMapModelChanged( MapModelChange(
                 MapModelChange::ADD_ELEVATION_LAYER, newRevision, layer, index) );
-        }   
-    }   
+        }
+    }
 }
 
 void 
@@ -561,6 +586,8 @@ Map::removeElevationLayer( ElevationLayer* layer )
                 break;
             }
         }
+
+        layerToRemove->removeCallback( _elevationLayerCB.get() );
     }
 
     // a separate block b/c we don't need the mutex
@@ -866,9 +893,6 @@ Map::clear()
         elevLayersRemoved.swap ( _elevationLayers );
         modelLayersRemoved.swap( _modelLayers );
 
-        // Because you cannot remove a mask layer once it's in place
-        //maskLayersRemoved.swap ( _terrainMaskLayers );
-
         // calculate a new revision.
         newRevision = ++_dataModelRevision;
     }
@@ -882,8 +906,6 @@ Map::clear()
             i->get()->onMapModelChanged( MapModelChange(MapModelChange::REMOVE_ELEVATION_LAYER, newRevision, k->get()) );
         for( ModelLayerVector::iterator k = modelLayersRemoved.begin(); k != modelLayersRemoved.end(); ++k )
             i->get()->onMapModelChanged( MapModelChange(MapModelChange::REMOVE_MODEL_LAYER, newRevision, k->get()) );
-        //for( MaskLayerVector::iterator k = maskLayersRemoved.begin(); k != maskLayersRemoved.end(); ++k )
-        //    i->get()->onMapModelChanged( MapModelChange(MapModelChange::REMOVE_MASK_LAYER, newRevision, k->get()) );
     }
 }
 
@@ -935,30 +957,47 @@ Map::calculateProfile()
                 else
                 {
                     OE_WARN << LC 
-                        << "Map is geocentric, but the configured profile does not "
-                        << "have a geographic SRS. Falling back on default.."
+                        << "Map is geocentric, but the configured profile SRS ("
+                        << userProfile->getSRS()->getName() << ") is not geographic; "
+                        << "it will be ignored."
                         << std::endl;
                 }
             }
-
-            if ( !_profile.valid() )
-            {
-                // by default, set a geocentric map to use global-geodetic WGS84.
-                _profile = osgEarth::Registry::instance()->getGlobalGeodeticProfile();
-            }
         }
-
         else if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC_CUBE )
         {
-            //If the map type is a Geocentric Cube, set the profile to the cube profile.
-            _profile = osgEarth::Registry::instance()->getCubeProfile();
+            if ( userProfile.valid() )
+            {
+                if ( userProfile->isOK() && userProfile->getSRS()->isCube() )
+                {
+                    _profile = userProfile.get();
+                }
+                else
+                {
+                    OE_WARN << LC 
+                        << "Map is geocentric cube, but the configured profile SRS ("
+                        << userProfile->getSRS()->getName() << ") is not geocentric cube; "
+                        << "it will be ignored."
+                        << std::endl;
+                }
+            }
         }
-
         else // CSTYPE_PROJECTED
         {
             if ( userProfile.valid() )
             {
-                _profile = userProfile.get();
+                if ( userProfile->isOK() && userProfile->getSRS()->isProjected() )
+                {
+                    _profile = userProfile.get();
+                }
+                else
+                {
+                    OE_WARN << LC 
+                        << "Map is projected, but the configured profile SRS ("
+                        << userProfile->getSRS()->getName() << ") is not projected; "
+                        << "it will be ignored."
+                        << std::endl;
+                }
             }
         }
 
@@ -986,13 +1025,31 @@ Map::calculateProfile()
             }
         }
 
-        // convert the profile to Plate Carre if necessary.
-        if (_profile.valid() &&
-            _profile->getSRS()->isGeographic() && 
-            getMapOptions().coordSysType() == MapOptions::CSTYPE_PROJECTED )
+        // ensure that the profile we found is the correct kind
+        // convert a geographic profile to Plate Carre if necessary
+        if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC && !( _profile.valid() && _profile->getSRS()->isGeographic() ) )
         {
-            OE_INFO << LC << "Projected display with geographic SRS; activating Plate Carre mode" << std::endl;
-            _profile = _profile->overrideSRS( _profile->getSRS()->createPlateCarreGeographicSRS() );
+            // by default, set a geocentric map to use global-geodetic WGS84.
+            _profile = osgEarth::Registry::instance()->getGlobalGeodeticProfile();
+        }
+        else if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_GEOCENTRIC_CUBE && !( _profile.valid() && _profile->getSRS()->isCube() ) )
+        {
+            //If the map type is a Geocentric Cube, set the profile to the cube profile.
+            _profile = osgEarth::Registry::instance()->getCubeProfile();
+        }
+        else if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_PROJECTED && _profile.valid() && _profile->getSRS()->isGeographic() )
+        {
+            OE_INFO << LC << "Projected map with geographic SRS; activating EQC profile" << std::endl;            
+            unsigned u, v;
+            _profile->getNumTiles(0, u, v);
+            const osgEarth::SpatialReference* eqc = _profile->getSRS()->createEquirectangularSRS();
+            osgEarth::GeoExtent e = _profile->getExtent().transform( eqc );
+            _profile = osgEarth::Profile::create( eqc, e.xMin(), e.yMin(), e.xMax(), e.yMax(), u, v);
+        }
+        else if ( _mapOptions.coordSysType() == MapOptions::CSTYPE_PROJECTED && !( _profile.valid() && _profile->getSRS()->isProjected() ) )
+        {
+            // TODO: should there be a default projected profile?
+            _profile = 0;
         }
 
         // finally, fire an event if the profile has been set.
@@ -1021,13 +1078,19 @@ Map::calculateProfile()
             for( ImageLayerVector::iterator i = _imageLayers.begin(); i != _imageLayers.end(); i++ )
             {
                 ImageLayer* layer = i->get();
-                layer->setTargetProfileHint( _profile.get() );
+                if ( layer->getEnabled() == true )
+                {
+                    layer->setTargetProfileHint( _profile.get() );
+                }
             }
 
             for( ElevationLayerVector::iterator i = _elevationLayers.begin(); i != _elevationLayers.end(); i++ )
             {
                 ElevationLayer* layer = i->get();
-                layer->setTargetProfileHint( _profile.get() );
+                if ( layer->getEnabled() )
+                {
+                    layer->setTargetProfileHint( _profile.get() );
+                }
             }
         }
 
@@ -1045,30 +1108,41 @@ Map::calculateProfile()
     }
 }
 
+osg::HeightField*
+Map::createReferenceHeightField(const TileKey& key,
+                                bool           expressHeightsAsHAE) const
+{
+    unsigned size = std::max(*_mapOptions.elevationTileSize(), 2u);
+    return HeightFieldUtils::createReferenceHeightField(key.getExtent(), size, size, expressHeightsAsHAE);
+}
 
+#if 0
 bool
-Map::getHeightField(const TileKey&                  key,
-                    bool                            fallback,
-                    osg::ref_ptr<osg::HeightField>& out_result,
-                    bool*                           out_isFallback,
-                    bool                            convertToHAE,
-                    ElevationSamplePolicy           samplePolicy,
-                    ProgressCallback*               progress) const
+Map::populateHeightField(osg::ref_ptr<osg::HeightField>& hf,
+                         const TileKey&                  key,
+                         bool                            convertToHAE,
+                         ElevationSamplePolicy           samplePolicy, // deprecated (unused)
+                         bool                            fallbackIfPossible,
+                         ProgressCallback*               progress) const
 {
     Threading::ScopedReadLock lock( const_cast<Map*>(this)->_mapDataMutex );
 
     ElevationInterpolation interp = getMapOptions().elevationInterpolation().get();    
 
-    return _elevationLayers.createHeightField(
-        key, 
-        fallback, 
+    if ( !hf.valid() )
+    {
+        hf = createReferenceHeightField(key, convertToHAE);
+    }
+
+    return _elevationLayers.populateHeightField(
+        hf.get(),
+        key,
         convertToHAE ? _profileNoVDatum.get() : 0L,
-        interp, 
-        samplePolicy, 
-        out_result,  
-        out_isFallback,
+        interp,
+        fallbackIfPossible,
         progress );
 }
+#endif
 
 const SpatialReference*
 Map::getWorldSRS() const
@@ -1097,10 +1171,6 @@ Map::sync( MapFrame& frame ) const
         if ( frame._parts & ELEVATION_LAYERS )
         {
             frame._elevationLayers = _elevationLayers;
-            //if ( !frame._initialized )
-            //    frame._elevationLayers.reserve( _elevationLayers.size() );
-            //frame._elevationLayers.clear();
-            //std::copy( _elevationLayers.begin(), _elevationLayers.end(), std::back_inserter(frame._elevationLayers) );
             if ( _mapOptions.elevationTileSize().isSet() )
                 frame._elevationLayers.setExpressTileSize( *_mapOptions.elevationTileSize() );
         }

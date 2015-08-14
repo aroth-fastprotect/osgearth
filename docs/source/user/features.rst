@@ -193,18 +193,23 @@ The numeric expression evaluator supports basic arithmetic (+, -, *, / %), some 
 functions (min, max), and grouping with parentheses. It also works for string values. 
 There are no operators, but you can still embed attributes.
 
-If simple expressions are not enough, you can embed JavaScript code -- please see the
-section on Scripting_ for more information.
+If simple expressions are not enough, you can use Javascript::
 
-Style Selectors
-~~~~~~~~~~~~~~~
+    <styles>
+        <script language="javascript">
+            function getOffset() {
+                return feature.properties.base_offset + 1.0;
+            }
+        </script>
 
-TBD.
+        <style type="text/css">
+            mystyle {
+                extrusion-height: feature.properties.hgt * 0.3048;
+                altitude-offset:  getOffset();
+            }
+        </style>
+    </styles>
 
-Scripting
-~~~~~~~~~
-
-TBD.
 
 Terrain Following
 -----------------
@@ -329,8 +334,8 @@ Let's modify the previous example::
       </features>
 
       <layout>
-          <tile_size_factor>15.0</tile_size_factor>
-          <level name="only" max_range="100000"/>
+          <tile_size>250000</tile_size>
+          <level name="data" max_range="100000"/>
       </layout>
 
       <styles>
@@ -351,6 +356,9 @@ all load at once. With one or more levels, osgEarth will break up the feature da
 into tiles at one or more levels of detail and page those tiles in individually.
 More below.
 
+Paging breaks the data up into tiles. The ``tile_size`` is the width (in meters)
+of each paged tile.
+
 Levels
 ~~~~~~
 
@@ -358,16 +366,7 @@ Each level describes a level of detail. This is a camera range (between ``min_ra
 and ``max_range``) at which tiles in this level of detail are rendered. But how
 big is each tile? This is calculated based on the *tile range factor*.
 
-The ``tile_range_factor`` determines the size of a tile, based on the ``max_range``
-of the LOD. The tile range factor is the multiple of a tile's radius at which the
-LOD's ``max_range`` takes effect. In other words::
-
-    tile radius = max range / tile size factor.
-    
-The default tile range factor is **15.0**.
-
-The upshot is: if you want larger tiles, reduce the range factor.
-For smaller tiles, increase the factor.
+The ``tile_size`` sets the size of a tile (in meters).
 
 Why do you care about tile size? Because the density of your data will affect
 how much geometry is in each tile. And since OSG (OpenGL, really) benefits from
@@ -375,46 +374,3 @@ sending large batches of similar geometry to the graphics card, tweaking the
 tile size can help with performance and throughput. Unfortunately there's no way
 for osgEarth to know exactly what the "best" tile size will be in advance;
 so, you have the opportunity to tweak using this setting.
-
-Multiple Levels and Using Selectors
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-You can have any number of levels -- but keep in mind that unlike the terrain
-imagery, feature data does NOT form a quadtree in which the higher LODs replace
-the lower ones. Rather, feature levels are independent of one another. So if you
-want to draw more detail as you zoom in closer, you have to use selectors to
-decide what you want to draw at each step.
-
-Here's an example. Say we're drawing roads.
-We have a shapefile in which the road type is stored in an attribute called ``roadtype`` ::
-
-   <layout>
-       <tile_size_factor>15.0</tile_size_factor>
-       <crop_features>true</crop_features>
-       <level name="highway" max_range="100000">
-          <selector class="highway">
-             <query>
-                <expr>roadtype = 'A'</expr>
-             </query>
-          </selector>
-       </level>
-       <level name="street" max_range="10000">
-          <selector class="street">
-             <query>
-                <expr>roadtype = 'B'</expr>
-             </query>
-          </selector>
-       </level>
-   </layout>
-
-   <styles>
-      highway {
-          stroke:       #ffff00;
-          stroke-width: 2.0;
-      }
-      street {
-          stroke:       #ffffff7f;
-          stroke-width: 1.0;
-      }
-   </styles>
-   

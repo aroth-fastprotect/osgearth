@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,15 +21,20 @@
 #include <osgEarth/GeoMath>
 #include <osg/TriangleFunctor>
 #include <osg/TriangleIndexFunctor>
-//#include <osgUtil/MeshOptimizers>
 #include <climits>
 #include <queue>
 #include <map>
+#include <algorithm>
+#include <iterator>
 
 #define LC "[MeshSubdivider] "
 
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
+
+// Define this to create line strips after tessellating line geometry.
+// This is necessary if you intend to use stippling!
+#define STRIPIFY_LINES 1
 
 //------------------------------------------------------------------------
 
@@ -63,8 +68,6 @@ namespace
             out_mid.set( 0.5*((g0.x()+2*osg::PI)+g1.x()), 0.5*(g0.y()+g1.y()) );
         else
            out_mid.set( 0.5*(g0.x()+(g1.x()+2*osg::PI)), 0.5*(g0.y()+g1.y()) );
-
-        //GeoMath::midpoint(g0.y(), g0.x(), g1.y(), g1.x(), out_mid.y(), out_mid.x());
     }
 
     // finds the midpoint between two geocentric coordinates. We have to convert
@@ -136,7 +139,7 @@ namespace
         osg::Vec4Array* _sourceColors;
         osg::Vec2Array* _sourceTexCoords;
         osg::Vec3Array* _sourceNormals;
-        osg::ref_ptr<osg::Vec3Array> _verts;        
+        osg::ref_ptr<osg::Vec3Array> _verts;
         osg::ref_ptr<osg::Vec4Array> _colors;
         osg::ref_ptr<osg::Vec2Array> _texcoords;
         osg::ref_ptr<osg::Vec3Array> _normals;
@@ -319,6 +322,39 @@ namespace
     typedef std::queue<Line>  LineQueue;
     typedef std::vector<Line> LineVector;
 
+    void stripifyLines(LineVector& input, std::vector<LineVector>& strips, LineVector& segments)
+    {
+        LineVector source(input);
+        while(source.size() > 0)
+        {
+            LineVector next;
+            std::deque<Line> lineStrip;
+            lineStrip.push_back(source[0]);
+            for(unsigned i=1; i<source.size(); ++i)
+            {
+                if ( source[i]._i0 == lineStrip.back()._i1 )
+                    lineStrip.push_back(source[i]);
+                else if ( source[i]._i1 == lineStrip.front()._i0 )
+                    lineStrip.push_front(source[i]);
+                else
+                    next.push_back(source[i]);                    
+            }
+
+            if ( lineStrip.size() > 1 )
+            {
+                strips.push_back(LineVector());
+                strips.back().reserve(lineStrip.size());
+                std::copy(lineStrip.begin(), lineStrip.end(), std::back_inserter(strips.back()));
+            }
+            else
+            {
+                segments.push_back( lineStrip.front() );
+            }
+
+            source.swap(next);
+        }
+    }
+
     struct LineData
     {
         typedef std::map<osg::Vec3,GLuint> VertMap;        
@@ -451,10 +487,46 @@ namespace
         {
             geom.addPrimitiveSet( ebo );
         }
+    }       
+    
+    /**
+     * Populates the geometry object with a collection of GL_LINE_STRIP index elements primitives.
+     */
+    template<typename ETYPE, typename VTYPE>
+    void populateLineStrip( osg::Geometry& geom, const LineVector& strip, unsigned maxElementsPerEBO )
+    {
+        unsigned numElementsTotal = (unsigned)strip.size() + 1;
+        unsigned numElementsWritten = 0;
+        unsigned numElementsInCurrentEBO = maxElementsPerEBO;
+
+        ETYPE* ebo = 0L;
+
+        for( LineVector::const_iterator i = strip.begin(); i != strip.end(); ++i )
+        {
+            if ( !ebo )
+            {
+                ebo = new ETYPE( GL_LINE_STRIP );
+                ebo->reserve( std::min(numElementsTotal-numElementsWritten, maxElementsPerEBO+1) );
+                numElementsInCurrentEBO = 0;
+            }
+
+            ebo->push_back( static_cast<VTYPE>(i->_i0) );
+            ++numElementsInCurrentEBO;
+            ++numElementsWritten;
+
+            if (numElementsInCurrentEBO+1 >= maxElementsPerEBO ||
+                (i+1) == strip.end())
+            {
+                ebo->push_back( static_cast<VTYPE>(i->_i1) );
+                geom.addPrimitiveSet( ebo );
+                ebo = 0L;
+            }
+        }
     }
 
     static const osg::Vec3d s_pole(0,0,1);
     static const double s_maxLatAdjustment(0.75);
+
 
     /**
      * Collects all the line segments from the geometry, coalesces them into a single
@@ -536,12 +608,39 @@ namespace
             if ( data._colors )
                 geom.setColorArray( data._colors );
 
+#ifdef STRIPIFY_LINES
+            // detect and assemble line strips/loop
+            std::vector<LineVector> strips;
+            LineVector              segments;
+            stripifyLines(done, strips, segments);
+
+            if ( segments.size() > 0 )
+            {
+                if ( data._verts->size() < 256 )
+                    populateLines<osg::DrawElementsUByte,GLubyte>( geom, done, maxElementsPerEBO );
+                else if ( data._verts->size() < 65536 )
+                    populateLines<osg::DrawElementsUShort,GLushort>( geom, done, maxElementsPerEBO );
+                else
+                    populateLines<osg::DrawElementsUInt,GLuint>( geom, done, maxElementsPerEBO );
+            }
+
+            for(unsigned i=0; i<strips.size(); ++i)
+            {
+                if ( data._verts->size() < 256 )
+                    populateLineStrip<osg::DrawElementsUByte,GLubyte>( geom, strips[i], maxElementsPerEBO );
+                else if ( data._verts->size() < 65536 )
+                    populateLineStrip<osg::DrawElementsUShort,GLushort>( geom, strips[i], maxElementsPerEBO );
+                else
+                    populateLineStrip<osg::DrawElementsUInt,GLuint>( geom, strips[i], maxElementsPerEBO );
+            }
+#else
             if ( data._verts->size() < 256 )
                 populateLines<osg::DrawElementsUByte,GLubyte>( geom, done, maxElementsPerEBO );
             else if ( data._verts->size() < 65536 )
                 populateLines<osg::DrawElementsUShort,GLushort>( geom, done, maxElementsPerEBO );
             else
                 populateLines<osg::DrawElementsUInt,GLuint>( geom, done, maxElementsPerEBO );
+#endif
         }
     }
 
@@ -762,13 +861,7 @@ namespace
         else
         {
             subdivideTriangles( granularity, interp, geom, W2L, L2W, maxElementsPerEBO );
-
-            //osgUtil::VertexCacheVisitor cacheOptimizer;
-            //cacheOptimizer.optimizeVertices( geom );
         }
-        
-        //osgUtil::VertexAccessOrderVisitor orderOptimizer;
-        //orderOptimizer.optimizeOrder( geom );
     }
 }
 
@@ -790,6 +883,10 @@ void
 MeshSubdivider::run(osg::Geometry& geom, double granularity, GeoInterpolation interp)
 {
     if ( geom.getNumPrimitiveSets() < 1 )
+        return;
+
+    // unsupported for now. NYI.
+    if ( geom.getVertexAttribArrayList().size() > 0 )
         return;
 
     subdivide( granularity, interp, geom, _world2local, _local2world, _maxElementsPerEBO );

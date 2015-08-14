@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -29,8 +29,8 @@ using namespace osgEarth::Util;
 
 LatLongFormatter::LatLongFormatter(const AngularFormat& defaultFormat,
                                    unsigned             options ) :
-_options      ( options ),
 _defaultFormat( defaultFormat ),
+_options      ( options ),
 _prec         ( 5 )
 {
     if ( _defaultFormat == FORMAT_DEFAULT )
@@ -47,13 +47,13 @@ LatLongFormatter::format( const GeoPoint& p ) const
         return "";
 
     return Stringify()
-        << format( Angular(geo.y()) )
+        << format( Angular(geo.y()), true )
         << ", "
-        << format( Angular(geo.x()) );
+        << format( Angular(geo.x()), false );
 }
 
 std::string
-LatLongFormatter::format( const Angular& angle, int precision, const AngularFormat& format ) const
+LatLongFormatter::format( const Angular& angle, bool latitude, int precision, const AngularFormat& format ) const
 {
     std::stringstream buf;
     std::string result;
@@ -69,18 +69,52 @@ LatLongFormatter::format( const Angular& angle, int precision, const AngularForm
     if ( precision > 0 )
         buf << std::setprecision(precision);
 
+   
+       
+
     double df = angle.as(Units::DEGREES);
     while( df < -180. ) df += 360.;
     while( df >  180. ) df -= 360.;
+
+    // Determine the label to use for suffixes or prefixes
+    std::string label;
+    if (latitude)
+    {
+        label = df < 0 ? "S":"N";
+    }
+    else
+    {
+        label = df < 0 ? "W":"E";
+    }
+  
+    std::string prefix = "";
+    std::string suffix = "";
+    bool makePositive = false;
+    if (_options & USE_PREFIXES)
+    {
+        prefix = label;
+        makePositive = true;
+    }
+    else if (_options & USE_SUFFIXES)
+    {
+        suffix = label;
+        makePositive = true;
+    }
+
+    // If we are using suffixes or prefixes then make the value positive.
+    if (makePositive)
+    {
+        df = osg::absolute(df);
+    }
 
     switch( f )
     {
     case FORMAT_DECIMAL_DEGREES:
         {
             if ( _options & USE_SYMBOLS )
-                buf << df << "\xb0";
+                buf << prefix << df << "\xb0" << suffix;
             else
-                buf << df;
+                buf << prefix << df << suffix;
         }
         break;
 
@@ -93,11 +127,11 @@ LatLongFormatter::format( const Angular& angle, int precision, const AngularForm
                 mf = 0.0;
             }
             if ( _options & USE_SYMBOLS )
-                buf << d << "\xb0" << space << mf << "'";
+                buf << prefix << d << "\xb0" << space << mf << "'" << suffix;
             else if ( _options & USE_COLONS )
-                buf << d << ":" << mf;
+                buf << prefix << d << ":" << mf << suffix;
             else
-                buf << d << " " << mf;
+                buf << prefix << d << " " << mf << suffix;
         }
         break;
 
@@ -115,12 +149,76 @@ LatLongFormatter::format( const Angular& angle, int precision, const AngularForm
                     m = 0;
                 }
             }
+
             if ( _options & USE_SYMBOLS )
-                buf << d << "\xb0" << space << m << "'" << space << sf << "\"";
+            {
+                buf << prefix << d << "\xb0" << space << m << "'" << space << sf << "\"" << suffix;
+            }
             else if ( _options & USE_COLONS )
-                buf << d << ":" << m << ":" << sf;
+                buf << prefix << d << ":" << m << ":" << sf << suffix;
             else
-                buf << d << " " << m << " " << sf;
+                buf << prefix << d << " " << m << " " << sf << suffix;
+        }
+        break;
+    case FORMAT_DEGREES_MINUTES_SECONDS_TERSE:
+        {
+            int    d  = (int)floor(df);
+            double mf = 60.0*(df-(double)d);
+            int    m  = (int)floor(mf);
+            double sf = 60.0*(mf-(double)m);
+            int s = osg::round(sf);
+
+            if ( s == 60 ) {
+                m += 1;
+                s = 0;
+                if ( m == 60 ) {
+                    d += 1;
+                    m = 0;
+                }
+            }
+
+            
+
+            if ( _options & USE_SYMBOLS )
+            {
+                buf << prefix << d << "\xb0";
+                if (m != 0 || s != 0)
+                {
+                    buf << space << m << "'";
+                    if (s != 0)
+                    {
+                         buf << space << s << "\"" << suffix;
+                    }
+                }
+                buf << suffix;
+                
+            }
+            else if ( _options & USE_COLONS )
+            {
+                buf << prefix << d;
+                if (m != 0 || s != 0)
+                {
+                    buf << ":" << m;
+                    if (s != 0)
+                    {
+                        buf << ":" << s;
+                    }
+                }
+                buf << suffix;
+            }
+            else
+            {
+                buf << prefix << d;
+                if (m != 0 || s != 0)
+                {
+                    buf << " " << m;
+                    if (s != 0)
+                    {
+                        buf << " " << s;
+                    }
+                }
+                buf << suffix;
+            }
         }
         break;
 		case FORMAT_DEFAULT:
@@ -130,6 +228,8 @@ LatLongFormatter::format( const Angular& angle, int precision, const AngularForm
     result = buf.str();
     return result;
 }
+
+#define SIGN(x) (x>=0.0?1.0:-1.0)
 
 bool
 LatLongFormatter::parseAngle( const std::string& input, Angular& out_value )
@@ -145,7 +245,7 @@ LatLongFormatter::parseAngle( const std::string& input, Angular& out_value )
         sscanf(c, "%lfd %lfm %lfs",  &d, &m, &s) == 3 ||
         sscanf(c, "%lf %lf' %lf\"",  &d, &m, &s) == 3 )
     {
-        out_value.set( d + m/60.0 + s/3600.0, Units::DEGREES );
+        out_value.set( SIGN(d) * (fabs(d) + m/60.0 + s/3600.0), Units::DEGREES );
         return true;
     }
     else if (
@@ -157,7 +257,7 @@ LatLongFormatter::parseAngle( const std::string& input, Angular& out_value )
         sscanf(c, "%lfd%lf'",  &d, &m) == 2 ||
         sscanf(c, "%lf %lf'",  &d, &m) == 2 )
     {
-        out_value.set( d + m/60.0, Units::DEGREES );
+        out_value.set( SIGN(d) * (fabs(d) + m/60.0), Units::DEGREES );
         return true;
     }
     else if (

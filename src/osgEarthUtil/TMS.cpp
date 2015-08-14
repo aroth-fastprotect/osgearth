@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -39,14 +39,21 @@ using namespace osgEarth::Util::TMS;
 
 #define LC "[TMS] "
 
-static std::string toString(double value, int precision = 25)
+//-----------------------------------------------------------------
+
+namespace
 {
-    std::stringstream out;
-    out << std::fixed << std::setprecision(precision) << value;
-	std::string outStr;
-	outStr = out.str();
-    return outStr;
+    std::string toString(double value, int precision = 7)
+    {
+        std::stringstream out;
+        out << std::fixed << std::setprecision(precision) << value;
+	    std::string outStr;
+	    outStr = out.str();
+        return outStr;
+    }
 }
+
+//-----------------------------------------------------------------
 
 TileFormat::TileFormat():
 _width(0),
@@ -69,9 +76,11 @@ _maxX(0.0),
 _maxY(0.0),
 _minLevel(0),
 _maxLevel(0),
-_numTilesWide(-1),
 _numTilesHigh(-1),
-_timestamp(0)
+_numTilesWide(-1),
+_timestamp(0),
+_version("1.0"),
+_tileMapService("http://tms.osgeo.org/1.0.0")
 {   
 }
 
@@ -105,6 +114,7 @@ void TileMap::setExtents( double minX, double minY, double maxX, double maxY)
 #define ELEM_ABSTRACT "abstract"
 #define ELEM_SRS "srs"
 #define ELEM_VERTICAL_SRS "vsrs"
+#define ELEM_VERTICAL_DATUM "vdatum"
 #define ELEM_BOUNDINGBOX "boundingbox"
 #define ELEM_ORIGIN "origin"
 #define ELEM_TILE_FORMAT "tileformat"
@@ -183,15 +193,16 @@ void TileMap::computeNumTiles()
 const Profile*
 TileMap::createProfile() const
 {
-    osg::ref_ptr< SpatialReference > spatialReference =  osgEarth::SpatialReference::create(_srs);
+    osg::ref_ptr<const Profile> profile = 0L;
+    osg::ref_ptr< SpatialReference > spatialReference =  osgEarth::SpatialReference::create(_srs, _vsrs);
 
     if (getProfileType() == Profile::TYPE_GEODETIC)
     {
-        return osgEarth::Registry::instance()->getGlobalGeodeticProfile();
+        profile = osgEarth::Registry::instance()->getGlobalGeodeticProfile();
     }
     else if (getProfileType() == Profile::TYPE_MERCATOR)
     {
-        return osgEarth::Registry::instance()->getSphericalMercatorProfile();
+        profile = osgEarth::Registry::instance()->getSphericalMercatorProfile();
     }    
     else if (spatialReference->isSphericalMercator())
     {
@@ -206,7 +217,7 @@ TileMap::createProfile() const
             osg::equivalent(merc->getExtent().xMax(), _maxX, eps) &&
             osg::equivalent(merc->getExtent().yMax(), _maxY, eps))
         {            
-            return osgEarth::Registry::instance()->getSphericalMercatorProfile();
+            profile = osgEarth::Registry::instance()->getSphericalMercatorProfile();
         }
     }
 
@@ -218,20 +229,33 @@ TileMap::createProfile() const
         osg::equivalent(_minY,  -90.) &&
         osg::equivalent(_maxY,   90.) )
     {
-        return osgEarth::Registry::instance()->getGlobalGeodeticProfile();
+        profile = osgEarth::Registry::instance()->getGlobalGeodeticProfile();
     }
     else if ( _profile_type == Profile::TYPE_MERCATOR )
     {
-        return osgEarth::Registry::instance()->getSphericalMercatorProfile();
-    }    
+        profile = osgEarth::Registry::instance()->getSphericalMercatorProfile();
+    }
 
-    // everything else is a "LOCAL" profile.
-    return Profile::create(
-        _srs,
-        _minX, _minY, _maxX, _maxY,
-        _vsrs,
-        osg::maximum(_numTilesWide, (unsigned int)1),
-        osg::maximum(_numTilesHigh, (unsigned int)1) );
+    if ( !profile )
+    {
+        // everything else is a "LOCAL" profile.
+        profile = Profile::create(
+            _srs,
+            _minX, _minY, _maxX, _maxY,
+            _vsrs,
+            osg::maximum(_numTilesWide, (unsigned int)1),
+            osg::maximum(_numTilesHigh, (unsigned int)1) );
+    }
+    else if ( !_vsrs.empty() )
+    {
+        // vdatum override?
+        ProfileOptions options(profile->toProfileOptions());
+        options.vsrsString() = _vsrs;
+        profile = Profile::create(options);
+    }
+    
+
+    return profile.release();
 }
 
 
@@ -257,7 +281,7 @@ TileMap::getURL(const osgEarth::TileKey& tilekey, bool invertY)
         unsigned int numRows, numCols;
         tilekey.getProfile()->getNumTiles(tilekey.getLevelOfDetail(), numCols, numRows);
         y  = numRows - y - 1;
-    }
+    }    
 
     //OE_NOTICE << LC << "KEY: " << tilekey.str() << " level " << zoom << " ( " << x << ", " << y << ")" << std::endl;
 
@@ -368,27 +392,36 @@ std::string getHorizSRSString(const osgEarth::SpatialReference* srs)
 
 TileMap*
 TileMap::create(const std::string& url,
-                const Profile* profile,
+                const Profile*     profile,
                 const std::string& format,
-                int tile_width,
-                int tile_height)
+                int                tile_width,
+                int                tile_height)
 {
-    //Profile profile(type);
-
     const GeoExtent& ex = profile->getExtent();
 
     TileMap* tileMap = new TileMap();
-    tileMap->setProfileType(profile->getProfileType()); //type);
+    tileMap->setProfileType(profile->getProfileType());
     tileMap->setExtents(ex.xMin(), ex.yMin(), ex.xMax(), ex.yMax());
     tileMap->setOrigin(ex.xMin(), ex.yMin());
     tileMap->_filename = url;
     tileMap->_srs = getHorizSRSString(profile->getSRS());
     tileMap->_vsrs = profile->getSRS()->getVertInitString();
-    //tileMap->_vsrs = profile->getVerticalSRS() ? profile->getVerticalSRS()->getInitString() : "";
     tileMap->_format.setWidth( tile_width );
     tileMap->_format.setHeight( tile_height );
-    tileMap->_format.setExtension( format );
     profile->getNumTiles( 0, tileMap->_numTilesWide, tileMap->_numTilesHigh );
+
+    // format can be a mime-type or an extension:
+    std::string::size_type p = format.find('/');
+    if ( p == std::string::npos )
+    {
+        tileMap->_format.setExtension(format);
+        tileMap->_format.setMimeType( Registry::instance()->getMimeTypeForExtension(format) );
+    }
+    else
+    {
+        tileMap->_format.setMimeType(format);
+        tileMap->_format.setExtension( Registry::instance()->getExtensionForMimeType(format) );
+    }
 
     tileMap->generateTileSets();
     tileMap->computeMinMaxLevel();
@@ -478,7 +511,11 @@ TileMapReaderWriter::read( const Config& conf )
     tileMap->setTitle         ( tileMapConf->value(ELEM_TITLE) );
     tileMap->setAbstract      ( tileMapConf->value(ELEM_ABSTRACT) );
     tileMap->setSRS           ( tileMapConf->value(ELEM_SRS) );
-    tileMap->setVerticalSRS   ( tileMapConf->value(ELEM_VERTICAL_SRS) );
+
+    if (tileMapConf->hasValue(ELEM_VERTICAL_SRS))
+        tileMap->setVerticalSRS( tileMapConf->value(ELEM_VERTICAL_SRS) );
+    if (tileMapConf->hasValue(ELEM_VERTICAL_DATUM))
+        tileMap->setVerticalSRS( tileMapConf->value(ELEM_VERTICAL_DATUM) );
 
     const Config* bboxConf = tileMapConf->find( ELEM_BOUNDINGBOX );
     if ( bboxConf )
@@ -502,10 +539,15 @@ TileMapReaderWriter::read( const Config& conf )
     const Config* formatConf = tileMapConf->find( ELEM_TILE_FORMAT );
     if ( formatConf )
     {
+        OE_DEBUG << LC << "Read TileFormat " << formatConf->value(ATTR_EXTENSION) << std::endl;
         tileMap->getFormat().setExtension( formatConf->value(ATTR_EXTENSION) );
         tileMap->getFormat().setMimeType ( formatConf->value(ATTR_MIME_TYPE) );
         tileMap->getFormat().setWidth    ( formatConf->value<unsigned>(ATTR_WIDTH,  256) );
         tileMap->getFormat().setHeight   ( formatConf->value<unsigned>(ATTR_HEIGHT, 256) );
+    }
+    else
+    {
+        OE_WARN << LC << "No TileFormat in TileMap!" << std::endl;
     }
 
     //Read the tilesets
@@ -577,11 +619,6 @@ tileMapToXmlDocument(const TileMap* tileMap)
     //Create the root XML document
     osg::ref_ptr<XmlDocument> doc = new XmlDocument();
     doc->setName( ELEM_TILEMAP );
-    
-    //Create the root node
-    //osg::ref_ptr<XmlElement> e_tile_map = new XmlElement( ELEM_TILEMAP );
-    //doc->getChildren().push_back( e_tile_map.get() );
-
     doc->getAttrs()[ ATTR_VERSION ] = tileMap->getVersion();
     doc->getAttrs()[ ATTR_TILEMAPSERVICE ] = tileMap->getTileMapService();
   
@@ -681,4 +718,78 @@ TileMapReaderWriter::write(const TileMap* tileMap, std::ostream &output)
     doc->store(output);
 }
 
+
+//----------------------------------------------------------------------------
+
+TileMapEntry::TileMapEntry( const std::string& _title, const std::string& _href, const std::string& _srs, const std::string& _profile ):
+title( _title ),
+href( _href ),
+srs( _srs ),
+profile( _profile )
+{
+}
+
+//----------------------------------------------------------------------------
+
+TileMapServiceReader::TileMapServiceReader()
+{
+}
+
+TileMapServiceReader::TileMapServiceReader(const TileMapServiceReader& rhs)
+{
+}
+
+bool
+TileMapServiceReader::read( const std::string &location, const osgDB::ReaderWriter::Options* options, TileMapEntryList& tileMaps )
+{     
+    ReadResult r = URI(location).readString();
+    if ( r.failed() )
+    {
+        OE_WARN << LC << "Failed to read TileMapServices from " << location << std::endl;
+        return 0L;
+    }    
+    
+    // Read tile map into a Config:
+    Config conf;
+    std::stringstream buf( r.getString() );
+    conf.fromXML( buf );    
+
+    // parse that into a tile map:        
+    return read( conf, tileMaps );    
+}
+
+bool
+TileMapServiceReader::read( const Config& conf, TileMapEntryList& tileMaps)
+{    
+    const Config* TileMapServiceConf = conf.find("tilemapservice");
+
+    if (!TileMapServiceConf)
+    {
+        OE_NOTICE << "Couldn't find root TileMapService element" << std::endl;
+        return false;
+    }
+
+    const Config* TileMapsConf = TileMapServiceConf->find("tilemaps");
+    if (TileMapsConf)
+    {
+        const ConfigSet& TileMaps = TileMapsConf->children("tilemap");
+        if (TileMaps.size() == 0)
+        {            
+            return false;
+        }
+        
+        for (ConfigSet::const_iterator itr = TileMaps.begin(); itr != TileMaps.end(); ++itr)
+        {
+            std::string href = itr->value("href");
+            std::string title = itr->value("title");
+            std::string profile = itr->value("profile");
+            std::string srs = itr->value("srs");            
+
+            tileMaps.push_back( TileMapEntry( title, href, srs, profile ) );
+        }        
+
+        return true;
+    }    
+    return false;
+}
 

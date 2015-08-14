@@ -6,6 +6,7 @@ Footprint Extrusion using the "feature_geom" driver.
 
 <map name="Extrusion Demo" type="geocentric" version="2">
       
+	
     <!-- Our features layer. The "feature_geom" driver will analyze the
          style sheet and determine how to render the feature data. -->
          
@@ -36,26 +37,29 @@ Footprint Extrusion using the "feature_geom" driver.
 
         <lighting>true</lighting>
     </model>
+	
+    <image name="mapquest_osm" driver="xyz" max_level="14">
+        <url>http://otile[1234].mqcdn.com/tiles/1.0.0/osm/{z}/{x}/{y}.jpg</url>
+        <profile>global-mercator</profile>
+    </image>
     
-    
-    <options>
-        <lighting>false</lighting>
-        <terrain>
-            <sample_ratio>0.2</sample_ratio>
-        </terrain>
-    </options> 
-    
-    <image name="ReadyMap.org - Imagery" driver="tms">
+    <image name="ReadyMap.org - Imagery" driver="tms" enabled="false">
         <url>http://readymap.org/readymap/tiles/1.0.0/7/</url>
     </image>
     
     <elevation name="ReadyMap.org - Elevation" driver="tms">
         <url>http://readymap.org/readymap/tiles/1.0.0/9/</url>
     </elevation>
+	
+	<options>
+		<terrain normalize_edges="true"/>
+	</options>
     
     <external>
-        <viewpoint name="Zoom to Buildings" heading="12.4" lat="38.8982" long="-77.0365" height="20.67" pitch="-51.4" range="4500" />
-        <sky hours="21.0"/>
+		<viewpoints>
+			<viewpoint name="Zoom to Buildings" heading="12.4" lat="38.8982" long="-77.0365" height="20.67" pitch="-51.4" range="4500" />
+		</viewpoints>
+        <sky driver="gl" hours="21.0"/>
     </external>
   
 </map>

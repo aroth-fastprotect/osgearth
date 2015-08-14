@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -83,17 +83,23 @@ public:
 
                 std::string binId = Stringify() << std::hex << hashString(optionsConf.toJSON()) << "_tfs";
                 _cacheBin = cache->addBin( binId );
-                
-                // write a metadata record just for reference purposes.. we don't actually use it
-                Config metadata = _cacheBin->readMetadata();
-                if ( metadata.empty() )
-                {
-                    _cacheBin->writeMetadata( optionsConf );
-                }
-
                 if ( _cacheBin.valid() )
+                {                
+                    // write a metadata record just for reference purposes.. we don't actually use it
+                    Config metadata = _cacheBin->readMetadata();
+                    if ( metadata.empty() )
+                    {
+                        _cacheBin->writeMetadata( optionsConf );
+                    }
+
+                    if ( _cacheBin.valid() )
+                    {
+                        _cacheBin->apply( _dbOptions.get() );
+                    }
+                }
+                else
                 {
-                    _cacheBin->apply( _dbOptions.get() );
+                    OE_INFO << LC << "Failed to open cache bin \"" << binId << "\"\n";
                 }
             }
         }     
@@ -117,6 +123,8 @@ public:
             result->setFirstLevel( _layer.getFirstLevel());
             result->setMaxLevel( _layer.getMaxLevel());
             result->setProfile( osgEarth::Profile::create(_layer.getSRS(), _layer.getExtent().xMin(), _layer.getExtent().yMin(), _layer.getExtent().xMax(), _layer.getExtent().yMax(), 1, 1) );
+            if ( _options.geoInterp().isSet() )
+                result->geoInterp() = _options.geoInterp().get();
         }
         return result;        
     }
@@ -161,7 +169,7 @@ public:
             {
                 if ( feat_handle )
                 {
-                    osg::ref_ptr<Feature> f = OgrUtils::createFeature( feat_handle, srs );
+                    osg::ref_ptr<Feature> f = OgrUtils::createFeature( feat_handle, getFeatureProfile() );
                     if ( f.valid() && !isBlacklisted(f->getFID()) )
                     {
                         features.push_back( f.release() );
@@ -226,11 +234,22 @@ public:
     {     
         if (query.tileKey().isSet())
         {
+            const TileKey &key = query.tileKey().get();
+            unsigned int tileX = key.getTileX();
+            unsigned int tileY = key.getTileY();
+            unsigned int level = key.getLevelOfDetail();
+            
+#if 0
+            unsigned int numRows, numCols;
+            key.getProfile()->getNumTiles(key.getLevelOfDetail(), numCols, numRows);
+            tileY  = numRows - tileY - 1;
+#endif
+            
             std::stringstream buf;
             std::string path = osgDB::getFilePath(_options.url()->full());
-            buf << path << "/" << query.tileKey().get().getLevelOfDetail() << "/"
-                               << query.tileKey().get().getTileX() << "/"
-                               << query.tileKey().get().getTileY()
+            buf << path << "/" << level << "/"
+                               << tileX << "/"
+                               << tileY
                                << "." << _options.format().get();            
             OE_DEBUG << "TFS url " << buf.str() << std::endl;
             return buf.str();
@@ -256,7 +275,7 @@ public:
         ReadResult r = uri.readString( _dbOptions.get() );
 
         const std::string& buffer = r.getString();
-        //const Config&      meta   = r.metadata();
+        const Config&      meta   = r.metadata();
 
         bool dataOK = false;
 
@@ -286,7 +305,7 @@ public:
             if ( features.size() > 0 )
             {
                 FilterContext cx;
-                cx.profile() = getFeatureProfile();
+                cx.setProfile( getFeatureProfile() );
 
                 for( FeatureFilterList::const_iterator i = _options.filters().begin(); i != _options.filters().end(); ++i )
                 {
@@ -305,13 +324,14 @@ public:
         return result;
     }
 
-    /**
-    * Gets the Feature with the given FID
-    * @returns
-    *     The Feature with the given FID or NULL if not found.
-    */
+    virtual bool supportsGetFeature() const
+    {
+        return false;
+    }
+
     virtual Feature* getFeature( FeatureID fid )
     {
+        // not supported for TFS.
         return 0;
     }
 

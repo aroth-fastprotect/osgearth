@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2008-2014 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarth/ECEF>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
+#include <osgEarth/GeoMath>
 #include <osgViewer/View>
 #include <osg/Depth>
 

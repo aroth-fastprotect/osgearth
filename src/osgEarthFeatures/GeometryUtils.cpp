@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -24,7 +27,7 @@ using namespace osgEarth::Features;
 using namespace osgEarth::Symbology;
 
 std::string
-osgEarth::Features::GeometryUtils::geometryToWKT( Geometry* geometry )
+osgEarth::Features::GeometryUtils::geometryToWKT( const Geometry* geometry )
 {
     OGRGeometryH g = OgrUtils::createOgrGeometry( geometry );
     std::string result;
@@ -42,7 +45,7 @@ osgEarth::Features::GeometryUtils::geometryToWKT( Geometry* geometry )
 }
 
 std::string 
-osgEarth::Features::GeometryUtils::geometryToGeoJSON( Geometry* geometry )
+osgEarth::Features::GeometryUtils::geometryToGeoJSON( const Geometry* geometry )
 {
     OGRGeometryH g = OgrUtils::createOgrGeometry( geometry );
     std::string result;
@@ -60,8 +63,21 @@ osgEarth::Features::GeometryUtils::geometryToGeoJSON( Geometry* geometry )
     return result;
 }
 
+Geometry*
+osgEarth::Features::GeometryUtils::geometryFromGeoJSON(const std::string& geojson)
+{
+    Geometry* result = 0L;
+    OGRGeometryH g = OGR_G_CreateGeometryFromJson(geojson.c_str());
+    if ( g )
+    {
+        result = OgrUtils::createGeometry( g );
+        OGR_G_DestroyGeometry( g );
+    }
+    return result;
+}
+
 std::string 
-osgEarth::Features::GeometryUtils::geometryToKML( Geometry* geometry )
+osgEarth::Features::GeometryUtils::geometryToKML( const Geometry* geometry )
 {
     OGRGeometryH g = OgrUtils::createOgrGeometry( geometry );
     std::string result;
@@ -80,7 +96,7 @@ osgEarth::Features::GeometryUtils::geometryToKML( Geometry* geometry )
 }
 
 std::string 
-osgEarth::Features::GeometryUtils::geometryToGML( Geometry* geometry )
+osgEarth::Features::GeometryUtils::geometryToGML( const Geometry* geometry )
 {
     OGRGeometryH g = OgrUtils::createOgrGeometry( geometry );
     std::string result;
@@ -134,7 +150,7 @@ osgEarth::Features::GeometryUtils::geometryFromWKT( const std::string& wkt )
 }
 
 double
-osgEarth::Features::GeometryUtils::getGeometryArea( Geometry* geometry )
+osgEarth::Features::GeometryUtils::getGeometryArea( const Geometry* geometry )
 {
     OGRGeometryH g = OgrUtils::createOgrGeometry( geometry );
     

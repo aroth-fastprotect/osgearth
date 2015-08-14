@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -25,7 +25,8 @@ using namespace osgEarth;
 //------------------------------------------------------------------------
 
 MaskLayerOptions::MaskLayerOptions( const ConfigOptions& options ) :
-ConfigOptions( options )
+ConfigOptions( options ),
+_minLevel( 0 )
 {
     setDefaults();
     fromConfig( _conf ); 
@@ -43,7 +44,7 @@ ConfigOptions()
 void
 MaskLayerOptions::setDefaults()
 {
-    //nop
+    _minLevel.init( 0 );
 }
 
 Config
@@ -52,6 +53,7 @@ MaskLayerOptions::getConfig() const
     Config conf = ConfigOptions::getConfig();
 
     conf.updateIfSet( "name", _name );
+    conf.updateIfSet( "min_level", _minLevel );
 
     return conf;
 }
@@ -60,6 +62,7 @@ void
 MaskLayerOptions::fromConfig( const Config& conf )
 {
     conf.getIfSet( "name", _name );
+    conf.getIfSet( "min_level", _minLevel );
 }
 
 void
@@ -108,13 +111,14 @@ MaskLayer::initialize( const osgDB::Options* dbOptions, const Map* map )
 
     if ( _maskSource.valid() )
     {
-        _maskSource->initialize( dbOptions, map );
+        _maskSource->initialize( dbOptions );
     }
 }
 
 osg::Vec3dArray*
-MaskLayer::getOrCreateBoundary( float heightScale, const SpatialReference *srs, ProgressCallback* progress )
+MaskLayer::getOrCreateMaskBoundary( float heightScale, const SpatialReference *srs, ProgressCallback* progress )
 {
+    OpenThreads::ScopedLock< OpenThreads::Mutex > lock( _mutex );
     if ( _maskSource.valid() )
     {
         // if the model source has changed, regenerate the node.

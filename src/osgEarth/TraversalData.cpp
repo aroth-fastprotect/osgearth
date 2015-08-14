@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,11 +24,11 @@ MapNodeCullData::MapNodeCullData()
 {
     _stateSet = new osg::StateSet();
 
-    _windowScaleMatrix = new osg::Uniform(osg::Uniform::FLOAT_MAT3, "oe_WindowScaleMatrix");
-    osg::Matrix3 identity;
-    identity.makeIdentity();
-    _windowScaleMatrix->set( identity );
-    _stateSet->addUniform( _windowScaleMatrix.get() );
+    _windowMatrixUniform = new osg::Uniform(osg::Uniform::FLOAT_MAT4, "oe_WindowMatrix");
+    _windowMatrixUniform->set( osg::Matrix::identity() );
+    _stateSet->addUniform( _windowMatrixUniform.get() );
 
     _cameraAltitude = 0.0;
+    _cameraAltitudeUniform = new osg::Uniform(osg::Uniform::FLOAT, "oe_CameraAltitude");
+    _stateSet->addUniform( _cameraAltitudeUniform.get() );
 }

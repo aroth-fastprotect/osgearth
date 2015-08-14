@@ -4,7 +4,8 @@ FOREACH( lib
          osgEarthAnnotation
          osgEarthFeatures
          osgEarthUtil
-         osgEarthSymbology )
+         osgEarthSymbology
+ )
 
     ADD_SUBDIRECTORY(${lib})
     
@@ -13,12 +14,13 @@ FOREACH( lib
 ENDFOREACH( lib )
 
 ADD_SUBDIRECTORY( osgEarthDrivers )
+ADD_SUBDIRECTORY( osgEarthExtensions )
 
 IF(NOT OSG_BUILD_PLATFORM_IPHONE AND NOT OSG_BUILD_PLATFORM_IPHONE_SIMULATOR AND NOT ANDROID)
 ADD_SUBDIRECTORY( applications )
 ENDIF()
 
-IF (QT4_FOUND AND NOT ANDROID AND OSGEARTH_USE_QT)
+IF (Qt5Widgets_FOUND OR QT4_FOUND AND NOT ANDROID AND OSGEARTH_USE_QT)
     ADD_SUBDIRECTORY(osgEarthQt)
     SET_PROPERTY(TARGET osgEarthQt PROPERTY FOLDER "Libs")
 ENDIF()

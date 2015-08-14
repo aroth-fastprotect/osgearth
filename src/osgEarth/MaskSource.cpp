@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -25,6 +25,10 @@ using namespace osgEarth;
 using namespace OpenThreads;
 
 /****************************************************************/
+
+MaskSourceOptions::~MaskSourceOptions()
+{
+}
 
 void
 MaskSourceOptions::fromConfig( const Config& conf )
@@ -51,8 +55,16 @@ MaskSourceOptions::getConfig() const
 MaskSource::MaskSource( const MaskSourceOptions& options ) :
 _options( options )
 {
-    //TODO: is this really necessary?
-    this->setThreadSafeRefUnref( true );
+}
+
+MaskSource::~MaskSource()
+{
+}
+
+//------------------------------------------------------------------------
+
+MaskSourceDriver::~MaskSourceDriver()
+{
 }
 
 //------------------------------------------------------------------------
@@ -60,6 +72,10 @@ _options( options )
 #undef  LC
 #define LC "[MaskSourceFactory] "
 #define MASK_SOURCE_OPTIONS_TAG "__osgEarth::MaskSourceOptions"
+
+MaskSourceFactory::~MaskSourceFactory()
+{
+}
 
 MaskSource*
 MaskSourceFactory::create( const MaskSourceOptions& options )

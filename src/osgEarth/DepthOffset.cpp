@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 #include <osgEarth/NodeUtils>
 #include <osgEarth/Capabilities>
 #include <osgEarth/VirtualProgram>
+#include <osgEarth/Shaders>
 
 #include <osg/Geode>
 #include <osg/Geometry>
@@ -35,10 +36,9 @@
 
 using namespace osgEarth;
 
-// undef this if you want to adjust in the normal direction (of a geocentric point) instead
-#define ADJUST_TOWARDS_EYE 1
-
-
+// vertex-only method - just pull the actual vertex. test for a while
+// and accept if it works consistently.
+#define VERTEX_ONLY_METHOD 1
 
 //------------------------------------------------------------------------
 
@@ -89,61 +89,6 @@ namespace
         LineFunctor<SegmentAnalyzer> _segmentAnalyzer;
         int                          _maxSegmentsToAnalyze;
     };
-
-
-    //...............................
-    // Shader code:
-
-    const char* s_vertex =
-        "#version " GLSL_VERSION_STR "\n"
-        GLSL_DEFAULT_PRECISION_FLOAT "\n"
-
-        // uniforms from ClampableNode:
-        "uniform vec2 oe_doff_bias; \n"
-        "uniform vec2 oe_doff_range; \n"
-
-        // values to pass to fragment shader:
-        "varying vec4 oe_doff_vert; \n"
-        "varying float oe_doff_vertRange; \n"
-
-        "void oe_doff_vertex(inout vec4 VertexVIEW) \n"
-        "{ \n"
-        //   calculate range to target:
-        "    vec3 vert3 = VertexVIEW.xyz/VertexVIEW.w; \n"
-        "    float range = length(vert3); \n"
-
-        //   calculate the depth offset bias for this range:
-        "    float ratio = (clamp(range, oe_doff_range[0], oe_doff_range[1])-oe_doff_range[0])/(oe_doff_range[1]-oe_doff_range[0]);\n"
-        "    float bias = oe_doff_bias[0] + ratio * (oe_doff_bias[1]-oe_doff_bias[0]);\n"
-
-        //   calculate the "simulated" vertex, pulled toward the camera:
-        "    vec3 pullVec = normalize(vert3); \n"
-        "    vec3 simVert3 = vert3 - pullVec*bias; \n"
-        "    vec4 simVert = vec4( simVert3 * VertexVIEW.w, VertexVIEW.w ); \n"
-        "    oe_doff_vert = gl_ProjectionMatrix * simVert; \n"
-        "    oe_doff_vertRange = range - bias; \n"
-        "} \n";
-
-    const char* s_fragment =
-        "#version " GLSL_VERSION_STR "\n"
-        GLSL_DEFAULT_PRECISION_FLOAT "\n"
-
-        // values to pass to fragment shader:
-        "varying vec4 oe_doff_vert; \n"
-        "varying float oe_doff_vertRange; \n"
-
-        "void oe_doff_fragment(inout vec4 color) \n"
-        "{ \n"
-        //   calculate the new depth value for the zbuffer.
-        "    float sim_depth = 0.5 * (1.0+(oe_doff_vert.z/oe_doff_vert.w));\n"
-
-        //   if the offset pushed the Z behind the eye, the projection mapping will
-        //   result in a z>1. We need to bring these values back down to the 
-        //   near clip plan (z=0). We need to check simRange too before doing this
-        //   so we don't draw fragments that are legitimently beyond the far clip plane.
-        "    if ( sim_depth > 1.0 && oe_doff_vertRange < 0.0 ) { sim_depth = 0.0; } \n"
-        "    gl_FragDepth = max(0.0, sim_depth); \n"
-        "} \n";
 }
 
 //------------------------------------------------------------------------
@@ -198,11 +143,13 @@ _dirty( false )
 void
 DepthOffsetAdapter::init()
 {
-    _supported = Registry::capabilities().supportsFragDepthWrite();
+    _supported = Registry::capabilities().supportsGLSL();
     if ( _supported )
     {
-        _biasUniform  = new osg::Uniform(osg::Uniform::FLOAT_VEC2, "oe_doff_bias");
-        _rangeUniform = new osg::Uniform(osg::Uniform::FLOAT_VEC2, "oe_doff_range");
+        _minBiasUniform  = new osg::Uniform(osg::Uniform::FLOAT, "oe_depthOffset_minBias");
+        _maxBiasUniform  = new osg::Uniform(osg::Uniform::FLOAT, "oe_depthOffset_maxBias");
+        _minRangeUniform = new osg::Uniform(osg::Uniform::FLOAT, "oe_depthOffset_minRange");
+        _maxRangeUniform = new osg::Uniform(osg::Uniform::FLOAT, "oe_depthOffset_maxRange");
         updateUniforms();
     }
 }
@@ -223,20 +170,21 @@ DepthOffsetAdapter::setGraph(osg::Node* graph)
         (graph && graphChanging ) || 
         (graph && (_options.enabled() == true));
 
+    // shader package:
+    Shaders shaders;
+
     if ( uninstall )
     {
         OE_TEST << LC << "Removing depth offset shaders" << std::endl;
 
         // uninstall uniforms and shaders.
         osg::StateSet* s = _graph->getStateSet();
-        s->removeUniform( _biasUniform.get() );
-        s->removeUniform( _rangeUniform.get() );
-        VirtualProgram* vp = VirtualProgram::get( s );
-        if ( vp )
-        {
-            vp->removeShader( "oe_doff_vertex" );
-            vp->removeShader( "oe_doff_fragment" );
-        }
+        s->removeUniform( _minBiasUniform.get() );
+        s->removeUniform( _maxBiasUniform.get() );
+        s->removeUniform( _minRangeUniform.get() );
+        s->removeUniform( _maxRangeUniform.get() );
+        
+        shaders.unload( VirtualProgram::get(s), shaders.DepthOffsetVertex );
     }
 
     if ( install )
@@ -245,13 +193,12 @@ DepthOffsetAdapter::setGraph(osg::Node* graph)
 
         // install uniforms and shaders.
         osg::StateSet* s = graph->getOrCreateStateSet();
-        s->addUniform( _biasUniform.get() );
-        s->addUniform( _rangeUniform.get() );
-
-        VirtualProgram* vp = VirtualProgram::getOrCreate( s );
-        vp->setFunction( "oe_doff_vertex", s_vertex, ShaderComp::LOCATION_VERTEX_VIEW );
-        vp->setFunction( "oe_doff_fragment", s_fragment, ShaderComp::LOCATION_FRAGMENT_COLORING );
-        s->setAttributeAndModes( vp, osg::StateAttribute::ON );
+        s->addUniform( _minBiasUniform.get() );
+        s->addUniform( _maxBiasUniform.get() );
+        s->addUniform( _minRangeUniform.get() );
+        s->addUniform( _maxRangeUniform.get() );
+        
+        shaders.load(VirtualProgram::getOrCreate(s), shaders.DepthOffsetVertex);        
     }
 
     if ( graphChanging )
@@ -269,13 +216,16 @@ DepthOffsetAdapter::updateUniforms()
 {
     if ( !_supported ) return;
 
-    _biasUniform->set( osg::Vec2f(*_options.minBias(), *_options.maxBias()) );
-    _rangeUniform->set( osg::Vec2f(*_options.minRange(), *_options.maxRange()) );
+    _minBiasUniform->set( *_options.minBias() );
+    _maxBiasUniform->set( *_options.maxBias() );
+    _minRangeUniform->set( *_options.minRange() );
+    _maxRangeUniform->set( *_options.maxRange() );
 
     if ( _options.enabled() == true )
     {
-        OE_TEST << LC << "bias=[" << *_options.minBias() << ", " << *_options.maxBias() << "] ... "
-                << "range=[" << *_options.minRange() << ", " << *_options.maxRange() << "]" << std::endl;
+        OE_TEST << LC 
+            << "bias=[" << *_options.minBias() << ", " << *_options.maxBias() << "] ... "
+            << "range=[" << *_options.minRange() << ", " << *_options.maxRange() << "]" << std::endl;
     }
 }
 
@@ -322,17 +272,20 @@ DepthOffsetAdapter::recalculate()
 DepthOffsetGroup::DepthOffsetGroup() :
 _updatePending( false )
 {
-    _adapter.setGraph( this );
+    if ( _adapter.supported() )
+    {
+        _adapter.setGraph( this );
 
-    if ( _adapter.isDirty() )
-        _adapter.recalculate();
+        if ( _adapter.isDirty() )
+            _adapter.recalculate();
+    }
 }
 
 void
 DepthOffsetGroup::setDepthOffsetOptions(const DepthOffsetOptions& options)
 {
     _adapter.setDepthOffsetOptions(options);
-    if ( _adapter.isDirty() && !_updatePending )
+    if ( _adapter.supported() && _adapter.isDirty() && !_updatePending )
         scheduleUpdate();
 }
 
@@ -345,17 +298,22 @@ DepthOffsetGroup::getDepthOffsetOptions() const
 void
 DepthOffsetGroup::scheduleUpdate()
 {
-    ADJUST_UPDATE_TRAV_COUNT(this, 1);
-    _updatePending = true;
+    if ( _adapter.supported() )
+    {
+        ADJUST_UPDATE_TRAV_COUNT(this, 1);
+        _updatePending = true;
+    }
 }
 
 osg::BoundingSphere
 DepthOffsetGroup::computeBound() const
 {
-    static Threading::Mutex s_mutex;
+    if ( _adapter.supported() )
     {
-        Threading::ScopedMutexLock lock(s_mutex);
+        static Threading::Mutex s_mutex;
+        s_mutex.lock();
         const_cast<DepthOffsetGroup*>(this)->scheduleUpdate();
+        s_mutex.unlock();
     }
     return osg::Group::computeBound();
 }

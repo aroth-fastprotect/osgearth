@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,6 +18,9 @@
  */
 #include <osgEarthSymbology/ModelResource>
 #include <osgEarth/StringUtils>
+#include <osgEarth/Utils>
+#include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
 #include <osgUtil/Optimizer>
 
 #define LC "[ModelResource] "
@@ -51,26 +54,35 @@ ModelResource::getConfig() const
 osg::Node*
 ModelResource::createNodeFromURI( const URI& uri, const osgDB::Options* dbOptions ) const
 {
+    osg::ref_ptr< osgDB::Options > options = dbOptions ? new osgDB::Options( *dbOptions ) : 0;
+
+    // Explicitly cache images so that models that share images will only load one copy.
+    options->setObjectCacheHint( osgDB::Options::CACHE_IMAGES );
     osg::Node* node = 0L;
 
-    ReadResult r = uri.getNode( dbOptions );
+    ReadResult r = uri.readNode( options.get() );
     if ( r.succeeded() )
     {
         node = r.releaseNode();
+        
+        OE_INFO << LC << "Loaded " << uri.base() << "(from " << (r.isFromCache()? "cache" : "source") << ")"
+            << std::endl;
 
         osgUtil::Optimizer o;
-        o.optimize( 
-            node, 
-            osgUtil::Optimizer::VERTEX_PRETRANSFORM |
-            osgUtil::Optimizer::INDEX_MESH |
-            osgUtil::Optimizer::VERTEX_POSTTRANSFORM );
+        o.optimize( node,
+            o.DEFAULT_OPTIMIZATIONS |
+            o.INDEX_MESH |
+            o.VERTEX_PRETRANSFORM |
+            o.VERTEX_POSTTRANSFORM );
     }
     else // failing that, fall back on the old encoding format..
     {
         StringVector tok;
         StringTokenizer( *uri, tok, "()" );
         if (tok.size() >= 2)
-            return createNodeFromURI( URI(tok[1]), dbOptions );
+        {
+            node = createNodeFromURI( URI(tok[1]), options.get() );
+        }
     }
 
     return node;

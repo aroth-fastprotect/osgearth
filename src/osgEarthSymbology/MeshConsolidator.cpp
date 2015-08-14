@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -21,6 +24,7 @@
 #include <osgEarth/StringUtils>
 #include <osg/TriangleFunctor>
 #include <osg/TriangleIndexFunctor>
+#include <osg/Version>
 #include <osgDB/WriteFile>
 #include <osgUtil/MeshOptimizers>
 #include <limits>
@@ -37,76 +41,6 @@ using namespace osgEarth;
 
 namespace
 {
-    struct GeometryValidator : public osg::NodeVisitor
-    {
-        template<typename DE>
-        void validateDE( DE* de, unsigned maxIndex, unsigned numVerts )
-        {
-            for( unsigned i=0; i<de->getNumIndices(); ++i )
-            {
-                typename DE::value_type index = de->getElement(i);
-                if ( index > maxIndex )
-                {
-                    OE_WARN << "MAXIMUM Index exceeded in DrawElements" << std::endl;
-                    break;
-                }
-                else if ( index > numVerts-1 )
-                {
-                    OE_WARN << "INDEX OUT OF Range in DrawElements" << std::endl;
-                }
-            }
-        }
-
-        void apply(osg::Geometry& geom)
-        {
-            unsigned numVerts = geom.getVertexArray()->getNumElements();
-
-            if ( geom.getColorArray() )
-            {
-                if ( geom.getColorBinding() == osg::Geometry::BIND_OVERALL && geom.getColorArray()->getNumElements() != 1 )
-                {
-                    OE_WARN << "BIND_OVERALL with wrong number of elements" << std::endl;
-                }
-                else if ( geom.getColorBinding() == osg::Geometry::BIND_PER_VERTEX && geom.getColorArray()->getNumElements() != numVerts )
-                {
-                    OE_WARN << "BIND_PER_VERTEX with color.size != verts.size" << std::endl;
-                }
-
-                const osg::Geometry::PrimitiveSetList& plist = geom.getPrimitiveSetList();
-                for( osg::Geometry::PrimitiveSetList::const_iterator p = plist.begin(); p != plist.end(); ++p )
-                {
-                    osg::PrimitiveSet* pset = p->get();
-
-                    osg::DrawElementsUByte* de_byte = dynamic_cast<osg::DrawElementsUByte*>(pset);
-                    if ( de_byte )
-                    {
-                        if ( numVerts > 0xFF )
-                        {
-                            OE_WARN << "DrawElementsUByte used when numVerts > 0xFF" << std::endl;
-                        }
-                        validateDE(de_byte, 0xFF, numVerts );
-                    }
-
-                    osg::DrawElementsUShort* de_short = dynamic_cast<osg::DrawElementsUShort*>(pset);
-                    if ( de_short )
-                    {
-                        if ( numVerts > 0xFFFF )
-                        {
-                            OE_WARN << "DrawElementsUShort used when numVerts > 0xFFFF" << std::endl;
-                        }
-                        validateDE(de_short, 0xFFFF, numVerts );
-                    }
-
-                    osg::DrawElementsUInt* de_int = dynamic_cast<osg::DrawElementsUInt*>(pset);
-                    if ( de_int )
-                    {
-                        validateDE(de_int, 0xFFFFFFFF, numVerts );
-                    }
-                }
-            }
-        }
-    };
-
     template<typename T>
     struct Collector
     {
@@ -151,6 +85,134 @@ namespace
             return copy<FROM,osg::DrawElementsUInt>( src, offset );
     }
 
+    template<typename TYPE>
+    osg::Array* convertToBindPerVertex( TYPE* src, unsigned int numVerts)
+    {
+        TYPE* result = new TYPE();
+        result->reserve(numVerts);
+        for (unsigned int i = 0; i < numVerts; i++)
+        {
+            result->push_back((*src)[0]);
+        }
+        return result;
+    }
+
+    osg::Array* makeBindPerVertex( osg::Array* array, unsigned int numVerts)
+    {
+        switch (array->getType())
+        {
+        case osg::Array::ByteArrayType:
+            return convertToBindPerVertex<osg::ByteArray>(static_cast<osg::ByteArray*>(array), numVerts);
+
+        case osg::Array::ShortArrayType:
+            return convertToBindPerVertex<osg::ShortArray>(static_cast<osg::ShortArray*>(array), numVerts);
+
+        case osg::Array::IntArrayType:
+            return convertToBindPerVertex<osg::IntArray>(static_cast<osg::IntArray*>(array), numVerts);
+
+        case osg::Array::UByteArrayType:
+            return convertToBindPerVertex<osg::UByteArray>(static_cast<osg::UByteArray*>(array), numVerts);
+
+        case osg::Array::UShortArrayType:
+            return convertToBindPerVertex<osg::UShortArray>(static_cast<osg::UShortArray*>(array), numVerts);
+
+        case osg::Array::UIntArrayType:
+            return convertToBindPerVertex<osg::UIntArray>(static_cast<osg::UIntArray*>(array), numVerts);
+
+        case osg::Array::FloatArrayType:
+            return convertToBindPerVertex<osg::FloatArray>(static_cast<osg::FloatArray*>(array), numVerts);
+
+        case osg::Array::DoubleArrayType:
+            return convertToBindPerVertex<osg::DoubleArray>(static_cast<osg::DoubleArray*>(array), numVerts);
+
+        case osg::Array::Vec2bArrayType:
+            return convertToBindPerVertex<osg::Vec2bArray>(static_cast<osg::Vec2bArray*>(array), numVerts);
+
+        case osg::Array::Vec3bArrayType:
+            return convertToBindPerVertex<osg::Vec3bArray>(static_cast<osg::Vec3bArray*>(array), numVerts);
+
+        case osg::Array::Vec4bArrayType:
+            return convertToBindPerVertex<osg::Vec4bArray>(static_cast<osg::Vec4bArray*>(array), numVerts);
+
+        case osg::Array::Vec2sArrayType:
+            return convertToBindPerVertex<osg::Vec2sArray>(static_cast<osg::Vec2sArray*>(array), numVerts);
+
+        case osg::Array::Vec3sArrayType:
+            return convertToBindPerVertex<osg::Vec3sArray>(static_cast<osg::Vec3sArray*>(array), numVerts);
+
+        case osg::Array::Vec4sArrayType:
+            return convertToBindPerVertex<osg::Vec4sArray>(static_cast<osg::Vec4sArray*>(array), numVerts);
+
+        
+
+        case osg::Array::Vec4ubArrayType:
+            return convertToBindPerVertex<osg::Vec4ubArray>(static_cast<osg::Vec4ubArray*>(array), numVerts);
+
+
+        case osg::Array::Vec2ArrayType:
+            return convertToBindPerVertex<osg::Vec2Array>(static_cast<osg::Vec2Array*>(array), numVerts);
+
+        case osg::Array::Vec3ArrayType:
+            return convertToBindPerVertex<osg::Vec3Array>(static_cast<osg::Vec3Array*>(array), numVerts);
+
+        case osg::Array::Vec4ArrayType:
+            return convertToBindPerVertex<osg::Vec4Array>(static_cast<osg::Vec4Array*>(array), numVerts);
+
+
+        case osg::Array::Vec2dArrayType:
+            return convertToBindPerVertex<osg::Vec2dArray>(static_cast<osg::Vec2dArray*>(array), numVerts);
+
+        case osg::Array::Vec3dArrayType:
+            return convertToBindPerVertex<osg::Vec3dArray>(static_cast<osg::Vec3dArray*>(array), numVerts);
+
+        case osg::Array::Vec4dArrayType:
+            return convertToBindPerVertex<osg::Vec4dArray>(static_cast<osg::Vec4dArray*>(array), numVerts);
+
+        case osg::Array::MatrixArrayType:
+            return convertToBindPerVertex<osg::MatrixfArray>(static_cast<osg::MatrixfArray*>(array), numVerts);
+
+#if OSG_MIN_VERSION_REQUIRED(3,1,9)
+        case osg::Array::Vec2iArrayType:
+            return convertToBindPerVertex<osg::Vec2iArray>(static_cast<osg::Vec2iArray*>(array), numVerts);
+
+        case osg::Array::Vec3iArrayType:
+            return convertToBindPerVertex<osg::Vec3iArray>(static_cast<osg::Vec3iArray*>(array), numVerts);
+
+        case osg::Array::Vec4iArrayType:
+            return convertToBindPerVertex<osg::Vec4iArray>(static_cast<osg::Vec4iArray*>(array), numVerts);
+
+        case osg::Array::Vec2ubArrayType:
+            return convertToBindPerVertex<osg::Vec2ubArray>(static_cast<osg::Vec2ubArray*>(array), numVerts );
+
+        case osg::Array::Vec3ubArrayType:
+            return convertToBindPerVertex<osg::Vec3ubArray>(static_cast<osg::Vec3ubArray*>(array), numVerts );
+
+        case osg::Array::Vec2usArrayType:
+            return convertToBindPerVertex<osg::Vec2usArray>(static_cast<osg::Vec2usArray*>(array), numVerts);
+
+        case osg::Array::Vec3usArrayType:
+            return convertToBindPerVertex<osg::Vec3usArray>(static_cast<osg::Vec3usArray*>(array), numVerts );
+
+        case osg::Array::Vec4usArrayType:
+            return convertToBindPerVertex<osg::Vec4usArray >(static_cast<osg::Vec4usArray*>(array), numVerts );
+
+        case osg::Array::Vec2uiArrayType:
+            return convertToBindPerVertex<osg::Vec2uiArray>(static_cast<osg::Vec2uiArray*>(array), numVerts);
+
+        case osg::Array::Vec3uiArrayType:
+            return convertToBindPerVertex<osg::Vec3uiArray>(static_cast<osg::Vec3uiArray*>(array), numVerts);
+
+        case osg::Array::Vec4uiArrayType:
+            return convertToBindPerVertex<osg::Vec4uiArray>(static_cast<osg::Vec4uiArray*>(array), numVerts);
+
+        case osg::Array::MatrixdArrayType:
+            return convertToBindPerVertex<osg::MatrixdArray>(static_cast<osg::MatrixdArray*>(array),  numVerts);
+#endif
+        default:
+            return array;
+        }
+    }
+
     osg::PrimitiveSet* convertDAtoDE( osg::DrawArrays* da, unsigned numVerts, unsigned offset )
     {
         osg::DrawElements* de = 0L;
@@ -170,32 +232,55 @@ namespace
 
     bool canOptimize( osg::Geometry& geom )
     {
-        osg::Array* vertexArray = geom.getVertexArray();
+        osg::Vec3Array* vertexArray = dynamic_cast<osg::Vec3Array*>(geom.getVertexArray());
         if ( !vertexArray )
+        {
             return false;
+        }
 
-        // check that everything is bound per-vertex
+        // check that everything is bound per-vertex or convert bind overall
 
         if ( geom.getColorArray() != 0L && geom.getColorBinding() != osg::Geometry::BIND_PER_VERTEX )
-            return false;
+        {
+            if (geom.getColorBinding() == osg::Geometry::BIND_OVERALL)
+            {
+                geom.setColorArray(makeBindPerVertex(geom.getColorArray(), vertexArray->size()));
+            }
+            else
+            {
+                return false;
+            }
+        }
 
         if ( geom.getNormalArray() != 0L && geom.getNormalBinding() != osg::Geometry::BIND_PER_VERTEX )
-            return false;
+        {
+            if (geom.getNormalBinding() == osg::Geometry::BIND_OVERALL)
+            {
+                geom.setNormalArray(makeBindPerVertex(geom.getNormalArray(), vertexArray->size()));
+            }
+            else
+            {
+                return false;
+            }
+        }
 
         if ( geom.getSecondaryColorArray() != 0L && geom.getSecondaryColorBinding() != osg::Geometry::BIND_PER_VERTEX )
-            return false;
+        {
+            if (geom.getSecondaryColorBinding() == osg::Geometry::BIND_OVERALL)
+            {
+                geom.setSecondaryColorArray(makeBindPerVertex(geom.getSecondaryColorArray(), vertexArray->size()));
+            }
+            else
+            {
+                return false;
+            }
+        }
 
         // just for now.... TODO: allow thi later
         if ( geom.getVertexAttribArrayList().size() > 0 )
+        {
             return false;
-        //{
-        //    unsigned n = geom.getVertexAttribArrayList().size();
-        //    for( unsigned i=0; i<n; ++i ) 
-        //    {
-        //        if ( geom.getVertexAttribBinding( i ) != osg::Geometry::BIND_PER_VERTEX )
-        //            return false;
-        //    }
-        //}
+        }
 
         // check that all primitive sets share the same user data
         osg::Geometry::PrimitiveSetList& pslist = geom.getPrimitiveSetList();
@@ -221,9 +306,9 @@ namespace
 //------------------------------------------------------------------------
 
 void
-MeshConsolidator::convertToTriangles( osg::Geometry& geom )
+MeshConsolidator::convertToTriangles( osg::Geometry& geom, bool force )
 {
-    if ( !canOptimize(geom) )
+    if ( !force && !canOptimize(geom) )
         return;
 
     osg::Geometry::PrimitiveSetList& primSets = geom.getPrimitiveSetList();
@@ -298,8 +383,7 @@ MeshConsolidator::convertToTriangles( osg::Geometry& geom )
     geom.setPrimitiveSetList( nonTriSets );
 }
 
-
-typedef osg::Geode::DrawableList DrawableList;
+typedef std::vector<osg::ref_ptr<osg::Drawable> > DrawableList;
 
 namespace
 {
@@ -311,12 +395,32 @@ namespace
         unsigned                      numNormals,
         const std::vector<unsigned>&  texCoordArrayUnits,
         bool                          useVBOs,
-        osg::Geode::DrawableList&     results )
+        DrawableList&                 results )
     {
         osg::Geometry::AttributeBinding newColorsBinding, newNormalsBinding;
 
         osg::Vec3Array* newVerts = new osg::Vec3Array();
         newVerts->reserve( numVerts );
+
+        // Determine if we need to use 3D texture coordinates or not.
+        bool use3DTextureCoords = false;
+        for( DrawableList::iterator i = start; i != end; ++i )
+        {
+            for( unsigned a=0; a<texCoordArrayUnits.size(); ++a )
+            {
+                unsigned unit = texCoordArrayUnits[a];
+
+                osg::Vec3Array* texCoords = dynamic_cast<osg::Vec3Array*>(i->get()->asGeometry()->getTexCoordArray( unit ));
+                if (texCoords)
+                {
+                    use3DTextureCoords = true;
+                    break;
+                }
+            }
+
+            if (use3DTextureCoords) break;
+        }
+
 
         osg::Vec4Array* newColors =0L;
         if ( numColors > 0 )
@@ -338,11 +442,22 @@ namespace
             //newNormalsBinding = numNormals==numVerts? osg::Geometry::BIND_PER_VERTEX : osg::Geometry::BIND_OVERALL;
         }
 
-        std::vector<osg::Vec2Array*> newTexCoordsArrays;
+        std::vector<osg::Array*> newTexCoordsArrays;
         for( unsigned i=0; i<texCoordArrayUnits.size(); ++i )
         {
-            osg::Vec2Array* newTexCoords = new osg::Vec2Array();
-            newTexCoords->reserve( numVerts );
+            osg::Array* newTexCoords;
+            if (use3DTextureCoords)
+            {
+                osg::Vec3Array* texCoords3D = new osg::Vec3Array;
+                texCoords3D->reserve( numVerts );
+                newTexCoords = texCoords3D;                                    
+            }
+            else
+            {
+                osg::Vec2Array* texCoords2D = new osg::Vec2Array;
+                texCoords2D->reserve( numVerts );
+                newTexCoords = texCoords2D;                                    
+            }                        
             newTexCoordsArrays.push_back( newTexCoords );
         }
 
@@ -406,12 +521,39 @@ namespace
                     for( unsigned a=0; a<texCoordArrayUnits.size(); ++a )
                     {
                         unsigned unit = texCoordArrayUnits[a];
-                        osg::Vec2Array* texCoords = dynamic_cast<osg::Vec2Array*>( geom->getTexCoordArray(unit) );
-                        if ( texCoords )
+
+                        // We are just using 2D texture coordinates so only check for the 2D case
+                        if (!use3DTextureCoords)
                         {
-                            osg::Vec2Array* newTexCoords = newTexCoordsArrays[a];
-                            std::copy( texCoords->begin(), texCoords->end(), std::back_inserter(*newTexCoords) );
+                            osg::Vec2Array* texCoords2D = dynamic_cast<osg::Vec2Array*>( geom->getTexCoordArray(unit) );
+                            if (texCoords2D)
+                            {
+                                osg::Vec2Array* newTexCoords = static_cast< osg::Vec2Array*>( newTexCoordsArrays[a] );
+                                std::copy( texCoords2D->begin(), texCoords2D->end(), std::back_inserter(*newTexCoords) );
+                            }                                                           
                         }
+                        else
+                        {
+                            // We are using 3D coordinates, so check for both 2D and 3D coordinates.  We will consolidate them all into 3D coordinates.
+                            osg::Vec2Array* texCoords2D = dynamic_cast<osg::Vec2Array*>( geom->getTexCoordArray(unit) );
+                            osg::Vec3Array* texCoords3D = dynamic_cast<osg::Vec3Array*>( geom->getTexCoordArray(unit) );
+                            if (texCoords2D || texCoords3D)
+                            {
+                                osg::Vec3Array* newTexCoords = static_cast< osg::Vec3Array*>( newTexCoordsArrays[a] );
+                                if (texCoords3D)
+                                {
+                                    std::copy( texCoords3D->begin(), texCoords3D->end(), std::back_inserter(*newTexCoords) );
+                                }
+                                else
+                                {
+                                    // Convert 2D to 3D coords
+                                    for (osg::Vec2Array::iterator itr = texCoords2D->begin(); itr != texCoords2D->end(); ++itr)
+                                    {                                        
+                                        newTexCoords->push_back( osg::Vec3(itr->x(), itr->y(), 0) );
+                                    }
+                                }
+                            }
+                        }                                                
                     }
                 }
 
@@ -517,7 +659,7 @@ MeshConsolidator::run( osg::Geode& geode )
         {
             if ( canOptimize(*geom) )
             {
-                // convert all primitives to triangles.
+                // convert all surface primitives to triangles.
                 convertToTriangles( *geom );
 
                 // NOTE!! tex/attrib array counts much already be equal.

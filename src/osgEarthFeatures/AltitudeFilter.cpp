@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -51,7 +51,6 @@ AltitudeFilter::push( FeatureList& features, FilterContext& cx )
         _altitude.valid()                                          && 
         _altitude->clamping()  != AltitudeSymbol::CLAMP_NONE       &&
         _altitude->technique() == AltitudeSymbol::TECHNIQUE_MAP    &&
-        //_altitude->technique() != AltitudeSymbol::TECHNIQUE_SCENE  &&
         cx.getSession()        != 0L                               &&
         cx.profile()           != 0L;
 
@@ -74,9 +73,20 @@ AltitudeFilter::pushAndDontClamp( FeatureList& features, FilterContext& cx )
     if ( _altitude.valid() && _altitude->verticalOffset().isSet() )
         offsetExpr = *_altitude->verticalOffset();
 
+    bool gpuClamping =
+        _altitude.valid() &&
+        _altitude->technique() == _altitude->TECHNIQUE_GPU;
+
     for( FeatureList::iterator i = features.begin(); i != features.end(); ++i )
     {
         Feature* feature = i->get();
+        
+        // run a symbol script if present.
+        if ( _altitude.valid() && _altitude->script().isSet() )
+        {
+            StringExpression temp( _altitude->script().get() );
+            feature->eval( temp, &cx );
+        }
 
         double minHAT       =  DBL_MAX;
         double maxHAT       = -DBL_MAX;
@@ -95,8 +105,11 @@ AltitudeFilter::pushAndDontClamp( FeatureList& features, FilterContext& cx )
             Geometry* geom = gi.next();
             for( Geometry::iterator g = geom->begin(); g != geom->end(); ++g )
             {
-                g->z() *= scaleZ;
-                g->z() += offsetZ;
+                if ( !gpuClamping )
+                {
+                    g->z() *= scaleZ;
+                    g->z() += offsetZ;
+                }
 
                 if ( g->z() < minHAT )
                     minHAT = g->z();
@@ -110,6 +123,13 @@ AltitudeFilter::pushAndDontClamp( FeatureList& features, FilterContext& cx )
             feature->set( "__min_hat", minHAT );
             feature->set( "__max_hat", maxHAT );
         }
+
+        // encode the Z offset if
+        if ( gpuClamping )
+        {
+            feature->set("__oe_verticalScale",  scaleZ);
+            feature->set("__oe_verticalOffset", offsetZ);
+        }
     }
 }
 
@@ -120,13 +140,17 @@ AltitudeFilter::pushAndClamp( FeatureList& features, FilterContext& cx )
 
     // the map against which we'll be doing elevation clamping
     //MapFrame mapf = session->createMapFrame( Map::ELEVATION_LAYERS );
-    MapFrame mapf = session->createMapFrame( Map::TERRAIN_LAYERS );
+    MapFrame mapf = session->createMapFrame( 
+        (Map::ModelParts)(Map::TERRAIN_LAYERS | Map::MODEL_LAYERS) );
 
     const SpatialReference* mapSRS = mapf.getProfile()->getSRS();
     osg::ref_ptr<const SpatialReference> featureSRS = cx.profile()->getSRS();
 
     // establish an elevation query interface based on the features' SRS.
     ElevationQuery eq( mapf );
+
+    // want a result even if it's low res
+    eq.setFallBackOnNoData( true );
 
     NumericExpression scaleExpr;
     if ( _altitude->verticalScale().isSet() )
@@ -149,9 +173,19 @@ AltitudeFilter::pushAndClamp( FeatureList& features, FilterContext& cx )
     bool vertEquiv =
         featureSRS->isVertEquivalentTo( mapSRS );
 
+
+
     for( FeatureList::iterator i = features.begin(); i != features.end(); ++i )
     {
         Feature* feature = i->get();
+        
+        // run a symbol script if present.
+        if ( _altitude.valid() && _altitude->script().isSet() )
+        {
+            StringExpression temp( _altitude->script().get() );
+            feature->eval( temp, &cx );
+        }
+
         double maxTerrainZ  = -DBL_MAX;
         double minTerrainZ  =  DBL_MAX;
         double minHAT       =  DBL_MAX;

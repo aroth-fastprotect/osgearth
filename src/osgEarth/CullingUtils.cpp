@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,10 +21,12 @@
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/DPLineSegmentIntersector>
 #include <osgEarth/GeoData>
+#include <osgEarth/Utils>
 #include <osg/ClusterCullingCallback>
 #include <osg/PrimitiveSet>
 #include <osg/Geode>
 #include <osg/TemplatePrimitiveFunctor>
+#include <osgGA/GUIActionAdapter>
 #include <osgUtil/CullVisitor>
 #include <osgUtil/IntersectionVisitor>
 #include <osgUtil/LineSegmentIntersector>
@@ -308,13 +310,34 @@ Culling::asCullVisitor(osg::NodeVisitor* nv)
     return 0L;
 }
 
+//------------------------------------------------------------------------
+
+void
+DoNotComputeNearFarCullCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
+{
+    osgUtil::CullVisitor* cv = static_cast< osgUtil::CullVisitor*>( nv );
+    osg::CullSettings::ComputeNearFarMode oldMode;
+    if( cv )
+    {
+        oldMode = cv->getComputeNearFarMode();
+        cv->setComputeNearFarMode( osg::CullSettings::DO_NOT_COMPUTE_NEAR_FAR );
+    }
+    traverse(node, nv);
+    if( cv )
+    {
+        cv->setComputeNearFarMode(oldMode);
+    }
+}
+
 
 //----------------------------------------------------------------------------
-
 
 bool 
 SuperClusterCullingCallback::cull(osg::NodeVisitor* nv, osg::Drawable* , osg::State*) const
 {
+    static int c0, c1;
+    static int frame = -1;
+
     osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
 
     if (!cv) return false;
@@ -323,36 +346,58 @@ SuperClusterCullingCallback::cull(osg::NodeVisitor* nv, osg::Drawable* , osg::St
     if ( !(cv->getCullingMode() & osg::CullSettings::CLUSTER_CULLING) )
         return false;
 
+    bool visible = true;
+
     // quick bail is the deviation is maxed out
-    if ( _deviation <= -1.0f )
-        return false;
-
-    // accept if we're within the culling radius
-    osg::Vec3d eye_cp = nv->getViewPoint() - _controlPoint;
-    float radius = (float)eye_cp.length();
-    if (radius < _radius)
-        return false;
-
-    // handle perspective and orthographic projections differently.
-    const osg::Matrixd& proj = *cv->getProjectionMatrix();
-    bool isOrtho = ( proj(3,3) == 1. ) && ( proj(2,3) == 0. ) && ( proj(1,3) == 0. ) && ( proj(0,3) == 0.);
-
-    if ( isOrtho )
+    if ( _deviation > -1.0f )
     {
-        // For an ortho camera, use the reverse look vector instead of the eye->controlpoint
-        // vector for the deviation test. Transform the local reverse-look vector (always 0,0,1)
-        // into world space and dot them. (Use 3x3 since we're xforming a vector, not a point)
-        osg::Vec3d revLookWorld = osg::Matrix::transform3x3( *cv->getModelViewMatrix(), osg::Vec3d(0,0,1) );
-        revLookWorld.normalize();
-        float deviation = revLookWorld * _normal;
-        return deviation < _deviation;
+        // accept if we're within the culling radius
+        osg::Vec3d eye_cp = nv->getViewPoint() - _controlPoint;
+        float radius = (float)eye_cp.length();
+        if ( radius >= _radius )
+        {
+            // handle perspective and orthographic projections differently.
+            const osg::Matrixd& proj = *cv->getProjectionMatrix();
+            bool isOrtho = ( proj(3,3) == 1. ) && ( proj(2,3) == 0. ) && ( proj(1,3) == 0. ) && ( proj(0,3) == 0.);
+
+            float deviation;
+            if ( isOrtho )
+            {
+                // For an ortho camera, use the reverse look vector instead of the eye->controlpoint
+                // vector for the deviation test. Transform the local reverse-look vector (always 0,0,1)
+                // into world space and dot them. (Use 3x3 since we're xforming a vector, not a point)
+                osg::Vec3d revLookWorld = osg::Matrix::transform3x3( *cv->getModelViewMatrix(), osg::Vec3d(0,0,1) );
+                revLookWorld.normalize();
+                deviation = revLookWorld * _normal;
+                visible = deviation >= _deviation;
+            }
+
+            else // isPerspective
+            {
+                deviation = (eye_cp * _normal)/radius;
+                visible = deviation >= _deviation;
+            }
+
+            visible = deviation >= _deviation;            
+        }
     }
 
-    else // isPerspective
+#if 0 // debugging
+    int fn = cv->getFrameStamp()->getFrameNumber();
+    if ( fn != frame )
     {
-        float deviation = (eye_cp * _normal)/radius;
-        return deviation < _deviation;
+        frame = fn;
+        OE_INFO << "Frame: " << fn << "try = " << c0 << ", viz = " << c1 << "\n";
+        c0 = c1 = 0;
     }
+    else
+    {
+        c0 ++;
+        c1 += visible ? 1 : 0;
+    }
+#endif
+
+    return !visible;
 }
 
 
@@ -438,126 +483,6 @@ ClusterCullingFactory::create(const osg::Vec3& controlPoint,
     SuperClusterCullingCallback* ccc = new SuperClusterCullingCallback();
     ccc->set(controlPoint, normal, deviation, radius);
     return ccc;
-}
-
-
-//------------------------------------------------------------------------
-
-CullNodeByEllipsoid::CullNodeByEllipsoid( const osg::EllipsoidModel* model ) :
-_minRadius( std::min(model->getRadiusPolar(), model->getRadiusEquator()) )
-{
-    //nop
-}
-
-
-void
-CullNodeByEllipsoid::operator()(osg::Node* node, osg::NodeVisitor* nv)
-{
-    if ( nv )
-    {
-        osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
-
-        // camera location
-        osg::Vec3d vp, center, up;
-        cv->getCurrentCamera()->getViewMatrixAsLookAt(vp, center, up);
-        double vpLen2 = vp.length2();
-
-        // world bound of this model
-        osg::Matrix l2w = osg::computeLocalToWorld( nv->getNodePath() );
-        const osg::BoundingSphere& bs = node->getBound();
-        osg::BoundingSphere bsWorld( bs.center() * l2w, bs.radius() * l2w.getScale().x() );
-        double bswLen2 = bsWorld.center().length2();
-
-        double vpLen = vp.length();
-        osg::Vec3d vpToTarget = bsWorld.center() - vp;
-        
-        vp.normalize();
-        vpToTarget.normalize();
-        double theta = acos( vpToTarget * -vp );
-        double r = vpLen * sin(theta);
-        //double p = 
-
-        // "r" is the length of the shortest line between the center of the 
-        // ellipsoid and the line of light. If (r) is less than the ellipsoid's
-        // minumum radius, that means the ellipsoid is blocking the LOS.
-        // (We "tweak" r a bit: increase it by the target object's radius so we
-        // can account for the whole object, and subtract the lower point on 
-        // earth to account for the camera being underground)
-        if ( r + bsWorld.radius() > _minRadius - 11000.0 )
-        {
-            OE_NOTICE 
-                << "r=" << r << ", rad="<<bsWorld.radius()<<", min=" << _minRadius
-                << std::endl;
-            traverse(node, nv);
-        }
-    }
-}
-
-//------------------------------------------------------------------------
-
-CullNodeByHorizon::CullNodeByHorizon( const osg::Vec3d& world, const osg::EllipsoidModel* model ) :
-_world(world),
-_r    (model->getRadiusPolar()),
-_r2   (model->getRadiusPolar() * model->getRadiusPolar())
-{
-    //nop
-}
-CullNodeByHorizon::CullNodeByHorizon( osg::MatrixTransform* xform, const osg::EllipsoidModel* model ) :
-_xform(xform),
-_r    (model->getRadiusPolar()),
-_r2   (model->getRadiusPolar() * model->getRadiusPolar())
-{
-    //nop
-}
-
-void
-CullNodeByHorizon::operator()(osg::Node* node, osg::NodeVisitor* nv)
-{
-    if ( nv )
-    {
-        osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
-
-        // get the viewpoint. It will be relative to the current reference location (world).
-        osg::Matrix l2w = osg::computeLocalToWorld( nv->getNodePath(), true );
-        osg::Vec3d vp  = cv->getViewPoint() * l2w;
-
-        osg::Vec3d world = _xform.valid() ? _xform->getMatrix().getTrans() : _world;
-
-        // same quadrant:
-        if ( vp * world >= 0.0 )
-        {
-            double d2 = vp.length2();
-            double horiz2 = d2 - _r2;
-            double dist2 = (world-vp).length2();
-            if ( dist2 < horiz2 )
-            {
-                traverse(node, nv);
-            }
-        }
-
-        // different quadrants:
-        else
-        {
-            // there's a horizon between them; now see if the thing is visible.
-            // find the triangle formed by the viewpoint, the target point, and 
-            // the center of the earth.
-            double a = (world-vp).length();
-            double b = world.length();
-            double c = vp.length();
-
-            // Heron's formula for triangle area:
-            double s = 0.5*(a+b+c);
-            double area = 0.25*sqrt( s*(s-a)*(s-b)*(s-c) );
-
-            // Get the triangle's height:
-            double h = (2*area)/a;
-
-            if ( h >= _r )
-            {
-                traverse(node, nv);
-            }
-        }
-    }
 }
 
 //------------------------------------------------------------------------
@@ -666,7 +591,7 @@ void OcclusionCullingCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
             remainingTime = OcclusionCullingCallback::_maxFrameTime;
         }
 
-        osg::Vec3d eye = cv->getViewPoint();        
+        osg::Vec3d eye = cv->getViewPoint();
 
         if (_prevEye != eye || _prevWorld != _world)
         {
@@ -694,7 +619,7 @@ void OcclusionCullingCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
                     osg::Vec3d start = eye;
                     osg::Vec3d end = _world;
                     DPLineSegmentIntersector* i = new DPLineSegmentIntersector( start, end );
-                    i->setIntersectionLimit( osgUtil::Intersector::LIMIT_ONE );
+                    i->setIntersectionLimit( osgUtil::Intersector::LIMIT_NEAREST );
                     osgUtil::IntersectionVisitor iv;
                     iv.setIntersector( i );
                     _node->accept( iv );
@@ -717,6 +642,15 @@ void OcclusionCullingCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
             else
             {
                 numSkipped++;
+                // if we skipped some we need to request a redraw so the remianing ones get processed on the next frame.
+                if ( cv->getCurrentCamera() && cv->getCurrentCamera()->getView() )
+                {
+                    osgGA::GUIActionAdapter* aa = dynamic_cast<osgGA::GUIActionAdapter*>(cv->getCurrentCamera()->getView());
+                    if ( aa )
+                    {
+                        aa->requestRedraw();
+                    }
+                }
             }
         }
 
@@ -806,9 +740,15 @@ ProxyCullVisitor::distance(const osg::Vec3& coord,const osg::Matrix& matrix)
 void 
 ProxyCullVisitor::handle_cull_callbacks_and_traverse(osg::Node& node)
 {
+#if OSG_VERSION_GREATER_THAN(3,3,1)
+    osg::Callback* callback = node.getCullCallback();
+    if (callback) callback->run(&node, this);
+    else traverse(node);
+#else
     osg::NodeCallback* callback = node.getCullCallback();
     if (callback) (*callback)(&node,this);
     else traverse(node);
+#endif
 }
 
 void 
@@ -892,12 +832,17 @@ ProxyCullVisitor::apply(osg::Geode& node)
     for(unsigned int i=0;i<node.getNumDrawables();++i)
     {
         osg::Drawable* drawable = node.getDrawable(i);
-        const osg::BoundingBox& bb =drawable->getBound();
+        const osg::BoundingBox& bb = Utils::getBoundingBox(drawable);
 
         if( drawable->getCullCallback() )
         {
+#if OSG_VERSION_GREATER_THAN(3,3,1)
+            if( drawable->getCullCallback()->run(drawable, _cv) == true )
+                continue;
+#else
             if( drawable->getCullCallback()->cull( _cv, drawable, &_cv->getRenderInfo() ) == true )
                 continue;
+#endif
         }
 
         //else
@@ -1055,4 +1000,47 @@ LODScaleGroup::traverse(osg::NodeVisitor& nv)
     }
 
     osg::Group::traverse( nv );
+}
+
+//------------------------------------------------------------------
+
+ClipToGeocentricHorizon::ClipToGeocentricHorizon(const osgEarth::SpatialReference* srs,
+                                                 osg::ClipPlane*                   clipPlane)
+{
+    _radii.set(
+        srs->getEllipsoid()->getRadiusEquator(),
+        srs->getEllipsoid()->getRadiusEquator(),
+        srs->getEllipsoid()->getRadiusPolar() );
+
+    _clipPlane = clipPlane;
+}
+
+void
+ClipToGeocentricHorizon::operator()(osg::Node* node, osg::NodeVisitor* nv)
+{
+    osg::ref_ptr<osg::ClipPlane> clipPlane;
+    if ( _clipPlane.lock(clipPlane) )
+    {
+        osg::Vec3d eye = nv->getEyePoint();
+
+        // viewer in ellipsoidal unit space:
+        osg::Vec3d unitEye( eye.x()/_radii.x(), eye.y()/_radii.y(), eye.z()/_radii.z());
+
+        // calculate scaled distance from center to viewer:
+        double unitEyeLen = unitEye.length();
+
+        // calculate scaled distance from center to horizon plane:
+        double unitHorizonPlaneLen = 1.0/unitEyeLen;
+
+        // convert back to real space:
+        double eyeLen = eye.length();
+        double horizonPlaneLen = eyeLen * unitHorizonPlaneLen/unitEyeLen;
+
+        // normalize the eye vector:
+        eye /= eyeLen;
+
+        // compute a new clip plane:
+        clipPlane->setClipPlane(osg::Plane(eye, eye*horizonPlaneLen));
+    }
+    traverse(node, nv);
 }

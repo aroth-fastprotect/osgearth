@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -36,9 +36,9 @@ namespace osgEarth
     class OSGEARTH_EXPORT MaskLayerOptions : public ConfigOptions
     {
     public:        
-        MaskLayerOptions( const ConfigOptions& options =ConfigOptions() );
+        MaskLayerOptions(const ConfigOptions& options =ConfigOptions() );
 
-        MaskLayerOptions( const std::string& name, const MaskSourceOptions& driverOptions =MaskSourceOptions() );
+        MaskLayerOptions(const std::string& name, const MaskSourceOptions& driverOptions =MaskSourceOptions() );
 
         /** dtor */
         virtual ~MaskLayerOptions() { }
@@ -55,6 +55,12 @@ namespace osgEarth
         optional<MaskSourceOptions>& driver() { return _driver; }
         const optional<MaskSourceOptions>& driver() const { return _driver; }
 
+        /**
+         * Gets or sets the minimum of detail for which this layer should generate data.
+         */
+        optional<unsigned>& minLevel() { return _minLevel; }
+        const optional<unsigned>& minLevel() const { return _minLevel; }
+
     public:
         virtual Config getConfig() const;
         virtual void mergeConfig( const Config& conf );
@@ -63,13 +69,16 @@ namespace osgEarth
         void fromConfig( const Config& conf );
         void setDefaults();
 
-        optional<std::string> _name;
+        optional<std::string>       _name;
         optional<MaskSourceOptions> _driver;
+        optional<unsigned>          _minLevel;
     };
+
 
     /**
      * A MaskLayer is a specialized layer used to mask out a part of the terrain.
-     * Typically you would use this if you had a pre-built 3D terrain model for an inset area.
+     * Typically you would use this if you had a pre-built 3D terrain model for
+     * an inset area.
      */
     class OSGEARTH_EXPORT MaskLayer : public Layer
     {
@@ -97,17 +106,24 @@ namespace osgEarth
          */
         MaskSource* getMaskSource() const { return _maskSource.get(); }
 
-    public:
         /** 
          * Gets the name of this mask layer
          */
         const std::string& getName() const { return *_runtimeOptions.name(); }
 
+        /**
+         * Minimum terrain LOD at which masking should occur
+         */
+        unsigned getMinLevel() const { return *_runtimeOptions.minLevel(); }
+
         /** 
          * Gets the geometric boundary polygon representing the area of the
          * terrain to mask out.
          */
-        osg::Vec3dArray* getOrCreateBoundary( float heightScale = 1.0, const SpatialReference* srs = NULL, ProgressCallback* progress =0L );
+        osg::Vec3dArray* getOrCreateMaskBoundary(
+            float                   heightScale,
+            const SpatialReference* srs,
+            ProgressCallback*       progress );
 
     public:
 
@@ -120,6 +136,7 @@ namespace osgEarth
         Revision                      _maskSourceRev;
         osg::ref_ptr<osg::Vec3dArray> _boundary;
         osg::ref_ptr<osgDB::Options>  _dbOptions;
+        OpenThreads::Mutex            _mutex;
 
         void copyOptions();
     };

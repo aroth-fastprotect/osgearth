@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -90,7 +90,7 @@ _bufsize( 1024000 )
 KMZArchive::~KMZArchive()
 {
     if ( _buf )
-        delete [] (char*)_buf;
+        delete [] _buf;
 }
 
 void 

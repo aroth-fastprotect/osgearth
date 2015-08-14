@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -25,6 +28,7 @@
 #include <osgEarth/MapNodeOptions>
 #include <osgEarth/SpatialReference>
 #include <osgEarth/TerrainEngineNode>
+#include <osgEarth/Extension>
 
 namespace osgEarth
 {
@@ -163,12 +167,25 @@ namespace osgEarth
         const Config& externalConfig() const { return _externalConf; }
 
         /**
-         * Sets a custom texture compositor technique on the underlying terrain engine.
-         * This method is here b/c just calling getTerrainEngine()->getTextureCompositor()
-         * ->setTechnique() has problems (with init order of the terrain engine). Someday
-         * this needs to be cleaned up.
+         * Adds an Extension and calls its startup method with this MapNode.
          */
-        void setCompositorTechnique( class TextureCompositorTechnique* tech );
+        void addExtension(Extension* extension, const osgDB::Options* options =0L);
+
+        /**
+         * Removes an extension, and calls its shutdown method with this MapNode.
+         */
+        void removeExtension(Extension* extension);
+
+        /**
+         * Removes all extensions, calling each one's shutdown method this this MapNode.
+         */
+        void clearExtensions();
+
+        /**
+         * Access the extensions vector.
+         */
+        const std::vector< osg::ref_ptr<Extension> >& getExtensions() const { return _extensions; }
+
 
     public: // special purpose
 
@@ -201,7 +218,7 @@ namespace osgEarth
         Config                     _externalConf;
 
         // keep track of nodes created by model layers
-        typedef std::map<ModelLayer*,osg::Node*> ModelLayerNodeMap;
+        typedef std::map<ModelLayer*, osg::ref_ptr< osg::Node > > ModelLayerNodeMap;
         ModelLayerNodeMap        _modelLayerNodes;
         osg::Group*              _maskLayerNode;
         unsigned                 _lastNumBlacklistedFilenames;
@@ -209,14 +226,13 @@ namespace osgEarth
         bool                     _terrainEngineInitialized;
         osg::Group*              _terrainEngineContainer;
 
+        std::vector< osg::ref_ptr<Extension> > _extensions;
+
     public: // MapCallback proxy
 
         void onModelLayerAdded( ModelLayer*, unsigned int );
         void onModelLayerRemoved( ModelLayer* );
-		void onModelLayerMoved( ModelLayer* layer, unsigned int oldIndex, unsigned int newIndex );
-
-    public:
-        void onModelLayerOverlayChanged( ModelLayer* layer );
+        void onModelLayerMoved( ModelLayer* layer, unsigned int oldIndex, unsigned int newIndex );
 
     public:
         struct TileRangeData : public osg::Referenced {
@@ -227,7 +243,6 @@ namespace osgEarth
 
     private:
 
-        osg::ref_ptr< ModelLayerCallback > _modelLayerCallback;
         osg::ref_ptr< MapCallback >        _mapCallback;
     
         void init();

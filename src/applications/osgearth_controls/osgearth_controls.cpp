@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -48,7 +51,7 @@ int main(int argc, char** argv)
         root->addChild( node );
 
     // create a surface to house the controls
-    ControlCanvas* cs = ControlCanvas::get( &viewer );
+    ControlCanvas* cs = ControlCanvas::getOrCreate( &viewer );
 
     viewer.setSceneData( root );
     viewer.setCameraManipulator( new osgEarth::Util::EarthManipulator );
@@ -96,20 +99,19 @@ createControls( ControlCanvas* cs )
     // a container centered on the screen, containing an image and a text label.
     {
         VBox* center = new VBox();
-        center->setFrame( new RoundedFrame() );
-        center->getFrame()->setBackColor( 1,1,1,0.5 );
+        center->setBorderColor( 1, 1, 1, 1 );
+        center->setBackColor( .6,.5,.4,0.5 );
         center->setPadding( 10 );
         center->setHorizAlign( Control::ALIGN_CENTER );
         center->setVertAlign( Control::ALIGN_CENTER );
 
         // Add an image:
-        osg::ref_ptr<osg::Image> image = osgDB::readImageFile("http://demo.pelicanmapping.com/rmweb/readymap_logo.png");
+        osg::ref_ptr<osg::Image> image = osgDB::readImageFile("http://osgearth.org/images/octocat-icon.png");
         if ( image.valid() )
         {
             s_imageControl = new ImageControl( image.get() );
             s_imageControl->setHorizAlign( Control::ALIGN_CENTER );
             s_imageControl->setFixSizeForRotation( true );
-            //imageCon->addEventHandler( new ImageRotationHandler );
             center->addControl( s_imageControl );
             center->setHorizAlign( Control::ALIGN_CENTER );
         }
@@ -199,8 +201,7 @@ createControls( ControlCanvas* cs )
     // a centered hbox container along the bottom on the screen.
     {
         HBox* bottom = new HBox();
-        bottom->setFrame( new RoundedFrame() );
-        bottom->getFrame()->setBackColor(0,0,0,0.5);
+        bottom->setBackColor(0,0,0,0.5);        
         bottom->setMargin( 10 );
         bottom->setChildSpacing( 145 );
         bottom->setVertAlign( Control::ALIGN_BOTTOM );

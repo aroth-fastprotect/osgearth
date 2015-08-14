@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -27,7 +27,7 @@ using namespace osgEarth;
 
 //------------------------------------------------------------------------
 
-const std::string IOMetadata::CONTENT_TYPE = "Content-type";
+const std::string IOMetadata::CONTENT_TYPE = "Content-Type";
 
 //------------------------------------------------------------------------
 
@@ -37,11 +37,29 @@ osg::Object()
     //nop
 }
 
+StringObject::~StringObject()
+{
+}
+
+const std::string& StringObject::getString() const
+{
+    return _str;
+}
+
+void StringObject::setString( const std::string& value )
+{
+    _str = value;
+}
+
 //------------------------------------------------------------------------
 
 URIReadCallback::URIReadCallback()
 {
     //nop
+}
+
+URIReadCallback::~URIReadCallback()
+{
 }
 
 //------------------------------------------------------------------------
@@ -98,7 +116,7 @@ struct osgEarthStringReaderWriter##SUFFIX : public osgDB::ReaderWriter \
 }
 
 STRING_READER_WRITER_SHIM( XML, "xml", "osgEarth XML shim" );
-REGISTER_OSGPLUGIN( xml, osgEarthStringReaderWriterXML )
+REGISTER_OSGPLUGIN( xml, osgEarthStringReaderWriterXML );
 
 STRING_READER_WRITER_SHIM( JSON, "json", "osgEarth JSON shim" );
-REGISTER_OSGPLUGIN( json, osgEarthStringReaderWriterJSON )
+REGISTER_OSGPLUGIN( json, osgEarthStringReaderWriterJSON );

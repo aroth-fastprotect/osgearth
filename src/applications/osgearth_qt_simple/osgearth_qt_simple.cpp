@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -22,11 +25,11 @@
 #include <osgEarthUtil/ExampleResources>
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthQt/ViewerWidget>
-#include <QtGui/QApplication>
-#include <QtGui/QMainWindow>
-#include <QtGui/QStatusBar>
-#include <QtGui/QMdiArea>
-#include <QtGui/QMdiSubWindow>
+#include <QApplication>
+#include <QMainWindow>
+#include <QStatusBar>
+#include <QMdiArea>
+#include <QMdiSubWindow>
 
 #ifdef Q_WS_X11
 #include <X11/Xlib.h>
@@ -58,6 +61,7 @@ main(int argc, char** argv)
 
 
     osgViewer::Viewer viewer(arguments);
+    viewer.setRunFrameScheme( viewer.ON_DEMAND );
     viewer.setCameraManipulator( new EarthManipulator() );
 
     // load an earth file
@@ -77,14 +81,9 @@ main(int argc, char** argv)
     QApplication app(argc, argv);
 
     QWidget* viewerWidget = new ViewerWidget( &viewer );
-    
-    QMdiArea *mdiArea = new QMdiArea();
-    QMdiSubWindow* s = mdiArea->addSubWindow(viewerWidget); 
-    s->setGeometry( 75, 75, 800, 600 );
-    
+
     QMainWindow win;
-    //win.setCentralWidget( viewerWidget );
-    win.setCentralWidget( mdiArea );
+    win.setCentralWidget( viewerWidget );
     win.setGeometry(100, 100, 1024, 800);
 
     win.statusBar()->showMessage(QString("Quite possibly the world's simplest osgEarthQt app."));

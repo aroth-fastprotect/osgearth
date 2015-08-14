@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -42,9 +45,42 @@ namespace
     //
     // Caveats: You can still fake out the morph by zooming around very quickly.
     // Also, it will only morph properly if you use odd-numbers post spacings
-    // in your terrain tile. (See MapOptions::elevation_tile_size).
+    // in your terrain tile. (See MapOptions::elevation_tile_size). Finally,
+    // a large PAGEDLOD cache will negate the blending effect when zooming out
+    // and then back in. See MPGeometry.
 
-    const char* vs =
+    const char* vs_imagery =
+        "#version " GLSL_VERSION_STR "\n"
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
+
+        "uniform float oe_min_tile_range_factor; \n"
+        "uniform vec4 oe_tile_key; \n"
+        "uniform float osg_FrameTime; \n"
+        "uniform float oe_tile_birthtime; \n"
+        "uniform float oe_lodblend_delay; \n"
+        "uniform float oe_lodblend_duration; \n"
+
+        "uniform mat4 oe_layer_parent_texmat; \n"
+        "varying vec4 oe_layer_texc; \n"
+        "varying vec4 oe_lodblend_texc; \n"
+        "varying float oe_lodblend_r; \n"
+
+        "void oe_lodblend_imagery_vertex(inout vec4 VertexVIEW) \n"
+        "{ \n"
+        "    float radius     = oe_tile_key.w; \n"
+        "    float near       = oe_min_tile_range_factor*radius; \n"
+        "    float far        = near + radius*2.0; \n"
+        "    float d          = length(VertexVIEW.xyz/VertexVIEW.w); \n"
+        "    float r_dist     = clamp((d-near)/(far-near), 0.0, 1.0); \n"
+
+        "    float r_time     = 1.0 - clamp(osg_FrameTime-(oe_tile_birthtime+oe_lodblend_delay), 0.0, oe_lodblend_duration)/oe_lodblend_duration; \n"
+        "    float r          = max(r_dist, r_time); \n"
+
+        "    oe_lodblend_texc = oe_layer_parent_texmat * oe_layer_texc; \n"
+        "    oe_lodblend_r    = oe_layer_parent_texmat[0][0] > 0.0 ? r : 0.0; \n" // obe?
+        "} \n";
+
+    const char* vs_elevation =
         "#version " GLSL_VERSION_STR "\n"
         GLSL_DEFAULT_PRECISION_FLOAT "\n"
 
@@ -60,12 +96,49 @@ namespace
         "uniform float oe_lodblend_duration; \n"
         "uniform float oe_lodblend_vscale; \n"
 
-        "uniform mat4 oe_layer_parent_matrix; \n"
+        "void oe_lodblend_elevation_vertex(inout vec4 VertexMODEL) \n"
+        "{ \n"
+        "    float radius     = oe_tile_key.w; \n"
+        "    float near       = oe_min_tile_range_factor*radius; \n"
+        "    float far        = near + radius*2.0; \n"
+        "    vec4  VertexVIEW = gl_ModelViewMatrix * VertexMODEL; \n"
+        "    float d          = length(VertexVIEW.xyz/VertexVIEW.w); \n"
+        "    float r_dist     = clamp((d-near)/(far-near), 0.0, 1.0); \n"
+
+        "    float r_time     = 1.0 - clamp(osg_FrameTime-(oe_tile_birthtime+oe_lodblend_delay), 0.0, oe_lodblend_duration)/oe_lodblend_duration; \n"
+        "    float r          = max(r_dist, r_time); \n"
+
+        "    vec3  upVector   = oe_terrain_attr.xyz; \n"
+        "    float elev       = oe_terrain_attr.w; \n"
+        "    float elevOld    = oe_terrain_attr2.w; \n"
+
+        "    vec3  vscaleOffset = upVector * elev * (oe_lodblend_vscale-1.0); \n"
+        "    vec3  blendOffset  = upVector * r * oe_lodblend_vscale * (elevOld-elev); \n"
+        "    VertexMODEL       += vec4( (vscaleOffset + blendOffset)*VertexMODEL.w, 0.0 ); \n"
+        "} \n";
+
+    const char* vs_combined =
+        "#version " GLSL_VERSION_STR "\n"
+        GLSL_DEFAULT_PRECISION_FLOAT "\n"
+
+        "attribute vec4 oe_terrain_attr; \n"
+        "attribute vec4 oe_terrain_attr2; \n"
+        "varying vec3 oe_Normal; \n"
+
+        "uniform float oe_min_tile_range_factor; \n"
+        "uniform vec4 oe_tile_key; \n"
+        "uniform float osg_FrameTime; \n"
+        "uniform float oe_tile_birthtime; \n"
+        "uniform float oe_lodblend_delay; \n"
+        "uniform float oe_lodblend_duration; \n"
+        "uniform float oe_lodblend_vscale; \n"
+
+        "uniform mat4 oe_layer_parent_texmat; \n"
         "varying vec4 oe_layer_texc; \n"
         "varying vec4 oe_lodblend_texc; \n"
         "varying float oe_lodblend_r; \n"
 
-        "void oe_lodblend_vertex(inout vec4 VertexMODEL) \n"
+        "void oe_lodblend_combined_vertex(inout vec4 VertexMODEL) \n"
         "{ \n"
         "    float radius     = oe_tile_key.w; \n"
         "    float near       = oe_min_tile_range_factor*radius; \n"
@@ -85,29 +158,31 @@ namespace
         "    vec3  blendOffset  = upVector * r * oe_lodblend_vscale * (elevOld-elev); \n"
         "    VertexMODEL       += vec4( (vscaleOffset + blendOffset)*VertexMODEL.w, 0.0 ); \n"
 
-        "    oe_lodblend_texc    = oe_layer_parent_matrix * oe_layer_texc; \n"
-        "    oe_lodblend_r       = oe_layer_parent_matrix[0][0] > 0.0 ? r : 0.0; \n" // obe?
+        "    oe_lodblend_texc = oe_layer_parent_texmat * oe_layer_texc; \n"
+        "    oe_lodblend_r    = oe_layer_parent_texmat[0][0] > 0.0 ? r : 0.0; \n" // obe?
 
         "    oe_Normal = normalize(mix(normalize(oe_Normal), oe_terrain_attr2.xyz, r)); \n"
         "} \n";
 
-    const char* fs =
+    const char* fs_imagery =
         "#version " GLSL_VERSION_STR "\n"
         GLSL_DEFAULT_PRECISION_FLOAT "\n"
 
         "uniform vec4 oe_tile_key; \n"
         "uniform int oe_layer_uid; \n"
-        "uniform float oe_layer_opacity; \n"
         "varying vec4 oe_lodblend_texc; \n"
         "varying float oe_lodblend_r; \n"
         "uniform sampler2D oe_layer_tex_parent; \n"
 
-        "void oe_lodblend_fragment(inout vec4 color) \n"
+        "void oe_lodblend_imagery_fragment(inout vec4 color) \n"
         "{ \n"
         "    if ( oe_layer_uid >= 0 ) \n"
         "    { \n"
-        "        vec4 texelpma = texture2D(oe_layer_tex_parent, oe_lodblend_texc.st) * oe_layer_opacity; \n"
-        "        color = mix(color, texelpma, oe_lodblend_r); \n"
+        "        vec4 texel = texture2D(oe_layer_tex_parent, oe_lodblend_texc.st); \n"
+        "        float enable = step(0.09, texel.a); \n"          // did we get a parent texel?
+        "        texel.rgb = mix(color.rgb, texel.rgb, enable); \n" // if not, use the incoming color for the blend
+        "        texel.a = mix(0.0, color.a, enable); \n"           // ...and blend from alpha=0 for a fade-in effect.
+        "        color = mix(color, texel, oe_lodblend_r); \n"
         "    } \n"
         "} \n";
 }
@@ -115,9 +190,11 @@ namespace
 
 LODBlending::LODBlending() :
 TerrainEffect(),
-_delay       ( 0.0f ),
-_duration    ( 0.25f ),
-_vscale      ( 1.0f )
+_delay         ( 0.0f ),
+_duration      ( 0.25f ),
+_vscale        ( 1.0f ),
+_blendImagery  ( true ),
+_blendElevation( true )
 {
     init();
 }
@@ -125,9 +202,11 @@ _vscale      ( 1.0f )
 
 LODBlending::LODBlending(const Config& conf) :
 TerrainEffect(),
-_delay       ( 0.0f ),
-_duration    ( 0.25f ),
-_vscale      ( 1.0f )
+_delay         ( 0.0f ),
+_duration      ( 0.25f ),
+_vscale        ( 1.0f ),
+_blendImagery  ( true ),
+_blendElevation( true )
 {
     mergeConfig(conf);
     init();
@@ -180,12 +259,32 @@ LODBlending::setVerticalScale(float vscale)
     }
 }
 
+void
+LODBlending::setBlendImagery(bool value)
+{
+   if ( value != _blendImagery.get() )
+   {
+      _blendImagery = value;
+   }
+}
+
+void
+LODBlending::setBlendElevation(bool value)
+{
+   if ( value != _blendElevation.get() )
+   {
+      _blendElevation = value;
+   }
+}
 
 void
 LODBlending::onInstall(TerrainEngineNode* engine)
 {
     if ( engine )
     {
+        // need the parent textures for blending.
+        engine->requireParentTextures();
+
         osg::StateSet* stateset = engine->getOrCreateStateSet();
 
         stateset->addUniform( _delayUniform.get() );
@@ -193,8 +292,20 @@ LODBlending::onInstall(TerrainEngineNode* engine)
         stateset->addUniform( _vscaleUniform.get() );
 
         VirtualProgram* vp = VirtualProgram::getOrCreate(stateset);
-        vp->setFunction( "oe_lodblend_vertex",   vs, ShaderComp::LOCATION_VERTEX_MODEL );
-        vp->setFunction( "oe_lodblend_fragment", fs, ShaderComp::LOCATION_FRAGMENT_COLORING );
+        vp->setName( "osgEarth::Util::LODBlending" );
+
+        if ( _blendElevation == true )
+        {
+            vp->setFunction("oe_lodblend_elevation_vertex", vs_elevation, ShaderComp::LOCATION_VERTEX_MODEL );
+        }
+
+        if ( _blendImagery == true )
+        {
+            vp->setFunction("oe_lodblend_imagery_vertex", vs_imagery, ShaderComp::LOCATION_VERTEX_VIEW);
+            vp->setFunction("oe_lodblend_imagery_fragment", fs_imagery, ShaderComp::LOCATION_FRAGMENT_COLORING);
+        }
+
+        OE_INFO << LC << "On!\n";
     }
 }
 
@@ -214,8 +325,9 @@ LODBlending::onUninstall(TerrainEngineNode* engine)
             VirtualProgram* vp = VirtualProgram::get(stateset);
             if ( vp )
             {
-                vp->removeShader( "oe_lodblend_vertex" );
-                vp->removeShader( "oe_lodblend_fragment" );
+                vp->removeShader( "oe_lodblend_imagery_vertex" );
+                vp->removeShader( "oe_lodblend_elevation_vertex" );
+                vp->removeShader( "oe_lodblend_imagery_fragment" );
             }
         }
     }
@@ -231,6 +343,8 @@ LODBlending::mergeConfig(const Config& conf)
     conf.getIfSet( "delay",    _delay );
     conf.getIfSet( "duration", _duration );
     conf.getIfSet( "vertical_scale", _vscale );
+    conf.getIfSet( "blend_imagery",  _blendImagery );
+    conf.getIfSet( "blend_elevation", _blendElevation );
 }
 
 Config
@@ -240,5 +354,7 @@ LODBlending::getConfig() const
     conf.addIfSet( "delay",    _delay );
     conf.addIfSet( "duration", _duration );
     conf.addIfSet( "vertical_scale", _vscale );
+    conf.addIfSet( "blend_imagery",  _blendImagery );
+    conf.addIfSet( "blend_elevation", _blendElevation );
     return conf;
 }

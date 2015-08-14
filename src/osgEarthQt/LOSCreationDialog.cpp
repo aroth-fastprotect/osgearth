@@ -1,5 +1,5 @@
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -7,10 +7,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -58,7 +61,7 @@ namespace
 }
 
 LOSCreationDialog::LOSCreationDialog(osgEarth::MapNode* mapNode, osg::Group* root, int losCount, osgEarth::QtGui::DataManager *manager, ViewVector* views)
-  : _mapNode(mapNode), _root(root), _manager(manager), _updatingUi(false), _updateAlt(true), _views(views), _activeButton(0L)
+  : _mapNode(mapNode), _root(root), _manager(manager), _views(views), _activeButton(0L), _updatingUi(false), _updateAlt(true)
 {
   if (_mapNode.valid())
     _map = _mapNode->getMap();
@@ -74,7 +77,7 @@ LOSCreationDialog::LOSCreationDialog(osgEarth::MapNode* mapNode, osg::Group* roo
 }
 
 LOSCreationDialog::LOSCreationDialog(osgEarth::MapNode* mapNode, osg::Group* root, osg::Group* losNode, const std::string& name, osgEarth::QtGui::DataManager *manager, ViewVector* views)
-  : _mapNode(mapNode), _root(root), _manager(manager), _updatingUi(false), _updateAlt(true), _views(views), _activeButton(0L)
+  : _mapNode(mapNode), _root(root), _manager(manager), _views(views), _activeButton(0L), _updatingUi(false), _updateAlt(true)
 {
   if (_mapNode.valid())
     _map = _mapNode->getMap();
@@ -760,7 +763,8 @@ void LOSCreationDialog::centerMapOnNode(osg::Node* node)
       output.fromWorld( _map->getSRS(), center );
       //_map->worldPointToMapPoint(center, output);
 
-      _manager->doAction(this, new SetViewpointAction(osgEarth::Viewpoint(output.vec3d(), 0.0, -90.0, 1e5), *_views));
+      _manager->doAction(this, new SetViewpointAction(osgEarth::Viewpoint(
+          "center", output.x(), output.y(), output.z(), 0.0, -90.0, 1e5), *_views));
     }
   }
 }

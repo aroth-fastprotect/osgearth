@@ -4,9 +4,13 @@ ELSE (DYNAMIC_OSGEARTH)
     ADD_DEFINITIONS(-DOSGEARTHQT_LIBRARY_STATIC)
 ENDIF(DYNAMIC_OSGEARTH)
 
+SET(LIB_NAME osgEarthQt)
+
+SET(HEADER_PATH ${OSGEARTH_SOURCE_DIR}/include/${LIB_NAME})
+
 # Header files that need moc'd
-SET(TARGET_PUBLIC_MOC_H
-	AnnotationDialogs
+set(LIB_MOC_HDRS
+    AnnotationDialogs
     AnnotationListWidget
     AnnotationToolbar
     CollapsiblePairWidget
@@ -21,17 +25,34 @@ SET(TARGET_PUBLIC_MOC_H
 )
 
 # Qt resource files
-SET(TARGET_QRC
+set(LIB_QT_RCS
     images.qrc
 )
 
 # Qt UI files
-SET(TARGET_UI
+set(LIB_QT_UIS
     ui/LOSCreationDialog.ui
 )
 
+IF(Qt5Widgets_FOUND)
+    QT5_ADD_RESOURCES( LIB_RC_SRCS ${LIB_QT_RCS} )
+    QT5_WRAP_UI( LIB_UI_HDRS ${LIB_QT_UIS} )
+    IF(Qt5Widgets_VERSION VERSION_LESS 5.2.0)
+        QT5_WRAP_CPP( LIB_UI_SRCS ${LIB_UI_HDRS} OPTIONS "-f" )
+        QT5_WRAP_CPP( LIB_MOC_SRCS ${LIB_MOC_HDRS} OPTIONS "-f" )
+    ELSE()
+        QT5_WRAP_CPP( LIB_UI_SRCS ${LIB_UI_HDRS} )
+        QT5_WRAP_CPP( LIB_MOC_SRCS ${LIB_MOC_HDRS} )
+    ENDIF()
+ELSE()
+    INCLUDE( ${QT_USE_FILE} )
+    QT4_ADD_RESOURCES( LIB_RC_SRCS ${LIB_QT_RCS} )
+    QT4_WRAP_UI( LIB_UI_HDRS ${LIB_QT_UIS} )
+    QT4_WRAP_CPP( LIB_UI_SRCS ${LIB_UI_HDRS} OPTIONS "-f" )
+    QT4_WRAP_CPP( LIB_MOC_SRCS ${LIB_MOC_HDRS} OPTIONS "-f" )
+ENDIF()
 
-SET(TARGET_PUBLIC_H
+SET(LIB_PUBLIC_HEADERS
 #   header files go here
     Actions
     AnnotationDialogs
@@ -45,15 +66,22 @@ SET(TARGET_PUBLIC_H
     LOSControlWidget
     LOSCreationDialog
     MapCatalogWidget
-    MultiViewerWidget
     TerrainProfileGraph
     TerrainProfileWidget
     ViewWidget
     ViewerWidget
+    ${LIB_UI_HDRS}
+    ${LIB_QT_UIS}
+    ${LIB_QT_RCS}
 )
 
-SET(TARGET_SRC
-	AnnotationDialogs.cpp
+ADD_LIBRARY(${LIB_NAME} SHARED
+    ${LIB_PUBLIC_HEADERS}
+#  .cpp files go here
+    ${LIB_RC_SRCS}
+    ${LIB_UI_SRCS}
+    ${LIB_MOC_SRCS}
+    AnnotationDialogs.cpp
     AnnotationListWidget.cpp
     AnnotationToolbar.cpp
     CollapsiblePairWidget.cpp
@@ -62,7 +90,6 @@ SET(TARGET_SRC
     LOSControlWidget.cpp
     LOSCreationDialog.cpp
     MapCatalogWidget.cpp
-    MultiViewerWidget.cpp
     TerrainProfileGraph.cpp
     TerrainProfileWidget.cpp
     ViewWidget.cpp
@@ -71,24 +98,27 @@ SET(TARGET_SRC
 
 INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR} ${QT_INCLUDES} ${CMAKE_CURRENT_BINARY_DIR})
 
-SET(TARGET_ADDED_LIBRARIES
+IF (WIN32)
+  LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
+ELSE(WIN32)
+  LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
+ENDIF(WIN32)
+
+LINK_INTERNAL(${LIB_NAME}
     osgEarth
     osgEarthAnnotation
-    osgEarthSymbology
-    osgEarthFeatures
     osgEarthUtil
-    osg
-    osgUtil
-	osgViewer
-	osgGA
-	osgQt
-    OpenThreads
-    )
+    ${QT_QTCORE_LIBRARY}
+    ${QT_QTGUI_LIBRARY}
+    ${QT_QTOPENGL_LIBRARY}
+)
 
-SET(TARGET_LIBRARIES_VARS	
-    QT_QTCORE_LIBRARY
-    QT_QTGUI_LIBRARY
-    QT_QTOPENGL_LIBRARY
-	)
+LINK_WITH_VARIABLES(${LIB_NAME} OSG_LIBRARY OSGWIDGET_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGTERRAIN_LIBRARY OSGDB_LIBRARY OSGFX_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OSGQT_LIBRARY OPENTHREADS_LIBRARY)
 
-SETUP_OSG_LIB(osgEarthQt NO_MOC_INCLUDE)
+LINK_CORELIB_DEFAULT(${LIB_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
+
+IF ( Qt5Widgets_FOUND )
+    qt5_use_modules( ${LIB_NAME} Gui Widgets OpenGL )
+ENDIF( Qt5Widgets_FOUND )
+
+INCLUDE(ModuleInstall OPTIONAL)

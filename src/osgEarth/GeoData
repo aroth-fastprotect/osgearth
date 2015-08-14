@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -28,10 +28,11 @@
 #include <osg/Referenced>
 #include <osg/Image>
 #include <osg/Shape>
+#include <osg/Polytope>
 
 namespace osgEarth
 {
-    class TerrainHeightProvider;
+    class TerrainResolver;
     class GeoExtent;
 
     /**
@@ -52,6 +53,15 @@ namespace osgEarth
             const AltitudeMode& mode );
 
         /**
+         * Constructs a GeoPoint with an absolute Z.
+         */
+        GeoPoint(
+            const SpatialReference* srs,
+            double x,
+            double y,
+            double z );
+
+        /**
          * Constructs a GeoPoint with X and Y coordinates. The Z defaults
          * to zero with an ALTMODE_RELATIVE altitude mode (i.e., 0 meters
          * above the terrain).
@@ -68,6 +78,13 @@ namespace osgEarth
             const SpatialReference* srs,
             const osg::Vec3d&       xyz,
             const AltitudeMode&     mode );
+
+        /**
+         * Constructs a GeoPoint from a vec3 with absolute Z.
+         */
+        GeoPoint(
+            const SpatialReference* srs,
+            const osg::Vec3d&       xyz);
 
         /**
          * Constructs a new GeoPoint by transforming an existing GeoPoint into
@@ -129,8 +146,16 @@ namespace osgEarth
 
         const SpatialReference* getSRS() const { return _srs.get(); }
 
+        /**
+         * AltitudeMode reflects whether the Z coordinate is absolute with
+         * respect to MSL or relative to the terrain elevation at that
+         * point. When using relative points, GeoPoint usually requires
+         * access to a TerrainProvider in order to resolve the altitude.
+         */
         AltitudeMode& altitudeMode() { return _altMode; }
         const AltitudeMode& altitudeMode() const { return _altMode; }
+        bool isRelative() const { return _altMode == ALTMODE_RELATIVE; }
+        bool isAbsolute() const { return _altMode == ALTMODE_ABSOLUTE; }
 
         /**
          * Returns a copy of this geopoint transformed into another SRS.
@@ -145,22 +170,22 @@ namespace osgEarth
         /**
          * Transforms this geopoint's Z coordinate (in place)
          */
-        bool transformZ(const AltitudeMode& altMode, const TerrainHeightProvider* t );
+        bool transformZ(const AltitudeMode& altMode, const TerrainResolver* t );
 
         /**
          * Transforms and returns the geopoints Z coordinate.
          */
-        bool transformZ(const AltitudeMode& altMode, const TerrainHeightProvider* t, double& out_z) const;
+        bool transformZ(const AltitudeMode& altMode, const TerrainResolver* t, double& out_z) const;
 
         /**
          * Transforms this geopoint's Z to be absolute w.r.t. the vertical datum
          */
-        bool makeAbsolute(const TerrainHeightProvider* t) { return transformZ(ALTMODE_ABSOLUTE, t); }
+        bool makeAbsolute(const TerrainResolver* t) { return transformZ(ALTMODE_ABSOLUTE, t); }
 
         /**
          * Transforms this geopoint's Z to be terrain-relative.
          */
-        bool makeRelative(const TerrainHeightProvider* t) { return transformZ(ALTMODE_RELATIVE, t); }
+        bool makeRelative(const TerrainResolver* t) { return transformZ(ALTMODE_RELATIVE, t); }
 
         /**
          * Transforms this GeoPoint to geographic (lat/long) coords in place.
@@ -180,7 +205,7 @@ namespace osgEarth
          * object that will be used if the point needs to be converted to absolute
          * altitude
          */
-        bool toWorld( osg::Vec3d& out_world, const TerrainHeightProvider* terrain ) const;
+        bool toWorld( osg::Vec3d& out_world, const TerrainResolver* terrain ) const;
 
         /**
          * Converts world coordinates into a geopoint
@@ -461,7 +486,6 @@ namespace osgEarth
          */
         double area() const;
 
-
         /**
          * Normalize the longitude values in this GeoExtent
          */
@@ -471,6 +495,12 @@ namespace osgEarth
          * Given a longitude value, normalize it so that it exists within the GeoExtents longitude frame.
          */
         double normalizeLongitude( double longitude ) const;
+
+        /**
+         * Generate a polytope in world coordinates that bounds the extent.
+         * Return false if the extent it invalid.
+         */
+        bool createPolytope(osg::Polytope& out) const;
 
     public:
         static GeoExtent INVALID;
@@ -519,10 +549,10 @@ namespace osgEarth
         /** Construct an empty (invalid) geoimage. */
         GeoImage();
 
-        /**
+        /** 
          * Constructs a new goereferenced image.
          */
-        GeoImage( osg::Image* image, const GeoExtent& extent );
+        GeoImage(osg::Image* image, const GeoExtent& extent);
 
         /** dtor */
         virtual ~GeoImage() { }
@@ -602,6 +632,11 @@ namespace osgEarth
             bool topBorder=true);
 
         /**
+         * Sets alpha to Zero for any pixels that do NOT intersect the masking extent.
+         */
+        void applyAlphaMask(const GeoExtent& maskingExtent);
+
+        /**
          * Returns the underlying OSG image and releases the reference pointer.
          */
         osg::Image* takeImage();
@@ -613,7 +648,7 @@ namespace osgEarth
 
     private:
         osg::ref_ptr<osg::Image> _image;
-        GeoExtent _extent;
+        GeoExtent                _extent;
     };
 
     typedef std::vector<GeoImage> GeoImageVector;

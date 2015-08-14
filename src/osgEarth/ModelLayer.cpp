@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 #include <osgEarth/Map>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
+#include <osgEarth/ShaderFactory>
 #include <osg/Depth>
 
 #define LC "[ModelLayer] "
@@ -37,7 +38,7 @@ namespace
     {
         NodeModelSource( osg::Node* node ) : _node(node) { }
 
-        osg::Node* createNodeImplementation(const Map* map, const osgDB::Options* dbOptions, ProgressCallback* progress) {
+        osg::Node* createNodeImplementation(const Map* map, ProgressCallback* progress) {
             return _node.get();
         }
 
@@ -66,27 +67,37 @@ ConfigOptions()
 void
 ModelLayerOptions::setDefaults()
 {
-    _overlay.init     ( false );
     _enabled.init     ( true );
     _visible.init     ( true );
     _lighting.init    ( true );
+    _opacity.init     ( 1.0f );
+    _maskMinLevel.init( 0 );
+    _terrainPatch.init( false );
+    _cachePolicy.init ( CachePolicy() );
 }
 
 Config
 ModelLayerOptions::getConfig() const
 {
-    //Config conf = ConfigOptions::getConfig();
     Config conf = ConfigOptions::newConfig();
 
-    conf.updateIfSet( "name", _name );
-    conf.updateIfSet( "overlay", _overlay );
-    conf.updateIfSet( "enabled", _enabled );
-    conf.updateIfSet( "visible", _visible );
-    conf.updateIfSet( "lighting", _lighting );
+    conf.updateIfSet( "name",           _name );
+    conf.updateIfSet( "enabled",        _enabled );
+    conf.updateIfSet( "visible",        _visible );
+    conf.updateIfSet( "lighting",       _lighting );
+    conf.updateIfSet( "opacity",        _opacity );
+    conf.updateIfSet( "mask_min_level", _maskMinLevel );
+    conf.updateIfSet( "patch",          _terrainPatch );  
+
+    conf.updateObjIfSet( "cache_policy", _cachePolicy );  
 
     // Merge the ModelSource options
     if ( driver().isSet() )
         conf.merge( driver()->getConfig() );
+
+    // Merge the MaskSource options
+    if ( maskOptions().isSet() )
+        conf.add( "mask", maskOptions()->getConfig() );
 
     return conf;
 }
@@ -94,14 +105,21 @@ ModelLayerOptions::getConfig() const
 void
 ModelLayerOptions::fromConfig( const Config& conf )
 {
-    conf.getIfSet( "name", _name );
-    conf.getIfSet( "overlay", _overlay );
-    conf.getIfSet( "enabled", _enabled );
-    conf.getIfSet( "visible", _visible );
-    conf.getIfSet( "lighting", _lighting );
+    conf.getIfSet( "name",           _name );
+    conf.getIfSet( "enabled",        _enabled );
+    conf.getIfSet( "visible",        _visible );
+    conf.getIfSet( "lighting",       _lighting );
+    conf.getIfSet( "opacity",        _opacity );
+    conf.getIfSet( "mask_min_level", _maskMinLevel );
+    conf.getIfSet( "patch",          _terrainPatch );
+
+    conf.getObjIfSet( "cache_policy", _cachePolicy );  
 
     if ( conf.hasValue("driver") )
         driver() = ModelSourceOptions(conf);
+
+    if ( conf.hasChild("mask") )
+        maskOptions() = MaskSourceOptions(conf.child("mask"));
 }
 
 void
@@ -141,52 +159,138 @@ _modelSource( new NodeModelSource(node) )
 
 ModelLayer::~ModelLayer()
 {
-    OE_DEBUG << "~ModelLayer" << std::endl;
+    //nop
 }
 
 void
 ModelLayer::copyOptions()
 {
     _runtimeOptions = _initOptions;
+
+    _alphaEffect = new AlphaEffect();
+    _alphaEffect->setAlpha( *_initOptions.opacity() );
 }
 
 void
-ModelLayer::initialize( const osgDB::Options* dbOptions )
+ModelLayer::initialize(const osgDB::Options* dbOptions)
 {
     if ( !_modelSource.valid() && _initOptions.driver().isSet() )
     {
-        _modelSource = ModelSourceFactory::create( *_initOptions.driver() );
+        OE_INFO << LC << "Initializing model layer \"" << getName() << "\", driver=\"" << _initOptions.driver()->getDriver() << "\"" << std::endl;
+        
+        // set up the db options and caching policy first
+        _dbOptions = Registry::instance()->cloneOrCreateOptions(dbOptions);
+        initializeCachePolicy( _dbOptions.get() );
 
+        // the model source:
+        _modelSource = ModelSourceFactory::create( *_initOptions.driver() );
         if ( _modelSource.valid() )
         {
-            _modelSource->initialize( dbOptions );
+            _modelSource->setName( this->getName() );
+
+            _modelSource->initialize( _dbOptions.get() );
+
+            // the mask, if there is one:
+            if ( !_maskSource.valid() && _initOptions.maskOptions().isSet() )
+            {
+                OE_INFO << LC << "...initializing mask, driver=\"" << _initOptions.maskOptions()->getDriver() << std::endl;
+
+                _maskSource = MaskSourceFactory::create( *_initOptions.maskOptions() );
+                if ( _maskSource.valid() )
+                {
+                    _maskSource->initialize( _dbOptions.get() );
+                }
+                else
+                {
+                    OE_INFO << LC << "...mask init failed!" << std::endl;
+                }
+            }
         }
     }
 }
 
-osg::Node*
-ModelLayer::createSceneGraph(const Map*            map,
-                             const osgDB::Options* dbOptions,
-                             ProgressCallback*     progress )
+void
+ModelLayer::initializeCachePolicy(const osgDB::Options* options)
 {
+    // Start with the cache policy passed in by the Map.
+    optional<CachePolicy> cp;
+    CachePolicy::fromOptions(options, cp);
+
+    // if this layer specifies cache policy info, that will override 
+    // whatever the map passed in:
+    if ( _initOptions.cachePolicy().isSet() )
+        cp->mergeAndOverride( _initOptions.cachePolicy() );
+
+    // finally resolve with global overrides:
+    Registry::instance()->resolveCachePolicy( cp );
+
+    setCachePolicy( cp.get() );
+}
+
+void
+ModelLayer::setCachePolicy( const CachePolicy& cp )
+{
+    _runtimeOptions.cachePolicy() = cp;
+    _runtimeOptions.cachePolicy()->apply( _dbOptions.get() );
+}
+
+const CachePolicy&
+ModelLayer::getCachePolicy() const
+{
+    return _runtimeOptions.cachePolicy().value();
+}
+
+osg::Node*
+ModelLayer::getSceneGraph(const UID& mapUID) const
+{
+    Threading::ScopedMutexLock lock(_mutex);
+    Graphs::const_iterator i = _graphs.find( mapUID );
+    return i == _graphs.end() ? 0L : i->second.get();
+}
+
+osg::Node*
+ModelLayer::getOrCreateSceneGraph(const Map*        map,
+                                  ProgressCallback* progress )
+{
+    // exclusive lock for cache lookup/update.
+    Threading::ScopedMutexLock lock( _mutex );
+
+    // There can be one node graph per Map. See if it already exists
+    // and if so, return it.
+    Graphs::iterator i = _graphs.find(map->getUID());
+    if ( i != _graphs.end() && i->second.valid() )
+        return i->second.get();
+
+    // need to create it.
     osg::Node* node = 0L;
 
     if ( _modelSource.valid() )
     {
-        node = _modelSource->createNode( map, dbOptions, progress );
+        node = _modelSource->createNode( map, progress );
 
         if ( node )
         {
+            if ( _runtimeOptions.lightingEnabled().isSet() )
+            {
+                setLightingEnabledNoLock( *_runtimeOptions.lightingEnabled() );
+            }
+
+            _modelSource->sync( _modelSourceRev );
+
+
+            // add a parent group for shaders/effects to attach to without overwriting any model programs directly
+            osg::Group* group = new osg::Group();
+            group->addChild(node);
+            _alphaEffect->attach( group->getOrCreateStateSet() );
+            node = group;
+
+            // Toggle visibility if necessary
             if ( _runtimeOptions.visible().isSet() )
             {
                 node->setNodeMask( *_runtimeOptions.visible() ? ~0 : 0 );
             }
 
-            if ( _runtimeOptions.lightingEnabled().isSet() )
-            {
-                setLightingEnabled( *_runtimeOptions.lightingEnabled() );
-            }
-
+            // Handle disabling depth testing
             if ( _modelSource->getOptions().depthTestEnabled() == false )
             {
                 osg::StateSet* ss = node->getOrCreateStateSet();
@@ -194,16 +298,8 @@ ModelLayer::createSceneGraph(const Map*            map,
                 ss->setRenderBinDetails( 99999, "RenderBin" ); //TODO: configure this bin ...
             }
 
-            if ( Registry::capabilities().supportsGLSL() )
-            {
-                // install a callback that keeps the shader uniforms up to date
-                node->addCullCallback( new UpdateLightingUniformsHelper() );
-            }
-
-            _modelSource->sync( _modelSourceRev );
-
-            // save an observer reference to the node so we can change the visibility/lighting/etc.
-            _nodeSet.insert( node );
+            // save it.
+            _graphs[map->getUID()] = node;
         }
     }
 
@@ -229,33 +325,64 @@ ModelLayer::setVisible(bool value)
     {
         _runtimeOptions.visible() = value;
 
-        for( NodeObserverSet::iterator i = _nodeSet.begin(); i != _nodeSet.end(); ++i )
+        _mutex.lock();
+        for(Graphs::iterator i = _graphs.begin(); i != _graphs.end(); ++i)
         {
-            if ( i->valid() )
-            {
-                i->get()->setNodeMask( value ? ~0 : 0 );
-            }
+            if ( i->second.valid() )
+                i->second->setNodeMask( value ? ~0 : 0 );
         }
-
-        //if ( _node.valid() )
-        //    _node->setNodeMask( value ? ~0 : 0 );
+        _mutex.unlock();
 
         fireCallback( &ModelLayerCallback::onVisibleChanged );
+    }
+}
+
+float
+ModelLayer::getOpacity() const
+{
+    return *_runtimeOptions.opacity();
+}
+
+void
+ModelLayer::setOpacity(float opacity)
+{
+    if ( _runtimeOptions.opacity() != opacity )
+    {
+        _runtimeOptions.opacity() = opacity;
+
+        _alphaEffect->setAlpha(opacity);
+
+        fireCallback( &ModelLayerCallback::onOpacityChanged );
     }
 }
 
 void
 ModelLayer::setLightingEnabled( bool value )
 {
+    Threading::ScopedMutexLock lock(_mutex);
+    setLightingEnabledNoLock( value );
+}
+
+void
+ModelLayer::setLightingEnabledNoLock(bool value)
+{
     _runtimeOptions.lightingEnabled() = value;
 
-    for( NodeObserverSet::iterator i = _nodeSet.begin(); i != _nodeSet.end(); ++i )
+    for(Graphs::iterator i = _graphs.begin(); i != _graphs.end(); ++i)
     {
-        if ( i->valid() )
+        if ( i->second.valid() )
         {
-            i->get()->getOrCreateStateSet()->setMode( 
+            osg::StateSet* stateset = i->second->getOrCreateStateSet();
+
+            stateset->setMode( 
                 GL_LIGHTING, value ? osg::StateAttribute::ON : 
                 (osg::StateAttribute::OFF | osg::StateAttribute::PROTECTED) );
+
+            if ( Registry::capabilities().supportsGLSL() )
+            {
+                stateset->addUniform( Registry::shaderFactory()->createUniformForGLMode(
+                    GL_LIGHTING, value ) );
+            }
         }
     }
 }
@@ -264,22 +391,6 @@ bool
 ModelLayer::isLightingEnabled() const
 {
     return *_runtimeOptions.lightingEnabled();
-}
-
-bool
-ModelLayer::getOverlay() const
-{
-    return *_runtimeOptions.overlay();
-}
-
-void
-ModelLayer::setOverlay(bool overlay)
-{
-    if ( _runtimeOptions.overlay() != overlay )
-    {
-        _runtimeOptions.overlay() = overlay;
-        fireCallback( &ModelLayerCallback::onOverlayChanged );
-    }
 }
 
 void
@@ -305,4 +416,28 @@ ModelLayer::fireCallback( ModelLayerCallbackMethodPtr method )
         ModelLayerCallback* cb = i->get();
         (cb->*method)( this );
     }
+}
+
+
+osg::Vec3dArray*
+ModelLayer::getOrCreateMaskBoundary(float                   heightScale,
+                                    const SpatialReference* srs, 
+                                    ProgressCallback*       progress )
+{
+    if ( _maskSource.valid() && !_maskBoundary.valid() )
+    {
+        Threading::ScopedMutexLock excl(_mutex);
+
+        if ( !_maskBoundary.valid() ) // double-check pattern
+        {
+            // make the geometry:
+            _maskBoundary = _maskSource->createBoundary( srs, progress );
+
+            // scale to the height scale factor:
+            for (osg::Vec3dArray::iterator vIt = _maskBoundary->begin(); vIt != _maskBoundary->end(); ++vIt)
+                vIt->z() = vIt->z() * heightScale;
+        }
+    }
+
+    return _maskBoundary.get();
 }

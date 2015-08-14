@@ -1,23 +1,14 @@
 <!--
-osgEarth Sample - ReadyMap.ORG Server - http://readymap.org
-
-ReadyMap.ORG provides free global base map data for osgEarth developers!
-This tiled, worldwide dataset of imagery, elevation, and street map data
-is a great base map that provides global context for your own local datasets.
-It works "out of the box" with osgEarth applications.
-
-**** NOTICE ****
-YOU ARE RESPONSIBLE for abiding by the TERMS AND CONDITIONS outlined at:
-http://readymap.org
-
+osgEarth Sample
+LOD Blending creates smoother transitions between levels of detail.
 -->
 <map name="readymap.org" type="geocentric" version="2">
     
     <options>
-		<!-- elevation_tile_size must be an odd number for morphing. -->
-        <elevation_tile_size>31</elevation_tile_size>
-		
-		<!-- extend the min_lod so we can see MORE morphing. -->
+        <!-- elevation_tile_size must be an odd number for morphing. -->
+		<elevation_interpolation>triangulate</elevation_interpolation>
+        
+        <!-- extend the min_lod so we can see MORE morphing. -->
         <terrain first_lod="1" min_lod="19"/>
     </options>
     
@@ -28,11 +19,13 @@ http://readymap.org
     <elevation name="readymap_elevation" driver="tms">
         <url>http://readymap.org/readymap/tiles/1.0.0/9/</url>
     </elevation>
-	
-	<external>
-	    <lod_blending>
-			<duration>1.0</duration>
-		</lod_blending>
-	</external>
+    
+    <external>
+        <lod_blending>
+            <duration>1.0</duration>
+			<blend_imagery>true</blend_imagery>
+			<blend_elevation>true</blend_elevation>
+        </lod_blending>
+    </external>
     
 </map>

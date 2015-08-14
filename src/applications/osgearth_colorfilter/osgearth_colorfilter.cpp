@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -28,16 +31,18 @@
 #include <osgEarthUtil/HSLColorFilter>
 #include <osgEarthUtil/RGBColorFilter>
 #include <osgEarthUtil/ChromaKeyColorFilter>
+#include <osgEarthSymbology/Color>
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgEarth::Util::Controls;
+using namespace osgEarth::Symbology;
 
 
 Container*
 createControlPanel(osgViewer::View* view)
 {
-    ControlCanvas* canvas = ControlCanvas::get( view, true );
+    ControlCanvas* canvas = ControlCanvas::getOrCreate(view);
     VBox* vbox = canvas->addControl(new VBox());
     vbox->setChildSpacing(10);
     return vbox;
@@ -98,7 +103,7 @@ namespace HSL
         s_layerBox->setVertAlign( Control::ALIGN_TOP );
 
         // Title:
-        s_layerBox->setControl( 0, 0, new LabelControl(Stringify()<<"Layer "<<i, Color::Yellow) );
+        s_layerBox->setControl( 0, 0, new LabelControl(Stringify()<<"Layer "<<i, osg::Vec4(1,1,0,1)));
         
         // Hue:
         LabelControl* hLabel = new LabelControl( "Hue" );      
@@ -138,8 +143,8 @@ namespace HSL
 
         // Reset button
         LabelControl* resetButton = new LabelControl( "Reset" );
-        resetButton->setBackColor( Color::Gray );
-        resetButton->setActiveColor( Color::Blue );
+        resetButton->setBackColor( osg::Vec4(0.5,0.5,0.5,1) );
+        resetButton->setActiveColor( osg::Vec4(0.5,0.5,1,1) );
         resetButton->addEventHandler( new ResetHSL(hAdjust, sAdjust, lAdjust) );
         s_layerBox->setControl( 1, 4, resetButton );
     }

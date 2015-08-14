@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,16 +8,19 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
-#ifndef OSGEARTH_ENGINE_MP_TILE_MODEL_COMPILER
-#define OSGEARTH_ENGINE_MP_TILE_MODEL_COMPILER 1
+#ifndef OSGEARTH_DRIVERS_MP_TERRAIN_ENGINE_TILE_MODEL_COMPILER
+#define OSGEARTH_DRIVERS_MP_TERRAIN_ENGINE_TILE_MODEL_COMPILER 1
 
 #include "Common"
 #include "TileModel"
@@ -26,16 +29,16 @@
 
 #include <osgEarth/Map>
 #include <osgEarth/Locators>
+#include <osgEarth/Progress>
 
 #include <osg/Node>
 #include <osg/StateSet>
 #include <osg/Drawable>
 #include <osg/Array>
 
-namespace osgEarth_engine_mp
+namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
 {
     using namespace osgEarth;
-    using namespace osgEarth::Drivers;
 
     /**
      * Cache used by the TileModelCompiler. This lets us share common data across
@@ -78,7 +81,8 @@ namespace osgEarth_engine_mp
     {
     public:
         TileModelCompiler(
-            const MaskLayerVector&        masks,
+            const MaskLayerVector&        maskLayers,
+            const ModelLayerVector&       modelLayers,
             int                           textureImageUnit,
             bool                          optimizeTriangleOrientation,
             const MPTerrainEngineOptions& options);
@@ -86,17 +90,21 @@ namespace osgEarth_engine_mp
         /**
          * Compiles a tile model into a TileNode.
          */
-        TileNode* compile(const TileModel* model);
+        TileNode* compile(
+            TileModel*        model,
+            const MapFrame&   frame,
+            ProgressCallback* progress);
 
     protected:
-        const MaskLayerVector&                    _masks;
+        const MaskLayerVector&                    _maskLayers;
+        const ModelLayerVector&                   _modelLayers;
         int                                       _textureImageUnit;
         bool                                      _optimizeTriOrientation;
         const MPTerrainEngineOptions&             _options;
-        osg::ref_ptr<osg::Drawable::CullCallback> _cullByTraversalMask;
         CompilerCache                             _cache;
+        bool                                      _debug;
     };
 
-} // namespace osgEarth_engine_mp
+} } } // namespace osgEarth::Drivers::MPTerrainEngine
 
-#endif // OSGEARTH_ENGINE_MP_TILE_MODEL_COMPILER
+#endif // OSGEARTH_DRIVERS_MP_TERRAIN_ENGINE_TILE_MODEL_COMPILER

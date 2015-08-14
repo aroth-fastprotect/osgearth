@@ -1,6 +1,15 @@
 <?xml version="1.0" ?>
 <resources name="texlib-us">
 
+  <!-- tiled repeatables -->
+    <skin name="asphalt" tags="asphalt road rock">
+	    <url>misc/asphalt.jpg</url>
+		<tiled>true</tiled>
+		<image_width>20</image_width>
+		<image_height>30</image_height>
+		<texture_mode>modulate</texture_mode>
+	</skin>
+
   <!-- tiled barriers textures -->
 
     <skin name="fence" tags="barrier fence">
@@ -325,9 +334,9 @@
 
    <skin name="8stResditentialTileApt" tags="building tile residential apt us concrete">
         <url>residential/tiles/USUAE-8stTile_rep.jpg</url>
-        <image_width>19</image_width>
-        <min_object_height>21</min_object_height>
-        <max_object_height>29</max_object_height>
+        <image_width>15</image_width>
+        <min_object_height>14</min_object_height>
+        <max_object_height>21</max_object_height>
         <tiled>false</tiled>
    </skin>
 

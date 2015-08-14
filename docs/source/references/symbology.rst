@@ -16,6 +16,7 @@ Jump to a symbol:
  * Render_
  * Skin_
  * Text_
+ * Coverage_
  
 **Developer Note**:
 
@@ -84,6 +85,21 @@ control the color and style of the vector data.
 |                       | rounded corner. Value is the ratio of |                            |
 |                       | line width to corner segment length.  |                            |
 +-----------------------+---------------------------------------+----------------------------+
+| stroke-stipple-pattern| Stippling pattern bitmask. Each set   | integer (65535)            |
+|                       | bit represents an "on" pixel in the   |                            |
+|                       | pattern.                              |                            |
++-----------------------+---------------------------------------+----------------------------+
+| stroke-stipple-factor | Stipple factor for pixel-width lines. | integer (1)                |
+|                       | Number of times to repeat each bit in |                            |
+|                       | the stippling pattern                 |                            |
++-----------------------+---------------------------------------+----------------------------+
+| stroke-crease-angle   | When outlining extruded polygons,     | float degrees (0.0)        |
+|                       | only draw a post outline if the angle |                            |
+|                       | between the adjoining faces exceeds   |                            |
+|                       | this value. This has the effect of    |                            |
+|                       | only outlining corners that are       |                            |
+|                       | sufficiently "sharp".                 |                            |
++-----------------------+---------------------------------------+----------------------------+
 | point-fill            | Fill color for a point.               | HTML color                 |
 +-----------------------+---------------------------------------+----------------------------+
 | point-size            | Size for a GL point geometry          | float (1.0)                |
@@ -124,6 +140,9 @@ the terrain under its location.
 +-----------------------+--------------------------------------------------------------------+
 | altitude-scale        | Scale factor to apply to geometry Z                                |
 +-----------------------+--------------------------------------------------------------------+
+
+Tip: You can also use a shortcut to activate draping or GPU clamping; set ``altitude-clamping``
+to either ``terrain-drape`` or ``terrain-gpu``.
 
 
 Extrusion
@@ -400,3 +419,15 @@ The *text symbol* (SDK: ``TextSymbol``) controls the existance and appearance of
 |                                | when line of sight is obstructed by terrain                        |
 +--------------------------------+--------------------------------------------------------------------+
 
+
+Coverage
+--------
+
+The *coverage symbol* (SDK: ``CoverageSymbol``) controls how a feature is rasterized into
+coverage data with discrete values.
+
++-----------------------+--------------------------------------------------------------------+
+| Property              | Description                                                        |
++=======================+====================================================================+
+| coverage-value        | Expression resolving to the floating-point value to encode.        |
++-----------------------+--------------------------------------------------------------------+

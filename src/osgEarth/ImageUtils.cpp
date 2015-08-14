@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -19,10 +19,14 @@
 
 #include <osgEarth/ImageUtils>
 #include <osgEarth/ThreadingUtils>
+#include <osgEarth/Registry>
+#include <osgEarth/Capabilities>
+#include <osgEarth/Random>
 #include <osg/Notify>
 #include <osg/Texture>
 #include <osg/ImageSequence>
 #include <osg/Timer>
+#include <osg/ValueObject>
 #include <osgDB/Registry>
 #include <string.h>
 #include <memory.h>
@@ -41,6 +45,7 @@
 
 using namespace osgEarth;
 
+
 osg::Image*
 ImageUtils::cloneImage( const osg::Image* input )
 {
@@ -53,11 +58,14 @@ ImageUtils::cloneImage( const osg::Image* input )
     
     osg::Image* clone = osg::clone( input, osg::CopyOp::DEEP_COPY_ALL );
     clone->dirty();
+    if (isNormalized(input) != isNormalized(clone)) {
+        OE_WARN << LC << "Fail in clone.\n";
+    }
     return clone;
 }
 
 void
-ImageUtils::normalizeImage( osg::Image* image )
+ImageUtils::fixInternalFormat( osg::Image* image )
 {
     // OpenGL is lax about internal texture formats, and e.g. allows GL_RGBA to be used
     // instead of the proper GL_RGBA8, etc. Correct that here, since some of our compositors
@@ -71,12 +79,30 @@ ImageUtils::normalizeImage( osg::Image* image )
     }
 }
 
+void
+ImageUtils::markAsUnNormalized(osg::Image* image, bool value)
+{
+    if ( image )
+    {
+        image->setUserValue("osgEarth.unnormalized", value);
+    }
+}
+
 bool
-ImageUtils::copyAsSubImage(const osg::Image* src, osg::Image* dst, int dst_start_col, int dst_start_row, int dst_img )
+ImageUtils::isUnNormalized(const osg::Image* image)
+{
+    if ( !image ) return false;
+    bool result;
+    return image->getUserValue("osgEarth.unnormalized", result) && (result == true);
+}
+
+bool
+ImageUtils::copyAsSubImage(const osg::Image* src, osg::Image* dst, int dst_start_col, int dst_start_row)
 {
     if (!src || !dst ||
         dst_start_col + src->s() > dst->s() ||
-        dst_start_row + src->t() > dst->t() )
+        dst_start_row + src->t() > dst->t() ||
+        src->r() != dst->r())
     {
         return false;
     }
@@ -84,14 +110,16 @@ ImageUtils::copyAsSubImage(const osg::Image* src, osg::Image* dst, int dst_start
     // check for fast bytewise copy:
     if (src->getPacking() == dst->getPacking() &&
         src->getDataType() == dst->getDataType() &&
-        src->getPixelFormat() == dst->getPixelFormat() &&
-        src->getInternalTextureFormat() == dst->getInternalTextureFormat() )
+        src->getPixelFormat() == dst->getPixelFormat() )
     {
-        for( int src_row=0, dst_row=dst_start_row; src_row < src->t(); src_row++, dst_row++ )
+        for(int r=0; r<src->r(); ++r) // each layer
         {
-            const void* src_data = src->data( 0, src_row, 0 );
-            void* dst_data = dst->data( dst_start_col, dst_row, dst_img );
-            memcpy( dst_data, src_data, src->getRowSizeInBytes() );
+            for( int src_row=0, dst_row=dst_start_row; src_row < src->t(); src_row++, dst_row++ )
+            {
+                const void* src_data = src->data( 0, src_row, r );
+                void* dst_data = dst->data( dst_start_col, dst_row, r );
+                memcpy( dst_data, src_data, src->getRowSizeInBytes() );
+            }
         }
     }
 
@@ -104,11 +132,14 @@ ImageUtils::copyAsSubImage(const osg::Image* src, osg::Image* dst, int dst_start
         PixelReader read(src);
         PixelWriter write(dst);
 
-        for( int src_t=0, dst_t=dst_start_row; src_t < src->t(); src_t++, dst_t++ )
+        for( int r=0; r<src->r(); ++r)
         {
-            for( int src_s=0, dst_s=dst_start_col; src_s < src->s(); src_s++, dst_s++ )
-            {           
-                write( read(src_s, src_t), dst_s, dst_t );
+            for( int src_t=0, dst_t=dst_start_row; src_t < src->t(); src_t++, dst_t++ )
+            {
+                for( int src_s=0, dst_s=dst_start_col; src_s < src->s(); src_s++, dst_s++ )
+                {           
+                    write(read(src_s, src_t, r), dst_s, dst_t, r);
+                }
             }
         }
     }
@@ -170,10 +201,11 @@ ImageUtils::createBumpMap(const osg::Image* input)
 }
 
 bool
-ImageUtils::resizeImage(const osg::Image* input, 
-                        unsigned int out_s, unsigned int out_t, 
+ImageUtils::resizeImage(const osg::Image* input,
+                        unsigned int out_s, unsigned int out_t,
                         osg::ref_ptr<osg::Image>& output,
-                        unsigned int mipmapLevel )
+                        unsigned int mipmapLevel,
+                        bool bilinear)
 {
     if ( !input && out_s == 0 && out_t == 0 )
         return false;
@@ -199,13 +231,14 @@ ImageUtils::resizeImage(const osg::Image* input,
 
         if ( PixelWriter::supports(input) )
         {
-            output->allocateImage( out_s, out_t, 1, input->getPixelFormat(), input->getDataType(), input->getPacking() );
+            output->allocateImage( out_s, out_t, input->r(), input->getPixelFormat(), input->getDataType(), input->getPacking() );
             output->setInternalTextureFormat( input->getInternalTextureFormat() );
+            markAsNormalized(output, isNormalized(input));
         }
         else
         {
-            // for unsupported write formats, convert to RGBA8 automatically.
-            output->allocateImage( out_s, out_t, 1, GL_RGBA, GL_UNSIGNED_BYTE );
+            // for unsupported write formats, convert to normalized RGBA8 automatically.
+            output->allocateImage( out_s, out_t, input->r(), GL_RGBA, GL_UNSIGNED_BYTE );
             output->setInternalTextureFormat( GL_RGB8A_INTERNAL );
         }
     }
@@ -228,24 +261,171 @@ ImageUtils::resizeImage(const osg::Image* input,
         {
             // get an appropriate input row
             float output_row_ratio = (float)output_row/(float)out_t;
-            int input_row = (unsigned int)( output_row_ratio * (float)in_t );
+            float input_row = output_row_ratio * (float)in_t;
             if ( input_row >= input->t() ) input_row = in_t-1;
             else if ( input_row < 0 ) input_row = 0;
 
             for( unsigned int output_col = 0; output_col < out_s; output_col++ )
             {
                 float output_col_ratio = (float)output_col/(float)out_s;
-                int input_col = (unsigned int)( output_col_ratio * (float)in_s );
+                float input_col =  output_col_ratio * (float)in_s;
                 if ( input_col >= (int)in_s ) input_col = in_s-1;
-                else if ( input_row < 0 ) input_row = 0;
+                else if ( input_col < 0 ) input_col = 0.0f;                
 
-                osg::Vec4 color = read( input_col, input_row ); // read pixel from mip level 0
-                write( color, output_col, output_row, 0, mipmapLevel ); // write to target mip level
+                osg::Vec4 color;
+
+                for(int layer=0; layer<input->r(); ++layer)
+                {
+                    if (bilinear)
+                    {
+                        // Do a billinear interpolation for the image
+                        int rowMin = osg::maximum((int)floor(input_row), 0);
+                        int rowMax = osg::maximum(osg::minimum((int)ceil(input_row), (int)(input->t()-1)), 0);
+                        int colMin = osg::maximum((int)floor(input_col), 0);
+                        int colMax = osg::maximum(osg::minimum((int)ceil(input_col), (int)(input->s()-1)), 0);                    
+
+                        if (rowMin > rowMax) rowMin = rowMax;
+                        if (colMin > colMax) colMin = colMax;  
+
+                        osg::Vec4 urColor = read(colMax, rowMax, layer);
+                        osg::Vec4 llColor = read(colMin, rowMin, layer);
+                        osg::Vec4 ulColor = read(colMin, rowMax, layer);
+                        osg::Vec4 lrColor = read(colMax, rowMin, layer);
+                    
+                        if ((colMax == colMin) && (rowMax == rowMin))
+                        {
+                            // Exact value
+                            color = urColor;
+                        }
+                        else if (colMax == colMin)
+                        {                     
+                            // Linear interpolate vertically            
+                            color = llColor * ((double)rowMax - input_row) + ulColor * (input_row - (double)rowMin);
+                        }
+                        else if (rowMax == rowMin)
+                        {                     
+                            // Linear interpolate horizontally
+                            color = llColor * ((double)colMax - input_col) + lrColor * (input_col - (double)colMin);
+                        }
+                        else
+                        {                        
+                            // Bilinear interpolate
+                            osg::Vec4 r1 = llColor * ((double)colMax - input_col) + lrColor * (input_col - (double)colMin);
+                            osg::Vec4 r2 = ulColor * ((double)colMax - input_col) + urColor * (input_col - (double)colMin);                      
+                            color = r1 * ((double)rowMax - input_row) + r2 * (input_row - (double)rowMin);
+                        }                         
+                    }
+                    else
+                    {
+                        // nearest neighbor:
+                        int col = (input_col-(int)input_col) <= (ceil(input_col)-input_col) ?
+                            (int)input_col :
+                            std::min( 1+(int)input_col, (int)in_s-1 );
+
+                        int row = (input_row-(int)input_row) <= (ceil(input_row)-input_row) ?
+                            (int)input_row :
+                            std::min( 1+(int)input_row, (int)in_t-1 );
+
+                        color = read(col, row, layer); // read pixel from mip level 0.
+
+                        // old code
+                        //color = read( (int)input_col, (int)input_row, layer ); // read pixel from mip level 0
+                    }
+
+                    write( color, output_col, output_row, layer, mipmapLevel ); // write to target mip level
+                }
             }
         }
     }
 
     return true;
+}
+
+bool
+ImageUtils::flattenImage(osg::Image*                             input,
+                         std::vector<osg::ref_ptr<osg::Image> >& output)
+{
+    if (input == 0L)
+        return false;
+
+    if ( input->r() == 1 )
+    {
+        output.push_back( input );
+        return true;
+    }
+
+    for(int r=0; r<input->r(); ++r)
+    {
+        osg::Image* layer = new osg::Image();
+        layer->allocateImage(input->s(), input->t(), 1, input->getPixelFormat(), input->getDataType(), input->getPacking());
+        layer->setPixelAspectRatio(input->getPixelAspectRatio());
+        markAsNormalized(layer, isNormalized(input));
+
+#if OSG_MIN_VERSION_REQUIRED(3,1,0)
+        layer->setRowLength(input->getRowLength());
+#endif
+        layer->setOrigin(input->getOrigin());
+        layer->setFileName(input->getFileName());
+        layer->setWriteHint(input->getWriteHint());
+        layer->setInternalTextureFormat(input->getInternalTextureFormat());
+        ::memcpy(layer->data(), input->data(0,0,r), layer->getTotalSizeInBytes());
+        output.push_back(layer);
+    }
+
+    return true;
+}
+
+osg::Image*
+ImageUtils::buildNearestNeighborMipmaps(const osg::Image* input)
+{
+    // first, build the image that will hold all the mipmap levels.
+    int numMipmapLevels = osg::Image::computeNumberOfMipmapLevels( input->s(), input->t() );
+    int pixelSizeBytes  = osg::Image::computeRowWidthInBytes( input->s(), input->getPixelFormat(), input->getDataType(), input->getPacking() ) / input->s();
+    int totalSizeBytes  = 0;
+    std::vector< unsigned int > mipmapDataOffsets;
+
+    mipmapDataOffsets.reserve( numMipmapLevels-1 );
+
+    for( int i=0; i<numMipmapLevels; ++i )
+    {
+        if ( i > 0 )
+            mipmapDataOffsets.push_back( totalSizeBytes );
+
+        int level_s = input->s() >> i;
+        int level_t = input->t() >> i;
+        int levelSizeBytes = level_s * level_t * pixelSizeBytes;
+
+        totalSizeBytes += levelSizeBytes;
+    }
+
+    unsigned char* data = new unsigned char[totalSizeBytes];
+
+    osg::ref_ptr<osg::Image> result = new osg::Image();
+    result->setImage(
+        input->s(), input->t(), 1,
+        input->getInternalTextureFormat(), 
+        input->getPixelFormat(), 
+        input->getDataType(), 
+        data, osg::Image::USE_NEW_DELETE );
+
+    result->setMipmapLevels( mipmapDataOffsets );
+
+    // now, populate the image levels.
+    int level_s = input->s();
+    int level_t = input->t();
+
+    osg::ref_ptr<const osg::Image> input2 = input;
+    for( int level=0; level<numMipmapLevels; ++level )
+    {
+        osg::ref_ptr<osg::Image> temp;
+        ImageUtils::resizeImage(input2, level_s, level_t, result, level, false);
+        ImageUtils::resizeImage(input2, level_s, level_t, temp, 0, false);
+        level_s >>= 1;
+        level_t >>= 1;
+        input2 = temp.get();
+    }
+
+    return result.release();
 }
 
 osg::Image*
@@ -327,7 +507,7 @@ namespace
 bool
 ImageUtils::mix(osg::Image* dest, const osg::Image* src, float a)
 {
-    if (!dest || !src || dest->s() != src->s() || dest->t() != src->t() ||
+    if (!dest || !src || dest->s() != src->s() || dest->t() != src->t() || src->r() != dest->r() ||
         !PixelReader::supports(src) ||
         !PixelWriter::supports(dest) )
     {
@@ -336,8 +516,8 @@ ImageUtils::mix(osg::Image* dest, const osg::Image* src, float a)
     
     PixelVisitor<MixImage> mixer;
     mixer._a = osg::clampBetween( a, 0.0f, 1.0f );
-    mixer._srcHasAlpha = src->getPixelSizeInBits() == 32;
-    mixer._destHasAlpha = src->getPixelSizeInBits() == 32;
+    mixer._srcHasAlpha = hasAlphaChannel(src); //src->getPixelSizeInBits() == 32;
+    mixer._destHasAlpha = hasAlphaChannel(dest); //dest->getPixelSizeInBits() == 32;
 
     mixer.accept( src, dest );  
 
@@ -386,18 +566,20 @@ ImageUtils::cropImage(const osg::Image* image,
 
     //Allocate the croppped image
     osg::Image* cropped = new osg::Image;
-    cropped->allocateImage(windowWidth, windowHeight, 1, image->getPixelFormat(), image->getDataType());
+    cropped->allocateImage(windowWidth, windowHeight, image->r(), image->getPixelFormat(), image->getDataType());
     cropped->setInternalTextureFormat( image->getInternalTextureFormat() );
+    ImageUtils::markAsNormalized( cropped, ImageUtils::isNormalized(image) );    
     
-    
-    for (int src_row = windowY, dst_row=0; dst_row < windowHeight; src_row++, dst_row++)
+    for (int layer=0; layer<image->r(); ++layer)
     {
-        if (src_row > image->t()-1) OE_NOTICE << "HeightBroke" << std::endl;
-        const void* src_data = image->data(windowX, src_row, 0);
-        void* dst_data = cropped->data(0, dst_row, 0);
-        memcpy( dst_data, src_data, cropped->getRowSizeInBytes());
+        for (int src_row = windowY, dst_row=0; dst_row < windowHeight; src_row++, dst_row++)
+        {
+            if (src_row > image->t()-1) OE_NOTICE << "HeightBroke" << std::endl;
+            const void* src_data = image->data(windowX, src_row, layer);
+            void* dst_data = cropped->data(0, dst_row, layer);
+            memcpy( dst_data, src_data, cropped->getRowSizeInBytes());
+        }
     }
-
     return cropped;
 }
 
@@ -414,27 +596,30 @@ ImageUtils::createSharpenedImage( const osg::Image* input )
 {
     int filter[9] = { 0, -1, 0, -1, 5, -1, 0, -1, 0 };
     osg::Image* output = ImageUtils::cloneImage(input);
-    for( int t=1; t<input->t()-1; t++ )
+    for( int r=0; r<input->r(); ++r)
     {
-        for( int s=1; s<input->s()-1; s++ )
+        for( int t=1; t<input->t()-1; t++ )
         {
-            int pixels[9] = {
-                *(int*)input->data(s-1,t-1), *(int*)input->data(s,t-1), *(int*)input->data(s+1,t-1),
-                *(int*)input->data(s-1,t  ), *(int*)input->data(s,t  ), *(int*)input->data(s+1,t  ),
-                *(int*)input->data(s-1,t+1), *(int*)input->data(s,t+1), *(int*)input->data(s+1,t+1) };
-
-            int shifts[4] = { 0, 8, 16, 32 };
-
-            for( int c=0; c<4; c++ ) // components
+            for( int s=1; s<input->s()-1; s++ )
             {
-                int mask = 0xff << shifts[c];
-                int sum = 0;
-                for( int i=0; i<9; i++ )
+                int pixels[9] = {
+                    *(int*)input->data(s-1,t-1,r), *(int*)input->data(s,t-1,r), *(int*)input->data(s+1,t-1,r),
+                    *(int*)input->data(s-1,t  ,r), *(int*)input->data(s,t  ,r), *(int*)input->data(s+1,t  ,r),
+                    *(int*)input->data(s-1,t+1,r), *(int*)input->data(s,t+1,r), *(int*)input->data(s+1,t+1,r) };
+
+                int shifts[4] = { 0, 8, 16, 32 };
+
+                for( int c=0; c<4; c++ ) // components
                 {
-                    sum += ((pixels[i] & mask) >> shifts[c]) * filter[i];
+                    int mask = 0xff << shifts[c];
+                    int sum = 0;
+                    for( int i=0; i<9; i++ )
+                    {
+                        sum += ((pixels[i] & mask) >> shifts[c]) * filter[i];
+                    }
+                    sum = sum > 255? 255 : sum < 0? 0 : sum;
+                    output->data(s,t,r)[c] = sum;
                 }
-                sum = sum > 255? 255 : sum < 0? 0 : sum;
-                output->data(s,t)[c] = sum;
             }
         }
     }
@@ -479,13 +664,16 @@ ImageUtils::isEmptyImage(const osg::Image* image, float alphaThreshold)
         return false;
 
     PixelReader read(image);
-    for(unsigned t=0; t<(unsigned)image->t(); ++t) 
+    for(unsigned r=0; r<(unsigned)image->r(); ++r)
     {
-        for(unsigned s=0; s<(unsigned)image->s(); ++s)
+        for(unsigned t=0; t<(unsigned)image->t(); ++t) 
         {
-            osg::Vec4 color = read(s, t);
-            if ( color.a() > alphaThreshold )
-                return false;
+            for(unsigned s=0; s<(unsigned)image->s(); ++s)
+            {
+                osg::Vec4 color = read(s, t, r);
+                if ( color.a() > alphaThreshold )
+                    return false;
+            }
         }
     }
     return true;
@@ -503,6 +691,119 @@ ImageUtils::createOnePixelImage(const osg::Vec4& color)
     return image;
 }
 
+osg::Image*
+ImageUtils::upSampleNN(const osg::Image* src, int quadrant)
+{
+    int soff = quadrant == 0 || quadrant == 2 ? 0 : src->s()/2;
+    int toff = quadrant == 2 || quadrant == 3 ? 0 : src->t()/2;
+    osg::Image* dst = new osg::Image();
+    dst->allocateImage(src->s(), src->t(), 1, src->getPixelFormat(), src->getDataType(), src->getPacking());
+
+    PixelReader readSrc(src);
+    PixelWriter writeDst(dst);
+
+    // first, copy the quadrant into the new image at every other pixel (s and t).
+    for(int s=0; s<src->s()/2; ++s)
+    {
+        for(int t=0; t<src->t()/2; ++t)
+        {           
+            writeDst(readSrc(soff+s,toff+t), 2*s, 2*t);
+        }
+    }
+
+    // next fill in the rows - simply copy the pixel from the left.
+    PixelReader readDst(dst);
+    int seed = *(int*)dst->data(0,0);
+
+    Random rng(seed+quadrant);
+    int c = 0;
+
+    for(int t=0; t<dst->t(); t+=2)
+    {
+        for(int s=1; s<dst->s(); s+=2)
+        {
+            int ss = rng.next(2)%2 && s<dst->s()-1 ? s+1 : s-1;
+            writeDst( readDst(ss,t), s, t );
+        }
+    }
+
+    // fill in the columns - copy the pixel above.
+    for(int t=1; t<dst->t(); t+=2)
+    {
+        for(int s=0; s<dst->s(); s+=2)
+        {
+            int tt = rng.next(2)%2 && t<dst->t()-1 ? t+1 : t-1;
+            writeDst( readDst(s,tt), s, t );
+        }
+    }
+
+    // fill in the LRs.
+    for(int t=1; t<dst->t(); t+=2)
+    {
+        bool last_t = t+2 >= dst->t();
+        for(int s=1; s<dst->s(); s+=2)
+        {
+            bool last_s = s+2 >= dst->s();
+
+            if (!last_s && !last_t)
+            {
+                bool d1 = readDst(s-1,t-1)==readDst(s+1,t+1);
+                bool d2 = readDst(s-1,t+1)==readDst(s+1,t-1);
+
+                if (d1 && !d2)
+                {
+                    writeDst( readDst(s-1,t-1), s, t);
+                }
+                else if (!d1 && d2)
+                {
+                    writeDst( readDst(s+1,t-1), s, t);
+                }
+                else if (d1 && d2)
+                {
+                    writeDst( readDst(s-1,t-1), s, t);
+                }
+                else
+                {
+                    int ss = rng.next(2)%2 ? s+1 : s-1, tt = rng.next(2)%2 ? t+1 : t-1;
+                    //int ss = (c++)%2? s+1, s-1, tt = (c++)%2? t+1 : t-1;
+                    writeDst( readDst(ss, tt), s, t );
+                }
+
+            }
+            else if ( last_s && !last_t )
+            {
+                writeDst( readDst(s,t-1), s, t );
+                //if ( readDst(s, t-1) == readDst(s, t+1) )
+                //{
+                //    writeDst( readDst(s, t-1), s, t );
+                //}
+                //else
+                //{
+                //    writeDst( readDst(s-1, t-1), s, t );
+                //}
+            }
+            else if ( !last_s && last_t )
+            {
+                writeDst( readDst(s-1,t), s, t );
+                //if ( readDst(s-1, t) == readDst(s+1, t) )
+                //{
+                //    writeDst( readDst(s-1,t), s, t );
+                //}
+                //else
+                //{
+                //    writeDst( readDst(s-1,t-1), s, t );
+                //}
+            }
+            else
+            {
+                writeDst( readDst(s-1,t-1), s, t);
+            }
+        }
+    }
+
+    return dst;
+}
+
 bool
 ImageUtils::isSingleColorImage(const osg::Image* image, float threshold)
 {
@@ -511,28 +812,98 @@ ImageUtils::isSingleColorImage(const osg::Image* image, float threshold)
 
     PixelReader read(image);
 
-    osg::Vec4 referenceColor = read(0, 0);
+    osg::Vec4 referenceColor = read(0, 0, 0);
     float refR = referenceColor.r();
     float refG = referenceColor.g();
     float refB = referenceColor.b();
     float refA = referenceColor.a();
 
-    for(unsigned t=0; t<(unsigned)image->t(); ++t) 
+    for(unsigned r=0; r<(unsigned)image->r(); ++r)
     {
-        for(unsigned s=0; s<(unsigned)image->s(); ++s)
+        for(unsigned t=0; t<(unsigned)image->t(); ++t) 
         {
-            osg::Vec4 color = read(s, t);
-            if (   (fabs(color.r()-refR) > threshold)
-                || (fabs(color.g()-refG) > threshold)
-                || (fabs(color.b()-refB) > threshold)
-                || (fabs(color.a()-refA) > threshold) )
+            for(unsigned s=0; s<(unsigned)image->s(); ++s)
             {
-                return false;
+                osg::Vec4 color = read(s, t, r);
+                if (   (fabs(color.r()-refR) > threshold)
+                    || (fabs(color.g()-refG) > threshold)
+                    || (fabs(color.b()-refB) > threshold)
+                    || (fabs(color.a()-refA) > threshold) )
+                {
+                    return false;
+                }
             }
         }
     }
-
     return true;
+}
+
+bool
+ImageUtils::computeTextureCompressionMode(const osg::Image*                 image,
+                                          osg::Texture::InternalFormatMode& out_mode)
+{
+    if (!image)
+        return false;
+
+    const Capabilities& caps = Registry::capabilities();
+
+#ifndef OSG_GLES2_AVAILABLE
+
+    if (image->getPixelFormat() == GL_RGBA && image->getPixelSizeInBits() == 32) 
+    {
+        if (caps.supportsTextureCompression(osg::Texture::USE_S3TC_DXT5_COMPRESSION))
+        {
+            out_mode = osg::Texture::USE_S3TC_DXT5_COMPRESSION;
+            return true;
+        }
+        //todo: add ETC2
+        else if (caps.supportsTextureCompression(osg::Texture::USE_ARB_COMPRESSION))
+        {
+            out_mode = osg::Texture::USE_ARB_COMPRESSION;
+            return true;
+        }
+    }
+    else if (image->getPixelFormat() == GL_RGB && image->getPixelSizeInBits() == 24)
+    {
+        if (caps.supportsTextureCompression(osg::Texture::USE_S3TC_DXT1_COMPRESSION))
+        {
+            out_mode = osg::Texture::USE_S3TC_DXT1_COMPRESSION;
+            return true;
+        }
+        else if (caps.supportsTextureCompression(osg::Texture::USE_ETC_COMPRESSION))
+        {
+            // ETC1 is RGB only
+            out_mode = osg::Texture::USE_ETC_COMPRESSION;
+            return true;
+        }
+        else if (caps.supportsTextureCompression(osg::Texture::USE_ARB_COMPRESSION))
+        {
+            out_mode = osg::Texture::USE_ARB_COMPRESSION;
+            return true;
+        }
+    }
+
+#else // OSG_GLES2_AVAILABLE
+
+    if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_4BPP_COMPRESSION))
+    {
+        out_mode = osg::Texture::USE_PVRTC_4BPP_COMPRESSION;
+        return true;
+    }
+    else if (caps.supportsTextureCompression(osg::Texture::USE_PVRTC_2BPP_COMPRESSION))
+    {
+        out_mode = osg::Texture::USE_PVRTC_2BPP_COMPRESSION;
+        return true;
+    }
+    else if (caps.supportsTextureCompression(osg::Texture::USE_ETC_COMPRESSION))
+    {
+        out_mode = osg::Texture::USE_ETC_COMPRESSION;
+        return true;
+    }
+
+#endif
+
+    return false;
 }
 
 bool
@@ -548,6 +919,7 @@ ImageUtils::convert(const osg::Image* image, GLenum pixelFormat, GLenum dataType
     if ( !image )
         return 0L;
 
+    // Very fast conversion if possible : clone image
     if ( image->getPixelFormat() == pixelFormat && image->getDataType() == dataType)
     {
         GLenum texFormat = image->getInternalTextureFormat();
@@ -556,11 +928,48 @@ ImageUtils::convert(const osg::Image* image, GLenum pixelFormat, GLenum dataType
             || (pixelFormat == GL_RGBA && texFormat == GL_RGB8A_INTERNAL))
         return cloneImage(image);
     }
+
+    // Fast conversion if possible : RGB8 to RGBA8
+    if ( dataType == GL_UNSIGNED_BYTE && pixelFormat == GL_RGBA && image->getDataType() == GL_UNSIGNED_BYTE && image->getPixelFormat() == GL_RGB)
+    {
+        // Do fast conversion
+        osg::Image* result = new osg::Image();
+        result->allocateImage(image->s(), image->t(), image->r(), GL_RGBA, GL_UNSIGNED_BYTE);
+        result->setInternalTextureFormat(GL_RGBA8);
+
+        const unsigned char* pSrcData = image->data();
+        unsigned char* pDstData = result->data();
+        int srcIndex = 0;
+        int dstIndex = 0;
+
+        // Convert all pixels except last one by reading 32bits chunks
+        for (int i=0; i<image->t()*image->s()*image->r()-1; i++)
+        {
+            unsigned int srcValue = *((const unsigned int*) (pSrcData + srcIndex)) | 0xFF000000;
+            *((unsigned int*) (pDstData + dstIndex)) = srcValue;
+
+            srcIndex += 3;
+            dstIndex += 4;
+        }
+
+        // Convert last pixel
+        pDstData[dstIndex + 0] = pSrcData[srcIndex + 0];
+        pDstData[dstIndex + 1] = pSrcData[srcIndex + 1];
+        pDstData[dstIndex + 2] = pSrcData[srcIndex + 2];
+        pDstData[dstIndex + 3] = 0xFF;
+
+        return result;
+    }
+
+    // Test if generic conversion is possible
     if ( !canConvert(image, pixelFormat, dataType) )
         return 0L;
 
+    // Generic conversion : use PixelVisitor
     osg::Image* result = new osg::Image();
     result->allocateImage(image->s(), image->t(), image->r(), pixelFormat, dataType);
+    memset(result->data(), 0, result->getTotalSizeInBytes());
+    markAsNormalized(result, isNormalized(image));
 
     if ( pixelFormat == GL_RGB && dataType == GL_UNSIGNED_BYTE )
         result->setInternalTextureFormat( GL_RGB8_INTERNAL );
@@ -593,6 +1002,7 @@ ImageUtils::areEquivalent(const osg::Image *lhs, const osg::Image *rhs)
 
     if ((lhs->s() == rhs->s()) &&
         (lhs->t() == rhs->t()) &&
+        (lhs->r() == rhs->r()) &&
         (lhs->getInternalTextureFormat() == rhs->getInternalTextureFormat()) &&
         (lhs->getPixelFormat() == rhs->getPixelFormat()) &&
         (lhs->getDataType() == rhs->getDataType()) &&
@@ -636,10 +1046,11 @@ ImageUtils::hasTransparency(const osg::Image* image, float threshold)
         return false;
 
     PixelReader read(image);
-    for( int t=0; t<image->t(); ++t )
-        for( int s=0; s<image->s(); ++s )
-            if ( read(s, t).a() < threshold )
-                return true;
+    for( int r=0; r<image->r(); ++r)
+        for( int t=0; t<image->t(); ++t )
+            for( int s=0; s<image->s(); ++s )
+                if ( read(s, t, r).a() < threshold )
+                    return true;
 
     return false;
 }
@@ -656,57 +1067,61 @@ ImageUtils::featherAlphaRegions(osg::Image* image, float maxAlpha)
 
     int ns = image->s();
     int nt = image->t();
+    int nr = image->r();
 
     osg::Vec4 n;
 
-    for( int t=0; t<nt; ++t )
+    for( int r=0; r<nr; ++r )
     {
-        bool rowdone = false;
-        for( int s=0; s<ns && !rowdone; ++s )
+        for( int t=0; t<nt; ++t )
         {
-            osg::Vec4 pixel = read(s, t);
-            if ( pixel.a() <= maxAlpha )
+            bool rowdone = false;
+            for( int s=0; s<ns && !rowdone; ++s )
             {
-                bool wrote = false;
-                if ( s < ns-1 ) {
-                    n = read( s+1, t );
-                    if ( n.a() > maxAlpha ) {
-                        write( n, s, t );
-                        wrote = true;
+                osg::Vec4 pixel = read(s, t, r);
+                if ( pixel.a() <= maxAlpha )
+                {
+                    bool wrote = false;
+                    if ( s < ns-1 ) {
+                        n = read( s+1, t, r);
+                        if ( n.a() > maxAlpha ) {
+                            write( n, s, t, r);
+                            wrote = true;
+                        }
                     }
-                }
-                if ( !wrote && s > 0 ) {
-                    n = read( s-1, t );
-                    if ( n.a() > maxAlpha ) {
-                        write( n, s, t );
-                        rowdone = true;
+                    if ( !wrote && s > 0 ) {
+                        n = read( s-1, t, r);
+                        if ( n.a() > maxAlpha ) {
+                            write( n, s, t, r);
+                            rowdone = true;
+                        }
                     }
                 }
             }
         }
-    }
 
-    for( int s=0; s<ns; ++s )
-    {
-        bool coldone = false;
-        for( int t=0; t<nt && !coldone; ++t )
+        for( int s=0; s<ns; ++s )
         {
-            osg::Vec4 pixel = read(s, t);
-            if ( pixel.a() <= maxAlpha )
+            bool coldone = false;
+            for( int t=0; t<nt && !coldone; ++t )
             {
-                bool wrote = false;
-                if ( t < nt-1 ) {
-                    n = read( s, t+1 );
-                    if ( n.a() > maxAlpha ) {
-                        write( n, s, t );
-                        wrote = true;
+                osg::Vec4 pixel = read(s, t, r);
+                if ( pixel.a() <= maxAlpha )
+                {
+                    bool wrote = false;
+                    if ( t < nt-1 ) {
+                        n = read( s, t+1, r );
+                        if ( n.a() > maxAlpha ) {
+                            write( n, s, t, r );
+                            wrote = true;
+                        }
                     }
-                }
-                if ( !wrote && t > 0 ) {
-                    n = read( s, t-1 );
-                    if ( n.a() > maxAlpha ) {
-                        write( n, s, t );
-                        coldone = true;
+                    if ( !wrote && t > 0 ) {
+                        n = read( s, t-1, r );
+                        if ( n.a() > maxAlpha ) {
+                            write( n, s, t, r);
+                            coldone = true;
+                        }
                     }
                 }
             }
@@ -725,10 +1140,12 @@ ImageUtils::convertToPremultipliedAlpha(osg::Image* image)
 
     PixelReader read(image);
     PixelWriter write(image);
-    for(int s=0; s<image->s(); ++s) {
-        for( int t=0; t<image->t(); ++t ) {
-            osg::Vec4f c = read(s, t);
-            write( osg::Vec4f(c.r()*c.a(), c.g()*c.a(), c.b()*c.a(), c.a()), s, t);
+    for(int r=0; r<image->r(); ++r) {
+        for(int s=0; s<image->s(); ++s) {
+            for( int t=0; t<image->t(); ++t ) {
+                osg::Vec4f c = read(s, t, r);
+                write( osg::Vec4f(c.r()*c.a(), c.g()*c.a(), c.b()*c.a(), c.a()), s, t, r);
+            }
         }
     }
     return true;
@@ -766,17 +1183,46 @@ ImageUtils::isCompressed(const osg::Image *image)
     }
 }
 
+
+bool
+ImageUtils::isFloatingPointInternalFormat(GLint i)
+{
+    return 
+        (i >= 0x8C10 && i <= 0x8C17) || // GL_TEXTURE_RED_TYPE_ARB, et al
+        (i >= 0x8814 && i <= 0x881F);   // GL_RGBA32F_ARB, et al
+}
+
+bool
+ImageUtils::sameFormat(const osg::Image* lhs, const osg::Image* rhs)
+{
+    return 
+        lhs != 0L &&
+        rhs != 0L &&
+        lhs->getPixelFormat() == rhs->getPixelFormat() &&
+        lhs->getDataType()    == rhs->getDataType();
+}
+
+bool
+ImageUtils::textureArrayCompatible(const osg::Image* lhs, const osg::Image* rhs)
+{
+    return
+        sameFormat(lhs, rhs) &&
+        lhs->s() == rhs->s() &&
+        lhs->t() == rhs->t() &&
+        lhs->r() == rhs->r();
+}
+
 //------------------------------------------------------------------------
 
 namespace
 {
-    //static const float r10= 1.0f/1023.0f;
-    //static const float r8 = 1.0f/255.0f;
-    //static const float r6 = 1.0f/63.0f;
-    static const float r5 = 1.0f/31.0f;
-    //static const float r4 = 1.0f/15.0f;
-    static const float r3 = 1.0f/7.0f;
-    static const float r2 = 1.0f/3.0f;
+    //static const double r10= 1.0/1023.0;
+    //static const double r8 = 1.0/255.0;
+    //static const double r6 = 1.0/63.0;
+    static const double r5 = 1.0/31.0;
+    //static const double r4 = 1.0/15.0;
+    static const double r3 = 1.0/7.0;
+    static const double r2 = 1.0/3.0;
 
     // The scale factors to convert from an image data type to a
     // float. This is copied from OSG; I think the factors for the signed
@@ -786,37 +1232,37 @@ namespace
 
     template<> struct GLTypeTraits<GLbyte>
     {
-        static float scale() { return 1.0f/128.0f; } // XXX
+        static double scale(bool norm) { return norm? 1.0/128.0 : 1.0; } // XXX
     };
 
     template<> struct GLTypeTraits<GLubyte>
     {
-        static float scale() { return 1.0f/255.0f; }
+        static double scale(bool norm) { return norm? 1.0/255.0 : 1.0; }
     };
 
     template<> struct GLTypeTraits<GLshort>
     {
-        static float scale() { return 1.0f/32768.0f; } // XXX
+        static double scale(bool norm) { return norm? 1.0/32768.0 : 1.0; } // XXX
     };
 
     template<> struct GLTypeTraits<GLushort>
     {
-        static float scale() { return 1.0f/65535.0f; }
+        static double scale(bool norm) { return norm? 1.0/65535.0 : 1.0; }
     };
 
     template<> struct GLTypeTraits<GLint>
     {
-        static float scale() { return 1.0f/2147483648.0f; } // XXX
+        static double scale(bool norm) { return norm? 1.0/2147483648.0 : 1.0; } // XXX
     };
 
     template<> struct GLTypeTraits<GLuint>
     {
-        static float scale() { return 1.0f/4294967295.0f; }
+        static double scale(bool norm) { return norm? 1.0/4294967295.0 : 1.0; }
     };
 
     template<> struct GLTypeTraits<GLfloat>
     {
-        static float scale() { return 1.0f; }
+        static double scale(bool norm) { return 1.0; }
     };
 
     // The Reader function that performs the read.
@@ -829,7 +1275,7 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float l = float(*ptr) * GLTypeTraits<T>::scale();
+            float l = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(l, l, l, 1.0f);
         }
     };
@@ -840,7 +1286,7 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m)
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            (*ptr) = (GLubyte)(c.r() / GLTypeTraits<T>::scale());
+            (*ptr) = (T)(c.r() / GLTypeTraits<T>::scale(iw->_normalized));
         }
     };
 
@@ -850,7 +1296,7 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float l = float(*ptr) * GLTypeTraits<T>::scale();
+            float l = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(l, l, l, 1.0f);
         }
     };
@@ -861,7 +1307,7 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m)
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            (*ptr) = (GLubyte)(c.r() / GLTypeTraits<T>::scale());
+            (*ptr) = (T)(c.r() / GLTypeTraits<T>::scale(iw->_normalized));
         }
     };
 
@@ -871,7 +1317,7 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float a = float(*ptr) * GLTypeTraits<T>::scale();
+            float a = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(1.0f, 1.0f, 1.0f, a);
         }
     };
@@ -882,7 +1328,7 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m)
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            (*ptr) = (GLubyte)(c.a() / GLTypeTraits<T>::scale());
+            (*ptr) = (T)(c.a() / GLTypeTraits<T>::scale(iw->_normalized));
         }
     };
 
@@ -892,8 +1338,8 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float l = float(*ptr++) * GLTypeTraits<T>::scale();
-            float a = float(*ptr) * GLTypeTraits<T>::scale();
+            float l = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float a = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(l, l, l, a);
         }
     };
@@ -904,8 +1350,8 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m )
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            *ptr++ = (GLubyte)( c.r() / GLTypeTraits<T>::scale() );
-            *ptr   = (GLubyte)( c.a() / GLTypeTraits<T>::scale() );
+            *ptr++ = (T)( c.r() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr   = (T)( c.a() / GLTypeTraits<T>::scale(iw->_normalized) );
         }
     };
 
@@ -915,9 +1361,9 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float d = float(*ptr++) * GLTypeTraits<T>::scale();
-            float g = float(*ptr++) * GLTypeTraits<T>::scale();
-            float b = float(*ptr) * GLTypeTraits<T>::scale();
+            float d = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float g = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float b = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(d, g, b, 1.0f);
         }
     };
@@ -928,9 +1374,9 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m )
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            *ptr++ = (GLubyte)( c.r() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.g() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.b() / GLTypeTraits<T>::scale() );
+            *ptr++ = (T)( c.r() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.g() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.b() / GLTypeTraits<T>::scale(iw->_normalized) );
         }
     };
 
@@ -940,10 +1386,10 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float d = float(*ptr++) * GLTypeTraits<T>::scale();
-            float g = float(*ptr++) * GLTypeTraits<T>::scale();
-            float b = float(*ptr++) * GLTypeTraits<T>::scale();
-            float a = float(*ptr) * GLTypeTraits<T>::scale();
+            float d = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float g = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float b = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float a = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(d, g, b, a);
         }
     };
@@ -954,10 +1400,10 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m)
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            *ptr++ = (GLubyte)( c.r() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.g() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.b() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.a() / GLTypeTraits<T>::scale() );
+            *ptr++ = (T)( c.r() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.g() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.b() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.a() / GLTypeTraits<T>::scale(iw->_normalized) );
         }
     };
 
@@ -967,9 +1413,9 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float b = float(*ptr) * GLTypeTraits<T>::scale();
-            float g = float(*ptr++) * GLTypeTraits<T>::scale();
-            float d = float(*ptr++) * GLTypeTraits<T>::scale();
+            float b = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
+            float g = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float d = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(d, g, b, 1.0f);
         }
     };
@@ -980,9 +1426,9 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m )
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            *ptr++ = (GLubyte)( c.b() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.g() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.r() / GLTypeTraits<T>::scale() );
+            *ptr++ = (T)( c.b() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.g() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.r() / GLTypeTraits<T>::scale(iw->_normalized) );
         }
     };
 
@@ -992,10 +1438,10 @@ namespace
         static osg::Vec4 read(const ImageUtils::PixelReader* ia, int s, int t, int r, int m)
         {
             const T* ptr = (const T*)ia->data(s, t, r, m);
-            float b = float(*ptr++) * GLTypeTraits<T>::scale();
-            float g = float(*ptr++) * GLTypeTraits<T>::scale();
-            float d = float(*ptr++) * GLTypeTraits<T>::scale();
-            float a = float(*ptr) * GLTypeTraits<T>::scale();
+            float b = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float g = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float d = float(*ptr++) * GLTypeTraits<T>::scale(ia->_normalized);
+            float a = float(*ptr) * GLTypeTraits<T>::scale(ia->_normalized);
             return osg::Vec4(d, g, b, a);
         }
     };
@@ -1006,10 +1452,10 @@ namespace
         static void write(const ImageUtils::PixelWriter* iw, const osg::Vec4f& c, int s, int t, int r, int m )
         {
             T* ptr = (T*)iw->data(s, t, r, m);
-            *ptr++ = (GLubyte)( c.b() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.g() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.r() / GLTypeTraits<T>::scale() );
-            *ptr++ = (GLubyte)( c.a() / GLTypeTraits<T>::scale() );
+            *ptr++ = (T)( c.b() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.g() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.r() / GLTypeTraits<T>::scale(iw->_normalized) );
+            *ptr++ = (T)( c.a() / GLTypeTraits<T>::scale(iw->_normalized) );
         }
     };
 
@@ -1038,7 +1484,11 @@ namespace
         {
             GLushort p = *(const GLushort*)ia->data(s, t, r, m);
             //internal format GL_RGB5_A1 is implied
-            return osg::Vec4( r5*(float)(p>>11), r5*(float)((p&0x7c0)>>6), r5*((p&0x3e)>>1), (float)(p&0x1));
+            return osg::Vec4(
+                r5*(float)(p>>11), 
+                r5*(float)((p&0x7c0)>>6), 
+                r5*(float)((p&0x3e)>>1), 
+                (float)(p&0x1));
         }
     };
 
@@ -1199,8 +1649,9 @@ namespace
 }
     
 ImageUtils::PixelReader::PixelReader(const osg::Image* image) :
-_image(image)
+_image     (image)
 {
+    _normalized = ImageUtils::isNormalized(image);
     _colMult = _image->getPixelSizeInBits() / 8;
     _rowMult = _image->getRowSizeInBytes();
     _imageSize = _image->getImageSizeInBytes();
@@ -1289,6 +1740,7 @@ namespace
 ImageUtils::PixelWriter::PixelWriter(osg::Image* image) :
 _image(image)
 {
+    _normalized = ImageUtils::isNormalized(image);
     _colMult = _image->getPixelSizeInBits() / 8;
     _rowMult = _image->getRowSizeInBytes();
     _imageSize = _image->getImageSizeInBytes();

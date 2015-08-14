@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -46,11 +46,13 @@ namespace osgEarth { namespace Symbology
 
             ALIGN_RIGHT_TOP,
             ALIGN_RIGHT_CENTER,
-            ALIGN_RIGHT_BOTTOM
+            ALIGN_RIGHT_BOTTOM,
         };
 
     public:
-        META_Symbol(IconSymbol);
+        META_Object(osgEarthSymbology, IconSymbol);
+
+        IconSymbol(const IconSymbol& rhs,const osg::CopyOp& copyop=osg::CopyOp::SHALLOW_COPY);
 
         IconSymbol( const Config& conf =Config() );
 

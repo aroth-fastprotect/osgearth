@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -319,8 +319,9 @@ Feature::eval( NumericExpression& expr, FilterContext const* context ) const
           ScriptResult result = engine->run(i->first, this, context);
           if (result.success())
             val = result.asDouble();
-          else
-              OE_WARN << LC << "Script error:" << result.message() << std::endl; 
+          else {
+              OE_WARN << LC << "Feature Script error on '" << expr.expr() << "': " << result.message() << std::endl;
+          }
         }
       }
 
@@ -352,7 +353,7 @@ Feature::eval( StringExpression& expr, FilterContext const* context ) const
           if (result.success())
             val = result.asString();
           else
-              OE_WARN << LC << "Script error:" << result.message() << std::endl;
+            OE_WARN << LC << "Feature Script error on '" << expr.expr() << "': " << result.message() << std::endl;
         }
       }
 
@@ -404,6 +405,15 @@ Feature::getWorldBoundingPolytope(const SpatialReference* srs,
     osg::BoundingSphered bs;
     if ( getWorldBound(srs, bs) && bs.valid() )
     {
+        return getWorldBoundingPolytope( bs, srs, out_polytope );
+    }
+    return false;
+}
+
+bool Feature::getWorldBoundingPolytope( const osg::BoundingSphered& bs, const SpatialReference* srs, osg::Polytope& out_polytope )
+{
+    if ( bs.valid() )
+    {
         out_polytope.clear();
 
         // add planes for the four sides of the BS. Normals point inwards.
@@ -444,7 +454,7 @@ Feature::getWorldBoundingPolytope(const SpatialReference* srs,
 
 
 std::string
-Feature::getGeoJSON()
+Feature::getGeoJSON() const
 {
     std::string geometry = GeometryUtils::geometryToGeoJSON( getGeometry() );
 
@@ -515,7 +525,6 @@ Feature::getGeoJSON()
 
     root["properties"] = props;
     return Json::FastWriter().write( root );
-    //return Json::StyledWriter().write( root );
 }
 
 std::string Feature::featuresToGeoJSON( FeatureList& features)

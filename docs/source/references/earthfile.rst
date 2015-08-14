@@ -42,10 +42,12 @@ the entire map.
 .. parsed-literal::
 
     <map>
-        <options lighting                = "true"
-                 elevation_interpolation = "bilinear"
-                 elevation_tile_size     = "8"
-                 overlay_texture_size    = "4096" >
+        <options lighting                 = "true"
+                 elevation_interpolation  = "bilinear"
+                 elevation_tile_size      = "17"
+                 overlay_texture_size     = "4096"
+                 overlay_blending         = "true"
+                 overlay_resolution_ratio = "3.0" >
 
             <:ref:`profile <Profile>`>
             <:ref:`proxy <ProxySettings>`>
@@ -53,24 +55,30 @@ the entire map.
             <:ref:`cache_policy <CachePolicy>`>
             <:ref:`terrain <TerrainOptions>`>
 
-+------------------------+--------------------------------------------------------------------+
-| Property               | Description                                                        |
-+========================+====================================================================+
-| lighting               | Whether to enable GL_LIGHTING on the entire map. By default this is|
-|                        | unset, meaning it will inherit the lighting mode of the scene.     |
-+------------------------+--------------------------------------------------------------------+
-| elevation_interpolation| Algorithm to use when resampling elevation source data:            |
-|                        |   :nearest:     Nearest neighbor                                   |
-|                        |   :average:     Averages the neighoring values                     |
-|                        |   :bilinear:    Linear interpolation in both axes                  |
-|                        |   :triangulate: Interp follows triangle slope                      |
-+------------------------+--------------------------------------------------------------------+
-| elevation_tile_size    | Forces the number of posts to render for each terrain tile. By     |
-|                        | default, the engine will use the size of the largest available     |
-|                        | source.                                                            |
-+------------------------+--------------------------------------------------------------------+
-| overlay_texture_size   | Sets the texture size to use for draping (projective texturing)    |
-+------------------------+--------------------------------------------------------------------+
++--------------------------+--------------------------------------------------------------------+
+| Property                 | Description                                                        |
++==========================+====================================================================+
+| lighting                 | Whether to allow lighting shaders to affect the map.               |
++--------------------------+--------------------------------------------------------------------+
+| elevation_interpolation  | Algorithm to use when resampling elevation source data:            |
+|                          |   :nearest:     Nearest neighbor                                   |
+|                          |   :average:     Averages the neighoring values                     |
+|                          |   :bilinear:    Linear interpolation in both axes                  |
+|                          |   :triangulate: Interp follows triangle slope                      |
++--------------------------+--------------------------------------------------------------------+
+| overlay_texture_size     | Sets the texture size to use for draping (projective texturing)    |
++--------------------------+--------------------------------------------------------------------+
+| overlay_blending         | Whether overlay geometry blends with the terrain during draping    |
+|                          | (projective texturing                                              |
++--------------------------+--------------------------------------------------------------------+
+| overlay_resolution_ratio | For draped geometry, the ratio of the resolution of the projective |
+|                          | texture near the camera versus the resolution far from the camera. |
+|                          | Increase the value to improve appearance close to the camera while |
+|                          | sacrificing appearance of farther geometry. NOTE: If you're using  |
+|                          | a camera manipulator that support roll, you will probably need to  |
+|                          | set this to 1.0; otherwise you will get draping artifacts! This is |
+|                          | a known issue.                                                     |
++--------------------------+--------------------------------------------------------------------+
 
 
 .. _TerrainOptions:
@@ -85,14 +93,17 @@ These options control the rendering of the terrain surface.
         <options>
             <terrain driver                = "mp"
                      lighting              = "true"
-                     skirt_ratio           = "0.05"
                      min_tile_range_factor = "6"
                      min_lod               = "0"
                      max_lod               = "23"
                      first_lod             = "0"
                      cluster_culling       = "true"
                      mercator_fast_path    = "true"
-                     blending              = "false" >
+                     blending              = "false"
+                     color                 = "#ffffffff"
+                     tile_size             = "17"
+                     normalize_edges       = "false"
+                     elevation_smoothing   = "false">
 
 +-----------------------+--------------------------------------------------------------------+
 | Property              | Description                                                        |
@@ -104,11 +115,10 @@ These options control the rendering of the terrain surface.
 | lighting              | Whether to enable GL_LIGHTING on the terrain. By default this is   |
 |                       | unset, meaning it will inherit the lighting mode of the scene.     |
 +-----------------------+--------------------------------------------------------------------+
-| skirt_ratio           | Ratio of the height of a terrain tile "skirt" to the extent of the |
-|                       | tile. The *skirt* is geometry that hides gaps between adjacent     |
-|                       | tiles with different levels of detail.                             |
-+-----------------------+--------------------------------------------------------------------+
-| min_tile_range_factor | Ratio of a tile's extent to its visibility range.                  |
+| min_tile_range_factor | Determines how close you need to be to a terrain tile for it to    |
+|                       | display. The value is the ratio of a tile's extent to its          |
+|                       | For example, if a tile is 10km is radius, and the MTRF=6, then the |
+|                       | tile will become visible at a range of about 60km.                 |
 +-----------------------+--------------------------------------------------------------------+
 | min_lod               | The lowest level of detail that the terrain is guaranteed to       |
 |                       | display, even if no source data is available at that LOD. The      |
@@ -132,6 +142,16 @@ These options control the rendering of the terrain surface.
 | blending              | Set this to ``true`` to enable GL blending on the terrain's        |
 |                       | underlying geometry. This lets you make the globe partially        |
 |                       | transparent. This is handy for seeing underground objects.         |
++-----------------------+--------------------------------------------------------------------+
+| tile_size             | The dimensions of each terrain tile. Each terrain tile will have   |
+|                       | ``tile_size`` X ``tile_size`` verticies.                           |
++-----------------------+--------------------------------------------------------------------+
+| normalize_edges       | Calculate normal vectors along the edges of terrain tiles so that  |
+|                       | lighting appears smoother from one tile to the next.               |
++-----------------------+--------------------------------------------------------------------+
+| elevation_smoothing   | Whether to smooth the transition across elevation data insets.     |
+|                       | Doing so will give a smoother appearance to disparate height field |
+|                       | data, but elevations will not be as accurate. Default = false      |
 +-----------------------+--------------------------------------------------------------------+
 
 
@@ -158,8 +178,13 @@ An *image layer* is a raster image overlaid on the map's geometry.
                enabled        = "true"
                visible        = "true"
                shared         = "false"
+               shared_sampler = "string"
+               shared_matrix  = "string"
+               coverage       = "false"
                feather_pixels = "false"
-               >
+               min_filter     = "LINEAR"
+               mag_filter     = "LINEAR" 
+               texture_compression = "auto" >
 
             <:ref:`cache_policy <CachePolicy>`>
             <:ref:`color_filters <ColorFilterChain>`>
@@ -197,6 +222,12 @@ An *image layer* is a raster image overlaid on the map's geometry.
 | max_resolution        | Maximum source data resolution at which to draw tiles. Value is    |
 |                       | units per pixel, in the native units of the source data.           |
 +-----------------------+--------------------------------------------------------------------+
+| max_data_level        | Maximum level of detail at which new source data is available to   |
+|                       | this image layer. Usually the driver will report this information. |
+|                       | But you may wish to limit it yourself. This is especially true for |
+|                       | some drivers that have no resolution limit, like a rasterization   |
+|                       | driver (agglite) for example.                                      |
++-----------------------+--------------------------------------------------------------------+
 | enabled               | Whether to include this layer in the map. You can only set this at |
 |                       | load time; it is just an easy way of "commenting out" a layer in   |
 |                       | the earth file.                                                    |
@@ -206,9 +237,34 @@ An *image layer* is a raster image overlaid on the map's geometry.
 | shared                | Generates a secondary, dedicated sampler for this layer so that it |
 |                       | may be accessed globally by custom shaders.                        |
 +-----------------------+--------------------------------------------------------------------+
+| shared_sampler        | For a shared layer, the uniform name of the sampler that will be   |
+|                       | available in GLSL code.                                            |
++-----------------------+--------------------------------------------------------------------+
+| shared_matrix         | For a shared layer, the uniform name of the texture matrix that    |
+|                       | will be available in GLSL code that you can use to access          |
+|                       | the proper texture coordinate for the ``shared_sampler`` above.    |
++-----------------------+--------------------------------------------------------------------+
+| coverage              | Indicates that this is a coverage layer, i.e. a layer that conveys |
+|                       | discrete values with particular semantics. An example would be a   |
+|                       | "land use" layer in which each pixel holds a value that indicates  |
+|                       | whether the area is grassland, desert, etc. Marking a layer as a   |
+|                       | coverage disables any interpolation, filtering, or compression as  |
+|                       | these will corrupt the sampled data values on the GPU.             |
++-----------------------+--------------------------------------------------------------------+
 | feather_pixels        | Whether to feather out alpha regions for this image layer with the |
 |                       | featherAlphaRegions function. Used to get proper blending when you |
 |                       | have datasets that abutt exactly with no overlap.                  |
++-----------------------+--------------------------------------------------------------------+
+| min_filter            | OpenGL texture minification filter to use for this layer.          |
+|                       | Options are NEAREST, LINEAR, NEAREST_MIPMAP_NEAREST,               |
+|                       | NEAREST_MIPMIP_LINEAR, LINEAR_MIPMAP_NEAREST, LINEAR_MIPMAP_LINEAR |
++-----------------------+--------------------------------------------------------------------+
+| mag_filter            | OpenGL texture magnification filter to use for this layer.         |
+|                       | Options are the same as for ``min_filter`` above.                  |
++-----------------------+--------------------------------------------------------------------+
+| texture_compression   | "auto" to compress textures on the GPU;                            |
+|                       | "none" to disable.                                                 |
+|                       | "fastdxt" to use the FastDXT real time DXT compressor              |
 +-----------------------+--------------------------------------------------------------------+
 
 
@@ -222,14 +278,18 @@ will composite all elevation data into a single heightmap and use that to build 
 .. parsed-literal::
 
     <map>
-        <elevation name           = "text"
-                   driver         = "gdal"
-                   min_level      = "0"
-                   max_level      = "23"
-                   min_resolution = "100.0"
-                   max_resolution = "0.0"
-                   enabled        = "true"
-                   offset         = "false" >
+        <elevation name            = "text"
+                   driver          = "gdal"
+                   min_level       = "0"
+                   max_level       = "23"
+                   min_resolution  = "100.0"
+                   max_resolution  = "0.0"
+                   enabled         = "true"
+                   offset          = "false"
+                   nodata_value    = "-32768"
+                   min_valid_value = "-32768"
+                   max_valid_value = "32768"
+                   nodata_policy   = "interpolate" >
 
 
 +-----------------------+--------------------------------------------------------------------+
@@ -258,6 +318,16 @@ will composite all elevation data into a single heightmap and use that to build 
 | offset                | Indicates that the height values in this layer are relative        |
 |                       | offsets rather than true terrain height samples.                   |
 +-----------------------+--------------------------------------------------------------------+
+| nodata_policy         | What to do with "no data" values. Default is "interpolate" which   |
+|                       | will interpolate neighboring values to fill holes. Set it to "msl" |
+|                       | to replace "no data" samples with the current sea level value.     |
++-----------------------+--------------------------------------------------------------------+
+| nodata_value          | Treat this value as "no data".                                     |
++-----------------------+--------------------------------------------------------------------+
+| min_valid_value       | Treat anything less than this value as "no data".                  |
++-----------------------+--------------------------------------------------------------------+
+| max_valid_value       | Treat anything greater than this value as "no data".               |
++-----------------------+--------------------------------------------------------------------+
 
 
 .. _ModelLayer:
@@ -269,8 +339,10 @@ A *Model Layer* renders non-terrain data, like vector features or external 3D mo
 .. parsed-literal::
 
     <map>
-        <model name   = "my model layer"
-               driver = "feature_geom"
+        <model name    = "my model layer"
+               driver  = "feature_geom"
+               enabled = true
+               visible = true >
 
 
 +-----------------------+--------------------------------------------------------------------+
@@ -288,6 +360,34 @@ A *Model Layer* renders non-terrain data, like vector features or external 3D mo
 +-----------------------+--------------------------------------------------------------------+
 | visible               | Whether to draw the layer.                                         |
 +-----------------------+--------------------------------------------------------------------+
+
+The Model Layer also allows you to define a cut-out mask. The terrain engine will cut a hole
+in the terrain surface matching a *boundary geometry* that you supply. You can use the tool
+*osgearth_boundarygen* to create such a geometry.
+
+This is useful if you have an external terrain model and you want to insert it into the 
+osgEarth terrain. The model MUST be in the same coordinate system as the terrain.
+
+.. parsed-literal::
+
+    <map>
+        <model ...>
+            <mask driver="feature">
+                <features driver="ogr">
+                    ...
+
+The Mask can take any polygon feature as input. You can specify masking geometry inline
+by using an inline geometry:
+
+.. parsed-literal::
+    
+    <features ...>
+        <geometry>POLYGON((120 42 0, 121 41 0, 121 40 0))</geometry>
+
+Or you use a shapefile or other feature source, in which case osgEarth will use the 
+*first* feature in the source.
+
+Refer to the *mask.earth* sample for an example.
 
 
 
@@ -344,11 +444,9 @@ Configures a cache for tile data.
 +-----------------------+--------------------------------------------------------------------+
 | Property              | Description                                                        |
 +=======================+====================================================================+
-| driver                | Plugin to use for caching.                                         |
-|                       | At the moment there is only one caching plugin that comes with     |
-|                       | osgEarth, the ``filesystem`` plugin.                               |
+| driver                | Plugin to use for caching, ``filesystem`` or ``leveldb``.          |
 +-----------------------+--------------------------------------------------------------------+
-| path                  | Path (relative or absolute) or the root of a ``filesystem`` cache. |
+| path                  | Path (relative or absolute) or the cache folder or file.           |
 +-----------------------+--------------------------------------------------------------------+
 
 
@@ -372,6 +470,8 @@ Policy that determines how a given element will interact with a configured cache
 |                       |                 data source. This is nice for offline rendering.   |
 |                       |   :no_cache:    Ignore caching and always read from the data       |
 |                       |                 source.                                            |
++-----------------------+--------------------------------------------------------------------+
+| max_age               | Treat cache entries older than this value (in seconds) as expired. |
 +-----------------------+--------------------------------------------------------------------+
 
 

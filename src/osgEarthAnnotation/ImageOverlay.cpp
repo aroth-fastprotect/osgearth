@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -65,10 +68,10 @@ _lowerRight   (20, 10),
 _upperRight   (20, 20),
 _upperLeft    (10, 20),
 _dirty        (false),
-_texture      (0),
 _alpha        (1.0f),
 _minFilter    (osg::Texture::LINEAR_MIPMAP_LINEAR),
-_magFilter    (osg::Texture::LINEAR)
+_magFilter    (osg::Texture::LINEAR),
+_texture      (0)
 {
     conf.getIfSet( "url",   _imageURI );
     if ( _imageURI.isSet() )
@@ -172,13 +175,10 @@ _upperRight   (20, 20),
 _upperLeft    (10, 20),
 _image        (image),
 _dirty        (false),
-_geode        (0),
-_transform    (0),
-_geometry     (0),
-_texture      (0),
 _alpha        (1.0f),
 _minFilter    (osg::Texture::LINEAR_MIPMAP_LINEAR),
-_magFilter    (osg::Texture::LINEAR)
+_magFilter    (osg::Texture::LINEAR),
+_texture      (0)
 {        
     postCTOR();
 }
@@ -211,8 +211,11 @@ ImageOverlay::init()
 
     if ( getMapNode() )
     {
+        double height = 0;
         osg::Geometry* geometry = new osg::Geometry();
         geometry->setUseVertexBufferObjects(true);
+
+        const osg::EllipsoidModel* ellipsoid = getMapNode()->getMapSRS()->getEllipsoid();
 
         const SpatialReference* mapSRS = getMapNode()->getMapSRS();
 
@@ -265,7 +268,9 @@ ImageOverlay::init()
         if (_image.valid())
         {
             //Create the texture
-            _texture = new osg::Texture2D(_image.get());        
+            _texture = new osg::Texture2D(_image.get());     
+            _texture->setWrap(_texture->WRAP_S, _texture->CLAMP_TO_EDGE);
+            _texture->setWrap(_texture->WRAP_T, _texture->CLAMP_TO_EDGE);
             _texture->setResizeNonPowerOfTwoHint(false);
             updateFilters();
             _geode->getOrCreateStateSet()->setTextureAttributeAndModes(0, _texture, osg::StateAttribute::ON);    
@@ -304,14 +309,8 @@ ImageOverlay::init()
 
         if ( Registry::capabilities().supportsGLSL() )
         {
-            OE_WARN << LC << "ShaderGen RUNNING" << std::endl;
-            ShaderGenerator gen;
-            _geode->accept( gen );
-            //// need a shader that supports one texture
-            //VirtualProgram* vp = new VirtualProgram();
-            //vp->setName( "imageoverlay");
-            //vp->installDefaultColoringShaders(1);
-            //d->getOrCreateStateSet()->setAttributeAndModes( vp, 1 );
+            //OE_WARN << LC << "ShaderGen RUNNING" << std::endl;
+            Registry::shaderGenerator().run( _geode, "osgEarth.ImageOverlay" );
         }
     }
 }

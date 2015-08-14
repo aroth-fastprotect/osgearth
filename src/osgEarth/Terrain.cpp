@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -33,23 +33,46 @@ namespace
 {
     struct BaseOp : public osg::Operation
     {
-        BaseOp(Terrain* terrain ) : osg::Operation("",false), _terrain(terrain) { }
-        osg::ref_ptr<Terrain> _terrain;
+        BaseOp(Terrain* terrain, bool keepByDefault) : osg::Operation("",keepByDefault), _terrain(terrain) { }
+        osg::observer_ptr<Terrain> _terrain;
     };
 
     struct OnTileAddedOperation : public BaseOp
     {
         TileKey _key;
-        osg::ref_ptr<osg::Node> _node;
+        osg::observer_ptr<osg::Node> _node;
+        unsigned _count;
 
         OnTileAddedOperation(const TileKey& key, osg::Node* node, Terrain* terrain)
-            : BaseOp(terrain), _key(key), _node(node) { }
+            : BaseOp(terrain, true), _key(key), _node(node), _count(0) { }
 
         void operator()(osg::Object*)
         {
-            if ( _node.valid() && _node->referenceCount() > 1 && _terrain.valid() )
+            if ( getKeep() == false )
+                return;
+
+            ++_count;
+            osg::ref_ptr<Terrain>   terrain;
+            osg::ref_ptr<osg::Node> node;
+
+            if ( _terrain.lock(terrain) && _node.lock(node) )
             {
-                _terrain->fireTileAdded( _key, _node.get() );
+                if ( node->getNumParents() > 0 )
+                {
+                    //OE_NOTICE << LC << "FIRING onTileAdded for " << _key.str() << " (tries=" << _count << ")" << std::endl;
+                    terrain->fireTileAdded( _key, node.get() );
+                    this->setKeep( false );
+                }
+                else
+                {
+                    //OE_NOTICE << LC << "Deferring onTileAdded for " << _key.str() << std::endl;
+                }
+            }
+            else
+            {
+                // nop; tile expired; let it go.
+                //OE_NOTICE << "Tile expired before notification: " << _key.str() << std::endl;
+                this->setKeep( false );
             }
         }
     };
@@ -99,16 +122,13 @@ Terrain::getHeight(osg::Node*              patch,
         const SpatialReference* ecef = getSRS()->getECEF();
         getSRS()->transform(start, ecef, start);
         getSRS()->transform(end,   ecef, end);
-        //getSRS()->transformToECEF(start, start);
-        //getSRS()->transformToECEF(end, end);
     }
 
-    osgUtil::LineSegmentIntersector* lsi = new osgUtil::LineSegmentIntersector(start, end);
-    lsi->setIntersectionLimit(osgUtil::Intersector::LIMIT_ONE);
+    DPLineSegmentIntersector* lsi = new DPLineSegmentIntersector( start, end );
+    lsi->setIntersectionLimit(osgUtil::Intersector::LIMIT_NEAREST);
 
     osgUtil::IntersectionVisitor iv( lsi );
-    iv.setTraversalMask( ~_terrainOptions.secondaryTraversalMask().value() );
-
+ 
     if ( patch )
         patch->accept( iv );
     else
@@ -152,10 +172,6 @@ Terrain::getWorldCoordsUnderMouse(osg::View* view, float x, float y, osg::Vec3d&
 
     osg::NodePath nodePath;
     nodePath.push_back( _graph.get() );
-
-    // fine but computeIntersections won't travers a masked Drawable, a la quadtree.
-    unsigned traversalMask = ~_terrainOptions.secondaryTraversalMask().value();
-
 
 #if 0
     // Old code, uses the computeIntersections method directly but sufferes from floating point precision problems.
@@ -204,10 +220,9 @@ Terrain::getWorldCoordsUnderMouse(osg::View* view, float x, float y, osg::Vec3d&
     osg::ref_ptr< DPLineSegmentIntersector > picker = new DPLineSegmentIntersector(osgUtil::Intersector::MODEL, startVertex, endVertex);
 
     // Limit it to one intersection, we only care about the first
-    picker->setIntersectionLimit( osgUtil::Intersector::LIMIT_ONE );
+    picker->setIntersectionLimit( osgUtil::Intersector::LIMIT_NEAREST );
 
     osgUtil::IntersectionVisitor iv(picker.get());
-    iv.setTraversalMask(traversalMask);
     nodePath.back()->accept(iv);
 
     if (picker->containsIntersections())
@@ -238,10 +253,7 @@ Terrain::getWorldCoordsUnderMouse(osg::View* view,
     osg::NodePath path;
     path.push_back( _graph.get() );
 
-    // fine but computeIntersections won't travers a masked Drawable, a la quadtree.
-    unsigned mask = ~_terrainOptions.secondaryTraversalMask().value();
-
-    if ( view2->computeIntersections( x, y, path, results, mask ) )
+    if ( view2->computeIntersections( x, y, path, results ) )
     {
         // find the first hit under the mouse:
         osgUtil::LineSegmentIntersector::Intersection first = *(results.begin());
@@ -265,6 +277,7 @@ Terrain::addTerrainCallback( TerrainCallback* cb )
     {        
         Threading::ScopedWriteLock exclusiveLock( _callbacksMutex );
         _callbacks.push_back( cb );
+        ++_callbacksSize; // atomic increment
     }
 }
 
@@ -278,6 +291,7 @@ Terrain::removeTerrainCallback( TerrainCallback* cb )
         if ( i->get() == cb )
         {
             i = _callbacks.erase( i );
+            --_callbacksSize;
         }
         else
         {
@@ -294,9 +308,10 @@ Terrain::notifyTileAdded( const TileKey& key, osg::Node* node )
         OE_WARN << LC << "notify with a null node!" << std::endl;
     }
 
-    if ( _updateOperationQueue.valid() )
+    osg::ref_ptr<osg::OperationQueue> queue;
+    if ( _callbacksSize > 0 && _updateOperationQueue.lock(queue) )
     {
-        _updateOperationQueue->add( new OnTileAddedOperation(key, node, this) );
+        queue->add( new OnTileAddedOperation(key, node, this) );
     }
 }
 
@@ -311,10 +326,10 @@ Terrain::fireTileAdded( const TileKey& key, osg::Node* node )
         i->get()->onTileAdded( key, node, context );
 
         // if the callback set the "remove" flag, discard the callback.
-        if ( !context._remove )
-            ++i;
-        else
+        if ( context.markedForRemoval() )
             i = _callbacks.erase( i );
+        else
+            ++i;
     }
 }
 

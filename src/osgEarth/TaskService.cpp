@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -65,9 +65,10 @@ TaskRequest::wasCanceled() const
 
 //------------------------------------------------------------------------
 
-TaskRequestQueue::TaskRequestQueue() :
+TaskRequestQueue::TaskRequestQueue(unsigned int maxSize) :
 osg::Referenced( true ),
-_done( false )
+_done( false ),
+_maxSize( maxSize )
 {
 }
 
@@ -76,6 +77,28 @@ TaskRequestQueue::clear()
 {
     ScopedLock<Mutex> lock(_mutex);
     _requests.clear();
+}
+
+void
+TaskRequestQueue::cancel()
+{
+    ScopedLock<Mutex> lock(_mutex);
+    for (TaskRequestPriorityMap::iterator it = _requests.begin(); it != _requests.end(); ++it)
+        (*it).second->cancel();
+
+    _requests.clear();
+}
+
+bool
+TaskRequestQueue::isFull() const
+{
+    return _maxSize > 0 && (_maxSize == _requests.size());
+}
+
+bool
+TaskRequestQueue::isEmpty() const
+{
+    return !_done && _requests.empty();
 }
 
 unsigned int
@@ -94,56 +117,57 @@ TaskRequestQueue::add( TaskRequest* request )
     if ( !request->getProgressCallback() )
         request->setProgressCallback( new ProgressCallback() );
 
-    ScopedLock<Mutex> lock(_mutex);
-
-    // insert by priority.
-    _requests.insert( std::pair<float,TaskRequest*>(request->getPriority(), request) );
-
-#if 0
-    // insert by priority.
-    bool inserted = false;
-    for( TaskRequestList::iterator i = _requests.begin(); i != _requests.end(); i++ )
     {
-        if ( request->getPriority() > i->get()->getPriority() )
+        // Lock on the add mutex so no one else can add.
+        ScopedLock<Mutex> lock( _mutex );
+
+        while(isFull())
         {
-            _requests.insert( i, request );
-            inserted = true;
-            //OE_NOTICE << "TaskRequestQueue size=" << _requests.size() << std::endl;
-            break;
+            _notFull.wait(&_mutex);
         }
+
+        // Check to make sure the bounded queue is working correctly.
+        if (_maxSize > 0 && _requests.size() > _maxSize)
+        {
+            OE_NOTICE << "ERROR:  TaskRequestQueue requests " << getNumRequests() << " > max size of " << _maxSize << std::endl;
+        }
+
+        // insert by priority.
+        _requests.insert( std::pair<float,TaskRequest*>(request->getPriority(), request) );
     }
 
-    if ( !inserted )
-        _requests.push_back( request );
-#endif
+    //OE_NOTICE << "There are now " << _requests.size() << " tasks" << std::endl;
 
     // since there is data in the queue, wake up one waiting task thread.
-    _cond.signal();
+    _notEmpty.signal(); 
 }
 
 TaskRequest* 
 TaskRequestQueue::get()
 {
-    ScopedLock<Mutex> lock(_mutex);
-
-    while ( !_done && _requests.empty() )
+    
+    osg::ref_ptr<TaskRequest> next;
     {
-        // releases the mutex and waits on the condition.
-        _cond.wait( &_mutex );
-    }
+        ScopedLock<Mutex> lock(_mutex);
 
-    if ( _done )
-    {
-        return 0L;
-    }
+        while ( isEmpty() )
+        {                
+            _notEmpty.wait( &_mutex );        
+        }
 
-    osg::ref_ptr<TaskRequest> next = _requests.begin()->second.get(); //_requests.front();
-    _requests.erase( _requests.begin() ); //_requests.pop_front();
+        if ( _done )
+        {
+            return 0L;
+        }
+
+        next = _requests.begin()->second.get(); //_requests.front();
+        _requests.erase( _requests.begin() ); //_requests.pop_front();
+    }
 
     // I'm done, someone else take a turn:
     // (technically this shouldn't be necessary since add() bumps the semaphore once
-    // for each request in the queue)
-    _cond.signal();
+    // for each request in the queue)    
+    _notFull.signal();    
 
     return next.release();
 }
@@ -160,8 +184,10 @@ TaskRequestQueue::setDone()
     //_cond.broadcast();
 
     // alternative to buggy win32 broadcast (OSG pre-r10457 on windows)
-    for(int i=0; i<128; i++)
-        _cond.signal();
+    for(int i=0; i<128; i++) {
+        _notFull.signal();
+        _notEmpty.signal();
+    }
 }
 
 //------------------------------------------------------------------------
@@ -185,6 +211,16 @@ TaskThread::run()
 
         if (_request.valid())
         { 
+            PoisonPill* poison = dynamic_cast< PoisonPill* > ( _request.get());
+            if ( poison )
+            {
+                OE_DEBUG << this->getThreadId() << " received poison pill.  Shutting down" << std::endl;
+                // Add the poison pill back to the queue to kill any other threads.  If I'm going down, you're all going down with me!
+                _queue->add( poison );
+                break;
+            }
+            
+
             // discard a completed or canceled request:
             if ( _request->getState() != TaskRequest::STATE_PENDING )
             {
@@ -215,6 +251,7 @@ TaskThread::run()
             // Release the request
             _request = 0;
         }
+        
     }
 }
 
@@ -240,13 +277,13 @@ TaskThread::cancel()
 
 //------------------------------------------------------------------------
 
-TaskService::TaskService( const std::string& name, int numThreads ):
+TaskService::TaskService( const std::string& name, int numThreads, unsigned int maxSize ):
 osg::Referenced( true ),
 _numThreads(0),
 _lastRemoveFinishedThreadsStamp(0),
 _name(name)
 {
-    _queue = new TaskRequestQueue();
+    _queue = new TaskRequestQueue( maxSize );
     setNumThreads( numThreads );
 }
 
@@ -262,6 +299,27 @@ TaskService::add( TaskRequest* request )
     //OE_INFO << LC << "TS [" << _name << "] adding request [" << request->getName() << "]" << std::endl;
     _queue->add( request );
 }
+
+void TaskService::waitforThreadsToComplete()
+{        
+    for( TaskThreads::iterator i = _threads.begin(); i != _threads.end(); i++ )
+    {
+        (*i)->join();
+    }    
+}
+
+bool TaskService::areThreadsRunning()
+{
+    for( TaskThreads::iterator i = _threads.begin(); i != _threads.end(); i++ )
+    {                
+        if ((*i)->isRunning())
+        {
+            return true;
+        }
+    }    
+    return false;
+}
+
 
 TaskService::~TaskService()
 {
@@ -377,6 +435,18 @@ TaskService::removeFinishedThreads()
     if (numRemoved > 0)
     {
         OE_DEBUG << LC << "Removed " << numRemoved << " finished threads " << std::endl;
+    }
+}
+
+void
+TaskService::cancelAll()
+{
+    if (_numThreads > 0)
+    {
+        _numThreads = 0;
+        adjustThreadCount();
+
+        OE_INFO << LC << "Cancelled all threads in TaskService [" << _name << "]" << std::endl;
     }
 }
 

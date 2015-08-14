@@ -18,11 +18,12 @@ SET(TARGET_PUBLIC_H
     Common
     ConvertTypeFilter
     CropFilter
-    ExtrudeGeometryFilter
+    ExtrudeGeometryFilter    
     Feature
     FeatureCursor
     FeatureDisplayLayout
     FeatureDrawSet
+    FeatureIndex
     FeatureListSource
     FeatureModelGraph
     FeatureModelSource
@@ -60,7 +61,7 @@ SET(TARGET_SRC
     CentroidFilter.cpp
     ConvertTypeFilter.cpp
     CropFilter.cpp
-    ExtrudeGeometryFilter.cpp
+    ExtrudeGeometryFilter.cpp    
     Feature.cpp
     FeatureCursor.cpp
     FeatureDisplayLayout.cpp

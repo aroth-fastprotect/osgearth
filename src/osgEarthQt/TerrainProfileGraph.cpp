@@ -1,5 +1,5 @@
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -7,10 +7,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -21,7 +24,11 @@
 #include <osgEarthQt/GuiActions>
 
 #include <osgEarthUtil/TerrainProfile>
+#include <osgEarthUtil/LatLongFormatter>
 
+#include <QApplication>
+#include <QClipboard>
+#include <QMimeData>
 #include <QGraphicsLineItem>
 #include <QGraphicsRectItem>
 #include <QGraphicsScene>
@@ -35,7 +42,6 @@
 #include <QRect>
 #include <QResizeEvent>
 #include <QToolTip>
-
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
@@ -84,8 +90,8 @@ const int TerrainProfileGraph::OVERLAY_Z = 30;
 
 
 TerrainProfileGraph::TerrainProfileGraph(TerrainProfileCalculator* calculator, TerrainProfilePositionCallback* callback)
-  : QGraphicsView(), _calculator(calculator), _positionCallback(callback), _graphFont(tr("Helvetica,Verdana,Arial"), 8),
-    _backgroundColor(128, 128, 128), _fieldColor(204, 204, 204), _axesColor(255, 255, 255), 
+  : QGraphicsView(), _calculator(calculator), _positionCallback(callback), 
+    _backgroundColor(128, 128, 128), _fieldColor(204, 204, 204), _axesColor(255, 255, 255),
     _graphColor(0, 128, 0), _graphFillColor(128, 255, 128, 192), _graphField(0, 0, 0, 0),
     _totalDistance(0.0), _graphMinY(0), _graphMaxY(0), _graphWidth(500), _graphHeight(309),
     _selecting(false)
@@ -93,6 +99,8 @@ TerrainProfileGraph::TerrainProfileGraph(TerrainProfileCalculator* calculator, T
   setMouseTracking(true);
 
   _graphFont.setStyleHint(QFont::SansSerif);
+  _graphFont.setFamily(_graphFont.defaultFamily());
+  _graphFont.setPixelSize( 10 );
 
   _linePen.setWidth(2);
   _linePen.setBrush(QBrush(_graphColor));
@@ -106,14 +114,20 @@ TerrainProfileGraph::TerrainProfileGraph(TerrainProfileCalculator* calculator, T
   _scene = new QGraphicsScene(0, 0, _graphWidth, _graphHeight);
   _scene->setBackgroundBrush(QBrush(_backgroundColor));
   setScene(_scene);
-  
+
   redrawGraph();
 
   _graphChangedCallback = new TerrainGraphChangedShim(this);
   connect(this, SIGNAL(onNotifyTerrainGraphChanged()), this, SLOT(onTerrainGraphChanged()), Qt::QueuedConnection);
   //connect(_graphChangedCallback, SIGNAL(graphChanged()), this, SLOT(onGraphChanged()), Qt::QueuedConnection);
   if (_calculator.valid())
-    _calculator->addChangedCallback(_graphChangedCallback);
+  {
+      _calculator->addChangedCallback(_graphChangedCallback);
+  }
+
+  _coordinateFormatter = new osgEarth::Util::LatLongFormatter(
+    osgEarth::Util::LatLongFormatter::FORMAT_DECIMAL_DEGREES,
+    osgEarth::Util::LatLongFormatter::USE_COLONS);
 }
 
 TerrainProfileGraph::~TerrainProfileGraph()
@@ -121,6 +135,46 @@ TerrainProfileGraph::~TerrainProfileGraph()
     // removed: unnecessary now, since the callback is an observer list
   //if (_calculator.valid())
   //  _calculator->removeChangedCallback(_graphChangedCallback);
+}
+
+void TerrainProfileGraph::clear()
+{
+  _scene->clear();
+  _graphLines.clear();
+  _graphField.setCoords(0, 0, 0, 0);
+  _hoverLine = 0L;
+}
+
+void TerrainProfileGraph::onCopyToClipboard()
+{
+  const osgEarth::Util::TerrainProfile profile = _calculator->getProfile();
+  if (profile.getNumElevations() > 0)
+  {
+    const QLatin1String fieldSeparator(",");
+    GeoPoint startPt = _calculator->getStart(ALTMODE_ABSOLUTE);
+    GeoPoint endPt = _calculator->getEnd(ALTMODE_ABSOLUTE);
+    QString profileInfo = QString("Start:,%1,%2\nEnd:,%3,%4\n")
+      .arg(_coordinateFormatter->format(startPt).c_str()).arg(startPt.alt())
+      .arg(_coordinateFormatter->format(endPt).c_str()).arg(endPt.alt());
+    QString distanceInfo("Distance:");
+    QString elevationInfo("Elevation:");
+    for (unsigned int i = 0; i < profile.getNumElevations(); i++)
+    {
+      distanceInfo += fieldSeparator + QString::number(profile.getDistance(i));
+      elevationInfo += fieldSeparator + QString::number(profile.getElevation(i));
+    }
+    profileInfo += distanceInfo + QString("\n") + elevationInfo;
+
+    QImage graphImage(_graphWidth, _graphHeight, QImage::Format_RGB32);
+    QPainter p;
+    p.begin(&graphImage);
+    _scene->render(&p);
+    p.end();
+    QMimeData* clipData = new QMimeData();
+    clipData->setText(profileInfo);
+    clipData->setImageData(graphImage);
+    QApplication::clipboard()->setMimeData(clipData);
+  }
 }
 
 void TerrainProfileGraph::setBackgroundColor(const QColor& color)
@@ -155,6 +209,11 @@ void TerrainProfileGraph::setGraphFillColor(const QColor& color)
 {
   _graphFillColor = color;
   redrawGraph();
+}
+
+void TerrainProfileGraph::setCoordinateFormatter(osgEarth::Util::Formatter* formatter)
+{
+  _coordinateFormatter = formatter;
 }
 
 void TerrainProfileGraph::resizeEvent(QResizeEvent* e)
@@ -192,8 +251,8 @@ void TerrainProfileGraph::mouseReleaseEvent(QMouseEvent* e)
     double endDistanceFactor = ((zoomEnd - _graphField.x()) / (double)_graphField.width());
 
     osg::Vec3d worldStart, worldEnd;
-    _calculator->getStart().toWorld(worldStart);
-    _calculator->getEnd().toWorld(worldEnd);
+    _calculator->getStart(ALTMODE_ABSOLUTE).toWorld(worldStart);
+    _calculator->getEnd(ALTMODE_ABSOLUTE).toWorld(worldEnd);
 
     double newStartWorldX = (worldEnd.x() - worldStart.x()) * startDistanceFactor + worldStart.x();
     double newStartWorldY = (worldEnd.y() - worldStart.y()) * startDistanceFactor + worldStart.y();
@@ -240,6 +299,10 @@ void TerrainProfileGraph::redrawGraph()
     _totalDistance = profile.getTotalDistance();
 
     int mag = (int)pow(10.0, (double)((int)log10(maxElevation - minElevation)));
+    if( mag == 0 )
+    {
+        mag = 1;
+    }
     _graphMinY = ((int)(minElevation / mag) - (minElevation < 0 ? 1 : 0)) * mag;
     _graphMaxY = ((int)(maxElevation / mag) + (maxElevation < 0 ? 0 : 1)) * mag;
 
@@ -434,8 +497,8 @@ void TerrainProfileGraph::drawHoverCursor(const QPointF& position)
       double distanceFactor = ((xPos - _graphField.x()) / (double)_graphField.width());
 
       osg::Vec3d worldStart, worldEnd;
-      _calculator->getStart().toWorld(worldStart);
-      _calculator->getEnd().toWorld(worldEnd);
+      _calculator->getStart(ALTMODE_ABSOLUTE).toWorld(worldStart);
+      _calculator->getEnd(ALTMODE_ABSOLUTE).toWorld(worldEnd);
 
       double worldX = (worldEnd.x() - worldStart.x()) * distanceFactor + worldStart.x();
       double worldY = (worldEnd.y() - worldStart.y()) * distanceFactor + worldStart.y();
@@ -463,7 +526,14 @@ void TerrainProfileGraph::drawHoverCursor(const QPointF& position)
   distanceText->setBrush(QBrush(_axesColor));
   distanceText->setFont(_graphFont);
   distanceText->setZValue(OVERLAY_Z);
-  distanceText->setPos(xPos - 2 - distanceText->boundingRect().width(), _graphField.y() + _graphField.height() + 2);
+  if(xPos - 2 - distanceText->boundingRect().width() > _graphField.x())
+  {
+      distanceText->setPos(xPos - 2 - distanceText->boundingRect().width(), _graphField.y() + _graphField.height() + 2);
+  }
+  else
+  {
+      distanceText->setPos(xPos + 2, _graphField.y() + _graphField.height() + 2);
+  }
   distanceText->setParentItem(_hoverLine);
 
   // Draw selection box

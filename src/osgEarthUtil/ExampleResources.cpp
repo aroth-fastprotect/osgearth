@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -24,9 +27,12 @@
 #include <osgEarthUtil/MouseCoordsTool>
 #include <osgEarthUtil/AutoClipPlaneHandler>
 #include <osgEarthUtil/DataScanner>
+#include <osgEarthUtil/Sky>
+#include <osgEarthUtil/Ocean>
+#include <osgEarthUtil/Shadowing>
+#include <osgEarthUtil/ActivityMonitorTool>
+#include <osgEarthUtil/LogarithmicDepthBuffer>
 
-#include <osgEarthUtil/NormalMap>
-#include <osgEarthUtil/DetailTexture>
 #include <osgEarthUtil/LODBlending>
 #include <osgEarthUtil/VerticalScale>
 #include <osgEarthUtil/ContourMap>
@@ -40,23 +46,25 @@
 
 #include <osgEarthDrivers/kml/KML>
 
-#include <osgGA/StateSetManipulator>
-#include <osgViewer/ViewerEventHandlers>
 #include <osgDB/FileNameUtils>
 #include <osgDB/WriteFile>
+#include <osgGA/StateSetManipulator>
+#include <osgGA/AnimationPathManipulator>
+#include <osgViewer/View>
+#include <osgViewer/ViewerEventHandlers>
 
-#define KML_PUSHPIN_URL "http://demo.pelicanmapping.com/icons/pushpin_yellow.png"
+#define KML_PUSHPIN_URL "../data/placemark32.png"
 
-#define VP_DURATION          4.5     // time to fly to a viewpoint
 #define VP_MIN_DURATION      2.0     // minimum fly time.
 #define VP_METERS_PER_SECOND 2500.0  // fly speed
-#define VP_MAX_DURATION      8.0     // maximum fly time.
+#define VP_MAX_DURATION      2.0 //8.0     // maximum fly time.
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgEarth::Util::Controls;
 using namespace osgEarth::Symbology;
 using namespace osgEarth::Annotation;
+using namespace osgEarth::Drivers;
 
 //------------------------------------------------------------------------
 
@@ -66,9 +74,7 @@ namespace
     void flyToViewpoint(EarthManipulator* manip, const Viewpoint& vp)
     {
         Viewpoint currentVP = manip->getViewpoint();
-        GeoPoint vp0(currentVP.getSRS(), currentVP.getFocalPoint(), ALTMODE_ABSOLUTE);
-        GeoPoint vp1(vp.getSRS(), vp.getFocalPoint(), ALTMODE_ABSOLUTE);
-        double distance = vp0.distanceTo(vp1);
+        double distance = currentVP.focalPoint()->distanceTo(currentVP.focalPoint().get());
         double duration = osg::clampBetween(distance / VP_METERS_PER_SECOND, VP_MIN_DURATION, VP_MAX_DURATION);
         manip->setViewpoint( vp, duration );
     }
@@ -87,7 +93,6 @@ namespace
         {
             if ( _manip )
                 flyToViewpoint(_manip, _vp);
-                //_manip->setViewpoint( _vp, VP_DURATION );
         }
     };
 
@@ -118,78 +123,6 @@ namespace
     };
 }
 
-//------------------------------------------------------------------------
-
-namespace
-{
-    struct ViewpointHandler : public osgGA::GUIEventHandler
-    {
-        ViewpointHandler( const std::vector<Viewpoint>& viewpoints, osgViewer::View* view )
-            : _viewpoints( viewpoints ),
-              _manip( dynamic_cast<EarthManipulator*>(view->getCameraManipulator()) ) { }
-
-        bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
-        {
-            if ( ea.getEventType() == ea.KEYDOWN )
-            {
-                if ( !_viewpoints.empty() )
-                {
-                    int index = (int)ea.getKey() - (int)'1';
-                    if ( index >= 0 && index < (int)_viewpoints.size() )
-                    {
-                        flyToViewpoint( _manip, _viewpoints[index] );
-                    }
-                }
-                if ( ea.getKey() == 'v' )
-                {
-                    XmlDocument xml( _manip->getViewpoint().getConfig() );
-                    xml.store( std::cout );
-                    std::cout << std::endl;
-                }
-                aa.requestRedraw();
-            }
-            return false;
-        }
-
-        std::vector<Viewpoint> _viewpoints;
-        EarthManipulator*      _manip;
-    };
-}
-
-
-Control*
-ViewpointControlFactory::create(const std::vector<Viewpoint>& viewpoints,
-                                osgViewer::View*              view) const
-{
-    Grid* grid = 0L;
-
-    if ( viewpoints.size() > 0 )
-    {
-        // the viewpoint container:
-        grid = new Grid();
-        grid->setChildSpacing( 0 );
-        grid->setChildVertAlign( Control::ALIGN_CENTER );
-
-        for( unsigned i=0; i<viewpoints.size(); ++i )
-        {
-            const Viewpoint& vp = viewpoints[i];
-            Control* num = new LabelControl(Stringify() << (i+1), 16.0f, osg::Vec4f(1,1,0,1));
-            num->setPadding( 4 );
-            grid->setControl( 0, i, num );
-
-            Control* vpc = new LabelControl(vp.getName().empty() ? "<no name>" : vp.getName(), 16.0f);
-            vpc->setPadding( 4 );
-            vpc->setHorizFill( true );
-            vpc->setActiveColor( Color::Blue );
-            vpc->addEventHandler( new ClickViewpointHandler(vp, view->getCameraManipulator()) );
-            grid->setControl( 1, i, vpc );
-        }
-    }
-
-    view->addEventHandler( new ViewpointHandler(viewpoints, view) );
-
-    return grid;
-}
 
 //------------------------------------------------------------------------
 
@@ -214,20 +147,23 @@ MouseCoordsControlFactory::create(MapNode*         mapNode,
 
 namespace
 {
-    struct SkySliderHandler : public ControlEventHandler
+    struct SkyTimeSliderHandler : public ControlEventHandler
     {
-        SkySliderHandler(SkyNode* sky) : _sky(sky)  { }
+        SkyTimeSliderHandler(SkyNode* sky) : _sky(sky)  { }
 
         SkyNode* _sky;
 
         virtual void onValueChanged( class Control* control, float value )
         {
-            DateTime d;
-            _sky->getDateTime(d);
+            DateTime d = _sky->getDateTime();
             _sky->setDateTime(DateTime(d.year(), d.month(), d.day(), value));
         }
     };
 
+//#undef USE_AMBIENT_SLIDER
+#define USE_AMBIENT_SLIDER 1
+
+#ifdef USE_AMBIENT_SLIDER
     struct AmbientBrightnessHandler : public ControlEventHandler
     {
         AmbientBrightnessHandler(SkyNode* sky) : _sky(sky) { }
@@ -236,13 +172,55 @@ namespace
 
         virtual void onValueChanged( class Control* control, float value )
         {
-            _sky->setAmbientBrightness( value );
+            _sky->setMinimumAmbient(osg::Vec4(value,value,value,1));
         }
     };
-}
+#endif
 
-//#undef USE_AMBIENT_SLIDER
-#define USE_AMBIENT_SLIDER 1
+    struct AnimateSkyUpdateCallback : public osg::NodeCallback
+    {    
+        /**
+        * Creates an AnimateSkyCallback.  
+        * @param rate    The time multipler from real time.  Default of 1440 means 1 minute real time will equal 1 day simulation time.
+        */
+        AnimateSkyUpdateCallback( double rate = 1440 ):
+            _rate( rate ),
+            _prevTime( -1 ),
+            _accumTime( 0.0 )
+        {
+        }
+
+        virtual void operator()(osg::Node* node, osg::NodeVisitor* nv)
+        {             
+            SkyNode* sky = dynamic_cast< SkyNode* >( node );
+            if (sky)
+            {            
+                double time = nv->getFrameStamp()->getSimulationTime();            
+                if (_prevTime > 0)
+                {                
+                    TimeStamp t = sky->getDateTime().asTimeStamp();                  
+                    double delta = ceil((time - _prevTime) * _rate);
+                    _accumTime += delta;
+                    // The time stamp only works in seconds so we wait until we've accumulated at least 1 second to change the date.
+                    if (_accumTime > 1.0)
+                    {
+                        double deltaS = floor(_accumTime );                    
+                        _accumTime -= deltaS;
+                        t += deltaS;
+                        sky->setDateTime( t );                        
+                    }                
+                }            
+                _prevTime = time;
+            }
+            traverse( node, nv );
+        }
+
+        double _accumTime;
+        double _prevTime;    
+        double _rate;
+    };
+
+}
 
 Control*
 SkyControlFactory::create(SkyNode*         sky,
@@ -253,20 +231,19 @@ SkyControlFactory::create(SkyNode*         sky,
     grid->setChildSpacing( 10 );
     grid->setHorizFill( true );
 
-    grid->setControl( 0, 0, new LabelControl("Time: ", 16) );
+    grid->setControl( 0, 0, new LabelControl("Time (Hours UTC): ", 16) );
 
-    DateTime dt;
-    sky->getDateTime(dt);
+    DateTime dt = sky->getDateTime();
 
     HSliderControl* skySlider = grid->setControl(1, 0, new HSliderControl( 0.0f, 24.0f, dt.hours() ));
-    skySlider->setHorizFill( true, 200 );
-    skySlider->addEventHandler( new SkySliderHandler(sky) );
+    skySlider->setHorizFill( true, 300 );
+    skySlider->addEventHandler( new SkyTimeSliderHandler(sky) );
 
     grid->setControl(2, 0, new LabelControl(skySlider) );
 
 #ifdef USE_AMBIENT_SLIDER
-    grid->setControl(0, 1, new LabelControl("Ambient: ", 16) );
-    HSliderControl* ambient = grid->setControl(1, 1, new HSliderControl(0.0f, 1.0f, sky->getAmbientBrightness()));
+    grid->setControl(0, 1, new LabelControl("Min.Ambient: ", 16) );
+    HSliderControl* ambient = grid->setControl(1, 1, new HSliderControl(0.0f, 1.0f, sky->getSunLight()->getAmbient().r()));
     ambient->addEventHandler( new AmbientBrightnessHandler(sky) );
     grid->setControl(2, 1, new LabelControl(ambient) );
 #endif
@@ -280,47 +257,19 @@ namespace
 {
     struct ChangeSeaLevel : public ControlEventHandler
     {
-        ChangeSeaLevel( OceanSurfaceNode* ocean ) : _ocean(ocean) { }
+        ChangeSeaLevel( OceanNode* ocean ) : _ocean(ocean) { }
 
-        OceanSurfaceNode* _ocean;
-
-        virtual void onValueChanged( class Control* control, float value )
-        {
-            _ocean->options().seaLevel() = value;
-            _ocean->dirty();
-        }
-    };
-
-    struct ChangeLowFeather : public ControlEventHandler
-    {
-        ChangeLowFeather( OceanSurfaceNode* ocean ) : _ocean(ocean) { }
-
-        OceanSurfaceNode* _ocean;
+        OceanNode* _ocean;
 
         virtual void onValueChanged( class Control* control, float value )
         {
-            _ocean->options().lowFeatherOffset() = value;
-            _ocean->dirty();
-        }
-    };
-
-    struct ChangeHighFeather : public ControlEventHandler
-    {
-        ChangeHighFeather( OceanSurfaceNode* ocean ) : _ocean(ocean) { }
-
-        OceanSurfaceNode* _ocean;
-
-        virtual void onValueChanged( class Control* control, float value )
-        {
-            _ocean->options().highFeatherOffset() = value;
-            _ocean->dirty();
+            _ocean->setSeaLevel( value );
         }
     };
 }
 
 Control*
-OceanControlFactory::create(OceanSurfaceNode* ocean,
-                            osgViewer::View*  view   ) const
+OceanControlFactory::create(OceanNode* ocean) const
 {
     VBox* main = new VBox();
 
@@ -336,32 +285,6 @@ OceanControlFactory::create(OceanSurfaceNode* ocean,
     mslSlider->setHeight( 12 );
     mslSlider->setHorizFill( true, 200 );
     mslSlider->addEventHandler( new ChangeSeaLevel(ocean) );
-
-    HBox* oceanBox2 = main->addControl(new HBox());
-    oceanBox2->setChildVertAlign( Control::ALIGN_CENTER );
-    oceanBox2->setChildSpacing( 10 );
-    oceanBox2->setHorizFill( true );
-
-    oceanBox2->addControl( new LabelControl("Low Feather: ", 16) );
-
-    HSliderControl* lfSlider = oceanBox2->addControl(new HSliderControl( -1000.0, 250.0f, -100.0f ));
-    lfSlider->setBackColor( Color::Gray );
-    lfSlider->setHeight( 12 );
-    lfSlider->setHorizFill( true, 200 );
-    lfSlider->addEventHandler( new ChangeLowFeather(ocean) );
-
-    HBox* oceanBox3 = main->addControl(new HBox());
-    oceanBox3->setChildVertAlign( Control::ALIGN_CENTER );
-    oceanBox3->setChildSpacing( 10 );
-    oceanBox3->setHorizFill( true );
-
-    oceanBox3->addControl( new LabelControl("High Feather: ", 16) );
-
-    HSliderControl* hfSlider = oceanBox3->addControl(new HSliderControl( -500.0f, 500.0f, -10.0f ));
-    hfSlider->setBackColor( Color::Gray );
-    hfSlider->setHeight( 12 );
-    hfSlider->setHorizFill( true, 200 );
-    hfSlider->addEventHandler( new ChangeHighFeather(ocean) );
 
     return main;
 }
@@ -438,11 +361,24 @@ AnnotationGraphControlFactory::create(osg::Node*       graph,
 osg::Group*
 MapNodeHelper::load(osg::ArgumentParser& args,
                     osgViewer::View*     view,
-                    Control*             userControl ) const
+                    Container*           userContainer ) const
 {
     // do this first before scanning for an earth file
     std::string outEarth;
     args.read( "--out-earth", outEarth );
+
+    osg::ref_ptr<osgDB::Options> options = new osgDB::Options();
+    
+#if 1
+    Config c;
+    c.add("elevation_smoothing", false);
+    TerrainOptions to(c);
+
+    MapNodeOptions defMNO;
+    defMNO.setTerrainOptions( to );
+
+    options->setPluginStringData("osgEarth.defaultOptions", defMNO.getConfig().toJSON());
+#endif
 
     // read in the Earth file:
     osg::Node* node = 0L;
@@ -450,23 +386,33 @@ MapNodeHelper::load(osg::ArgumentParser& args,
     {
         if ( osgDB::getLowerCaseFileExtension(args[i]) == "earth" )
         {
-            node = osgDB::readNodeFile( args[i] );
+            node = osgDB::readNodeFile( args[i], options );
             args.remove(i);
             break;
         }
     }
 
+    osg::ref_ptr<MapNode> mapNode;
     if ( !node )
     {
-        OE_WARN << LC << "No earth file from the command line; making one." << std::endl;
-        node = new MapNode();
+        if ( !args.find("--images") )
+        {
+            OE_WARN << LC << "No earth file." << std::endl;
+            return 0L;
+        }
+        else
+        {
+            mapNode = new MapNode();
+        }
     }
-
-    osg::ref_ptr<MapNode> mapNode = MapNode::get(node);
-    if ( !mapNode.valid() )
+    else
     {
-        OE_WARN << LC << "Loaded scene graph does not contain a MapNode - aborting" << std::endl;
-        return 0L;
+        mapNode = MapNode::get(node);
+        if ( !mapNode.valid() )
+        {
+            OE_WARN << LC << "Loaded scene graph does not contain a MapNode - aborting" << std::endl;
+            return 0L;
+        }
     }
 
     // warn about not having an earth manip
@@ -487,7 +433,7 @@ MapNodeHelper::load(osg::ArgumentParser& args,
     // parses common cmdline arguments.
     if ( view )
     {
-        parse( mapNode.get(), args, view, root, userControl );
+        parse( mapNode.get(), args, view, root, userContainer );
     }
 
     // Dump out an earth file if so directed.
@@ -502,7 +448,7 @@ MapNodeHelper::load(osg::ArgumentParser& args,
     {
         configureView( view );
     }
-
+    
     return root;
 }
 
@@ -512,9 +458,25 @@ MapNodeHelper::parse(MapNode*             mapNode,
                      osg::ArgumentParser& args,
                      osgViewer::View*     view,
                      osg::Group*          root,
-                     Control*             userControl ) const
+                     LabelControl*        userLabel ) const
 {
-    // this is a dubious move.
+    VBox* vbox = new VBox();
+    vbox->setAbsorbEvents( true );
+    vbox->setBackColor( Color(Color::Black, 0.8) );
+    vbox->setHorizAlign( Control::ALIGN_LEFT );
+    vbox->setVertAlign( Control::ALIGN_BOTTOM );
+    vbox->addControl( userLabel );
+
+    parse(mapNode, args, view, root, vbox);
+}
+
+void
+MapNodeHelper::parse(MapNode*             mapNode,
+                     osg::ArgumentParser& args,
+                     osgViewer::View*     view,
+                     osg::Group*          root,
+                     Container*           userContainer ) const
+{
     if ( !root )
         root = mapNode;
 
@@ -530,6 +492,19 @@ MapNodeHelper::parse(MapNode*             mapNode,
     bool useCoords     = args.read("--coords") || useMGRS || useDMS || useDD;
     bool useOrtho      = args.read("--ortho");
     bool useAutoClip   = args.read("--autoclip");
+    bool useShadows    = args.read("--shadows");
+    bool animateSky    = args.read("--animate-sky");
+    bool showActivity  = args.read("--activity");
+    bool useLogDepth   = args.read("--logdepth");
+    bool useLogDepth2  = args.read("--logdepth2");
+    bool kmlUI         = args.read("--kmlui");
+    bool inspect       = args.read("--inspect");
+
+    if (args.read("--verbose"))
+        osgEarth::setNotifyLevel(osg::INFO);
+    
+    if (args.read("--quiet"))
+        osgEarth::setNotifyLevel(osg::FATAL);
 
     float ambientBrightness = 0.2f;
     args.read("--ambientBrightness", ambientBrightness);
@@ -542,19 +517,32 @@ MapNodeHelper::parse(MapNode*             mapNode,
 
     std::string imageExtensions;
     args.read("--image-extensions", imageExtensions);
+    
+    // animation path:
+    std::string animpath;
+    if ( args.read("--path", animpath) )
+    {
+        view->setCameraManipulator( new osgGA::AnimationPathManipulator(animpath) );
+    }
 
-    // install a canvas for any UI controls we plan to create:
-    ControlCanvas* canvas = ControlCanvas::get(view, false);
+    // Install a new Canvas for our UI controls, or use one that already exists.
+    ControlCanvas* canvas = ControlCanvas::getOrCreate( view );
 
-    Container* mainContainer = canvas->addControl( new VBox() );
-    mainContainer->setAbsorbEvents( true );
-    mainContainer->setBackColor( Color(Color::Black, 0.8) );
-    mainContainer->setHorizAlign( Control::ALIGN_LEFT );
-    mainContainer->setVertAlign( Control::ALIGN_BOTTOM );
+    Container* mainContainer;
+    if ( userContainer )
+    {
+        mainContainer = userContainer;
+    }
+    else
+    {
+        mainContainer = new VBox();
+        mainContainer->setAbsorbEvents( true );
+        mainContainer->setBackColor( Color(Color::Black, 0.8) );
+        mainContainer->setHorizAlign( Control::ALIGN_LEFT );
+        mainContainer->setVertAlign( Control::ALIGN_BOTTOM );
+    }
+    canvas->addControl( mainContainer );
 
-    // install the user control:
-    if ( userControl )
-        mainContainer->addControl( userControl );
 
     // look for external data in the map node:
     const Config& externals = mapNode->externalConfig();
@@ -563,66 +551,82 @@ MapNodeHelper::parse(MapNode*             mapNode,
     const Config& oceanConf       = externals.child("ocean");
     const Config& annoConf        = externals.child("annotations");
     const Config& declutterConf   = externals.child("decluttering");
-    Config        viewpointsConf  = externals.child("viewpoints");
 
     // some terrain effects.
-    const Config& normalMapConf   = externals.child("normal_map");
-    const Config& detailTexConf   = externals.child("detail_texture");
+    // TODO: Most of these are likely to move into extensions.
     const Config& lodBlendingConf = externals.child("lod_blending");
     const Config& vertScaleConf   = externals.child("vertical_scale");
     const Config& contourMapConf  = externals.child("contour_map");
 
-    // backwards-compatibility: read viewpoints at the top level:
-    const ConfigSet& old_viewpoints = externals.children("viewpoint");
-    for( ConfigSet::const_iterator i = old_viewpoints.begin(); i != old_viewpoints.end(); ++i )
-        viewpointsConf.add( *i );
-
-    // Loading a viewpoint list from the earth file:
-    if ( !viewpointsConf.empty() )
-    {
-        std::vector<Viewpoint> viewpoints;
-
-        const ConfigSet& children = viewpointsConf.children();
-        if ( children.size() > 0 )
-        {
-            for( ConfigSet::const_iterator i = children.begin(); i != children.end(); ++i )
-            {
-                viewpoints.push_back( Viewpoint(*i) );
-            }
-        }
-
-        if ( viewpoints.size() > 0 )
-        {
-            Control* c = ViewpointControlFactory().create(viewpoints, view);
-            if ( c )
-                mainContainer->addControl( c );
-        }
-    }
-
     // Adding a sky model:
     if ( useSky || !skyConf.empty() )
     {
-        double hours = skyConf.value( "hours", 12.0 );
-        SkyNode* sky = new SkyNode( mapNode->getMap() );
-        sky->setAmbientBrightness( ambientBrightness );
-        sky->setDateTime( DateTime(2011, 3, 6, hours) );
-        sky->attach( view );
-        root->addChild( sky );
-        Control* c = SkyControlFactory().create(sky, view);
-        if ( c )
-            mainContainer->addControl( c );
+        SkyOptions options(skyConf);
+        if ( options.getDriver().empty() )
+        {
+            if ( mapNode->getMapSRS()->isGeographic() )
+                options.setDriver("simple");
+            else
+                options.setDriver("gl");
+        }
+
+        SkyNode* sky = SkyNode::create(options, mapNode);
+        if ( sky )
+        {
+            sky->attach( view, 0 );
+            if ( mapNode->getNumParents() > 0 )
+            {
+                osgEarth::insertGroup(sky, mapNode->getParent(0));
+            }
+            else
+            {
+                sky->addChild( mapNode );
+                root = sky;
+            }
+                
+            Control* c = SkyControlFactory().create(sky, view);
+            if ( c )
+                mainContainer->addControl( c );
+
+            if (animateSky)
+            {
+                sky->setUpdateCallback( new AnimateSkyUpdateCallback() );
+            }
+
+        }
     }
 
     // Adding an ocean model:
     if ( useOcean || !oceanConf.empty() )
     {
-        OceanSurfaceNode* ocean = new OceanSurfaceNode( mapNode, oceanConf );
+        OceanNode* ocean = OceanNode::create(OceanOptions(oceanConf), mapNode);
         if ( ocean )
         {
-            root->addChild( ocean );
-            Control* c = OceanControlFactory().create(ocean, view);
+            // if there's a sky, we want to ocean under it
+            osg::Group* parent = osgEarth::findTopMostNodeOfType<SkyNode>(root);
+            if ( !parent ) parent = root;
+            parent->addChild( ocean );
+
+            Control* c = OceanControlFactory().create(ocean);
             if ( c )
                 mainContainer->addControl(c);
+        }
+    }
+
+    // Shadowing.
+    if ( useShadows )
+    {
+        ShadowCaster* caster = new ShadowCaster();
+        caster->setLight( view->getLight() );
+        caster->getShadowCastingGroup()->addChild( mapNode->getModelLayerGroup() );
+        if ( mapNode->getNumParents() > 0 )
+        {
+            insertGroup(caster, mapNode->getParent(0));
+        }
+        else
+        {
+            caster->addChild(mapNode);
+            root = caster;
         }
     }
 
@@ -640,13 +644,20 @@ MapNodeHelper::parse(MapNode*             mapNode,
         osg::Node* kml = KML::load( URI(kmlFile), mapNode, kml_options );
         if ( kml )
         {
-            Control* c = AnnotationGraphControlFactory().create(kml, view);
-            if ( c )
+            if (kmlUI)
             {
-                c->setVertAlign( Control::ALIGN_TOP );
-                canvas->addControl( c );
+                Control* c = AnnotationGraphControlFactory().create(kml, view);
+                if ( c )
+                {
+                    c->setVertAlign( Control::ALIGN_TOP );
+                    canvas->addControl( c );
+                }
             }
             root->addChild( kml );
+        }
+        else
+        {
+            OE_NOTICE << "Failed to load " << kmlFile << std::endl;
         }
     }
 
@@ -657,7 +668,8 @@ MapNodeHelper::parse(MapNode*             mapNode,
         AnnotationRegistry::instance()->create( mapNode, annoConf, dbOptions.get(), annotations );
         if ( annotations )
         {
-            root->addChild( annotations );
+            mapNode->addChild( annotations );
+            //root->addChild( annotations );
         }
     }
 
@@ -691,17 +703,46 @@ MapNodeHelper::parse(MapNode*             mapNode,
     // Configure for an ortho camera:
     if ( useOrtho )
     {
-        EarthManipulator* manip = dynamic_cast<EarthManipulator*>(view->getCameraManipulator());
-        if ( manip )
-        {
-            manip->getSettings()->setCameraProjection( EarthManipulator::PROJ_ORTHOGRAPHIC );
-        }
+        view->getCamera()->setProjectionMatrixAsOrtho(-1, 1, -1, 1, 0, 1);
+        //EarthManipulator* manip = dynamic_cast<EarthManipulator*>(view->getCameraManipulator());
+        //if ( manip )
+        //{
+        //    manip->getSettings()->setCameraProjection( EarthManipulator::PROJ_ORTHOGRAPHIC );
+        //}
+    }
+
+    // activity monitor (debugging)
+    if ( showActivity )
+    {
+        VBox* vbox = new VBox();
+        vbox->setBackColor( Color(Color::Black, 0.8) );
+        vbox->setHorizAlign( Control::ALIGN_RIGHT );
+        vbox->setVertAlign( Control::ALIGN_BOTTOM );
+        view->addEventHandler( new ActivityMonitorTool(vbox) );
+        canvas->addControl( vbox );
     }
 
     // Install an auto clip plane clamper
     if ( useAutoClip )
     {
         mapNode->addCullCallback( new AutoClipPlaneCullCallback(mapNode) );
+    }
+
+    // Install logarithmic depth buffer on main camera
+    if ( useLogDepth )
+    {
+        OE_INFO << LC << "Activating logarithmic depth buffer (vertex-only) on main camera" << std::endl;
+        osgEarth::Util::LogarithmicDepthBuffer logDepth;
+        logDepth.setUseFragDepth( false );
+        logDepth.install( view->getCamera() );
+    }
+
+    else if ( useLogDepth2 )
+    {
+        OE_INFO << LC << "Activating logarithmic depth buffer (precise) on main camera" << std::endl;
+        osgEarth::Util::LogarithmicDepthBuffer logDepth;
+        logDepth.setUseFragDepth( true );
+        logDepth.install( view->getCamera() );
     }
 
     // Scan for images if necessary.
@@ -728,26 +769,6 @@ MapNodeHelper::parse(MapNode*             mapNode,
             mapNode->getMap()->endUpdate();
         }
         OE_INFO << LC << "...found " << imageLayers.size() << " image layers." << std::endl;
-    }
-
-    // Install a normal map layer.
-    if ( !normalMapConf.empty() )
-    {
-        osg::ref_ptr<NormalMap> effect = new NormalMap(normalMapConf, mapNode->getMap());
-        if ( effect->getNormalMapLayer() )
-        {
-            mapNode->getTerrainEngine()->addEffect( effect.get() );
-        }
-    }
-
-    // Install a detail texturer
-    if ( !detailTexConf.empty() )
-    {
-        osg::ref_ptr<DetailTexture> effect = new DetailTexture(detailTexConf);
-        if ( effect->getImage() )
-        {
-            mapNode->getTerrainEngine()->addEffect( effect.get() );
-        }
     }
 
     // Install elevation morphing
@@ -796,6 +817,30 @@ MapNodeHelper::parse(MapNode*             mapNode,
         }
     }
 
+    if ( inspect )
+    {
+        mapNode->addExtension( Extension::create("mapinspector", ConfigOptions()) );
+    }
+    
+
+    // Process extensions.
+    for(std::vector<osg::ref_ptr<Extension> >::const_iterator eiter = mapNode->getExtensions().begin();
+        eiter != mapNode->getExtensions().end();
+        ++eiter)
+    {
+        Extension* e = eiter->get();
+
+        // Check for a View interface:
+        ExtensionInterface<osg::View>* viewIF = ExtensionInterface<osg::View>::get( e );
+        if ( viewIF )
+            viewIF->connect( view );
+
+        // Check for a Control interface:
+        ExtensionInterface<Control>* controlIF = ExtensionInterface<Control>::get( e );
+        if ( controlIF )
+            controlIF->connect( mainContainer );
+    }
+
     root->addChild( canvas );
 }
 
@@ -809,6 +854,7 @@ MapNodeHelper::configureView( osgViewer::View* view ) const
     view->addEventHandler(new osgViewer::ThreadingHandler());
     view->addEventHandler(new osgViewer::LODScaleHandler());
     view->addEventHandler(new osgGA::StateSetManipulator(view->getCamera()->getOrCreateStateSet()));
+    view->addEventHandler(new osgViewer::RecordCameraPathHandler());
 }
 
 
@@ -817,16 +863,18 @@ MapNodeHelper::usage() const
 {
     return Stringify()
         << "  --sky                         : add a sky model\n"
-        << "  --ocean                       : add an ocean model\n"
         << "  --kml <file.kml>              : load a KML or KMZ file\n"
+        << "  --kmlui                       : display a UI for toggling nodes loaded with --kml\n"
         << "  --coords                      : display map coords under mouse\n"
         << "  --dms                         : dispay deg/min/sec coords under mouse\n"
         << "  --dd                          : display decimal degrees coords under mouse\n"
         << "  --mgrs                        : show MGRS coords under mouse\n"
         << "  --ortho                       : use an orthographic camera\n"
-        << "  --autoclip                    : installs an auto-clip plane callback\n"
+        << "  --logdepth                    : activates the logarithmic depth buffer\n"
+        << "  --logdepth2                   : activates logarithmic depth buffer with per-fragment interpolation\n"
         << "  --images [path]               : finds and loads image layers from folder [path]\n"
         << "  --image-extensions [ext,...]  : with --images, extensions to use\n"
         << "  --out-earth [file]            : write the loaded map to an earth file\n"
-        << "  --uniform [name] [min] [max]  : create a uniform controller with min/max values\n";
+        << "  --uniform [name] [min] [max]  : create a uniform controller with min/max values\n"
+        << "  --path [file]                 : load and playback an animation path\n";
 }

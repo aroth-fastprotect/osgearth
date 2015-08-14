@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -118,14 +118,6 @@ GeoLocator::getDataExtent() const {
     return _dataExtent;
 }
 
-#if 0
-GeoLocator*
-GeoLocator::cloneAndCrop( const osgTerrain::Locator& prototype, const GeoExtent& displayExtent ) const
-{
-    return new GeoLocator( prototype, _dataExtent, displayExtent );
-}
-#endif
-
 bool
 GeoLocator::convertModelToLocal(const osg::Vec3d& world, osg::Vec3d& local) const
 {
@@ -181,6 +173,23 @@ GeoLocator::createScaleBiasMatrix(const GeoExtent& window, osg::Matrixd& out) co
 
     return true;
 }
+
+bool
+GeoLocator::createScaleBiasMatrix(const GeoExtent& window, osg::Matrixf& out) const
+{
+    float scalex = window.width() / _dataExtent.width();
+    float scaley = window.height() / _dataExtent.height();
+    float biasx  = (window.xMin()-_dataExtent.xMin()) / _dataExtent.width();
+    float biasy  = (window.yMin()-_dataExtent.yMin()) / _dataExtent.height();
+
+    out(0,0) = scalex;
+    out(1,1) = scaley;
+    out(3,0) = biasx;
+    out(3,1) = biasy;
+
+    return true;
+}
+
 
 /****************************************************************************/
 
@@ -258,15 +267,6 @@ MercatorLocator::createSameTypeForExtent(const GeoExtent& extent, const MapInfo&
 {
     return new MercatorLocator(extent);
 }
-
-
-#if 0
-GeoLocator*
-MercatorLocator::cloneAndCrop( const osgTerrain::Locator& prototype, const GeoExtent& displayExtent )
-{
-    return new MercatorLocator( prototype, getDataExtent() );
-}
-#endif
 
 bool
 MercatorLocator::convertModelToLocal(const osg::Vec3d& world, osg::Vec3d& local) const

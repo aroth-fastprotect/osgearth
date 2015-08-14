@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,6 +21,20 @@
 
 using namespace osgEarth;
 using namespace osgEarth::Symbology;
+
+OSGEARTH_REGISTER_SIMPLE_SYMBOL(extrusion, ExtrusionSymbol);
+
+ExtrusionSymbol::ExtrusionSymbol(const ExtrusionSymbol& rhs,const osg::CopyOp& copyop):
+Symbol(rhs, copyop)
+{
+    _height = rhs._height;
+    _flatten = rhs._flatten;
+    _heightExpr = rhs._heightExpr;
+    _heightRef = rhs._heightRef;
+    _wallStyleName = rhs._wallStyleName;
+    _roofStyleName = rhs._roofStyleName;
+    _wallGradientPercentage = rhs._wallGradientPercentage;
+}
 
 ExtrusionSymbol::ExtrusionSymbol( const Config& conf ) :
 Symbol    ( conf ),
@@ -79,5 +93,8 @@ ExtrusionSymbol::parseSLD(const Config& c, Style& style)
     }
     else if ( match(c.key(), "extrusion-wall-gradient") ) {
         style.getOrCreate<ExtrusionSymbol>()->wallGradientPercentage() = as<float>(c.value(), 0.0f);
+    }
+    else if ( match(c.key(), "extrusion-script") ) {
+        style.getOrCreate<ExtrusionSymbol>()->script() = StringExpression(c.value());
     }
 }

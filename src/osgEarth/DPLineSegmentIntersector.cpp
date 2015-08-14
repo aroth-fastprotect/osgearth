@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/DPLineSegmentIntersector>
+#include <osgEarth/Utils>
 #include <osg/KdTree>
 #include <osg/TriangleFunctor>
 
@@ -259,7 +260,7 @@ DPLineSegmentIntersector::intersect(osgUtil::IntersectionVisitor& iv, osg::Drawa
     if (reachedLimit()) return;
 
     osg::Vec3d s(_start), e(_end);
-    if ( !intersectAndClip( s, e, drawable->getBound() ) ) return;
+    if ( !intersectAndClip( s, e, Utils::getBoundingBox(drawable))) return;
 
     if (iv.getDoDummyTraversal()) return;
 

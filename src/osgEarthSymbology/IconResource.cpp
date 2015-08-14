@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,8 +24,10 @@
 
 #include <osg/AutoTransform>
 #include <osg/Depth>
+#include <osg/Geode>
 #include <osg/Geometry>
 #include <osg/TextureRectangle>
+#include <osg/Texture2D>
 #include <osg/Program>
 
 #define LC "[IconResource] "
@@ -150,6 +152,9 @@ IconResource::createNodeFromURI( const URI& uri, const osgDB::Options* dbOptions
     ReadResult r = uri.readImage( dbOptions );
     if ( r.succeeded() )
     {
+        OE_INFO << LC << "Loaded " << uri.base() << "(from " << (r.isFromCache()? "cache" : "source") << ")"
+            << std::endl;
+
         if ( r.getImage() )
         {
             node = buildIconModel( r.releaseImage() );

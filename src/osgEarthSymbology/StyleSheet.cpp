@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2008-2013 Pelican Mapping
+* Copyright 2015 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -8,10 +8,13 @@
 * the Free Software Foundation; either version 2 of the License, or
 * (at your option) any later version.
 *
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU Lesser General Public License for more details.
+* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+* AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+* LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+* FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+* IN THE SOFTWARE.
 *
 * You should have received a copy of the GNU Lesser General Public License
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
@@ -154,7 +157,7 @@ StyleSheet::getResourceLibrary( const std::string& name ) const
         return 0L;
 }
 
-void StyleSheet::setScript( Script* script )
+void StyleSheet::setScript( ScriptDef* script )
 {
   _script = script;
 }
@@ -191,11 +194,14 @@ StyleSheet::getConfig() const
     if ( _script.valid() )
     {
         Config scriptConf("script");
+
         if ( !_script->name.empty() )
             scriptConf.set( "name", _script->name );
         if ( !_script->language.empty() )
             scriptConf.set( "language", _script->language );
-        if ( !_script->code.empty() )
+        if ( !_script->uri.isSet() )
+            scriptConf.set( "url", _script->uri->base() );
+        else if ( !_script->code.empty() )
             scriptConf.value() = _script->code;
 
         conf.add( scriptConf );
@@ -221,19 +227,25 @@ StyleSheet::mergeConfig( const Config& conf )
     ConfigSet scripts = conf.children( "script" );
     for( ConfigSet::iterator i = scripts.begin(); i != scripts.end(); ++i )
     {
-        // get the script code
-        std::string code = i->value();
+        _script = new ScriptDef();
 
-        // name is optional and unused at the moment
-        std::string name = i->value("name");
-
-        std::string lang = i->value("language");
-        if ( lang.empty() ) {
-            // default to javascript
-            lang = "javascript";
+        // load the code from a URI if there is one:
+        if ( i->hasValue("url") )
+        {
+            _script->uri = URI( i->value("url"), _uriContext );
+            OE_INFO << LC << "Loading script from \"" << _script->uri->full() << std::endl;
+            _script->code = _script->uri->getString();
+        }
+        else
+        {
+            _script->code = i->value();
         }
 
-        _script = new Script(code, lang, name);
+        // name is optional and unused at the moment
+        _script->name = i->value("name");
+
+        std::string lang = i->value("language");
+        _script->language = lang.empty() ? "javascript" : lang;
     }
 
     // read any style class definitions. either "class" or "selector" is allowed

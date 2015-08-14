@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2008-2013 Pelican Mapping
+ * Copyright 2015 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -39,6 +39,8 @@
 #include <osg/PagedLOD>
 #include <osg/Depth>
 #include <osg/Program>
+#include <osg/ClipNode>
+#include <osg/ClipPlane>
 #include <osgDB/FileNameUtils>
 
 #define LC "[UTMGraticule] "
@@ -105,9 +107,22 @@ UTMGraticule::init()
     }
 
     // make the shared depth attr:
-    _depthAttribute = new osg::Depth(osg::Depth::LEQUAL,0,1,false);
+    this->getOrCreateStateSet()->setMode(GL_DEPTH_TEST, 0);
+
+    // force it to render after the terrain.
+    this->getOrCreateStateSet()->setRenderBinDetails(1, "RenderBin");
+
+    // install the range callback for clip plane activation
+    this->addCullCallback( new RangeUniformCullCallback() );
 
     // this will intialize the graph.
+    rebuild();
+}
+
+void
+UTMGraticule::setClipPlane(osg::ClipPlane* value)
+{
+    _clipPlane = value;
     rebuild();
 }
 
@@ -171,8 +186,6 @@ UTMGraticule::rebuild()
         line->stroke()->width() = 1.0;
         line->tessellation() = 20;
 
-        //AltitudeSymbol* alt = _options->primaryStyle()->getOrCreate<AltitudeSymbol>();
-
         TextSymbol* text = _options->primaryStyle()->getOrCreate<TextSymbol>();
         text->fill()->color() = Color(Color::White, 0.3f);
         text->halo()->color() = Color(Color::Black, 0.2f);
@@ -181,18 +194,25 @@ UTMGraticule::rebuild()
 
 
     // rebuild the graph:
-    _root = new DrapeableNode( getMapNode(), false );
-    this->addChild( _root );
 
-#if 0
-    // set up depth offsetting.
-    osg::StateSet* s = _root->getOrCreateStateSet();
-    s->setAttributeAndModes( DepthOffsetUtils::getOrCreateProgram(), 1 );
-    s->addUniform( DepthOffsetUtils::getIsNotTextUniform() );
-    osg::Uniform* u = DepthOffsetUtils::createMinOffsetUniform();
-    u->set( 10000.0f );
-    s->addUniform( u );
-#endif
+    // Horizon clipping plane.
+    osg::ClipPlane* cp = _clipPlane.get();
+    if ( cp )
+    {
+        _root = this;
+    }
+    else
+    {
+        osg::ClipNode* clipNode = new osg::ClipNode();
+        osgEarth::Registry::shaderGenerator().run( clipNode );
+        cp = new osg::ClipPlane( 0 );
+        clipNode->addClipPlane( cp );
+        _root = clipNode;
+    }
+    _root->addCullCallback( new ClipToGeocentricHorizon(_profile->getSRS(), cp) );
+
+
+    this->addChild( _root );
 
     // build the base Grid Zone Designator (GZD) loolup table. This is a table
     // that maps the GZD string to its extent.
@@ -243,8 +263,6 @@ UTMGraticule::rebuild()
         if ( tile )
             _root->addChild( tile );
     }
-
-    //DepthOffsetUtils::prepareGraph( _root );
 }
 
 
@@ -307,29 +325,24 @@ UTMGraticule::buildGZDTile( const std::string& name, const GeoExtent& extent )
     
     osg::Vec3d centerECEF;
     extent.getSRS()->transform( tileCenter, ecefSRS, centerECEF );
-    //extent.getSRS()->transformToECEF( tileCenter, centerECEF );
 
     if ( hasText )
     {
         osg::Vec3d west, east;
         extent.getSRS()->transform( osg::Vec3d(extent.xMin(),tileCenter.y(),0), ecefSRS, west );
         extent.getSRS()->transform( osg::Vec3d(extent.xMax(),tileCenter.y(),0), ecefSRS, east );
-        //extent.getSRS()->transformToECEF(osg::Vec3d(extent.xMin(),tileCenter.y(),0), west );
-        //extent.getSRS()->transformToECEF(osg::Vec3d(extent.xMax(),tileCenter.y(),0), east );
 
         TextSymbol* textSym = _options->primaryStyle()->getOrCreate<TextSymbol>();
         textSym->size() = (west-east).length() / 3.0;
 
         TextSymbolizer ts( textSym );
         
-        osg::Geode* textGeode = new osg::Geode();
-        textGeode->getOrCreateStateSet()->setRenderBinDetails( 9998, "DepthSortedBin" );   
-        textGeode->getOrCreateStateSet()->setAttributeAndModes( _depthAttribute, 1 );
-        
+        osg::Geode* textGeode = new osg::Geode();        
         osg::Drawable* d = ts.create(name);
         d->getOrCreateStateSet()->setRenderBinToInherit();
-
         textGeode->addDrawable(d);
+        Registry::shaderGenerator().run(textGeode, Registry::stateSetCache());
+
         osg::Matrixd centerL2W;
         ecefSRS->createLocalToWorld( centerECEF, centerL2W );
         osg::MatrixTransform* mt = new osg::MatrixTransform(centerL2W);

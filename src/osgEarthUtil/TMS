@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -394,17 +394,10 @@ namespace osgEarth { namespace Util { namespace TMS
         static TileMap* create(
             const std::string& url,
             const Profile* profile,
-            //osgEarth::Profile::ProfileType type,
+            const DataExtentList& dataExtents,
             const std::string& format,
             int tile_width,
             int tile_height );
-
-        /**
-         * Creates a TileMap based on the parameters of a TileSource
-         */
-        static TileMap* create(
-            const TileSource* tileSource,
-            const Profile*    profile );
 
     protected:
         std::string _tileMapService;

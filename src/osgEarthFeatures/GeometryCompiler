@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -84,10 +84,6 @@ namespace osgEarth { namespace Features
         optional<bool>& useVertexBufferObjects() { return _useVertexBufferObjects;}
         const optional<bool>& useVertexBufferObjects() const { return _useVertexBufferObjects;}
 
-        /** Whether to combine resource library textures into a single texture array */        
-        optional<bool>& useTextureArrays() { return _useTextureArrays;}
-        const optional<bool>& useTextureArrays() const { return _useTextureArrays;}
-
         /** Whether to generate shader components on compiled geometry */
         optional<ShaderPolicy>& shaderPolicy() { return _shaderPolicy; }
         const optional<ShaderPolicy>& shaderPolicy() const { return _shaderPolicy; }
@@ -105,6 +101,11 @@ namespace osgEarth { namespace Features
         optional<bool>& validate() { return _validate; }
         const optional<bool>& validate() const { return _validate; }
 
+        /** Maximum size (angle, degrees) of a polygon tile, when breaking up a large polygon for tessellation;
+        only applies to geocentric maps - detault = 5.0 */
+        optional<float>& maxPolygonTilingAngle() { return _maxPolyTilingAngle; }
+        const optional<float>& maxPolygonTilingAngle() const { return _maxPolyTilingAngle; }
+
     public:
         Config getConfig() const;
         void mergeConfig( const Config& conf );
@@ -121,10 +122,10 @@ namespace osgEarth { namespace Features
         optional<bool>                 _ignoreAlt;
         optional<bool>                 _useVertexBufferObjects;
         optional<ShaderPolicy>         _shaderPolicy;
-        optional<bool>                 _useTextureArrays;
         optional<bool>                 _optimizeStateSharing;
         optional<bool>                 _optimize;
         optional<bool>                 _validate;
+        optional<float>                _maxPolyTilingAngle;
 
         void fromConfig( const Config& conf );
 
@@ -179,7 +180,11 @@ namespace osgEarth { namespace Features
 
         osg::Node* compile(
             Geometry*             geom,
-            const FilterContext&  context );
+            const Style&          style);
+
+        osg::Node* compile(
+            Geometry*             geom,
+            const FilterContext&  context);
 
         osg::Node* compile(
             FeatureList&          mungeableInput,

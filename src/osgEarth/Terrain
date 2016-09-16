@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -238,12 +238,12 @@ namespace osgEarth
          *      Terrain callback to add. This will get called whenever tile data changes in
          *      the active terrain graph
          */
-        void addTerrainCallback( TerrainCallback* callback);
+        void addTerrainCallback(TerrainCallback* callback);
 
         /**
          * Removes a terrain callback.
          */
-        void removeTerrainCallback( TerrainCallback* callback );
+        void removeTerrainCallback(TerrainCallback* callback );
         
 
     public:

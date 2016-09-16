@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -21,7 +21,7 @@
 */
 
 #include <osgEarth/MapNode>
-#include <osgEarth/Decluttering>
+#include <osgEarth/ScreenSpaceLayout>
 #include <osgEarth/ECEF>
 
 #include <osgEarthUtil/EarthManipulator>
@@ -94,10 +94,6 @@ main(int argc, char** argv)
     // Make a group for 2D items, and activate the decluttering engine. Decluttering
     // will migitate overlap between elements that occupy the same screen real estate.
     osg::Group* labelGroup = new osg::Group();
-    if (declutter)
-    {
-        Decluttering::setEnabled( labelGroup->getOrCreateStateSet(), true );
-    }
     root->addChild( labelGroup );
     
     // set up a style to use for placemarks:

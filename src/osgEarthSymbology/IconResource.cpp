@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -113,11 +113,6 @@ namespace
         geode->addDrawable( geometry );
 
         return geode;
-        //osg::AutoTransform* at = new osg::AutoTransform;
-        //at->setAutoScaleToScreen( true );
-        //at->setAutoRotateMode( osg::AutoTransform::ROTATE_TO_SCREEN );
-        //at->addChild( geode );
-        //return at;
     }
 }
 

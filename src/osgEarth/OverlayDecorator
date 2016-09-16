@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -69,9 +69,25 @@ namespace osgEarth
          */
         void setOverlayGraphTraversalMask( unsigned mask );
 
+        /**
+         * Sets the maximum horizon distance to enforce when calculating
+         * the draping extents. Constraining the distance will mean that you won't
+         * see draped geometry past a certain point, but you will potentially get
+         * higher quality for the geometry you do see (with fewer aliasing artifacts).
+         */
         double getMaxHorizonDistance() const;
         void setMaxHorizonDistance( double horizonDistance );
 
+        /**
+         * Maximum height (above and below) the terrain MSL/ellipsoid at which
+         * to drape geometry. Geometry above the max or below the -max will not
+         * appear. This is only important to maintain Z buffering precision in the
+         * draped geometry; however, it is usually a better idea to draw draped
+         * geometry without blending or z-testing anyway.
+         * Default is 500,000 meters.
+         */
+        void setMaximumHeight(double value) { _maxHeight = value; }
+        double getMaximumHeight() const { return _maxHeight; }
 
     public: // TerrainDecorator
         virtual void onInstall( TerrainEngineNode* engine );
@@ -99,8 +115,8 @@ namespace osgEarth
             osg::Group*                   _group;            // contains the overlay graphics
             osg::StateSet*                _terrainStateSet;  // same object as in PerViewData (shared across techniques)
             osg::ref_ptr<osg::Referenced> _techniqueData;    // technique sets this if needed
-            const double*                 _horizonDistance;  // points to the PVD horizon distance.
-            osg::Group*                   _terrainParent;    // the terrain is in getChild(0).
+            const double*                 _horizonDistance;  // points to the PVD horizon distance
+            TextureCompositor*            _terrainResources; // for accessing image units
             osg::Vec3d                    _eyeWorld;         // eyepoint in world coords
             osgShadow::ConvexPolyhedron   _visibleFrustumPH; // polyhedron representing the frustum
         };
@@ -122,14 +138,9 @@ namespace osgEarth
         optional<int>                 _textureSize;
         bool                          _useShaders;
         bool                          _isGeocentric;
-        bool                          _mipmapping;
-        bool                          _rttBlending;
-        bool                          _updatePending;
         unsigned                      _rttTraversalMask;
-        
+        double                        _maxHeight;
         double                        _maxHorizonDistance;
-        bool                          _attachStencil;
-        
         unsigned                      _totalOverlayChildren;
 
         osg::ref_ptr<const SpatialReference>    _srs;
@@ -185,6 +196,9 @@ namespace osgEarth
 
         virtual bool hasData(
             OverlayDecorator::TechRTTParams& params) const { return true; }
+
+        virtual const osg::BoundingSphere& getBound(
+            OverlayDecorator::TechRTTParams& params) const { return params._group->getBound(); }
 
         virtual void onInstall( TerrainEngineNode* engine ) { }
 

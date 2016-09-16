@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -26,15 +26,15 @@
 #include <osgEarth/Common>
 #include <osgEarth/Map>
 #include <osgEarth/MapNodeOptions>
-#include <osgEarth/SpatialReference>
-#include <osgEarth/TerrainEngineNode>
 #include <osgEarth/Extension>
 
 namespace osgEarth
 {
     class OverlayDecorator;
     class Terrain;
+    class TerrainEngineNode;
     class MapNodeCullData;
+    class SpatialReference;
 
     /**
      * OSG Node that forms the root of an osgEarth map. This node is a "view" component
@@ -44,9 +44,18 @@ namespace osgEarth
     {
     public:
         /**
-         * Attempts to load a MapNOde from a ".earth" file in the arguments list
+         * Attempts to load a MapNode from a ".earth" file in the arguments list
          */
-        static MapNode* load( class osg::ArgumentParser& arguments );
+        static MapNode* load(
+            class osg::ArgumentParser& arguments);
+
+        /**
+         * Attempts to load a MapNode from an ".earth" file, with a set of default
+         * map and terrain options.
+         */
+        static MapNode* load(
+            class osg::ArgumentParser& arguments,
+            const MapNodeOptions&      defaultOptions);
 
     public:
         /**
@@ -186,6 +195,23 @@ namespace osgEarth
          */
         const std::vector< osg::ref_ptr<Extension> >& getExtensions() const { return _extensions; }
 
+        /**
+         * Find an extension by type and return it.
+         */
+        template<typename T>
+        T* getExtension() const {
+            for(std::vector< osg::ref_ptr<Extension> >::const_iterator i = _extensions.begin(); i != _extensions.end(); ++i) {
+                T* e = dynamic_cast<T*>(i->get());
+                if ( e ) return e;
+            }
+            return 0L;
+        }
+
+        /**
+         * Opens all layers that are not already open.
+         */
+        void openMapLayers();
+
 
     public: // special purpose
 
@@ -228,6 +254,8 @@ namespace osgEarth
 
         std::vector< osg::ref_ptr<Extension> > _extensions;
 
+        Revisioned _mapRevisionMonitor;
+
     public: // MapCallback proxy
 
         void onModelLayerAdded( ModelLayer*, unsigned int );
@@ -247,10 +275,12 @@ namespace osgEarth
     
         void init();
 
+#if 0
         MapNodeCullData* getCullData(osg::Camera* camera) const;
         typedef std::map<osg::Camera*, osg::ref_ptr<MapNodeCullData> > CullDataMap;
         mutable CullDataMap _cullData;
         mutable Threading::ReadWriteMutex _cullDataMutex;
+#endif
     };
 
 } // namespace osgEarth

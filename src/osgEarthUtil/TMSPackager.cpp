@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -64,14 +64,20 @@ bool WriteTMSTileHandler::handleTile(const TileKey& key, const TileVisitor& tv)
     // Get the path to write to
     std::string path = getPathForTile( key );
 
+    // Get the user set TileSource for output if it is set
+    osgEarth::TileSource* tileSource = _packager->getTileSource();
+
     // Don't write out a new file if we're not overwriting
-    if (osgDB::fileExists(path) && !_packager->getOverwrite())
+    if (!tileSource && osgDB::fileExists(path) && !_packager->getOverwrite())
     {
         return true;
     }
 
-    // attempt to create the output folder:        
-    osgEarth::makeDirectoryForFile( path );       
+    if (!tileSource)
+    {
+        // attempt to create the output folder:        
+        osgEarth::makeDirectoryForFile( path );       
+    }
 
 
     if (imageLayer)
@@ -98,14 +104,24 @@ bool WriteTMSTileHandler::handleTile(const TileKey& key, const TileVisitor& tv)
             }
 
             // OE_NOTICE << "Created image for " << key.str() << std::endl;
-            osg::ref_ptr< const osg::Image > final = geoImage.getImage();                        
+            osg::ref_ptr< osg::Image > final = geoImage.getImage();                        
 
             // convert to RGB if necessary            
             if ( _packager->getExtension() == "jpg" && final->getPixelFormat() != GL_RGB )
             {
                 final = ImageUtils::convertToRGB8( final );
             }            
-            return osgDB::writeImageFile(*final, path, _packager->getOptions());
+
+            // use the TileSource provided if set, else use writeImageFile
+            if (tileSource)
+            {
+                tileSource->storeImage(key, final.get(), 0L);
+                return true;
+            }
+            else
+            {
+                return osgDB::writeImageFile(*final, path, _packager->getOptions());
+            }
         }            
     }
     else if (elevationLayer )
@@ -115,8 +131,18 @@ bool WriteTMSTileHandler::handleTile(const TileKey& key, const TileVisitor& tv)
         {
             // convert the HF to an image
             ImageToHeightFieldConverter conv;
-            osg::ref_ptr< osg::Image > image = conv.convert( hf.getHeightField(), _packager->getElevationPixelDepth() );				            
-            return osgDB::writeImageFile(*image.get(), path, _packager->getOptions());
+            osg::ref_ptr< osg::Image > image = conv.convert( hf.getHeightField(), _packager->getElevationPixelDepth() );	
+
+            // use the TileSource provided if set, else use writeImageFile
+            if (tileSource)
+            {
+                tileSource->storeImage(key, image.get(), 0L);
+                return true;
+            }
+            else
+            {
+                return osgDB::writeImageFile(*image.get(), path, _packager->getOptions());
+            }
         }            
     }
         
@@ -148,7 +174,7 @@ std::string WriteTMSTileHandler::getProcessString() const
     buf << "osgearth_package --tms ";
     if (imageLayer)
     {        
-        for (unsigned int i = 0; i < _map->getNumImageLayers(); i++)
+        for (int i = 0; i < _map->getNumImageLayers(); i++)
         {
             if (imageLayer == _map->getImageLayerAt(i))
             {
@@ -159,7 +185,7 @@ std::string WriteTMSTileHandler::getProcessString() const
     }
     else if (elevationLayer)
     {
-        for (unsigned int i = 0; i < _map->getNumElevationLayers(); i++)
+        for (int i = 0; i < _map->getNumElevationLayers(); i++)
         {
             if (elevationLayer == _map->getElevationLayerAt(i))
             {
@@ -200,7 +226,8 @@ _visitor(new TileVisitor()),
     _height(0),
     _overwrite(false),
     _keepEmpties(false),
-    _applyAlphaMask(false)
+    _applyAlphaMask(false),
+    _tileSource(0L)
 {
 }
 
@@ -242,6 +269,16 @@ osgDB::Options* TMSPackager::getOptions() const
 void TMSPackager::setWriteOptions( osgDB::Options* options )
 {
     _writeOptions = options;
+}
+
+void TMSPackager::setTileSource( osgEarth::TileSource* source )
+{
+    _tileSource = source;
+}
+
+osgEarth::TileSource* TMSPackager::getTileSource() const
+{
+    return _tileSource.get();
 }
 
 const std::string& TMSPackager::getLayerName() const
@@ -296,12 +333,6 @@ void TMSPackager::setVisitor(TileVisitor* visitor)
 
 void TMSPackager::run( TerrainLayer* layer,  Map* map  )
 {    
-    // Get a test image from the root keys
-
-    // collect the root tile keys in preparation for packaging:
-    std::vector<TileKey> rootKeys;
-    map->getProfile()->getRootKeys( rootKeys );
-
     // fetch one tile to see what the image size should be
     ImageLayer* imageLayer = dynamic_cast<ImageLayer*>(layer);
     ElevationLayer* elevationLayer = dynamic_cast<ElevationLayer*>(layer);
@@ -316,7 +347,7 @@ void TMSPackager::run( TerrainLayer* layer,  Map* map  )
         {            
             layerName << "image";
             // Get the index of the layer
-            for (unsigned int i = 0; i < map->getNumImageLayers(); i++)
+            for (int i = 0; i < map->getNumImageLayers(); i++)
             {
                 if (map->getImageLayerAt(i) == imageLayer)
                 {
@@ -329,7 +360,7 @@ void TMSPackager::run( TerrainLayer* layer,  Map* map  )
         {
             layerName << "elevation";
             // Get the index of the layer
-            for (unsigned int i = 0; i < map->getNumElevationLayers(); i++)
+            for (int i = 0; i < map->getNumElevationLayers(); i++)
             {
                 if (map->getElevationLayerAt(i) == elevationLayer)
                 {
@@ -388,10 +419,13 @@ void TMSPackager::run( TerrainLayer* layer,  Map* map  )
 
 void TMSPackager::writeXML( TerrainLayer* layer, Map* map)
 {
+    DataExtentList dataExtents;
+    layer->getDataExtents(dataExtents);
      // create the tile map metadata:
     osg::ref_ptr<TMS::TileMap> tileMap = TMS::TileMap::create(
         "",
         map->getProfile(),        
+        dataExtents,
         _extension,
         _width,
         _height

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -42,7 +42,9 @@ namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
             _tilePixelSize     ( 256 ),
             _color             ( Color::White ),
             _incrementalUpdate ( false ),
-            _smoothing         ( false )
+            _smoothing         ( false ),
+            _normalMaps        ( false ),
+            _adaptivePolarRangeFactor( false )
          {
             setDriver( "mp" );
             fromConfig( _conf );
@@ -87,6 +89,18 @@ namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
         optional<bool>& elevationSmoothing() { return _smoothing; }
         const optional<bool>& elevationSmoothing() const { return _smoothing; }
 
+        /** Whether to generate normal maps from elevation data. */
+        optional<bool>& normalMaps() { return _normalMaps; }
+        const optional<bool>& normalMaps() const { return _normalMaps; }
+
+        /**
+         * Whether to automatically adjust(reduce) the minTileRangeFactor with increase in
+         * latitude. This prevents overtessellation in the polar regions. Only works with
+         * a geocentric map. Defaults to false.
+         */
+        optional<bool>& adaptivePolarRangeFactor() { return _adaptivePolarRangeFactor; }
+        const optional<bool>& adaptivePolarRangeFactor() const { return _adaptivePolarRangeFactor; }
+
     public:
 
         /** @deprecated */
@@ -105,6 +119,8 @@ namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
             conf.updateIfSet( "color", _color );
             conf.updateIfSet( "incremental_update", _incrementalUpdate );
             conf.updateIfSet( "elevation_smoothing", _smoothing );
+            conf.updateIfSet( "normal_maps", _normalMaps );
+            conf.updateIfSet( "adaptive_polar_range_factor", _adaptivePolarRangeFactor);
 
             return conf;
         }
@@ -126,6 +142,8 @@ namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
             conf.getIfSet( "color", _color );
             conf.getIfSet( "incremental_update", _incrementalUpdate );
             conf.getIfSet( "elevation_smoothing", _smoothing );
+            conf.getIfSet( "normal_maps", _normalMaps );
+            conf.getIfSet( "adaptive_polar_range_factor", _adaptivePolarRangeFactor);
        }
 
         optional<float>               _skirtRatio;
@@ -137,6 +155,8 @@ namespace osgEarth { namespace Drivers { namespace MPTerrainEngine
         optional<Color>               _color;
         optional<bool>                _incrementalUpdate;
         optional<bool>                _smoothing;
+        optional<bool>                _normalMaps;
+        optional<bool>                _adaptivePolarRangeFactor;
     };
 
 } } } // namespace osgEarth::Drivers::MPTerrainEngine

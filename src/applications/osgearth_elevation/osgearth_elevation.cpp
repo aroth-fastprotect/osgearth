@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -30,23 +30,28 @@
 #include <osgEarth/ElevationQuery>
 #include <osgEarth/StringUtils>
 #include <osgEarth/Terrain>
+#include <osgEarth/VerticalDatum>
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/Controls>
 #include <osgEarthUtil/LatLongFormatter>
 #include <osgEarthUtil/ExampleResources>
+#include <osgEarthAnnotation/PlaceNode>
 #include <iomanip>
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
 using namespace osgEarth::Util::Controls;
+using namespace osgEarth::Annotation;
 
 static MapNode*       s_mapNode     = 0L;
 static LabelControl*  s_posLabel    = 0L;
 static LabelControl*  s_vdaLabel    = 0L;
 static LabelControl*  s_mslLabel    = 0L;
 static LabelControl*  s_haeLabel    = 0L;
+static LabelControl*  s_egm96Label  = 0L;
 static LabelControl*  s_mapLabel    = 0L;
 static LabelControl*  s_resLabel    = 0L;
+static PlaceNode*     s_marker      = 0L;
 
 
 // An event handler that will print out the elevation at the clicked point
@@ -79,7 +84,7 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
             mapPoint.fromWorld( _terrain->getSRS(), world );
 
             // do an elevation query:
-            double query_resolution = 0; // 1/10th of a degree
+            double query_resolution = 0; // max.
             double out_hamsl        = 0.0;
             double out_resolution   = 0.0;
 
@@ -107,6 +112,17 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
                 s_haeLabel->setText( Stringify() << mapPointGeodetic.z() );
                 s_resLabel->setText( Stringify() << out_resolution );
 
+                double egm96z = mapPoint.z();
+
+                VerticalDatum::transform(
+                    mapPointGeodetic.getSRS()->getVerticalDatum(),
+                    VerticalDatum::get("egm96"),
+                    mapPointGeodetic.y(),
+                    mapPointGeodetic.x(),
+                    egm96z);
+                
+                s_egm96Label->setText(Stringify() << egm96z);
+
                 yes = true;
             }
 
@@ -114,6 +130,9 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
             GeoPoint isectPoint;
             isectPoint.fromWorld( _terrain->getSRS()->getGeodeticSRS(), world );
             s_mapLabel->setText( Stringify() << isectPoint.alt() );
+
+            // and move the marker.
+            s_marker->setPosition(mapPoint);
         }
 
         if (!yes)
@@ -122,16 +141,18 @@ struct QueryElevationHandler : public osgGA::GUIEventHandler
             s_mslLabel->setText( "-" );
             s_haeLabel->setText( "-" );
             s_resLabel->setText( "-" );
+            s_egm96Label->setText("-");
         }
     }
 
     bool handle( const osgGA::GUIEventAdapter& ea, osgGA::GUIActionAdapter& aa )
     {
-        if (ea.getEventType() == osgGA::GUIEventAdapter::MOVE &&
-            aa.asView()->getFrameStamp()->getFrameNumber() % 10 == 0)
+        if (ea.getEventType() == ea.DOUBLECLICK &&
+            ea.getButton() == ea.LEFT_MOUSE_BUTTON)
         {
             osgViewer::View* view = static_cast<osgViewer::View*>(aa.asView());
             update( ea.getX(), ea.getY(), view );
+            return true;
         }
 
         return false;
@@ -173,19 +194,31 @@ int main(int argc, char** argv)
 
     // Make the readout:
     Grid* grid = new Grid();
-    grid->setControl(0,0,new LabelControl("Coords (Lat, Long):"));
-    grid->setControl(0,1,new LabelControl("Vertical Datum:"));
-    grid->setControl(0,2,new LabelControl("Height (MSL):"));
-    grid->setControl(0,3,new LabelControl("Height (HAE):"));
-    grid->setControl(0,4,new LabelControl("Isect  (HAE):"));
-    grid->setControl(0,5,new LabelControl("Resolution:"));
+    grid->setBackColor(osg::Vec4(0,0,0,0.5));
+    int r=0;
+    grid->setControl(0,r++,new LabelControl("Double-click to sample elevation", osg::Vec4(1,1,0,1)));
+    grid->setControl(0,r++,new LabelControl("Coords (Lat, Long):"));
+    grid->setControl(0,r++,new LabelControl("Map vertical datum:"));
+    grid->setControl(0,r++,new LabelControl("Height above geoid:"));
+    grid->setControl(0,r++,new LabelControl("Height above ellipsoid:"));
+    grid->setControl(0,r++,new LabelControl("Scene graph intersection:"));
+    grid->setControl(0,r++,new LabelControl("EGM96 elevation:"));
+    grid->setControl(0,r++,new LabelControl("Query resolution:"));
 
-    s_posLabel = grid->setControl(1,0,new LabelControl(""));
-    s_vdaLabel = grid->setControl(1,1,new LabelControl(""));
-    s_mslLabel = grid->setControl(1,2,new LabelControl(""));
-    s_haeLabel = grid->setControl(1,3,new LabelControl(""));
-    s_mapLabel = grid->setControl(1,4,new LabelControl(""));
-    s_resLabel = grid->setControl(1,5,new LabelControl(""));
+    r = 1;
+    s_posLabel = grid->setControl(1,r++,new LabelControl(""));
+    s_vdaLabel = grid->setControl(1,r++,new LabelControl(""));
+    s_mslLabel = grid->setControl(1,r++,new LabelControl(""));
+    s_haeLabel = grid->setControl(1,r++,new LabelControl(""));
+    s_mapLabel = grid->setControl(1,r++,new LabelControl(""));
+    s_egm96Label = grid->setControl(1,r++,new LabelControl(""));
+    s_resLabel = grid->setControl(1,r++,new LabelControl(""));
+
+    s_marker = new PlaceNode();
+    s_marker->setMapNode( s_mapNode );
+    s_marker->setIconImage(osgDB::readImageFile("../data/placemark32.png"));
+    s_marker->setDynamic(true);
+    root->addChild( s_marker );
 
     const SpatialReference* mapSRS = s_mapNode->getMapSRS();
     s_vdaLabel->setText( mapSRS->getVerticalDatum() ? 

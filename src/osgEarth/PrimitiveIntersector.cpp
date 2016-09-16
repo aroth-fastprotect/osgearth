@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -314,8 +314,12 @@ struct PrimitiveIntersectorFunctor
 //
 //  PrimitiveIntersector
 //
-PrimitiveIntersector::PrimitiveIntersector()
+PrimitiveIntersector::PrimitiveIntersector() :
+_parent(0),
+_thicknessVal(0),
+_overlayIgnore(false)
 {
+    //nop
 }
 
 PrimitiveIntersector::PrimitiveIntersector(CoordinateFrame cf, double x, double y, double thickness):

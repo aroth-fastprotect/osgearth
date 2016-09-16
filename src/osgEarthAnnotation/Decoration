@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -29,6 +29,7 @@ namespace osgEarth { namespace Annotation
 {	
     using namespace osgEarth;
 
+#if 0
     //-----------------------------------------------------------------------
 
     class OSGEARTHANNO_EXPORT Decoration : public osg::Referenced
@@ -43,8 +44,7 @@ namespace osgEarth { namespace Annotation
 
     public:
         virtual bool apply(class AnnotationNode& node, bool enable);
-        virtual bool apply(class LocalizedNode&  node, bool enable);
-        virtual bool apply(class OrthoNode&      node, bool enable);
+        virtual bool apply(class GeoPositionNode& node, bool enable);
     };
 
     //-----------------------------------------------------------------------
@@ -113,6 +113,7 @@ namespace osgEarth { namespace Annotation
         virtual bool apply(osg::Group* attachPoint, bool enable);
     };
 
+#endif
 
 } } // namespace osgEarth::Annotation
 

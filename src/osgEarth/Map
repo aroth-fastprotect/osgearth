@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -288,33 +288,7 @@ namespace osgEarth
          * Gets the readable name of this map.
          */
         const std::string& getName() const { return _name; }
-        
-        /**
-         * Creates a flat heightfield (MSL) for the given tilekey.
-         */
-        osg::HeightField* createReferenceHeightField(
-            const TileKey& key,
-            bool           expressHeightsAsHAE =true) const;
-        
-#if 0
-        /**
-         * Populates a heightfield with data from the elevation layers
-         * in the map. The method will create a new heightfield if you
-         * don't supply one to populate.
-         *
-         * NOTE: By default, this method will populate the heightfield with HAE (height
-         * above ellipsoid) values, even if the TileKey profile has an MSL vertical
-         * datum. That is because this method is usually called to produce a renderable
-         * height field. You can override this behavior by passing in convertToHAE=false.
-         */
-        bool populateHeightField(
-            osg::ref_ptr<osg::HeightField>& hf,
-            const TileKey&                  key,
-            bool                            expressHeightsAsHAE =true,
-            ElevationSamplePolicy           samplePolicy        =SAMPLE_FIRST_VALID,
-            ProgressCallback*               progress            =0L) const;
-#endif
-
+              
         /**
          * Sets the Cache for this Map. Set to NULL for no cache.
          */
@@ -358,7 +332,7 @@ namespace osgEarth
         /**
          * Gets the database options associated with this map.
          */
-        const osgDB::Options* getDBOptions() const { return _dbOptions.get(); }
+        const osgDB::Options* getReadOptions() const { return _readOptions.get(); }
 
         const Profile* getProfileNoVDatum() const { return _profileNoVDatum.get(); }
 
@@ -378,12 +352,11 @@ namespace osgEarth
         MaskLayerVector _terrainMaskLayers;
         MapCallbackList _mapCallbacks;
         osg::ref_ptr<const osgDB::Options> _globalOptions;
-        Threading::ReadWriteMutex _mapDataMutex;
+        mutable Threading::ReadWriteMutex _mapDataMutex;
         osg::ref_ptr<const Profile> _profile;
         osg::ref_ptr<const Profile> _profileNoVDatum;
-        osg::ref_ptr<Cache> _cache;
         Revision _dataModelRevision;
-        osg::ref_ptr<osgDB::Options> _dbOptions;
+        osg::ref_ptr<osgDB::Options> _readOptions;
 
         struct ElevationLayerCB : public ElevationLayerCallback {
             osg::observer_ptr<Map> _map;

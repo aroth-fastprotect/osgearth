@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -30,6 +30,7 @@
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/AutoClipPlaneHandler>
 #include <osgEarth/Utils>
+#include <osgEarthFeatures/GeometryUtils>
 
 #include <osgEarthSymbology/Style>
 
@@ -37,7 +38,6 @@
 #include <osgEarthDrivers/feature_ogr/OGRFeatureOptions>
 #include <osgEarthDrivers/agglite/AGGLiteOptions>
 #include <osgEarthDrivers/model_feature_geom/FeatureGeomModelOptions>
-#include <osgEarthDrivers/model_feature_stencil/FeatureStencilModelOptions>
 
 #include <osgEarthUtil/Controls>
 
@@ -132,7 +132,7 @@ struct EditModeHandler : public ControlEventHandler
         if (!s_editor.valid())
         {            
             Style style = s_featureNode->getStyle();
-            style.getOrCreate<LineSymbol>()->stroke()->stipple() = 0x00FF;            
+            style.getOrCreate<LineSymbol>()->stroke()->stipple() = 0x00FF;                        
             s_featureNode->setStyle( style );            
             s_editor = new FeatureEditor( s_featureNode );
             s_editorsRoot->addChild( s_editor.get() );            
@@ -163,12 +163,13 @@ Style buildStyle( const osg::Vec4 &color, float width )
 
     LineSymbol* ls = style.getOrCreateSymbol<LineSymbol>();
     ls->stroke()->color() = color;
-    ls->stroke()->width() = width;    
-    ls->tessellation() = 10;
-
+    ls->stroke()->width() = width;        
+    
     AltitudeSymbol* as = style.getOrCreate<AltitudeSymbol>();
     as->clamping() = AltitudeSymbol::CLAMP_TO_TERRAIN;
-    as->technique() = AltitudeSymbol::TECHNIQUE_SCENE;
+    as->technique() = AltitudeSymbol::TECHNIQUE_DRAPE;
+
+    style.getOrCreate<PolygonSymbol>()->fill()->color() = Color::Red;
 
     RenderSymbol* rs = style.getOrCreateSymbol<RenderSymbol>();
     rs->depthOffset()->enabled() = true;
@@ -211,8 +212,10 @@ int main(int argc, char** argv)
     // Define a style for the feature data.
     Style style = buildStyle( Color::Yellow, 2.0f );    
 
-    LineString* line = new LineString();    
-    Feature* feature = new Feature(line, s_mapNode->getMapSRS(), Style(), s_fid++);
+    //LineString* line = new LineString();    
+    Geometry* geom = GeometryUtils::geometryFromWKT("POLYGON((191.026667 87.63333,114.75 78,89.5 77.333336,81.833336 75.333336,70.683334 74.5,70.916664 73.666664,68.666664 73.666664,66.291664 71.505,57.65 71.166664,58 73.9,48.616665 73,49.198334 71.43,49.5 70.5,43.266666 68.666664,32.083332 71.5,32.083332 74,35 74,35 81,32 81,32 90,191.026667 87.63333))");
+    OE_NOTICE << "Geometry " << GeometryUtils::geometryToWKT(geom) << std::endl;
+    Feature* feature = new Feature(geom, s_mapNode->getMapSRS(), Style(), s_fid++);
     s_featureNode = new FeatureNode( s_mapNode, feature );    
     s_featureNode->setStyle( style );
     

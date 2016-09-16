@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -128,6 +128,13 @@
 
 using namespace osgEarth;
 
+
+std::string
+osgEarth::getAbsolutePath(const std::string& path)
+{
+    return osgDB::convertFileNameToUnixStyle( osgDB::getRealPath(path) );
+}
+
 bool osgEarth::isRelativePath(const std::string& fileName)
 {
     //If it is a URL, it is not relative
@@ -145,7 +152,7 @@ bool osgEarth::isRelativePath(const std::string& fileName)
     return true;
 #else
     //Absolute paths in Unix will start with a '/'
-    return !(fileName.size() >= 1 && fileName[0] == '/');
+    return !(native.size() >= 1 && native[0] == '/');
 #endif
 }
 
@@ -270,14 +277,14 @@ std::string osgEarth::getTempName(const std::string& prefix, const std::string& 
 {
     //tmpname is kind of busted on Windows, it always returns a file of the form \blah which gets put in your root directory but
     //oftentimes can't get opened by some drivers b/c it doesn't have a drive letter in front of it.
-    bool valid = false;
-    while (!valid)
+    while (true)
     {
         std::stringstream ss;
         ss << prefix << "~" << rand() << suffix;
-        if (!osgDB::fileExists(ss.str())) return ss.str();
+        if (!osgDB::fileExists(ss.str()))
+            return ss.str();
     }
-    return "";
+//    return "";
 }
 
 bool osgEarth::makeDirectory( const std::string &path )

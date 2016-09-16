@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -132,7 +132,7 @@ SpatialReference::createFromPROJ4( const std::string& proj4, const std::string& 
 	void* handle = OSRNewSpatialReference( NULL );
     if ( OSRImportFromProj4( handle, proj4.c_str() ) == OGRERR_NONE )
 	{
-        result = new SpatialReference( handle, "PROJ4" );
+        result = new SpatialReference( handle, std::string("PROJ4") );
 	}
 	else 
 	{
@@ -169,17 +169,44 @@ SpatialReference::createFromWKT( const std::string& wkt, const std::string& name
     osg::ref_ptr<SpatialReference> result;
     GDAL_SCOPED_LOCK;
     void* handle = OSRNewSpatialReference( NULL );
-    char buf[4096];
+    char buf[8192];
     char* buf_ptr = &buf[0];
-    strcpy( buf, wkt.c_str() );
+    if (wkt.length() < 8192)
+    {
+        strcpy( buf, wkt.c_str() );
+    }
+    else
+    {
+        OE_WARN << LC << "BUFFER OVERFLOW - INTERNAL ERROR\n";
+        return 0L;
+    }
+
     if ( OSRImportFromWkt( handle, &buf_ptr ) == OGRERR_NONE )
     {
-        result = new SpatialReference( handle, "WKT" );
+        result = new SpatialReference( handle, std::string("WKT") );
         result = result->fixWKT();
     }
     else 
     {
         OE_WARN << LC << "Unable to create spatial reference from WKT: " << wkt << std::endl;
+        OSRDestroySpatialReference( handle );
+    }
+    return result.release();
+}
+
+SpatialReference*
+SpatialReference::createFromUserInput( const std::string& input, const std::string& name )
+{
+    osg::ref_ptr<SpatialReference> result;
+    GDAL_SCOPED_LOCK;
+    void* handle = OSRNewSpatialReference( NULL );
+    if ( OSRSetFromUserInput( handle, input.c_str() ) == OGRERR_NONE )
+    {
+        result = new SpatialReference( handle, std::string("UserInput") );
+    }
+    else 
+    {
+        //OE_WARN << LC << "Unable to create spatial reference from user input: " << input << std::endl;
         OSRDestroySpatialReference( handle );
     }
     return result.release();
@@ -276,12 +303,19 @@ SpatialReference::create( const Key& key, bool useCache )
     else if (key.horizLower.find( "epsg:" )  == 0 ||
              key.horizLower.find( "osgeo:" ) == 0 )
     {
-        srs = createFromPROJ4( std::string("+init=") + key.horiz, key.horiz );
+        srs = createFromPROJ4( std::string("+init=") + key.horizLower, key.horiz );
     }
     else if (key.horizLower.find( "projcs" ) == 0 || 
              key.horizLower.find( "geogcs" ) == 0 )
     {
         srs = createFromWKT( key.horiz, key.horiz );
+    }
+    else
+    {
+        // Try to set it from the user input.  This will handle things like CRS:84
+        // createFromUserInput will actually handle all valid inputs from GDAL, so we might be able to
+        // simplify this function and just call createFromUserInput.
+        srs = createFromUserInput( key.horiz, key.horiz );
     }
 
     // bail out if no SRS exists by this point
@@ -380,12 +414,13 @@ SpatialReference::fixWKT()
 /****************************************************************************/
 
 
-SpatialReference::SpatialReference(void*              handle, 
+SpatialReference::SpatialReference(void* handle,
                                    const std::string& init_type) :
 osg::Referenced ( true ),
 _initialized    ( false ),
 _handle         ( handle ),
 _owns_handle    ( true ),
+_init_type      ( init_type ),
 _is_geographic  ( false ),
 _is_ecef        ( false ),
 _is_mercator    ( false ),
@@ -396,8 +431,8 @@ _is_contiguous  ( false ),
 _is_user_defined( false ),
 _is_ltp         ( false ),
 _is_plate_carre ( false ),
-_init_type      ( init_type ),
-_is_spherical_mercator( false )
+_is_spherical_mercator( false ),
+_ellipsoidId(0u)
 {
     // nop
 }
@@ -945,17 +980,12 @@ SpatialReference::createLocalToWorld(const osg::Vec3d& xyz, osg::Matrixd& out_lo
     }
     else
     {
-        // convert MSL to HAE if necessary:
-        osg::Vec3d geodetic;
-        if ( !transform(xyz, getGeodeticSRS(), geodetic) )
-            return false;
-
-        // then to ECEF:
+        // convert to ECEF:
         osg::Vec3d ecef;
-        if ( !transform(geodetic, getGeodeticSRS()->getECEF(), ecef) )
+        if ( !transform(xyz, getECEF(), ecef) )
             return false;
 
-        //out_local2world = ECEF::createLocalToWorld(ecef);        
+        // and create the matrix.
         _ellipsoid->computeLocalToWorldTransformFromXYZ(ecef.x(), ecef.y(), ecef.z(), out_local2world);
     }
     return true;
@@ -1357,7 +1387,6 @@ SpatialReference::transformExtentToMBR(const SpatialReference* to_srs,
     v.push_back( osg::Vec3d(in_out_xmin, in_out_ymax, 0) ); // ul
     v.push_back( osg::Vec3d(in_out_xmax, in_out_ymax, 0) ); // ur
     v.push_back( osg::Vec3d(in_out_xmax, in_out_ymin, 0) ); // lr
-
     if ( transform(v, to_srs) )
     {
         in_out_xmin = std::min( v[0].x(), v[1].x() );

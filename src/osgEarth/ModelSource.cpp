@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -33,6 +33,7 @@ DriverConfigOptions( options ),
 _minRange          ( 0.0f ),
 _maxRange          ( FLT_MAX ),
 _renderOrder       ( 11 ),
+_renderBin         ( "DepthSortedBin" ),
 _depthTestEnabled  ( true )
 { 
     fromConfig(_conf);
@@ -40,6 +41,7 @@ _depthTestEnabled  ( true )
 
 ModelSourceOptions::~ModelSourceOptions()
 {
+    //nop
 }
 
 void
@@ -48,6 +50,7 @@ ModelSourceOptions::fromConfig( const Config& conf )
     conf.getIfSet<float>( "min_range", _minRange );
     conf.getIfSet<float>( "max_range", _maxRange );
     conf.getIfSet<int>( "render_order", _renderOrder );
+    conf.getIfSet("render_bin", _renderBin );
     conf.getIfSet<bool>( "depth_test_enabled", _depthTestEnabled );
 }
 
@@ -65,6 +68,7 @@ ModelSourceOptions::getConfig() const
     conf.updateIfSet( "min_range", _minRange );
     conf.updateIfSet( "max_range", _maxRange );
     conf.updateIfSet( "render_order", _renderOrder );
+    conf.updateIfSet( "render_bin", _renderBin );
     conf.updateIfSet( "depth_test_enabled", _depthTestEnabled );
     return conf;
 }
@@ -83,11 +87,22 @@ ModelSource::~ModelSource()
    //nop
 }
 
+const Status&
+ModelSource::open(const osgDB::Options* readOptions)
+{
+    _status = initialize(readOptions);
+    return _status;
+}
 
 osg::Node* 
 ModelSource::createNode(const Map*        map,
                         ProgressCallback* progress )
 {
+    if (getStatus().isError())
+    {
+        return 0L;
+    }
+
     osg::Node* node = createNodeImplementation(map, progress);
     if ( node )
     {
@@ -180,6 +195,7 @@ ModelSource::firePostProcessors( osg::Node* node )
 
 ModelSourceFactory::~ModelSourceFactory()
 {
+    //nop
 }
 
 ModelSource*
@@ -195,10 +211,10 @@ ModelSourceFactory::create( const ModelSourceOptions& options )
         rwopts->setPluginData( MODEL_SOURCE_OPTIONS_TAG, (void*)&options );
 
         modelSource = dynamic_cast<ModelSource*>( osgDB::readObjectFile( driverExt, rwopts.get() ) );
-        if ( !modelSource )
-        {
-            OE_WARN << "FAILED to load model source driver \"" << options.getDriver() << "\"" << std::endl;
-        }
+        //if ( !modelSource )
+        //{
+        //    OE_WARN << "FAILED to load model source driver \"" << options.getDriver() << "\"" << std::endl;
+        //}
     }
     else
     {
@@ -213,7 +229,9 @@ ModelSourceFactory::create( const ModelSourceOptions& options )
 const ModelSourceOptions&
 ModelSourceDriver::getModelSourceOptions( const osgDB::ReaderWriter::Options* options ) const
 {
-    return *static_cast<const ModelSourceOptions*>( options->getPluginData( MODEL_SOURCE_OPTIONS_TAG ) );
+    static ModelSourceOptions s_default;
+    const void* data = options->getPluginData(MODEL_SOURCE_OPTIONS_TAG);
+    return data ? *static_cast<const ModelSourceOptions*>(data) : s_default;
 }
 
 ModelSourceDriver::~ModelSourceDriver()

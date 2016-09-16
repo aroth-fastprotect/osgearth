@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -136,9 +136,10 @@ public:
         {
 			OE_INFO << LC << "_map_service.init failed: " << _map_service.getError() << std::endl;
 
-            return Status::Error( Stringify()
-                << "[osgearth] [ArcGIS] map service initialization failed: "
-                << _map_service.getError() );
+            return Status::Error(
+                Status::ResourceUnavailable, Stringify()
+                    << "[osgearth] [ArcGIS] map service initialization failed: "
+                    << _map_service.getError() );
         }
 
         _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );        
@@ -268,7 +269,7 @@ public:
         supportsExtension( "osgearth_arcgis", "ArcGIS Server" );
     }
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "ArcGIS Server REST ReaderWriter";
     }

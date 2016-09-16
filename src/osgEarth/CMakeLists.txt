@@ -9,12 +9,21 @@ MARK_AS_ADVANCED(CURL_IS_STATIC)
 
 ADD_DEFINITIONS(-DTIXML_USE_STL)
 
+# Builds the HTTPClient with WIN_INET instead of CURL
+OPTION(OSGEARTH_USE_WININET_FOR_HTTP "Whether to use the WinInet library for HTTP requests (instead of cURL)" OFF)
+if (OSGEARTH_USE_WININET_FOR_HTTP)
+    ADD_DEFINITIONS(-DOSGEARTH_USE_WININET_FOR_HTTP)
+endif (OSGEARTH_USE_WININET_FOR_HTTP)
+
 IF(WIN32)
-    SET(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:MSVCRT")
+    IF(MSVC)
+        SET(CMAKE_SHARED_LINKER_FLAGS_DEBUG "${CMAKE_SHARED_LINKER_FLAGS_DEBUG} /NODEFAULTLIB:MSVCRT")
+    ENDIF(MSVC)
     IF(CURL_IS_STATIC)
         ADD_DEFINITIONS(-DCURL_STATICLIB)
         SET(TARGET_EXTERNAL_LIBRARIES ws2_32 winmm wldap32)
     ENDIF(CURL_IS_STATIC)
+    LIST(APPEND TARGET_EXTERNAL_LIBRARIES psapi)
 ENDIF(WIN32)
 
 SET(LIB_NAME osgEarth)
@@ -62,26 +71,28 @@ SET(LIB_PUBLIC_HEADERS
     Cube
     CullingUtils
     DateTime
-    Decluttering
+    DateTimeRange
     DepthOffset
     DPLineSegmentIntersector
     DrapeableNode
+    DrapingCullSet
     DrapingTechnique
     DrawInstanced
     ECEF
-    ElevationField
     ElevationLayer
     ElevationLOD
     ElevationQuery
     Export
-	Extension
+    Extension
     FadeEffect
     FileUtils
     GeoCommon
     GeoData
     Geoid
     GeoMath
-	GeoTransform
+    GeoTransform
+    GeometryClamper
+    GLSLChunker
     HeightFieldUtils
     Horizon
     HTTPClient
@@ -107,6 +118,7 @@ SET(LIB_PUBLIC_HEADERS
     MaskLayer
     MaskNode
     MaskSource
+    Memory
     MemCache
     ModelLayer
     ModelSource
@@ -117,25 +129,30 @@ SET(LIB_PUBLIC_HEADERS
     ObjectIndex
     OverlayDecorator
     OverlayNode
-	PhongLightingEffect
+    PhongLightingEffect
     Picker
     IntersectionPicker
     PrimitiveIntersector
     Profile
     Profiler
     Progress
+    QuadTree
     Random
     Registry
+    ResourceReleaser
     Revisioning
+    ScreenSpaceLayout
     Shaders
     ShaderFactory
     ShaderGenerator
     ShaderLoader
     ShaderUtils
-	SharedSARepo
+    Shadowing
+    SharedSARepo
     SpatialReference
     StateSetCache
-	StateSetLOD
+    StateSetLOD
+    Status
     StringUtils
     TaskService
     Terrain
@@ -143,12 +160,17 @@ SET(LIB_PUBLIC_HEADERS
     TerrainLayer
     TerrainOptions
     TerrainEngineNode
+    TerrainEngineRequirements
+    TerrainTileModel
+    TerrainTileModelFactory
     TerrainTileNode
+    TileKeyDataStore
+    TilePatchCallback
     Tessellator
     TextureCompositor
     TileKey
     TileHandler
-	TileSource
+    TileSource
     TileVisitor
     TimeControl
     TraversalData
@@ -200,6 +222,7 @@ set(TARGET_SRC
     AutoScale.cpp
     Bounds.cpp
     Cache.cpp
+    CacheBin.cpp
     CacheEstimator.cpp
     CachePolicy.cpp
     CacheSeed.cpp
@@ -213,24 +236,26 @@ set(TARGET_SRC
     Cube.cpp
     CullingUtils.cpp
     DateTime.cpp
-    Decluttering.cpp
+    DateTimeRange.cpp
     DepthOffset.cpp
     DPLineSegmentIntersector.cpp
     DrapeableNode.cpp
+    DrapingCullSet.cpp
     DrapingTechnique.cpp
     DrawInstanced.cpp
     ECEF.cpp
-    ElevationField.cpp
     ElevationLayer.cpp
     ElevationLOD.cpp
     ElevationQuery.cpp
-	Extension.cpp
+    Extension.cpp
     FadeEffect.cpp
     FileUtils.cpp
     GeoData.cpp
     Geoid.cpp
     GeoMath.cpp
-	GeoTransform.cpp
+    GeoTransform.cpp
+    GeometryClamper.cpp
+    GLSLChunker.cpp
     HeightFieldUtils.cpp
     Horizon.cpp
     HTTPClient.cpp
@@ -254,6 +279,7 @@ set(TARGET_SRC
     MaskNode.cpp
     MaskSource.cpp
     MemCache.cpp
+    Memory.cpp
     MimeTypes.cpp
     ModelLayer.cpp
     ModelSource.cpp
@@ -262,32 +288,41 @@ set(TARGET_SRC
     ObjectIndex.cpp
     OverlayDecorator.cpp
     OverlayNode.cpp
-	PhongLightingEffect.cpp
+    PhongLightingEffect.cpp
     IntersectionPicker.cpp
     PrimitiveIntersector.cpp
     Profile.cpp
     Profiler.cpp
     Progress.cpp
+    QuadTree.cpp
     Random.cpp
     Registry.cpp
+    ResourceReleaser.cpp
     Revisioning.cpp
+    ScreenSpaceLayout.cpp
     ShaderFactory.cpp
     ShaderGenerator.cpp
     ShaderLoader.cpp
     ShaderUtils.cpp
+    Shadowing.cpp
     SpatialReference.cpp
     StateSetCache.cpp
-	StateSetLOD.cpp
+    StateSetLOD.cpp
+    Status.cpp
     StringUtils.cpp
     TaskService.cpp
     Terrain.cpp
     TerrainLayer.cpp
     TerrainOptions.cpp
     TerrainEngineNode.cpp
+    TerrainTileModel.cpp
+    TerrainTileModelFactory.cpp
     Tessellator.cpp
+    TextureBufferSerializer.cpp
     TextureCompositor.cpp
     TileKey.cpp
     TileHandler.cpp
+    TilePatchCallback.cpp
     TileVisitor.cpp
     TileSource.cpp
     TimeControl.cpp
@@ -305,11 +340,11 @@ set(TARGET_SRC
 
 
 ADD_LIBRARY(
-	${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
+    ${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
     ${LIB_PUBLIC_HEADERS}
     ${TINYXML_SRC}
     ${VERSION_GIT_SOURCE}
-	${TARGET_SRC}
+    ${TARGET_SRC}
     ${TARGET_GLSL}
     ${TARGET_IN} )
 

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -55,7 +55,11 @@ void ElevationQueryCacheReadCallback::pruneUnusedDatabaseCache()
 {
 }
 
+#if OSG_VERSION_GREATER_OR_EQUAL(3,5,0)
+osg::ref_ptr<osg::Node> ElevationQueryCacheReadCallback::readNodeFile(const std::string& filename)
+#else
 osg::Node* ElevationQueryCacheReadCallback::readNodeFile(const std::string& filename)
+#endif
 {
     // first check to see if file is already loaded.
     {
@@ -71,7 +75,7 @@ osg::Node* ElevationQueryCacheReadCallback::readNodeFile(const std::string& file
     }
 
     // now load the file.
-    osg::ref_ptr<osg::Node> node = osgDB::readNodeFile(filename);
+    osg::ref_ptr<osg::Node> node = osgDB::readRefNodeFile(filename);
 
     // insert into the cache.
     if (node.valid())
@@ -105,7 +109,16 @@ osg::Node* ElevationQueryCacheReadCallback::readNodeFile(const std::string& file
         }
     }
 
+#if OSG_VERSION_GREATER_OR_EQUAL(3,5,0)
+    return node;
+#else
     return node.release();
+#endif
+}
+
+ElevationQuery::ElevationQuery()
+{
+    postCTOR();
 }
 
 ElevationQuery::ElevationQuery(const Map* map) :
@@ -121,6 +134,13 @@ _mapf( mapFrame )
 }
 
 void
+ElevationQuery::setMapFrame(const MapFrame& frame)
+{
+    _mapf = frame;
+    postCTOR();
+}
+
+void
 ElevationQuery::postCTOR()
 {
     // defaults:
@@ -128,6 +148,7 @@ ElevationQuery::postCTOR()
     _queries          = 0.0;
     _totalTime        = 0.0;
     _fallBackOnNoData = false;
+    _cache.clear();
     _cache.setMaxSize( 500 );
 
     // set read callback for IntersectionVisitor
@@ -192,7 +213,7 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
                     srs->transform(tsCoord, tsSRS, tsCoord);
                 else
                     tsSRS = srs;
-                
+
                 for (osgEarth::DataExtentList::iterator j = ts->getDataExtents().begin(); j != ts->getDataExtents().end(); j++)
                 {
                     if (j->maxLevel().isSet() &&
@@ -201,7 +222,7 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
                     {
                         layerMaxLevel = j->maxLevel().value();
                     }
-                }            
+                }
             }
             else
             {
@@ -230,7 +251,13 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
         // Adjust for the tile size resolution differential, if supported by the layer.
         if ( layerMaxLevel.isSet() )
         {
-#if 0
+			// TODO:  This native max resolution of the layer has already been computed here.
+			//        The following block attempts to compute a higher resolution to undo the resolution
+			//        mapping that populateHeightField will eventually do.  So for example, you might compute a maximum level of
+			//        10 here, and this will adjust it to 14 with the knowledge that populateHeightField will adjust the 14 back to 10.
+			//        The use of populateHeightField needs to be replaced by code that just works with the native resolution of the
+			//        layers instead.
+#if 1
             int layerTileSize = layer->getTileSize();
             if (layerTileSize > targetTileSizePOT)
             {
@@ -257,15 +284,15 @@ ElevationQuery::getMaxLevel( double x, double y, const SpatialReference* srs, co
 void
 ElevationQuery::setMaxTilesToCache( int value )
 {
-    _cache.setMaxSize( value );   
+    _cache.setMaxSize( value );
 }
 
 int
 ElevationQuery::getMaxTilesToCache() const
 {
-    return _cache.getMaxSize();    
+    return _cache.getMaxSize();
 }
-        
+
 void
 ElevationQuery::setMaxLevelOverride(int maxLevelOverride)
 {
@@ -382,7 +409,7 @@ ElevationQuery::getElevationImpl(const GeoPoint& point, /* abs */
 
                     osg::Vec3d start( surface + nvector*5e5 );
                     osg::Vec3d end  ( surface - nvector*5e5 );
-                
+
                     // first time through, set up the intersector on demand
                     if ( !_patchLayersLSI.valid() )
                     {
@@ -427,11 +454,11 @@ ElevationQuery::getElevationImpl(const GeoPoint& point, /* abs */
     {
         // this means there are no heightfields.
         out_elevation = 0.0;
-        return true;        
+        return true;
     }
 
-    // tile size (resolution of elevation tiles) 
-    unsigned tileSize = 17; // ???
+    // tile size (resolution of elevation tiles)
+    unsigned tileSize = 33; // ???
 
     // This is the max resolution that we actually have data at this point
     int bestAvailLevel = getMaxLevel( point.x(), point.y(), point.getSRS(), _mapf.getProfile(), tileSize );
@@ -463,7 +490,7 @@ ElevationQuery::getElevationImpl(const GeoPoint& point, /* abs */
             OE_WARN << LC << "Fail: coord transform failed" << std::endl;
             return false;
         }
-    }    
+    }
 
     // get the tilekey corresponding to the tile we need:
     TileKey key = _mapf.getProfile()->createTileKey( mapPoint.x(), mapPoint.y(), bestAvailLevel );
@@ -472,22 +499,22 @@ ElevationQuery::getElevationImpl(const GeoPoint& point, /* abs */
         OE_WARN << LC << "Fail: coords fall outside map" << std::endl;
         return false;
     }
-        
-    bool result = false; 
+
+    bool result = false;
 
     while ( !result && key.valid() )
     {
         GeoHeightField geoHF;
-        
+
         // Try to get the hf from the cache
         TileCache::Record record;
         if ( _cache.get( key, record ) )
-        {                        
+        {
             geoHF = record.value();
         }
         else
         {
-            // Create it            
+            // Create it
             osg::ref_ptr<osg::HeightField> hf = new osg::HeightField();
             hf->allocate( tileSize, tileSize );
 
@@ -495,26 +522,26 @@ ElevationQuery::getElevationImpl(const GeoPoint& point, /* abs */
             hf->getFloatArray()->assign( hf->getFloatArray()->size(), NO_DATA_VALUE );
 
             if (_mapf.populateHeightField(hf, key, false /*heightsAsHAE*/, 0L))
-            {                
+            {
                 geoHF = GeoHeightField( hf.get(), key.getExtent() );
                 _cache.insert( key, geoHF );
             }
         }
 
         if (geoHF.valid())
-        {            
-            float elevation = 0.0f;                 
-            result = geoHF.getElevation( mapPoint.getSRS(), mapPoint.x(), mapPoint.y(), _mapf.getMapInfo().getElevationInterpolation(), mapPoint.getSRS(), elevation);                              
+        {
+            float elevation = 0.0f;
+            result = geoHF.getElevation( mapPoint.getSRS(), mapPoint.x(), mapPoint.y(), _mapf.getMapInfo().getElevationInterpolation(), mapPoint.getSRS(), elevation);
             if (result && elevation != NO_DATA_VALUE)
             {
-                out_elevation = (double)elevation;                
+                out_elevation = (double)elevation;
 
                 // report the actual resolution of the heightfield.
                 if ( out_actualResolution )
                     *out_actualResolution = geoHF.getXInterval();
             }
             else
-            {                               
+            {
                 result = false;
             }
         }
@@ -528,7 +555,7 @@ ElevationQuery::getElevationImpl(const GeoPoint& point, /* abs */
             key = key.createParentKey();
         }
     }
-         
+
 
     osg::Timer_t end = osg::Timer::instance()->tick();
     _queries++;

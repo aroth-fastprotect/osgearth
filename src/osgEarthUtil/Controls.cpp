@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -1656,6 +1656,27 @@ Container::addControls( const ControlVector& controls )
     }
 }
 
+
+
+
+
+
+void Container::setVisible(bool visibility) 
+{ 
+        Control::setVisible(visibility); 
+        std::vector<osgEarth::Util::Controls::Control*> out; 
+        getChildren(out); 
+        for (int i = 0; i < (int) out.size(); i++) 
+        { 
+                Container* container = dynamic_cast<Container*>( out.at(i) ); 
+                if (container) { 
+                        container->setVisible(visibility); 
+                } else { 
+                        out.at(i)->setVisible(visibility); 
+                } 
+        } 
+}
+
 // ---------------------------------------------------------------------------
 
 VBox::VBox()
@@ -1778,8 +1799,7 @@ VBox::calcPos(const ControlContext& cx, const osg::Vec2f& cursor, const osg::Vec
 void
 VBox::draw( const ControlContext& cx )
 {
-    if ( visible() )
-    {
+   
         Container::draw( cx );
 
         for( unsigned i=1; i<getNumChildren(); ++i )
@@ -1788,7 +1808,7 @@ VBox::draw( const ControlContext& cx )
             if ( c )
                 c->draw( cx );
         }
-    }
+     
 }
 
 // ---------------------------------------------------------------------------
@@ -1847,6 +1867,10 @@ HBox::calcSize(const ControlContext& cx, osg::Vec2f& out_size)
         if (width().isSet() && width().get() > _renderSize.x()) _renderSize.x() = width().get();
 
         Container::calcSize( cx, out_size );
+    }
+    else
+    {
+        out_size.set(0,0);
     }
 }
 
@@ -1912,8 +1936,7 @@ HBox::calcPos(const ControlContext& cx, const osg::Vec2f& cursor, const osg::Vec
 void
 HBox::draw( const ControlContext& cx )
 {
-    if ( visible() )
-    {
+    
         Container::draw( cx );
 
         for( unsigned i=1; i<getNumChildren(); ++i )
@@ -1922,7 +1945,7 @@ HBox::draw( const ControlContext& cx )
             if ( c )
                 c->draw( cx );
         }
-    }
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -2069,8 +2092,7 @@ Grid::clearControls()
 void
 Grid::calcSize( const ControlContext& cx, osg::Vec2f& out_size )
 {
-    if ( visible() )
-    {
+    
         _renderSize.set( 0, 0 );
 
         int nRows = (int)getNumRows();
@@ -2109,7 +2131,7 @@ Grid::calcSize( const ControlContext& cx, osg::Vec2f& out_size )
         }
 
         Container::calcSize( cx, out_size );
-    }
+    
 }
 
 void
@@ -2164,11 +2186,14 @@ Grid::calcPos( const ControlContext& cx, const osg::Vec2f& cursor, const osg::Ve
     }
 }
 
+
+
+
+
 void
 Grid::draw( const ControlContext& cx )
 {
-    if ( visible() )
-    {
+    
         Container::draw( cx );
 
         for( unsigned i=1; i<getNumChildren(); ++i )
@@ -2186,7 +2211,7 @@ Grid::draw( const ControlContext& cx )
                 }
             }
         }
-    }
+ 
 }
 
 // ---------------------------------------------------------------------------
@@ -2351,8 +2376,9 @@ ControlNode::traverse( osg::NodeVisitor& nv )
 
 ControlNode::TravSpecificData::TravSpecificData() :
 _obscured   ( true ),
+_visibleTime( 0.0 ),
 _screenPos  ( 0.0, 0.0, 0.0 ),
-_visibleTime( 0.0 )
+_visitFrame(0)
 {
     //nop
 }
@@ -2382,9 +2408,9 @@ static osgEarthRegisterRenderBinProxy<osgEarthControlsRenderBin> s_regbin( OSGEA
 // ---------------------------------------------------------------------------
 
 ControlNodeBin::ControlNodeBin() :
+_sortingEnabled( true ),
 _sortByDistance( true ),
-_fading        ( true ),
-_sortingEnabled( true )
+_fading        ( true )
 {
     _group = new Group();
 
@@ -2409,6 +2435,7 @@ ControlNodeBin::setFading( bool value )
 void
 ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
 {
+    const osg::Viewport* vp = context._vp.get();
     osg::Vec2f surfaceSize( context._vp->width(), context._vp->height() );
 
     // we don't really need to keep this list in the object, but that prevents it from having to
@@ -2420,18 +2447,25 @@ ControlNodeBin::draw( const ControlContext& context, bool newContext, int bin )
 
     if ( _sortingEnabled && _sortByDistance )
     {
-        for( ControlNodeCollection::iterator i = _controlNodes.begin(); i != _controlNodes.end(); i++) 
+        for( ControlNodeCollection::iterator i = _controlNodes.begin(); i != _controlNodes.end();)
         {
             ControlNode* node = i->second.get();
             if ( node->getNumParents() == 0 )
             {
+              // Save the iterator and erase it before we increment it.  erase will invalidate i so we can't increment it directly.
+              ControlNodeCollection::iterator saveItr = i;
+              ++saveItr;
               _renderNodes.erase( node );
+              // Erase the current iterator
               _controlNodes.erase( i );
+              // Assign i to the incremented iterator
+              i = saveItr;
             }
             else
             {
                 ControlNode::TravSpecificData& nodeData = node->getData( context._view->getCamera() );
                 byDepth.insert( ControlNodePair(nodeData._screenPos.z(), node) );
+                i++;
             }
         }
 
@@ -2878,6 +2912,7 @@ ControlCanvas::traverse(osg::NodeVisitor& nv)
         }
         break;
 
+    default:
     case osg::NodeVisitor::CULL_VISITOR:
         {
         }

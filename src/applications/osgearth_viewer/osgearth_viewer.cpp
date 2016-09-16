@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -25,8 +25,8 @@
 #include <osgEarthUtil/EarthManipulator>
 #include <osgEarthUtil/ExampleResources>
 
-#include <osgEarth/Units>
-#include <osgEarth/Viewpoint>
+#include <osgEarth/Cache>
+#include <osgEarthDrivers/cache_filesystem/FileSystemCache>
 
 #define LC "[viewer] "
 
@@ -52,28 +52,43 @@ main(int argc, char** argv)
     if ( arguments.read("--help") )
         return usage(argv[0]);
 
-    if ( arguments.read("--stencil") )
-        osg::DisplaySettings::instance()->setMinimumNumStencilBits( 8 );
+    float vfov = -1.0f;
+    arguments.read("--vfov", vfov);
 
     // create a viewer:
     osgViewer::Viewer viewer(arguments);
 
     // Tell the database pager to not modify the unref settings
-    viewer.getDatabasePager()->setUnrefImageDataAfterApplyPolicy( false, false );
+    viewer.getDatabasePager()->setUnrefImageDataAfterApplyPolicy( true, false );
+
+    // thread-safe initialization of the OSG wrapper manager. Calling this here
+    // prevents the "unsupported wrapper" messages from OSG
+    osgDB::Registry::instance()->getObjectWrapperManager()->findWrapper("osg::Image");
 
     // install our default manipulator (do this before calling load)
-    viewer.setCameraManipulator( new EarthManipulator() );    
+    viewer.setCameraManipulator( new EarthManipulator(arguments) );
+
+    // disable the small-feature culling
+    viewer.getCamera()->setSmallFeatureCullingPixelSize(-1.0f);
+
+    // set a near/far ratio that is smaller than the default. This allows us to get
+    // closer to the ground without near clipping. If you need more, use --logdepth
+    viewer.getCamera()->setNearFarRatio(0.0001);
+
+    if ( vfov > 0.0 )
+    {
+        double fov, ar, n, f;
+        viewer.getCamera()->getProjectionMatrixAsPerspective(fov, ar, n, f);
+        viewer.getCamera()->setProjectionMatrixAsPerspective(vfov, ar, n, f);
+    }
 
     // load an earth file, and support all or our example command-line options
     // and earth file <external> tags    
-    osg::Node* node = MapNodeHelper().load( arguments, &viewer );
+    osg::Node* node = MapNodeHelper().load(arguments, &viewer);
     if ( node )
     {
         viewer.setSceneData( node );
-
-        viewer.getCamera()->setSmallFeatureCullingPixelSize(-1.0f);
-
-        return viewer.run();
+        viewer.run();
     }
     else
     {

@@ -1,6 +1,7 @@
 SET(TARGET_SRC 
     GLSkyDriver.cpp
     GLSkyNode.cpp
+    GLSkyExtension.cpp
 )
 SET(TARGET_H
     GLSkyOptions

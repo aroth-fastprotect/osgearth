@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -27,6 +27,8 @@
 
 namespace osgEarth { namespace Annotation
 {
+    class AnnotationFactory;
+
     /**
      * Singleton registry for annotation node types.
      */
@@ -59,7 +61,7 @@ namespace osgEarth { namespace Annotation
         /**
          * Adds an annotation type to the registry
          */
-        void add( const std::string& key, class AnnotationFactory* factory );
+        void add( const std::string& key, AnnotationFactory* factory );
 
         virtual ~AnnotationRegistry() { }
 
@@ -71,8 +73,7 @@ namespace osgEarth { namespace Annotation
         AnnotationNode* createOne( 
             MapNode*              mapNode, 
             const Config&         conf,
-            const osgDB::Options* dbOptions, 
-            bool                  declutter =false ) const;
+            const osgDB::Options* dbOptions) const;
     };
 
     // Macro used to register new annotation types.

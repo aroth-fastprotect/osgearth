@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -38,6 +38,10 @@ namespace
     {
         NodeModelSource( osg::Node* node ) : _node(node) { }
 
+        Status initialize(const osgDB::Options* readOptions) {
+            return Status::OK();
+        }
+
         osg::Node* createNodeImplementation(const Map* map, ProgressCallback* progress) {
             return _node.get();
         }
@@ -64,6 +68,41 @@ ConfigOptions()
     _driver = driverOptions;
 }
 
+ModelLayerOptions::ModelLayerOptions(const ModelLayerOptions& rhs) :
+ConfigOptions(rhs.getConfig())
+{
+    _name = optional<std::string>(rhs._name);
+    _driver = optional<ModelSourceOptions>(rhs._driver);
+    _enabled = optional<bool>(rhs._enabled);
+    _visible = optional<bool>(rhs._visible);
+    _opacity = optional<float>(rhs._opacity);
+    _lighting = optional<bool>(rhs._lighting);
+    _maskOptions = optional<MaskSourceOptions>(rhs._maskOptions);
+    _maskMinLevel = optional<unsigned>(rhs._maskMinLevel);
+    _terrainPatch = optional<bool>(rhs._terrainPatch);
+    _cachePolicy = optional<CachePolicy>(rhs._cachePolicy);
+    _cacheId = optional<std::string>(rhs._cacheId);
+}
+
+ModelLayerOptions& ModelLayerOptions::operator =(const ModelLayerOptions& rhs)
+{
+    ConfigOptions::operator =(rhs);
+
+    _name = optional<std::string>(rhs._name);
+    _driver = optional<ModelSourceOptions>(rhs._driver);
+    _enabled = optional<bool>(rhs._enabled);
+    _visible = optional<bool>(rhs._visible);
+    _opacity = optional<float>(rhs._opacity);
+    _lighting = optional<bool>(rhs._lighting);
+    _maskOptions = optional<MaskSourceOptions>(rhs._maskOptions);
+    _maskMinLevel = optional<unsigned>(rhs._maskMinLevel);
+    _terrainPatch = optional<bool>(rhs._terrainPatch);
+    _cachePolicy = optional<CachePolicy>(rhs._cachePolicy);
+    _cacheId = optional<std::string>(rhs._cacheId);
+
+    return *this;
+}
+
 void
 ModelLayerOptions::setDefaults()
 {
@@ -73,7 +112,9 @@ ModelLayerOptions::setDefaults()
     _opacity.init     ( 1.0f );
     _maskMinLevel.init( 0 );
     _terrainPatch.init( false );
-    _cachePolicy.init ( CachePolicy() );
+
+    // Expressly set it here since we want no caching by default on a model layer.
+    _cachePolicy = CachePolicy::NO_CACHE;
 }
 
 Config
@@ -90,6 +131,7 @@ ModelLayerOptions::getConfig() const
     conf.updateIfSet( "patch",          _terrainPatch );  
 
     conf.updateObjIfSet( "cache_policy", _cachePolicy );  
+    conf.updateIfSet("cacheid", _cacheId);
 
     // Merge the ModelSource options
     if ( driver().isSet() )
@@ -114,6 +156,7 @@ ModelLayerOptions::fromConfig( const Config& conf )
     conf.getIfSet( "patch",          _terrainPatch );
 
     conf.getObjIfSet( "cache_policy", _cachePolicy );  
+    conf.getIfSet("cacheid", _cacheId);
 
     if ( conf.hasValue("driver") )
         driver() = ModelSourceOptions(conf);
@@ -171,73 +214,102 @@ ModelLayer::copyOptions()
     _alphaEffect->setAlpha( *_initOptions.opacity() );
 }
 
-void
-ModelLayer::initialize(const osgDB::Options* dbOptions)
+const Status&
+ModelLayer::open()
 {
     if ( !_modelSource.valid() && _initOptions.driver().isSet() )
     {
-        OE_INFO << LC << "Initializing model layer \"" << getName() << "\", driver=\"" << _initOptions.driver()->getDriver() << "\"" << std::endl;
-        
-        // set up the db options and caching policy first
-        _dbOptions = Registry::instance()->cloneOrCreateOptions(dbOptions);
-        initializeCachePolicy( _dbOptions.get() );
+        std::string driverName = _initOptions.driver()->getDriver();
 
-        // the model source:
+        OE_INFO << LC << "Opening model layer \"" << getName() << "\", driver=\"" << driverName << "\"" << std::endl;
+        
+        // Try to create the model source:
         _modelSource = ModelSourceFactory::create( *_initOptions.driver() );
         if ( _modelSource.valid() )
         {
             _modelSource->setName( this->getName() );
 
-            _modelSource->initialize( _dbOptions.get() );
-
-            // the mask, if there is one:
-            if ( !_maskSource.valid() && _initOptions.maskOptions().isSet() )
+            const Status& modelStatus = _modelSource->open( _readOptions.get() );
+            if (modelStatus.isOK())
             {
-                OE_INFO << LC << "...initializing mask, driver=\"" << _initOptions.maskOptions()->getDriver() << std::endl;
+                // the mask, if there is one:
+                if ( !_maskSource.valid() && _initOptions.maskOptions().isSet() )
+                {
+                    OE_INFO << LC << "...initializing mask, driver=" << driverName << std::endl;
 
-                _maskSource = MaskSourceFactory::create( *_initOptions.maskOptions() );
-                if ( _maskSource.valid() )
-                {
-                    _maskSource->initialize( _dbOptions.get() );
-                }
-                else
-                {
-                    OE_INFO << LC << "...mask init failed!" << std::endl;
+                    _maskSource = MaskSourceFactory::create( *_initOptions.maskOptions() );
+                    if ( _maskSource.valid() )
+                    {
+                        const Status& maskStatus = _maskSource->open(_readOptions.get());
+                        if (maskStatus.isError())
+                        {
+                            _status = maskStatus;
+                        }
+                    }
+                    else
+                    {
+                        _status = Status::Error(Status::ServiceUnavailable, Stringify() << "Cannot find mask driver \"" << _initOptions.maskOptions()->getDriver() << "\"");
+                    }
                 }
             }
+            else
+            {
+                // propagate the model source's error status
+                _status = modelStatus;
+            }
+        }
+        else
+        {
+            _status = Status::Error(Status::ServiceUnavailable, Stringify() << "Failed to create driver \"" << driverName << "\"");
         }
     }
+
+    return _status;
 }
 
 void
-ModelLayer::initializeCachePolicy(const osgDB::Options* options)
+ModelLayer::setReadOptions(const osgDB::Options* readOptions)
 {
-    // Start with the cache policy passed in by the Map.
-    optional<CachePolicy> cp;
-    CachePolicy::fromOptions(options, cp);
+    _readOptions = Registry::cloneOrCreateOptions(readOptions);
 
-    // if this layer specifies cache policy info, that will override 
-    // whatever the map passed in:
-    if ( _initOptions.cachePolicy().isSet() )
-        cp->mergeAndOverride( _initOptions.cachePolicy() );
+    // Create some local cache settings for this layer:
+    CacheSettings* oldSettings = CacheSettings::get(readOptions);
+    _cacheSettings = oldSettings ? new CacheSettings(*oldSettings) : new CacheSettings();
 
-    // finally resolve with global overrides:
-    Registry::instance()->resolveCachePolicy( cp );
+    // bring in the new policy for this layer if there is one:
+    _cacheSettings->integrateCachePolicy(_initOptions.cachePolicy());
 
-    setCachePolicy( cp.get() );
-}
+    // if caching is a go, install a bin.
+    if (_cacheSettings->isCacheEnabled())
+    {
+        std::string binID;
+        if (_initOptions.cacheId().isSet() && !_initOptions.cacheId()->empty())
+        {
+            binID = _initOptions.cacheId().get();
+        }
+        else
+        {
+            Config conf = _initOptions.driver()->getConfig();
+            binID = hashToString(conf.toJSON(false));
+        }
 
-void
-ModelLayer::setCachePolicy( const CachePolicy& cp )
-{
-    _runtimeOptions.cachePolicy() = cp;
-    _runtimeOptions.cachePolicy()->apply( _dbOptions.get() );
-}
+        // make our cacheing bin!
+        CacheBin* bin = _cacheSettings->getCache()->addBin(binID);
+        if (bin)
+        {
+            OE_INFO << LC << "Layer \"" << getName() << "\" cache bin is [" << binID << "]\n";
+            _cacheSettings->setCacheBin( bin );
+        }
+        else
+        {
+            // failed to create the bin, so fall back on no cache mode.
+            OE_WARN << LC << "Layer " << getName() << " failed to open a cache bin [" << binID << "], disabling caching\n";
+            _cacheSettings->cachePolicy() = CachePolicy::NO_CACHE;
+        }
+    }
 
-const CachePolicy&
-ModelLayer::getCachePolicy() const
-{
-    return _runtimeOptions.cachePolicy().value();
+    // Store it for further propagation!
+    _cacheSettings->store(_readOptions.get());
 }
 
 osg::Node*
@@ -252,6 +324,9 @@ osg::Node*
 ModelLayer::getOrCreateSceneGraph(const Map*        map,
                                   ProgressCallback* progress )
 {
+    if (getStatus().isError())
+        return 0L;
+
     // exclusive lock for cache lookup/update.
     Threading::ScopedMutexLock lock( _mutex );
 
@@ -424,7 +499,7 @@ ModelLayer::getOrCreateMaskBoundary(float                   heightScale,
                                     const SpatialReference* srs, 
                                     ProgressCallback*       progress )
 {
-    if ( _maskSource.valid() && !_maskBoundary.valid() )
+    if (_maskSource.valid() && !_maskBoundary.valid() && getStatus().isOK())
     {
         Threading::ScopedMutexLock excl(_mutex);
 
@@ -432,10 +507,16 @@ ModelLayer::getOrCreateMaskBoundary(float                   heightScale,
         {
             // make the geometry:
             _maskBoundary = _maskSource->createBoundary( srs, progress );
-
-            // scale to the height scale factor:
-            for (osg::Vec3dArray::iterator vIt = _maskBoundary->begin(); vIt != _maskBoundary->end(); ++vIt)
-                vIt->z() = vIt->z() * heightScale;
+            if (_maskBoundary.valid())
+            {
+                // scale to the height scale factor:
+                for (osg::Vec3dArray::iterator vIt = _maskBoundary->begin(); vIt != _maskBoundary->end(); ++vIt)
+                    vIt->z() = vIt->z() * heightScale;
+            }
+            else
+            {
+                setStatus(Status::Error("Failed to create masking boundary"));
+            }
         }
     }
 

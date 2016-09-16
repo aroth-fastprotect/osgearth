@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -157,7 +157,7 @@ osgEarth::Features::GeometryUtils::getGeometryArea( const Geometry* geometry )
     double result = 0.0;
     if (g)
     {
-        result = OGR_G_GetArea( g );
+        result = OGR_G_Area( g );
         OGR_G_DestroyGeometry( g );
     }
     return result;

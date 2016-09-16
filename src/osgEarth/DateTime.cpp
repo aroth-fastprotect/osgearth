@@ -94,10 +94,13 @@ DateTime::DateTime(int year, int month, int day, double hour)
     else memset( &_tm, 0, sizeof(tm) );
 }
 
-DateTime::DateTime(const std::string& input)
+DateTime::DateTime(const std::string& input) :
+_time_t(0)
 {
     bool ok = false;
     int year, month, day, hour, min, sec;
+    
+    ::memset( &_tm, 0, sizeof(tm) );
 
     if (sscanf(input.c_str(), "%4d-%2d-%2dT%2d:%2d:%2d", &year, &month, &day, &hour, &min, &sec) == 6)
     {
@@ -146,7 +149,6 @@ DateTime::DateTime(const std::string& input)
         _time_t =  this->timegm( &_tm );
         tm* temp = ::gmtime( &_time_t );
         if ( temp ) _tm = *temp;
-        else memset( &_tm, 0, sizeof(tm) );
     }
 }
 

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -40,8 +40,8 @@ namespace osgEarth { namespace Drivers
         /**
          * API Key to use to access Bing REST services. Required!
          */
-        optional<std::string>& key() { return _apiKey; }
-        const optional<std::string>& key() const { return _apiKey; }
+        optional<std::string>& apiKey() { return _apiKey; }
+        const optional<std::string>& apiKey() const { return _apiKey; }
 
         /**
          * Imagery set to access. Default is "Aerial".

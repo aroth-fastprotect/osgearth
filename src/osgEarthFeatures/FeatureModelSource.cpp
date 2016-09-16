@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarth/ShaderUtils>
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
+#include <osgEarth/DrapeableNode>
 #include <osg/Notify>
 
 using namespace osgEarth;
@@ -37,7 +38,6 @@ FeatureModelSourceOptions::FeatureModelSourceOptions( const ConfigOptions& optio
 ModelSourceOptions ( options ),
 _lit               ( true ),
 _maxGranularity_deg( 1.0 ),
-_mergeGeometry     ( false ),
 _clusterCulling    ( true ),
 _backfaceCulling   ( true ),
 _alphaBlending     ( true ),
@@ -62,7 +62,6 @@ FeatureModelSourceOptions::fromConfig( const Config& conf )
 
     conf.getIfSet( "lighting",         _lit );
     conf.getIfSet( "max_granularity",  _maxGranularity_deg );
-    conf.getIfSet( "merge_geometry",   _mergeGeometry );
     conf.getIfSet( "cluster_culling",  _clusterCulling );
     conf.getIfSet( "backface_culling", _backfaceCulling );
     conf.getIfSet( "alpha_blending",   _alphaBlending );
@@ -89,7 +88,6 @@ FeatureModelSourceOptions::getConfig() const
 
     conf.updateIfSet( "lighting",         _lit );
     conf.updateIfSet( "max_granularity",  _maxGranularity_deg );
-    conf.updateIfSet( "merge_geometry",   _mergeGeometry );
     conf.updateIfSet( "cluster_culling",  _clusterCulling );
     conf.updateIfSet( "backface_culling", _backfaceCulling );
     conf.updateIfSet( "alpha_blending",   _alphaBlending );
@@ -121,10 +119,11 @@ FeatureModelSource::setFeatureSource( FeatureSource* source )
     }
 }
 
-void 
-FeatureModelSource::initialize(const osgDB::Options* dbOptions)
+Status
+FeatureModelSource::initialize(const osgDB::Options* readOptions)
 {
-    ModelSource::initialize( dbOptions );
+    if (readOptions)
+        setReadOptions(readOptions);
     
     // the data source from which to pull features:
     if ( _options.featureSource().valid() )
@@ -134,36 +133,46 @@ FeatureModelSource::initialize(const osgDB::Options* dbOptions)
     else if ( _options.featureOptions().isSet() )
     {
         _features = FeatureSourceFactory::create( _options.featureOptions().value() );
-        if ( !_features.valid() )
-        {
-            OE_WARN << LC << "No valid feature source provided!" << std::endl;
-        }
     }
 
-    // initialize the feature source if it exists:
-    if ( _features.valid() )
-    {
-        _features->initialize( dbOptions );
+    if (!_features.valid())
+        return Status::Error(Status::ServiceUnavailable, "Failed to create a feature driver");
 
-        // Try to fill the DataExtent list using the FeatureProfile
-        const FeatureProfile* featureProfile = _features->getFeatureProfile();
-        if (featureProfile != NULL)
-        {
-            if (featureProfile->getProfile() != NULL)
-            {
-                // Use specified profile's GeoExtent
-                getDataExtents().push_back(DataExtent(featureProfile->getProfile()->getExtent()));
-            }
-            else if (featureProfile->getExtent().isValid() == true)
-            {
-                // Use FeatureProfile's GeoExtent
-                getDataExtents().push_back(DataExtent(featureProfile->getExtent()));
-            }
-        }
-    }
-    else
+    // open the feature source if it exists:
+    const Status& featuresStatus = _features->open(_readOptions.get());
+    if (featuresStatus.isError())
+        return featuresStatus;
+
+    // Try to fill the DataExtent list using the FeatureProfile
+    const FeatureProfile* featureProfile = _features->getFeatureProfile();
+    if (featureProfile == NULL)
+        return Status::Error("Failed to establish a feature profile");
+
+    if (featureProfile->getProfile() != NULL)
     {
-        OE_WARN << LC << "No FeatureSource; nothing will be rendered (" << getName() << ")" << std::endl;
+        // Use specified profile's GeoExtent
+        getDataExtents().push_back(DataExtent(featureProfile->getProfile()->getExtent()));
+    }
+    else if (featureProfile->getExtent().isValid() == true)
+    {
+        // Use FeatureProfile's GeoExtent
+        getDataExtents().push_back(DataExtent(featureProfile->getExtent()));
+    }
+
+    return Status::OK();
+}
+
+void
+FeatureModelSource::setReadOptions(const osgDB::Options* readOptions)
+{
+    _readOptions = Registry::cloneOrCreateOptions(readOptions);
+    
+    // for texture atlas support
+    _readOptions->setObjectCacheHint(osgDB::Options::CACHE_IMAGES);
+
+    if (_features.valid())
+    {
+        _features->setReadOptions(_readOptions.get());
     }
 }
 
@@ -171,6 +180,10 @@ osg::Node*
 FeatureModelSource::createNodeImplementation(const Map*        map,
                                              ProgressCallback* progress )
 {
+    // trivial bailout.
+    if (!getStatus().isOK())
+        return 0L;
+
     // user must provide a valid map.
     if ( !map )
     {
@@ -181,7 +194,6 @@ FeatureModelSource::createNodeImplementation(const Map*        map,
     // make sure the feature source initialized properly:
     if ( !_features.valid() || !_features->getFeatureProfile() )
     {
-        OE_WARN << LC << "Invalid feature source" << std::endl;
         return 0L;
     }
 
@@ -190,6 +202,7 @@ FeatureModelSource::createNodeImplementation(const Map*        map,
     if ( !factory )
     {
         OE_WARN << LC << "Unable to create a feature node factory!" << std::endl;
+        setStatus(Status::Error(Status::ServiceUnavailable, "Failed to create a feature node factory"));
         return 0L;
     }
 
@@ -198,7 +211,7 @@ FeatureModelSource::createNodeImplementation(const Map*        map,
         map, 
         _options.styles().get(), 
         _features.get(), 
-        _dbOptions.get() );
+        _readOptions.get() );
 
     // Name the session (for debugging purposes)
     session->setName( this->getName() );
@@ -229,7 +242,22 @@ osg::Group*
 FeatureNodeFactory::getOrCreateStyleGroup(const Style& style,
                                           Session*     session)
 {
-    osg::Group* group = new osg::Group();
+    osg::Group* group = 0L;
+
+    // If we're draping, the style group will be a DrapeableNode.
+    const AltitudeSymbol* alt = style.get<AltitudeSymbol>();
+    if (alt &&
+        alt->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN &&
+        alt->technique() == AltitudeSymbol::TECHNIQUE_DRAPE )
+    {
+        group = new DrapeableNode();
+    }
+
+    // Otherwise, a normal group.
+    if ( !group )
+    {
+        group = new osg::Group();
+    }
 
     // apply necessary render styles.
     const RenderSymbol* render = style.get<RenderSymbol>();

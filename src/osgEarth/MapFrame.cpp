@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -17,6 +17,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  */
 #include <osgEarth/MapFrame>
+#include <osgEarth/Cache>
 
 using namespace osgEarth;
 
@@ -25,7 +26,8 @@ using namespace osgEarth;
 MapFrame::MapFrame() :
 _initialized    ( false ),
 _highestMinLevel( 0 ),
-_mapInfo       ( 0L )
+_mapInfo       ( 0L ),
+_parts(Map::ENTIRE_MODEL)
 {
     //nop
 }
@@ -172,12 +174,6 @@ MapFrame::populateHeightField(osg::ref_ptr<osg::HeightField>& hf,
     if ( _map.lock(map) )
     {        
         ElevationInterpolation interp = map->getMapOptions().elevationInterpolation().get();    
-
-        if ( !hf.valid() )
-        {
-            hf = map->createReferenceHeightField(key, convertToHAE);
-        }
-
         return _elevationLayers.populateHeightField(
             hf.get(),
             key,
@@ -253,11 +249,11 @@ MapFrame::isCached( const TileKey& key ) const
             continue;
 
         // If we're cache only we should be fast
-        if (layer->isCacheOnly())
+        if (layer->getCacheSettings()->cachePolicy()->isCacheOnly())
             continue;
 
-        // no-cache mode? always slow
-        if (layer->isNoCache())
+        // no-cache? always slow
+        if (layer->getCacheSettings()->cachePolicy()->isCacheDisabled())
             return false;
 
         // No tile source? skip it
@@ -285,11 +281,11 @@ MapFrame::isCached( const TileKey& key ) const
             continue;
 
         //If we're cache only we should be fast
-        if (layer->isCacheOnly())
+        if (layer->getCacheSettings()->cachePolicy()->isCacheOnly())
             continue;
 
-        // no-cache mode? always high-latency.
-        if (layer->isNoCache())
+        // no-cache? always high-latency.
+        if (layer->getCacheSettings()->cachePolicy()->isCacheDisabled())
             return false;
 
         osg::ref_ptr< TileSource > source = layer->getTileSource();

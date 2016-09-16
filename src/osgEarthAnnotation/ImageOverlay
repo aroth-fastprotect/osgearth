@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarth/GeoData>
 #include <osgEarth/Units>
 #include <osgEarth/URI>
+#include <osgEarth/Terrain>
 
 #include <osg/Group>
 #include <osg/Geometry>
@@ -80,6 +81,11 @@ namespace osgEarth { namespace Annotation
         osg::Vec2d getControlPoint(ControlPoint controlPoint);
         void setControlPoint(ControlPoint controlPoint, double lon_deg, double lat_deg, bool singleVert=false);
 
+        /** When refining the mesh to fit the curtavure of the earth, this is the target resolution of the triangle mesh.
+            Default is 5 degrees */
+        void setGeometryResolution(const Distance& d) { _geometryResolution = d; }
+        const Distance& getGeometryResolution() const { return _geometryResolution; }
+
         struct ImageOverlayCallback : public osg::Referenced
         {
             virtual void onOverlayChanged() {};
@@ -124,7 +130,7 @@ namespace osgEarth { namespace Annotation
 
     public: // AnnotationNode
         
-        virtual void reclamp( const TileKey& key, osg::Node* tile, const Terrain* );
+        //virtual void reclamp( const TileKey& key, osg::Node* tile, const Terrain* );
 
     public: // MapNodeObserver
 
@@ -133,6 +139,14 @@ namespace osgEarth { namespace Annotation
     public: // osg::Node
 
         virtual void traverse(osg::NodeVisitor& nv);
+
+    public:
+        
+        // callback from Terrain whsen new data arrives
+        void onTileAdded(
+            const TileKey&          key, 
+            osg::Node*              tile, 
+            TerrainCallbackContext& context);
         
     private:
         void fireCallback(ImageOverlay::ControlPoint point, const osg::Vec2d& location);
@@ -140,8 +154,6 @@ namespace osgEarth { namespace Annotation
         void postCTOR();
         void init();
         void clampLatitudes();
-
-        void clampMesh( osg::Node* terrainModel );
 
         void updateFilters();
 
@@ -158,6 +170,7 @@ namespace osgEarth { namespace Annotation
         osg::MatrixTransform* _transform;
         osg::Geometry* _geometry;
         osg::Texture* _texture;
+        Distance _geometryResolution;
 
         //float _alpha;
         CallbackList _callbacks;
@@ -166,6 +179,10 @@ namespace osgEarth { namespace Annotation
         optional<float> _alpha;
         optional<osg::Texture::FilterMode> _minFilter;
         optional<osg::Texture::FilterMode> _magFilter;
+
+        osg::ref_ptr< TerrainCallbackAdapter<ImageOverlay> > _clampCallback;
+        
+        void clamp(const Terrain* terrain, osg::Node* patch);
 
         ImageOverlay() { }
         ImageOverlay(const ImageOverlay&, const osg::CopyOp&) { }

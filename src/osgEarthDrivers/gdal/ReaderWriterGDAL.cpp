@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -51,11 +51,11 @@
 // From easyrgb.com
 float Hue_2_RGB( float v1, float v2, float vH )
 {
-   if ( vH < 0 ) vH += 1;
-   if ( vH > 1 ) vH -= 1;
-   if ( ( 6 * vH ) < 1 ) return ( v1 + ( v2 - v1 ) * 6 * vH );
-   if ( ( 2 * vH ) < 1 ) return ( v2 );
-   if ( ( 3 * vH ) < 2 ) return ( v1 + ( v2 - v1 ) * ( ( 2 / 3 ) - vH ) * 6 );
+   if ( vH < 0.0f ) vH += 1.0f;
+   if ( vH > 1.0f ) vH -= 1.0f;
+   if ( ( 6.0f * vH ) < 1.0f ) return ( v1 + ( v2 - v1 ) * 6.0f * vH );
+   if ( ( 2.0f * vH ) < 1.0f ) return ( v2 );
+   if ( ( 3.0f * vH ) < 2.0f ) return ( v1 + ( v2 - v1 ) * ( ( 2.0f / 3.0f ) - vH ) * 6.0f );
    return ( v1 );
 }
 
@@ -676,27 +676,17 @@ public:
     {
         GDAL_SCOPED_LOCK;
 
-        Cache* cache = 0;
-
         _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );
-
-        if ( _dbOptions.valid() )
-        {
-            // Set up a Custom caching bin for this TileSource
-            cache = Cache::get( _dbOptions.get() );
-            if ( cache )
-            {
-                Config optionsConf = _options.getConfig();
-
-                std::string binId = Stringify() << std::hex << hashString(optionsConf.toJSON());
-                _cacheBin = cache->addBin( binId );
-
-                if ( _cacheBin.valid() )
-                {
-                    _cacheBin->apply( _dbOptions.get() );
-                }
-            }
-        }
+        //if ( _dbOptions.valid() )
+        //{
+        //    // Set up a custom cache bin
+        //    CacheManager* cacheManager = CacheManager::get(dbOptions);
+        //    if (cacheManager && cacheManager->getCache())
+        //    {
+        //        std::string binId = Stringify() << std::hex << hashString(_options.getConfig().toJSON());
+        //        _cacheBin = cacheManager->getCache()->addBin(binId);
+        //    }
+        //}
 
         // Is a valid external GDAL dataset specified ?
         bool useExternalDataset = false;
@@ -713,7 +703,7 @@ public:
             (!_options.url().isSet() || _options.url()->empty()) &&
             (!_options.connection().isSet() || _options.connection()->empty()) )
         {
-            return Status::Error( "No URL, directory, or connection string specified" );
+            return Status::Error(Status::ConfigurationError, "No URL, directory, or connection string specified" );
         }
 
         // source connection:
@@ -752,7 +742,7 @@ public:
 
                 getFiles(source, exts, blackExts, files);
 
-                OE_INFO << LC << "Driver found " << files.size() << " files:" << std::endl;
+                OE_INFO << LC << "Identified " << files.size() << " files:" << std::endl;
                 for (unsigned int i = 0; i < files.size(); ++i)
                 {
                     OE_INFO << LC << INDENT << files[i] << std::endl;
@@ -766,7 +756,7 @@ public:
 
             if (files.empty())
             {
-                return Status::Error( "Could not find any valid input." );
+                return Status::Error( Status::ResourceUnavailable, "Could not find any valid input." );
             }
 
             //If we found more than one file, try to combine them into a single logical dataset
@@ -780,7 +770,7 @@ public:
                 //Try to load the VRT file from the cache so we don't have to build it each time.
                 if (_cacheBin.valid())
                 {                
-                    ReadResult result = _cacheBin->readString( vrtKey);
+                    ReadResult result = _cacheBin->readString( vrtKey, 0L);
                     if (result.succeeded())
                     {
                         _srcDS = (GDALDataset*)GDALOpen(result.getString().c_str(), GA_ReadOnly );
@@ -810,8 +800,10 @@ public:
 
                             if (vrtDriver)
                             {
-                                vrtDriver->CreateCopy(vrtFile.c_str(), _srcDS, 0, 0, 0, 0 );
-
+                                if ( vrtDriver->CreateCopy(vrtFile.c_str(), _srcDS, 0, 0, 0, 0 ) == NULL )
+                                {
+                                    OE_WARN << LC << INDENT << "Faile to create copy" << std::endl;
+                                }
 
                                 //We created the temp file, now read the contents back
                                 std::ifstream input( vrtFile.c_str() );
@@ -822,7 +814,7 @@ public:
                                     buf << input.rdbuf();
                                     std::string vrtContents = buf.str();
                                     osg::ref_ptr< StringObject > strObject = new StringObject( vrtContents );
-                                    _cacheBin->write( vrtKey, strObject.get() );
+                                    _cacheBin->write(vrtKey, strObject.get(), 0L);
                                 }
                             }
                             if (osgDB::fileExists( vrtFile ) )
@@ -865,7 +857,7 @@ public:
 
                 if (!_srcDS)
                 {
-                    return Status::Error( Stringify() << "Failed to open dataset " << files[0] );
+                    return Status::Error( Status::ResourceUnavailable, Stringify() << "Failed to open " << files[0] );
                 }
             }
         }
@@ -935,7 +927,7 @@ public:
 
             if ( !src_srs.valid() )
             {
-                return Status::Error( Stringify()
+                return Status::Error( Status::ResourceUnavailable, Stringify()
                     << "Dataset has no spatial reference information (" << source << ")" );
             }
         }
@@ -979,7 +971,7 @@ public:
             profile = Profile::create(src_srs.get(), -180.0, -90.0, 180.0, 90.0, 2u, 1u);
             if ( !profile )
             {
-                return Status::Error( Stringify()
+                return Status::Error( Status::ResourceUnavailable, Stringify()
                     << "Cannot create geographic Profile from dataset's spatial reference information: " << src_srs->getName() );
             }
         }
@@ -1045,7 +1037,10 @@ public:
             _warpedDS->GetGeoTransform(_geotransform);
         }
 
-        GDALInvGeoTransform(_geotransform, _invtransform);
+        if ( GDALInvGeoTransform(_geotransform, _invtransform) == 0 )
+        {
+            OE_WARN << LC << INDENT << "_geotransform not invertible" << std::endl;
+        }
 
         double minX, minY, maxX, maxY;
 
@@ -1232,9 +1227,9 @@ public:
 
                     var_1 = 2 * L - var_2;
 
-                    R = Hue_2_RGB( var_1, var_2, H + ( 1 / 3 ) );
+                    R = Hue_2_RGB( var_1, var_2, H + ( 1.0f / 3.0f ) );
                     G = Hue_2_RGB( var_1, var_2, H );
-                    B = Hue_2_RGB( var_1, var_2, H - ( 1 / 3 ) );
+                    B = Hue_2_RGB( var_1, var_2, H - ( 1.0f / 3.0f ) );
                 }
                 color.r() = static_cast<unsigned char>(R*255.0f);
                 color.g() = static_cast<unsigned char>(G*255.0f);
@@ -1509,23 +1504,33 @@ public:
                     image->allocateImage( tileSize, tileSize, 1, GL_LUMINANCE, glDataType );
                     image->setInternalTextureFormat( internalFormat );
                     ImageUtils::markAsUnNormalized( image, true );
+                    memset(image->data(), 0, image->getImageSizeInBytes());
+                
+                    ImageUtils::PixelWriter write(image); 
+                    
+                    // initialize all coverage texels to NODATA. -gw
+                    osg::Vec4 temp;
+                    temp.r() = NO_DATA_VALUE;
+
+                    for(int s=0; s<image->s(); ++s) {
+                        for(int t=0; t<image->t(); ++t) {
+                            write(temp, s, t);
+                        }
+                    }
                     
                     // coverage data; one channel data that is not subject to interpolated values
-                    int xbytes = target_width *  gdalSampleSize;
-                    int ybytes = target_height * gdalSampleSize;
-                    unsigned char* data = new unsigned char[xbytes * ybytes];
-                    osg::Vec4 temp;
+                    unsigned char* data = new unsigned char[target_width * target_height * gdalSampleSize];
+                    memset(data, 0, target_width * target_height * gdalSampleSize);
+
 
                     int success;
                     float nodata = bandGray->GetNoDataValue(&success);
                     if ( !success )
                         nodata = getOptions().noDataValue().get();
 
-                    CPLErr err = bandGray->RasterIO(GF_Read, off_x, off_y, width, height, data, target_width, target_height, gdalDataType, 1, 0);
+                    CPLErr err = bandGray->RasterIO(GF_Read, off_x, off_y, width, height, data, target_width, target_height, gdalDataType, 0, 0);
                     if ( err == CE_None )
                     {
-                        ImageUtils::PixelWriter write(image);
-
                         // copy from data to image.
                         for (int src_row = 0, dst_row = tile_offset_top; src_row < target_height; src_row++, dst_row++)
                         {
@@ -1644,13 +1649,22 @@ public:
                     image->allocateImage(tileSize, tileSize, 1, GL_LUMINANCE, GL_FLOAT);
                     image->setInternalTextureFormat(GL_LUMINANCE32F_ARB);
                     ImageUtils::markAsUnNormalized(image, true);
+
+                    // initialize all coverage texels to NODATA. -gw
+                    osg::Vec4 temp;
+                    temp.r() = NO_DATA_VALUE;
+                    ImageUtils::PixelWriter write(image);
+                    for(int s=0; s<image->s(); ++s) {
+                        for(int t=0; t<image->t(); ++t) {
+                            write(temp, s, t);
+                        }
+                    }
                 }
                 else
                 {
                     image->allocateImage(tileSize, tileSize, 1, pixelFormat, GL_UNSIGNED_BYTE);
+                    memset(image->data(), 0, image->getImageSizeInBytes());
                 }
-
-                memset(image->data(), 0, image->getImageSizeInBytes());
 
                 bandPalette->RasterIO(GF_Read, off_x, off_y, width, height, palette, target_width, target_height, GDT_Byte, 0, 0);
 
@@ -1707,10 +1721,6 @@ public:
 
                 return NULL;
             }
-        }
-        else
-        {
-            OE_NOTICE << LC << key.str() << " does not intersect " << _options.url()->full() << std::endl;
         }
 
         return image.release();
@@ -1902,23 +1912,68 @@ public:
                 band = _warpedDS->GetRasterBand(1);
             }
 
-            double dx = (xmax - xmin) / (tileSize-1);
-            double dy = (ymax - ymin) / (tileSize-1);
+            if (_options.interpolation() == INTERP_NEAREST)
+            {
+                double colMin, colMax;
+                double rowMin, rowMax;
+                geoToPixel( xmin, ymin, colMin, rowMax );
+                geoToPixel( xmax, ymax, colMax, rowMin );
+                std::vector<float> buffer(tileSize * tileSize, NO_DATA_VALUE);
 
+                int iColMin = floor(colMin);
+                int iColMax = ceil(colMax);
+                int iRowMin = floor(rowMin);
+                int iRowMax = ceil(rowMax);
+                int iNumCols = iColMax - iColMin + 1;
+                int iNumRows = iRowMax - iRowMin + 1;
+
+                int iWinColMin = max(0, iColMin);
+                int iWinColMax = min(_warpedDS->GetRasterXSize()-1, iColMax);
+                int iWinRowMin = max(0, iRowMin);
+                int iWinRowMax = min(_warpedDS->GetRasterYSize()-1, iRowMax);
+                int iNumWinCols = iWinColMax - iWinColMin + 1;
+                int iNumWinRows = iWinRowMax - iWinRowMin + 1;
+
+                int iBufColMin = osg::round((iWinColMin - iColMin) / double(iNumCols - 1) * (tileSize - 1));
+                int iBufColMax = osg::round((iWinColMax - iColMin) / double(iNumCols - 1) * (tileSize - 1));
+                int iBufRowMin = osg::round((iWinRowMin - iRowMin) / double(iNumRows - 1) * (tileSize - 1));
+                int iBufRowMax = osg::round((iWinRowMax - iRowMin) / double(iNumRows - 1) * (tileSize - 1));
+                int iNumBufCols = iBufColMax - iBufColMin + 1;
+                int iNumBufRows = iBufRowMax - iBufRowMin + 1;
+
+                int startOffset = iBufRowMin * tileSize + iBufColMin;
+                int lineSpace = tileSize * sizeof(float);
+
+                band->RasterIO(GF_Read, iWinColMin, iWinRowMin, iNumWinCols, iNumWinRows, &buffer[startOffset], iNumBufCols, iNumBufRows, GDT_Float32, 0, lineSpace);
+
+                for (int r = 0, ir = tileSize - 1; r < tileSize; ++r, --ir)
+                {
+                    for (int c = 0; c < tileSize; ++c)
+                    {
+                        hf->setHeight(c, ir, buffer[r * tileSize + c]);
+                    }
+                }
+            }
+            else
+            {
+                double dx = (xmax - xmin) / (tileSize-1);
+                double dy = (ymax - ymin) / (tileSize-1);
                 for (int r = 0; r < tileSize; ++r)
                 {
                     double geoY = ymin + (dy * (double)r);
-                for (int c = 0; c < tileSize; ++c)
-                {
-                    double geoX = xmin + (dx * (double)c);
-                    float h = getInterpolatedValue(band, geoX, geoY);
-                    hf->setHeight(c, r, h);
+                    for (int c = 0; c < tileSize; ++c)
+                    {
+                        double geoX = xmin + (dx * (double)c);
+                        float h = getInterpolatedValue(band, geoX, geoY);
+                        hf->setHeight(c, r, h);
+                    }
                 }
             }
         }
         else
         {
-            for (unsigned int i = 0; i < hf->getHeightList().size(); ++i) hf->getHeightList()[i] = NO_DATA_VALUE;
+            std::vector<float>& heightList = hf->getHeightList();
+            std::fill(heightList.begin(), heightList.end(), NO_DATA_VALUE);
         }
         return hf.release();
     }
@@ -2246,7 +2301,7 @@ class ReaderWriterGDALTile : public TileSourceDriver
 public:
     ReaderWriterGDALTile() {}
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "GDAL Tile Reader";
     }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -50,7 +50,7 @@ class QuadKeySource : public TileSource
 {
 public:
     QuadKeySource(const TileSourceOptions& options) : 
-      TileSource(options), _options(options), _rotate_iter(0u)
+        TileSource(options), _options(options), _rotate_iter(0u), _rotateStart(0), _rotateEnd(0)
     {
         //nop
     }
@@ -63,7 +63,7 @@ public:
         URI uri = _options.url().value();
         if ( uri.empty() )
         {
-            return Status::Error( "Fail: driver requires a valid \"url\" property" );
+            return Status::Error( Status::ConfigurationError, "Fail: driver requires a valid \"url\" property" );
         }
 
         // The quadkey driver always uses spherical mercator.
@@ -182,7 +182,7 @@ public:
         supportsExtension( "osgearth_quadkey", "QuadKey Driver" );
     }
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "QuadKey Driver";
     }

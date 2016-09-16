@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -37,16 +37,76 @@ using namespace osgEarth;
 #define LC "[MPGeometry] "
 
 
+MPGeometry::MPGeometry() :
+osg::Geometry(),
+_frame(0L),
+_uidUniformNameID(0),
+_birthTimeUniformNameID(0u),
+_orderUniformNameID(0u),
+_opacityUniformNameID(0u),
+_texMatParentUniformNameID(0u),
+_tileKeyUniformNameID(0u),
+_minRangeUniformNameID(0u),
+_maxRangeUniformNameID(0u),
+_imageUnit(0),
+_imageUnitParent(0),
+_elevUnit(0),
+_supportsGLSL(false)
+{
+}
+
+MPGeometry::MPGeometry(const MPGeometry& rhs, const osg::CopyOp& cop) :
+osg::Geometry(rhs, cop),
+_frame(rhs._frame),
+_uidUniformNameID(rhs._uidUniformNameID),
+_birthTimeUniformNameID(rhs._birthTimeUniformNameID),
+_orderUniformNameID(rhs._orderUniformNameID),
+_opacityUniformNameID(rhs._opacityUniformNameID),
+_texMatParentUniformNameID(rhs._texMatParentUniformNameID),
+_tileKeyUniformNameID(rhs._tileKeyUniformNameID),
+_minRangeUniformNameID(rhs._minRangeUniformNameID),
+_maxRangeUniformNameID(rhs._maxRangeUniformNameID),
+_imageUnit(rhs._imageUnit),
+_imageUnitParent(rhs._imageUnitParent),
+_elevUnit(rhs._elevUnit),
+_supportsGLSL(rhs._supportsGLSL)
+{
+}
+
+
 MPGeometry::MPGeometry(const TileKey& key, const MapFrame& frame, int imageUnit) : 
 osg::Geometry    ( ),
 _frame           ( frame ),
-_imageUnit       ( imageUnit )
+_imageUnit       ( imageUnit ),
+_uidUniformNameID(0),
+_birthTimeUniformNameID(0u),
+_orderUniformNameID(0u),
+_opacityUniformNameID(0u),
+_texMatParentUniformNameID(0u),
+_tileKeyUniformNameID(0u),
+_minRangeUniformNameID(0u),
+_maxRangeUniformNameID(0u),
+_imageUnitParent(0),
+_elevUnit(0),
+_supportsGLSL(false)
 {
     _supportsGLSL = Registry::capabilities().supportsGLSL();
-
+    
+    // Encode the tile key in a uniform. Note! The X and Y components are presented
+    // modulo 2^16 form so they don't overrun single-precision space.
     unsigned tw, th;
     key.getProfile()->getNumTiles(key.getLOD(), tw, th);
-    _tileKeyValue.set( key.getTileX(), th-key.getTileY()-1.0f, key.getLOD(), -1.0f );
+
+    const double m = pow(2.0, 16.0);
+
+    double x = (double)key.getTileX();
+    double y = (double)(th - key.getTileY()-1);
+
+    _tileKeyValue.set(
+        (float)fmod(x, m),
+        (float)fmod(y, m),
+        (float)key.getLOD(),
+        -1.0f);
 
     _imageUnitParent = _imageUnit + 1; // temp
 
@@ -141,6 +201,8 @@ MPGeometry::renderPrimitiveSets(osg::State& state,
         uidLocation          = pcp->getUniformLocation( _uidUniformNameID );
         orderLocation        = pcp->getUniformLocation( _orderUniformNameID );
         texMatParentLocation = pcp->getUniformLocation( _texMatParentUniformNameID );
+        minRangeLocation = pcp->getUniformLocation( _minRangeUniformNameID );
+        maxRangeLocation = pcp->getUniformLocation( _maxRangeUniformNameID );
     }
     
     // apply the tilekey uniform once.
@@ -193,13 +255,10 @@ MPGeometry::renderPrimitiveSets(osg::State& state,
 
     // remember whether we applied a parent texture.
     bool usedTexParent = false;
-    bool useMinVisibleRange = false;
-    bool useMaxVisibleRange = false;
 
     if ( _layers.size() > 0 )
     {
         float prev_opacity        = -1.0f;
-        float prev_alphaThreshold = -1.0f;
 
         // first bind any shared layers. We still have to do this even if we are
         // in !renderColor mode b/c these textures could be used by vertex shaders
@@ -234,29 +293,8 @@ MPGeometry::renderPrimitiveSets(osg::State& state,
                         }
                     }
                 }
-
-                // check for min/rax range usage.
-                const ImageLayerOptions& layerOptions = layer._imageLayer->getImageLayerOptions();
-
-                if ( layerOptions.minVisibleRange().isSet() )
-                    useMinVisibleRange = true;
-                if ( layerOptions.maxVisibleRange().isSet() )
-                    useMaxVisibleRange = true;
             }
         }
-
-        // look up the minRange uniform if necessary
-        if ( useMinVisibleRange && pcp )
-        {
-            minRangeLocation = pcp->getUniformLocation( _minRangeUniformNameID );
-        }
-        
-        // look up the maxRange uniform if necessary
-        if ( useMaxVisibleRange && pcp )
-        {
-            maxRangeLocation = pcp->getUniformLocation( _maxRangeUniformNameID );
-        }
-
         if (renderColor)
         {
             // find the first opaque layer, top-down, and start there:
@@ -438,22 +476,13 @@ MPGeometry:: COMPUTE_BOUND() const
         // update the uniform.
         Threading::ScopedMutexLock exclusive(_frameSyncMutex);
         _tileKeyValue.w() = bbox.radius();
-        
-#if 0
-        // make sure everyone's got a vbo.
-        MPGeometry* ncthis = const_cast<MPGeometry*>(this);
 
-        for(std::vector<Layer>::iterator i = _layers.begin(); i != _layers.end(); ++i)
+        // create the patch triangles index if necessary.
+        if ( getNumPrimitiveSets() > 0 && getPrimitiveSet(0)->getMode() == GL_PATCHES )
         {
-            if ( i->_texCoords.valid() && i->_texCoords->getVertexBufferObject() == 0L )
-                i->_texCoords->setVertexBufferObject( ncthis->getVertexArray()->getVertexBufferObject() );
+            _patchTriangles = osg::clone( getPrimitiveSet(0), osg::CopyOp::SHALLOW_COPY );
+            _patchTriangles->setMode( GL_TRIANGLES );
         }
-
-        if ( _tileCoords.valid() && _tileCoords->getVertexBufferObject() == 0L )
-        {
-            _tileCoords->setVertexBufferObject( ncthis->getVertexArray()->getVertexBufferObject() );
-        }
-#endif
     }
     return bbox;
 }
@@ -654,4 +683,26 @@ MPGeometry::drawImplementation(osg::RenderInfo& renderInfo) const
     // unbind the VBO's if any are used.
     state.unbindVertexBufferObject();
     state.unbindElementBufferObject();
+}
+
+void
+MPGeometry::accept(osg::PrimitiveIndexFunctor& functor) const
+{
+    osg::Geometry::accept(functor);
+
+    if ( getNumPrimitiveSets() > 0 && getPrimitiveSet(0)->getMode() == GL_PATCHES && _patchTriangles.valid() )
+    {
+        _patchTriangles->accept( functor );
+    }
+}
+
+void
+MPGeometry::accept(osg::PrimitiveFunctor& functor) const
+{
+    osg::Geometry::accept(functor);
+
+    if ( getNumPrimitiveSets() > 0 && getPrimitiveSet(0)->getMode() == GL_PATCHES && _patchTriangles.valid() )
+    {
+        _patchTriangles->accept( functor );
+    }
 }

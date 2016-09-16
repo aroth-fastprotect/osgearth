@@ -13,6 +13,9 @@ SET(TARGET_PUBLIC_H
 #   header files go here
     AGG.h
     AltitudeSymbol
+    BBoxSymbol
+    BillboardResource
+    BillboardSymbol
     Common
     Color
     CoverageSymbol
@@ -56,6 +59,9 @@ SET(TARGET_PUBLIC_H
 
 SET(TARGET_SRC
     AltitudeSymbol.cpp
+    BBoxSymbol.cpp
+    BillboardResource.cpp
+    BillboardSymbol.cpp
     Color.cpp
     CoverageSymbol.cpp
     CssUtils.cpp

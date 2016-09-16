@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -509,7 +509,7 @@ GeoPoint::distanceTo(const GeoPoint& rhs) const
         }
         else
         {
-            GeoPoint rhsT = transform(rhs.getSRS());
+            GeoPoint rhsT = rhs.transform(getSRS());
             return (vec3d() - rhsT.vec3d()).length();
         }
     }
@@ -833,43 +833,41 @@ GeoExtent::contains(double x, double y, const SpatialReference* srs) const
     if ( isInvalid() )
         return false;
 
-    double local_x = x, local_y = y;
-
     osg::Vec3d xy( x, y, 0 );
     osg::Vec3d localxy = xy;
 
     if (srs &&
         !srs->isEquivalentTo( _srs.get() ) &&
         !srs->transform(xy, _srs.get(), localxy) )
-    {
+    {    
         return false;
     }
     else
     {
         // normalize a geographic longitude to -180:+180
         if ( _srs->isGeographic() )
-            local_x = normalizeLongitude( local_x );            
+            localxy.x() = normalizeLongitude( localxy.x() );            
 
         //Account for small rounding errors along the edges of the extent
-        if (osg::equivalent(_west, local_x)) local_x = _west;
-        if (osg::equivalent(_east, local_x)) local_x = _east;
-        if (osg::equivalent(_south, local_y)) local_y = _south;
-        if (osg::equivalent(_north, local_y)) local_y = _north;
+        if (osg::equivalent(_west, localxy.x())) localxy.x() = _west;
+        if (osg::equivalent(_east, localxy.x())) localxy.x() = _east;
+        if (osg::equivalent(_south, localxy.y())) localxy.y() = _south;
+        if (osg::equivalent(_north, localxy.y())) localxy.y() = _north;
 
         if ( crossesAntimeridian() )
         {
-            if ( local_x > 0.0 )
+            if ( localxy.x() > 0.0 )
             {
-                return local_x >= _west && local_x <= 180.0 && local_y >= _south && local_y <= _north;
+                return localxy.x() >= _west && localxy.x() <= 180.0 && localxy.y() >= _south && localxy.y() <= _north;
             }
             else
             {
-                return local_x >= -180.0 && local_x <= _east && local_y >= _south && local_y <= _north;
+                return localxy.x() >= -180.0 && localxy.x() <= _east && localxy.y() >= _south && localxy.y() <= _north;
             }
         }
         else
         {
-            return local_x >= _west && local_x <= _east && local_y >= _south && local_y <= _north;
+            return localxy.x() >= _west && localxy.x() <= _east && localxy.y() >= _south && localxy.y() <= _north;
         }
     }
 }
@@ -1911,7 +1909,7 @@ GeoImage::reproject(const SpatialReference* to_srs, const GeoExtent* to_extent, 
     }
     else
     {
-         destExtent = getExtent().transform(to_srs);    
+        destExtent = getExtent().transform(to_srs);    
     }
 
     osg::Image* resultImage = 0L;
@@ -1926,7 +1924,7 @@ GeoImage::reproject(const SpatialReference* to_srs, const GeoExtent* to_extent, 
     {
         // if either of the SRS is a custom projection, we have to do a manual reprojection since
         // GDAL will not recognize the SRS.
-        resultImage = manualReproject(getImage(), getExtent(), *to_extent, useBilinearInterpolation && isNormalized, width, height);
+        resultImage = manualReproject(getImage(), getExtent(), destExtent, useBilinearInterpolation && isNormalized, width, height);
     }
     else
     {
@@ -2008,14 +2006,16 @@ _maxHeight  ( 0.0f )
 GeoHeightField::GeoHeightField(osg::HeightField* heightField,
                                const GeoExtent&  extent) :
 _heightField( heightField ),
-_extent     ( extent )
+_extent     ( extent ),
+_minHeight( FLT_MAX ),
+_maxHeight( -FLT_MAX )
 {
     if ( _heightField.valid() && extent.isInvalid() )
     {
         OE_WARN << LC << "Created with a valid heightfield AND INVALID extent" << std::endl;
     }
 
-    else if ( _heightField )
+    else if ( _heightField.valid() )
     {
         double minx, miny, maxx, maxy;
         _extent.getBounds(minx, miny, maxx, maxy);
@@ -2025,7 +2025,6 @@ _extent     ( extent )
         _heightField->setYInterval( (maxy - miny)/(double)(_heightField->getNumRows()-1) );
         _heightField->setBorderWidth( 0 );
 
-        _minHeight = FLT_MAX, _maxHeight = -FLT_MAX;
         const osg::HeightField::HeightList& heights = _heightField->getHeightList();
         for( unsigned i=0; i<heights.size(); ++i )
         {
@@ -2075,7 +2074,9 @@ GeoHeightField::getElevation(const SpatialReference* inputSRS,
             interp);
 
         // if the vertical datums don't match, do a conversion:
-        if ( out_elevation != NO_DATA_VALUE && !extentSRS->isVertEquivalentTo(outputSRS) )
+        if (out_elevation != NO_DATA_VALUE && 
+            outputSRS && 
+            !extentSRS->isVertEquivalentTo(outputSRS) )
         {
             // if the caller provided a custom output SRS, perform the appropriate
             // Z transformation. This requires a lat/long point:
@@ -2088,7 +2089,7 @@ GeoHeightField::getElevation(const SpatialReference* inputSRS,
 
             VerticalDatum::transform(
                 extentSRS->getVerticalDatum(),
-                outputSRS ? outputSRS->getVerticalDatum() : 0L,
+                outputSRS->getVerticalDatum(),
                 geolocal.y(), geolocal.x(), out_elevation);
         }
 
@@ -2102,47 +2103,38 @@ GeoHeightField::getElevation(const SpatialReference* inputSRS,
 }
 
 GeoHeightField
-GeoHeightField::createSubSample( const GeoExtent& destEx, ElevationInterpolation interpolation) const
+GeoHeightField::createSubSample( const GeoExtent& destEx, unsigned int width, unsigned int height, ElevationInterpolation interpolation) const
 {
     double div = destEx.width()/_extent.width();
     if ( div >= 1.0f )
         return GeoHeightField::INVALID;
 
-    int w = _heightField->getNumColumns();
-    int h = _heightField->getNumRows();
-    double xInterval = _extent.width() / (double)(_heightField->getNumColumns()-1);
-    double yInterval = _extent.height() / (double)(_heightField->getNumRows()-1);
-    double dx = xInterval * div;
-    double dy = yInterval * div;
+    double dx = destEx.width()/(double)(width-1);
+    double dy = destEx.height()/(double)(height-1);    
 
     osg::HeightField* dest = new osg::HeightField();
-    dest->allocate( w, h );
+    dest->allocate( width, height );
     dest->setXInterval( dx );
     dest->setYInterval( dy );
-
-    // copy over the skirt height, adjusting it for tile size.
-    dest->setSkirtHeight( _heightField->getSkirtHeight() * div );
 
     double x, y;
     int col, row;
 
     double x0 = (destEx.xMin()-_extent.xMin())/_extent.width();
     double y0 = (destEx.yMin()-_extent.yMin())/_extent.height();
-    double xstep = div/double(w-1);
-    double ystep = div/double(h-1);
 
-    for( x = x0, col = 0; col < w; x += xstep, col++ )
+    double xstep = div / (double)(width-1);
+    double ystep = div / (double)(height-1);
+    
+    for( x = x0, col = 0; col < width; x += xstep, col++ )
     {
-        for( y = y0, row = 0; row < h; y += ystep, row++ )
+        for( y = y0, row = 0; row < height; y += ystep, row++ )
         {
             float height = HeightFieldUtils::getHeightAtNormalizedLocation(
                 _heightField.get(), x, y, interpolation );
             dest->setHeight( col, row, height );
         }
     }
-
-    osg::Vec3d orig( destEx.xMin(), destEx.yMin(), _heightField->getOrigin().z() );
-    dest->setOrigin( orig );
 
     return GeoHeightField( dest, destEx ); // Q: is the VDATUM accounted for?
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -61,17 +61,17 @@ GeometryCompilerOptions::setDefaults(const GeometryCompilerOptions& defaults)
 // defaults.
 GeometryCompilerOptions::GeometryCompilerOptions(bool stockDefaults) :
 _maxGranularity_deg    ( 10.0 ),
-_mergeGeometry         ( false ),
+_mergeGeometry         ( true ),
 _clustering            ( false ),
 _instancing            ( false ),
 _ignoreAlt             ( false ),
 _useVertexBufferObjects( true ),
-_useTextureArrays      ( true ),
 _shaderPolicy          ( SHADERPOLICY_GENERATE ),
 _geoInterp             ( GEOINTERP_GREAT_CIRCLE ),
 _optimizeStateSharing  ( true ),
 _optimize              ( false ),
-_validate              ( false )
+_validate              ( false ),
+_maxPolyTilingAngle    ( 45.0f )
 {
    //nop
 }
@@ -86,12 +86,12 @@ _clustering            ( s_defaults.clustering().value() ),
 _instancing            ( s_defaults.instancing().value() ),
 _ignoreAlt             ( s_defaults.ignoreAltitudeSymbol().value() ),
 _useVertexBufferObjects( s_defaults.useVertexBufferObjects().value() ),
-_useTextureArrays      ( s_defaults.useTextureArrays().value() ),
 _shaderPolicy          ( s_defaults.shaderPolicy().value() ),
 _geoInterp             ( s_defaults.geoInterp().value() ),
 _optimizeStateSharing  ( s_defaults.optimizeStateSharing().value() ),
 _optimize              ( s_defaults.optimize().value() ),
-_validate              ( s_defaults.validate().value() )
+_validate              ( s_defaults.validate().value() ),
+_maxPolyTilingAngle    ( s_defaults.maxPolygonTilingAngle().value() )
 {
     fromConfig(_conf);
 }
@@ -108,10 +108,10 @@ GeometryCompilerOptions::fromConfig( const Config& conf )
     conf.getIfSet   ( "geo_interpolation", "great_circle", _geoInterp, GEOINTERP_GREAT_CIRCLE );
     conf.getIfSet   ( "geo_interpolation", "rhumb_line",   _geoInterp, GEOINTERP_RHUMB_LINE );
     conf.getIfSet   ( "use_vbo", _useVertexBufferObjects);
-    conf.getIfSet   ( "use_texture_arrays", _useTextureArrays );
     conf.getIfSet   ( "optimize_state_sharing", _optimizeStateSharing );
     conf.getIfSet   ( "optimize", _optimize );
     conf.getIfSet   ( "validate", _validate );
+    conf.getIfSet   ( "max_polygon_tiling_angle", _maxPolyTilingAngle );
 
     conf.getIfSet( "shader_policy", "disable",  _shaderPolicy, SHADERPOLICY_DISABLE );
     conf.getIfSet( "shader_policy", "inherit",  _shaderPolicy, SHADERPOLICY_INHERIT );
@@ -131,10 +131,10 @@ GeometryCompilerOptions::getConfig() const
     conf.addIfSet   ( "geo_interpolation", "great_circle", _geoInterp, GEOINTERP_GREAT_CIRCLE );
     conf.addIfSet   ( "geo_interpolation", "rhumb_line",   _geoInterp, GEOINTERP_RHUMB_LINE );
     conf.addIfSet   ( "use_vbo", _useVertexBufferObjects);
-    conf.addIfSet   ( "use_texture_arrays", _useTextureArrays );
     conf.addIfSet   ( "optimize_state_sharing", _optimizeStateSharing );
     conf.addIfSet   ( "optimize", _optimize );
     conf.addIfSet   ( "validate", _validate );
+    conf.addIfSet   ( "max_polygon_tiling_angle", _maxPolyTilingAngle );
 
     conf.addIfSet( "shader_policy", "disable",  _shaderPolicy, SHADERPOLICY_DISABLE );
     conf.addIfSet( "shader_policy", "inherit",  _shaderPolicy, SHADERPOLICY_INHERIT );
@@ -169,6 +169,14 @@ GeometryCompiler::compile(Geometry*             geometry,
 {
     osg::ref_ptr<Feature> f = new Feature(geometry, 0L); // no SRS!
     return compile(f.get(), style, context);
+}
+
+osg::Node*
+GeometryCompiler::compile(Geometry*             geometry,
+                          const Style&          style)
+{
+    osg::ref_ptr<Feature> f = new Feature(geometry, 0L); // no SRS!
+    return compile(f.get(), style, FilterContext(0L) );
 }
 
 osg::Node*
@@ -377,7 +385,7 @@ GeometryCompiler::compile(FeatureList&          workingSet,
     // instance substitution (replaces marker)
     else if ( model )
     {
-        const InstanceSymbol* instance = model ? (const InstanceSymbol*)model : (const InstanceSymbol*)icon;
+        const InstanceSymbol* instance = (const InstanceSymbol*)model;
 
         // use a separate filter context since we'll be munging the data
         FilterContext localCX = sharedCX;
@@ -452,17 +460,12 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         ExtrudeGeometryFilter extrude;
         extrude.setStyle( style );
 
-        // Activate texture arrays if the GPU supports them and if the user
-        // hasn't disabled them.        
-        extrude.useTextureArrays() =
-            Registry::capabilities().supportsTextureArrays() &&
-            _options.useTextureArrays() == true;
-
         // apply per-feature naming if requested.
         if ( _options.featureName().isSet() )
             extrude.setFeatureNameExpr( *_options.featureName() );
-        if ( _options.useVertexBufferObjects().isSet())
-            extrude.useVertexBufferObjects() = *_options.useVertexBufferObjects();
+
+        if ( _options.mergeGeometry().isSet() )
+            extrude.setMergeGeometry( *_options.mergeGeometry() );
 
         osg::Node* node = extrude.push( workingSet, sharedCX );
         if ( node )
@@ -488,6 +491,9 @@ GeometryCompiler::compile(FeatureList&          workingSet,
         BuildGeometryFilter filter( style );
         filter.maxGranularity() = *_options.maxGranularity();
         filter.geoInterp()      = *_options.geoInterp();
+
+        if (_options.maxPolygonTilingAngle().isSet())
+            filter.maxPolygonTilingAngle() = *_options.maxPolygonTilingAngle();
 
         if ( _options.featureName().isSet() )
             filter.featureName() = *_options.featureName();
@@ -571,13 +577,18 @@ GeometryCompiler::compile(FeatureList&          workingSet,
             osgUtil::Optimizer::REMOVE_REDUNDANT_NODES |
             osgUtil::Optimizer::COMBINE_ADJACENT_LODS |
             osgUtil::Optimizer::SHARE_DUPLICATE_STATE |
-            osgUtil::Optimizer::MERGE_GEOMETRY |
+            //osgUtil::Optimizer::MERGE_GEOMETRY |
             osgUtil::Optimizer::CHECK_GEOMETRY |
             osgUtil::Optimizer::MERGE_GEODES |
             osgUtil::Optimizer::STATIC_OBJECT_DETECTION;
 
         osgUtil::Optimizer opt;
         opt.optimize(resultGroup.get(), optimizations);
+
+        osgUtil::Optimizer::MergeGeometryVisitor mg;
+        mg.setTargetMaximumNumberOfVertices(65536);
+        resultGroup->accept(mg);
+
         OE_DEBUG << LC << "optimize complete" << std::endl;
 
         if ( trackHistory ) history.push_back( "optimize" );

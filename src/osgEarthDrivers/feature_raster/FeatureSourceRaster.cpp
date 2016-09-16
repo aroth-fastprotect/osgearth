@@ -49,34 +49,9 @@ public:
         //nop
     }
 
-    //override
-    void initialize( const osgDB::Options* dbOptions )
-    {
-        _dbOptions = dbOptions ? osg::clone(dbOptions) : 0L;
-    }
-
-
-    /** Called once at startup to create the profile for this feature set. Successful profile
-        creation implies that the datasource opened succesfully. */
-    const FeatureProfile* createFeatureProfile()
-    {
-        const Profile* wgs84 = Registry::instance()->getGlobalGeodeticProfile();
-        //GeoExtent extent(wgs84->getSRS(), -180, -90, 0, 90);
-        GeoExtent extent(wgs84->getSRS(), -180, -90, 180, 90);
-        FeatureProfile* profile = new FeatureProfile( extent );
-        profile->setProfile( Profile::create("wgs84", extent.xMin(), extent.yMin(), extent.xMax(), extent.yMax(), "", 1, 1) );
-        unsigned int level = *_options.level();
-        profile->setFirstLevel(level);
-        profile->setMaxLevel(level);
-        profile->setTiled(true);
-        return profile;
-    }
-
     FeatureCursor* createFeatureCursor( const Symbology::Query& query )
     {
-        unsigned w, h;
-        query.tileKey()->getProfile()->getNumTiles( query.tileKey()->getLevelOfDetail(), w, h );      
-        TileKey key = TileKey(query.tileKey()->getLevelOfDetail(), query.tileKey()->getTileX(), h - query.tileKey()->getTileY() -1, query.tileKey()->getProfile() );
+        TileKey key = *query.tileKey();
 
 #if 0
         // Debug
@@ -208,6 +183,27 @@ public:
         return Geometry::TYPE_UNKNOWN;
     }
 
+protected:
+
+    //override
+    Status initialize(const osgDB::Options* readOptions)
+    {
+        _dbOptions = Registry::cloneOrCreateOptions(readOptions);
+        
+        // Establish the feature profile.
+        const Profile* wgs84 = Registry::instance()->getGlobalGeodeticProfile();
+        GeoExtent extent(wgs84->getSRS(), -180, -90, 180, 90);
+
+        FeatureProfile* profile = new FeatureProfile( extent );
+        profile->setProfile( Profile::create("wgs84", extent.xMin(), extent.yMin(), extent.xMax(), extent.yMax(), "", 1, 1) );
+        unsigned int level = _options.level().get();
+        profile->setFirstLevel(level);
+        profile->setMaxLevel(level);
+        profile->setTiled(true);
+
+        setFeatureProfile(profile);
+        return Status::OK();
+    }
 
 
 private:
@@ -225,7 +221,7 @@ public:
         supportsExtension( "osgearth_feature_raster", "Raster feature driver for osgEarth" );
     }
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "Raster Feature Reader";
     }

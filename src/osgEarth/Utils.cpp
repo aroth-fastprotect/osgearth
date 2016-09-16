@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -45,7 +45,8 @@ void osgEarth::removeEventHandler(osgViewer::View* view, osgGA::GUIEventHandler*
 PixelAutoTransform::PixelAutoTransform() :
 osg::AutoTransform         (),
 _rotateInScreenSpace       ( false ),
-_screenSpaceRotationRadians( 0.0 )
+_screenSpaceRotationRadians( 0.0 ),
+_dirty( true )
 {
     // deactivate culling for the first traversal. We will reactivate it later.
     setCullingActive( false );
@@ -56,11 +57,16 @@ _screenSpaceRotationRadians( 0.0 )
 void
 PixelAutoTransform::accept( osg::NodeVisitor& nv )
 {
+    // optimization - don't bother with mathing if the node is hidden.
+    // (this occurs in Node::accept, which we override here)
+    if ( !nv.validNodeMask(*this) )
+        return;
+
     if ( nv.getVisitorType() == osg::NodeVisitor::CULL_VISITOR )
     {
         // re-activate culling now that the first cull traversal has taken place.
         this->setCullingActive( true );
-        osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
+        osgUtil::CullVisitor* cv = dynamic_cast<osgUtil::CullVisitor*>(&nv);
         if ( cv )
         {
             osg::Viewport::value_type width  = _previousWidth;
@@ -449,20 +455,24 @@ GeometryValidator::apply(osg::Geometry& geom)
     for(unsigned i=0; i<arrays.size(); ++i)
     {
         osg::Array* a = arrays[i].get();
-        if ( a == NULL )
+        if ( a )
+        {
+            if ( a->getBinding() == a->BIND_OVERALL && a->getNumElements() != 1 )
+            {
+                OE_NOTICE << LC << "Found an array with BIND_OVERALL and size <> 1\n";
+            }
+            else if ( a->getBinding() == a->BIND_PER_VERTEX && a->getNumElements() != numVerts )
+            {
+                OE_NOTICE << LC << "Found BIND_PER_VERTEX with wrong number of elements (expecting " << numVerts << "; found " << a->getNumElements() << ")\n";
+            }
+
+            _vbos.insert( a->getVertexBufferObject() );
+        }
+        else
         {
             OE_NOTICE << LC << "Found a NULL array\n";
         }
-        else if ( a->getBinding() == a->BIND_OVERALL && a->getNumElements() != 1 )
-        {
-            OE_NOTICE << LC << "Found an array with BIND_OVERALL and size <> 1\n";
-        }
-        else if ( a->getBinding() == a->BIND_PER_VERTEX && a->getNumElements() != numVerts )
-        {
-            OE_NOTICE << LC << "Found BIND_PER_VERTEX with wrong number of elements (expecting " << numVerts << "; found " << a->getNumElements() << ")\n";
-        }
 
-        _vbos.insert( a->getVertexBufferObject() );
     }
 
     if ( _vbos.size() != 1 )
@@ -613,4 +623,37 @@ AllocateAndMergeBufferObjectsVisitor::apply(osg::Geode& geode)
         }
     }
     traverse(geode);
+}
+
+
+//------------------------------------------------------------------------
+
+namespace
+{
+    unsigned getTotalNumRenderLeavesInStateGraph(const osgUtil::StateGraph* sg)
+    {
+        unsigned count = sg->_leaves.size();
+        for(osgUtil::StateGraph::ChildList::const_iterator i = sg->_children.begin(); i != sg->_children.end(); ++i)
+            count += getTotalNumRenderLeavesInStateGraph( i->second.get() );
+        return count;
+    }
+}
+
+unsigned
+RenderBinUtils::getTotalNumRenderLeaves(osgUtil::RenderBin* bin)
+{
+    if ( !bin ) return 0u;
+    unsigned count = bin->getRenderLeafList().size();
+
+    for(osgUtil::RenderBin::StateGraphList::const_iterator i = bin->getStateGraphList().begin(); i != bin->getStateGraphList().end(); ++i)
+    {
+        count += getTotalNumRenderLeavesInStateGraph( *i );
+    }
+
+    for(osgUtil::RenderBin::RenderBinList::const_iterator i = bin->getRenderBinList().begin(); i != bin->getRenderBinList().end(); ++i)
+    {
+        count += getTotalNumRenderLeaves( i->second.get() );
+    }
+
+    return count;
 }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -69,10 +69,9 @@ _outOfDate         ( false )
 
             _elevTexMat = new osg::RefMatrixf( osg::Matrixf(elevMatrix) );
             
-            // just stick this here for now.
-            // TODO: use the proper unit binding.
             osg::StateSet* stateSet = getOrCreateStateSet();
 
+            // TEMPORARY.
             stateSet->setTextureAttribute(
                 2,
                 _model->_elevationTexture.get() );
@@ -101,6 +100,15 @@ _outOfDate         ( false )
             normalMatrix.postMult( samplingScaleBias );
 
             _normalTexMat = new osg::RefMatrixf(normalMatrix);
+            
+            osg::StateSet* stateSet = getOrCreateStateSet();
+
+            stateSet->setTextureAttribute(
+                model->_normalData.getUnit(),
+                model->_normalTexture.get() );
+
+            stateSet->addUniform( new osg::Uniform(
+                "oe_tile_normalTexMatrix", *_normalTexMat.get() ) );
         }
     }
 }
@@ -137,29 +145,6 @@ void
 TileNode::setLastTraversalFrame(unsigned frame)
 {
     _lastTraversalFrame = frame;
-}
-
-osg::Group*
-TileNode::getPayloadGroup() const
-{
-    return _payload.get();
-}
-
-osg::Group*
-TileNode::getOrCreatePayloadGroup()
-{
-    if ( !_payload.valid() )
-    {
-        osg::StateSet* stateSet = new osg::StateSet();
-        std::string binName = Stringify() << "oe.PayloadBin." << _engineUID;
-        stateSet->setRenderBinDetails(1, binName);
-        stateSet->setNestRenderBins( false );
-
-        _payload = new osg::Group();
-        _payload->setStateSet( stateSet );
-        this->addChild( _payload.get() );
-    }
-    return _payload.get();
 }
 
 void

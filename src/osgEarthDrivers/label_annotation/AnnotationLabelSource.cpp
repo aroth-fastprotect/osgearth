@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -61,6 +61,8 @@ public:
         StringExpression  textContentExpr ( text ? *text->content()  : StringExpression() );
         NumericExpression textPriorityExpr( text ? *text->priority() : NumericExpression() );
         NumericExpression textSizeExpr    ( text ? *text->size()     : NumericExpression() );
+        NumericExpression textRotationExpr( text ? *text->onScreenRotation() : NumericExpression() );
+        NumericExpression textCourseExpr  ( text ? *text->geographicCourse() : NumericExpression() );
         StringExpression  iconUrlExpr     ( icon ? *icon->url()      : StringExpression() );
         NumericExpression iconScaleExpr   ( icon ? *icon->scale()    : NumericExpression() );
         NumericExpression iconHeadingExpr ( icon ? *icon->heading()  : NumericExpression() );
@@ -102,6 +104,12 @@ public:
 
                 if ( text->size().isSet() )
                     tempStyle.get<TextSymbol>()->size()->setLiteral( feature->eval(textSizeExpr, &context) );
+
+                if ( text->onScreenRotation().isSet() )
+                    tempStyle.get<TextSymbol>()->onScreenRotation()->setLiteral( feature->eval(textRotationExpr, &context) );
+
+                if ( text->geographicCourse().isSet() )
+                    tempStyle.get<TextSymbol>()->geographicCourse()->setLiteral( feature->eval(textCourseExpr, &context) );
             }
 
             if ( icon )
@@ -133,10 +141,6 @@ public:
             }
         }
 
-        // Note to self: need to change this to support picking later. -gw
-        //VirtualProgram* vp = VirtualProgram::getOrCreate(group->getOrCreateStateSet());
-        //vp->setInheritShaders( false );
-
         return group;
     }
 
@@ -147,16 +151,25 @@ public:
                              NumericExpression& priorityExpr )
     {
         osg::Vec3d center = feature->getGeometry()->getBounds().center();
-        GeoPoint point(feature->getSRS(), center.x(), center.y());
 
-        //LabelNode* node = new LabelNode(0L, point, style);
+        AltitudeMode mode = ALTMODE_ABSOLUTE;        
+
+        const AltitudeSymbol* alt = style.getSymbol<AltitudeSymbol>();
+        if (alt &&
+           (alt->clamping() == AltitudeSymbol::CLAMP_TO_TERRAIN || alt->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN) &&
+           alt->technique() == AltitudeSymbol::TECHNIQUE_SCENE)
+        {
+            mode = ALTMODE_RELATIVE;
+        }                              
+
+        GeoPoint point(feature->getSRS(), center.x(), center.y(), center.z(), mode);        
+
         PlaceNode* node = new PlaceNode(0L, point, style, context.getDBOptions());
-
+        
         if ( !priorityExpr.empty() )
         {
-            AnnotationData* data = new AnnotationData();
-            data->setPriority( feature->eval(priorityExpr, &context) );
-            node->setAnnotationData( data );
+            float val = feature->eval(priorityExpr, &context);
+            node->setPriority( val >= 0.0f ? val : FLT_MAX );
         }
 
         return node;
@@ -174,7 +187,7 @@ public:
         supportsExtension( "osgearth_label_annotation", "osgEarth annotation label plugin" );
     }
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "osgEarth Annotation Label Plugin";
     }

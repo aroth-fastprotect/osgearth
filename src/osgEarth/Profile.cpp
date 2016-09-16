@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -531,14 +531,22 @@ Profile::createTileKey( double x, double y, unsigned int level ) const
 {
     if ( _extent.contains( x, y ) )
     {
-        unsigned int tilesX = (unsigned int)_numTilesWideAtLod0 * (1 << (unsigned int)level);
-        unsigned int tilesY = (unsigned int)_numTilesHighAtLod0 * (1 << (unsigned int)level);
+        unsigned tilesX = _numTilesWideAtLod0 * (1 << (unsigned)level);
+        unsigned tilesY = _numTilesHighAtLod0 * (1 << (unsigned)level);
 
-        if (((_numTilesWideAtLod0 != 0) && ((tilesX / _numTilesWideAtLod0) != (1 << (unsigned int) level))) ||
-            ((_numTilesHighAtLod0 != 0) && ((tilesY / _numTilesHighAtLod0) != (1 << (unsigned int) level))))
-        {	// check for overflow condition
-            return (TileKey::INVALID);
-        }
+        // overflow checks:
+
+        if (_numTilesWideAtLod0 == 0u || ((tilesX / _numTilesWideAtLod0) != (1 << (unsigned)level)))
+            return TileKey::INVALID;
+
+        if (_numTilesHighAtLod0 == 0u || ((tilesY / _numTilesHighAtLod0) != (1 << (unsigned)level)))
+            return TileKey::INVALID;
+
+        //if (((_numTilesWideAtLod0 != 0) && ((tilesX / _numTilesWideAtLod0) != (1 << (unsigned int) level))) ||
+        //    ((_numTilesHighAtLod0 != 0) && ((tilesY / _numTilesHighAtLod0) != (1 << (unsigned int) level))))
+        //{	// check for overflow condition
+        //    return (TileKey::INVALID);
+        //}
 
         double rx = (x - _extent.xMin()) / _extent.width();
         int tileX = osg::clampBelow( (unsigned int)(rx * (double)tilesX), tilesX-1 );
@@ -741,8 +749,8 @@ Profile::getEquivalentLOD( const Profile* rhsProfile, unsigned rhsLOD ) const
         return rhsLOD;
 
     // Special check for geodetic to mercator or vise versa, they should match up in LOD.
-    if (rhsProfile->isEquivalentTo(Registry::instance()->getSphericalMercatorProfile()) && isEquivalentTo(Registry::instance()->getGlobalGeodeticProfile()) ||
-        rhsProfile->isEquivalentTo(Registry::instance()->getGlobalGeodeticProfile()) && isEquivalentTo(Registry::instance()->getSphericalMercatorProfile()))
+    if ((rhsProfile->isEquivalentTo(Registry::instance()->getSphericalMercatorProfile()) && isEquivalentTo(Registry::instance()->getGlobalGeodeticProfile())) ||
+        (rhsProfile->isEquivalentTo(Registry::instance()->getGlobalGeodeticProfile()) && isEquivalentTo(Registry::instance()->getSphericalMercatorProfile())))
     {
         return rhsLOD;
     }

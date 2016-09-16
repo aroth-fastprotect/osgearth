@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -28,6 +28,9 @@
 namespace osgEarth
 {
     /**
+     * @deprecated
+     * Consider GeoPositionNodeAutoScaler instead
+     *
      * Usage: set your render bin to AUTO_SCALE_BIN and your
      * geometry will automatically draw at one pixel per meter.
      *

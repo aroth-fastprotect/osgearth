@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,9 @@
 #include <osgEarth/Common>
 #include <osgEarth/optional>
 #include <osgEarth/SpatialReference>
+#include <osgEarth/Horizon>
+#include <osgEarth/GeoTransform>
+
 #include <osg/NodeCallback>
 #include <osg/ClusterCullingCallback>
 #include <osg/CoordinateSystemNode>
@@ -75,7 +78,12 @@ namespace osgEarth
         /**
          * Creates a cluster culling callback with the standard parameters.
          */
-        static osg::NodeCallback* create(const osg::Vec3& controlPoint, const osg::Vec3& normal, float deviation, float radius);
+        static osg::NodeCallback* create(const osg::Vec3& controlPoint, const osg::Vec3& normal, float deviation, float radius);        
+
+        /**
+         * Creates a cluster culling callback based on an extent (for geocentric tiles).
+         */
+        static osg::NodeCallback* create(const class GeoExtent& extent);
     };
 
     
@@ -124,16 +132,15 @@ namespace osgEarth
 
     /**
      * Simple occlusion culling callback that does a ray interseciton between the eyepoint
-     * and a world point and doesn't draw if there are intersections with the node.
+     * and a A GeoTransform node.
      */
-    struct OSGEARTH_EXPORT OcclusionCullingCallback : public osg::NodeCallback {
-        OcclusionCullingCallback( const SpatialReference* srs, const osg::Vec3d& world, osg::Node* node);
+    struct OSGEARTH_EXPORT OcclusionCullingCallback : public osg::NodeCallback
+    {
+        OcclusionCullingCallback(GeoTransform* xform);
 
-        const osg::Vec3d& getWorld() const;
-        void setWorld( const osg::Vec3d& world);
+        /** Maximum eye altitude at which to perform the occlusion culling test */
         double getMaxAltitude() const;
         void setMaxAltitude( double value);
-        void operator()(osg::Node* node, osg::NodeVisitor* nv);
 
         /**
         * Gets the maximum number of ms that the OcclusionCullingCallback can run on each frame.
@@ -147,12 +154,13 @@ namespace osgEarth
         */
         static void setMaxFrameTime( double ms );
 
+    public: //NodeCallback
+        
+        void operator()(osg::Node* node, osg::NodeVisitor* nv);
+
     private:
 
-        osg::ref_ptr< osg::Node > _node;
-        osg::ref_ptr< const osgEarth::SpatialReference > _srs;
-        osg::Vec3d _world;
-        osg::Vec3d _prevWorld;
+        osg::observer_ptr<GeoTransform> _xform;
         osg::Vec3d _prevEye;
         bool _visible;
         double _maxAltitude;
@@ -166,15 +174,6 @@ namespace osgEarth
     {
         static osgUtil::CullVisitor* asCullVisitor(osg::NodeVisitor* nv);
         static osgUtil::CullVisitor* asCullVisitor(osg::NodeVisitor& nv) { return asCullVisitor(&nv); }
-
-        /** General user data to calculate once and pass down with a CullVisitor. */
-        struct CullUserData : public osg::Referenced
-        {
-            optional<double> _cameraAltitude;
-        };
-
-        static CullUserData* getCullUserData(osgUtil::CullVisitor* cv) {
-            return cv ? dynamic_cast<CullUserData*>(cv->getUserData()) : 0L; }
     };
 
     /**
@@ -269,8 +268,14 @@ namespace osgEarth
         void operator()(osg::Node* node, osg::NodeVisitor* nv);
 
     protected:
-        osg::Vec3d                        _radii;
+        osg::ref_ptr<Horizon>             _horizon;
         osg::observer_ptr<osg::ClipPlane> _clipPlane;
+    };
+
+
+    struct OSGEARTH_EXPORT CullDebugger
+    {
+        Config dumpRenderBin(osgUtil::RenderBin* bin) const;
     };
 }
 

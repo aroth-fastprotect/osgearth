@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -125,7 +125,7 @@ IntersectionPicker::pick( float x, float y, Hits& results ) const
     //picker->setIntersectionLimit( osgUtil::Intersector::LIMIT_ONE_PER_DRAWABLE );
 
     // in MODEL mode, we need to window and proj matrixes in order to support some of the 
-    // features in osgEarth (like Annotation::OrthoNode).
+    // features in osgEarth (like Annotation::GeoPositionNode).
     if ( _root.valid() )
     {
         iv.pushWindowMatrix( new osg::RefMatrix(windowMatrix) );

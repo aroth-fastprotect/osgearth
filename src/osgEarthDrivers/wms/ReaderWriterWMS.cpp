@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -117,7 +117,7 @@ public:
         osg::ref_ptr<WMSCapabilities> capabilities = WMSCapabilitiesReader::read( capUrl.full(), dbOptions );
         if ( !capabilities.valid() )
         {
-            return Status::Error( "Unable to read WMS GetCapabilities." );
+            return Status::Error( Status::ResourceUnavailable, "Unable to read WMS GetCapabilities." );
         }
         else
         {
@@ -274,7 +274,7 @@ public:
             // set up the cache options properly for a TileSource.
             _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );            
 
-            return STATUS_OK;
+            return Status::OK();
         }
         else
         {
@@ -579,7 +579,7 @@ class WMSSourceFactory : public TileSourceDriver
     public:
         WMSSourceFactory() {}
 
-        virtual const char* className()
+        virtual const char* className() const
         {
             return "WMS Reader";
         }

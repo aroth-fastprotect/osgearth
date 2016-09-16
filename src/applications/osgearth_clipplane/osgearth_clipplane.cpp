@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -56,7 +56,7 @@ usage(const char* name)
 
 // Vertex shader to activate clip planes in GLSL:
 const char* clipvs =
-    "#version 110 \n"
+    "#version " GLSL_VERSION_STR "\n"
     "void oe_clip_vert(inout vec4 vertex_view) { \n"
     "   gl_ClipVertex = vertex_view; \n"
     "}\n";

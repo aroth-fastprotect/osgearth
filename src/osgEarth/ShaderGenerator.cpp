@@ -1,7 +1,7 @@
 
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -102,7 +102,7 @@ struct OSGEarthShaderGenPseudoLoader : public osgDB::ReaderWriter
         this->supportsExtension( SHADERGEN_PL_EXTENSION, "ShaderGen pseudoloader" );
     }
 
-    const char* className()
+    const char* className() const
     {
         return "OSGEarth ShaderGen pseudoloader";
     }
@@ -310,7 +310,8 @@ namespace
 //...........................................................................
 
 ShaderGenerator::GenBuffers::GenBuffers() :
-_version( GLSL_VERSION )
+_version( GLSL_VERSION ),
+_stateSet(0L)
 {
     //nop
 }
@@ -571,12 +572,33 @@ ShaderGenerator::apply( osg::Geode& node )
     }
 }
 
+#if OSG_VERSION_GREATER_OR_EQUAL(3,3,3)
+void
+ShaderGenerator::apply( osg::Drawable& drawable )
+{
+    if ( !_active )
+        return;
+
+    if ( ignore(&drawable) )
+        return;
+
+    if ( _duplicateSharedSubgraphs )
+        duplicateSharedNode(drawable);
+
+    apply( &drawable );
+}
+#endif
 
 void 
 ShaderGenerator::apply( osg::Drawable* drawable )
 {
     if ( drawable )
     {
+        if (_drawablesVisited.find(drawable) != _drawablesVisited.end())
+            return;
+        else
+            _drawablesVisited.insert(drawable);
+
         osg::ref_ptr<osg::StateSet> ss = drawable->getStateSet();
         if ( ss.valid() )
         {
@@ -774,10 +796,11 @@ ShaderGenerator::processText(const osg::StateSet* ss, osg::ref_ptr<osg::StateSet
         "void " FRAGMENT_FUNCTION "(inout vec4 color)\n"
         "{ \n"
         INDENT MEDIUMP "vec4 texel = texture2D(" SAMPLER_TEXT ", " TEX_COORD_TEXT ".xy);\n"
+        //INDENT MEDIUMP "vec4 texel = texture2DLod(" SAMPLER_TEXT ", " TEX_COORD_TEXT ".xy, 0.0);\n"
         INDENT "color.a *= texel.a; \n"
         "}\n";
 
-    vp->setFunction( VERTEX_FUNCTION,   vertSrc, ShaderComp::LOCATION_VERTEX_VIEW, 0.5f );
+    vp->setFunction( VERTEX_FUNCTION,   vertSrc, ShaderComp::LOCATION_VERTEX_MODEL, 0.5f );
     vp->setFunction( FRAGMENT_FUNCTION, fragSrc, ShaderComp::LOCATION_FRAGMENT_COLORING, 0.5f );
     replacement->getOrCreateUniform( SAMPLER_TEXT, osg::Uniform::SAMPLER_2D )->set( 0 );
 
@@ -879,7 +902,7 @@ ShaderGenerator::processGeometry(const osg::StateSet*         original,
 
     if ( needNewStateSet )
     {
-        std::string version = Stringify() << buf._version;
+        std::string version = GLSL_VERSION_STR;
 
         std::string vertHeadSource;
         vertHeadSource = buf._vertHead.str();
@@ -1080,11 +1103,11 @@ ShaderGenerator::apply(osg::TexGen* texgen, int unit, GenBuffers& buf)
 
         case osg::TexGen::SPHERE_MAP:
             buf._vertHead
-                << "varying vec3 oe_Normal;\n";
+                << "varying vec3 vp_Normal;\n";
             buf._vertBody 
                 << INDENT "{\n" // scope it in case there are > 1
                 << INDENT "vec3 view_vec = normalize(vertex_view.xyz/vertex_view.w); \n"
-                << INDENT "vec3 r = reflect(view_vec, oe_Normal);\n"
+                << INDENT "vec3 r = reflect(view_vec, vp_Normal);\n"
                 << INDENT "r.z += 1.0; \n"
                 << INDENT "float m = 2.0 * sqrt(dot(r,r)); \n"
                 << INDENT TEX_COORD << unit << " = vec4(r.x/m + 0.5, r.y/m + 0.5, 0.0, 1.0); \n"
@@ -1093,20 +1116,20 @@ ShaderGenerator::apply(osg::TexGen* texgen, int unit, GenBuffers& buf)
 
         case osg::TexGen::REFLECTION_MAP:
             buf._vertHead
-                << "varying vec3 oe_Normal;\n";
+                << "varying vec3 vp_Normal;\n";
             buf._vertBody
                 << INDENT "{\n"
                 << INDENT "vec3 view_vec = normalize(vertex_view.xyz/vertex_view.w);\n"
-                << INDENT TEX_COORD << unit << " = vec4(reflect(view_vec, oe_Normal), 1.0); \n"
+                << INDENT TEX_COORD << unit << " = vec4(reflect(view_vec, vp_Normal), 1.0); \n"
                 << INDENT "}\n";
             break;
 
         case osg::TexGen::NORMAL_MAP:
             buf._vertHead
-                << "varying vec3 oe_Normal;\n";
+                << "varying vec3 vp_Normal;\n";
             buf._vertBody
                 << INDENT "{\n"
-                << INDENT TEX_COORD << unit << " = vec4(oe_Normal, 1.0); \n"
+                << INDENT TEX_COORD << unit << " = vec4(vp_Normal, 1.0); \n"
                 << INDENT "}\n";
             break;
 

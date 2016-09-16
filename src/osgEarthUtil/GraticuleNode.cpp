@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 #include "GraticuleNode"
+#include <osgEarth/TerrainEngineNode>
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
@@ -84,7 +85,7 @@ _mapNode(mapNode),
     _formatter = new LatLongFormatter(osgEarth::Util::LatLongFormatter::FORMAT_DEGREES_MINUTES_SECONDS_TERSE, LatLongFormatter::USE_SYMBOLS |LatLongFormatter::USE_PREFIXES);
 
     // Initialize the resolution uniform
-    _resolutionUniform = mapNode->getTerrainEngine()->getTerrainStateSet()->getOrCreateUniform(GraticuleOptions::resolutionUniformName(), osg::Uniform::FLOAT);
+    _resolutionUniform = mapNode->getTerrainEngine()->getSurfaceStateSet()->getOrCreateUniform(GraticuleOptions::resolutionUniformName(), osg::Uniform::FLOAT);
     _resolutionUniform->set((float)_resolution);
 
     initLabelPool();
@@ -114,7 +115,7 @@ void GraticuleNode::setVisible(bool visible)
             setNodeMask(~0u);
             _mapNode->getTerrainEngine()->addEffect(_effect.get());
             // We need to re-initilize the uniform b/c the uniform may have been removed when the effect was removed.
-            _resolutionUniform = _mapNode->getTerrainEngine()->getTerrainStateSet()->getOrCreateUniform(GraticuleOptions::resolutionUniformName(), osg::Uniform::FLOAT);
+            _resolutionUniform = _mapNode->getTerrainEngine()->getSurfaceStateSet()->getOrCreateUniform(GraticuleOptions::resolutionUniformName(), osg::Uniform::FLOAT);
             _resolutionUniform->set((float)_resolution);
         }
         else
@@ -213,7 +214,7 @@ void GraticuleNode::updateLabels()
         int maxLatIndex = ceil(((extent.yMax() + 90)/resDegrees));
 
         // Generate horizontal labels
-        for (unsigned int i = minLonIndex; i <= maxLonIndex; i++)
+        for (int i = minLonIndex; i <= maxLonIndex; i++)
         {
             GeoPoint point(srs, -180.0 + (double)i * resDegrees, _lat + (_centerOffset.y() * degOffset), 0, ALTMODE_ABSOLUTE);
             LabelNode* label = _labelPool[labelIndex++];
@@ -231,7 +232,7 @@ void GraticuleNode::updateLabels()
 
 
         // Generate the vertical labels
-        for (unsigned int i = minLatIndex; i <= maxLatIndex; i++)
+        for (int i = minLatIndex; i <= maxLatIndex; i++)
         {
             GeoPoint point(srs, _lon + (_centerOffset.x() * degOffset), -90.0 + (double)i * resDegrees, 0, ALTMODE_ABSOLUTE);
             // Skip drawing labels at the poles
@@ -264,64 +265,71 @@ void GraticuleNode::traverse(osg::NodeVisitor& nv)
 
         osg::Vec3d vp = cv->getViewPoint();
 
+        osg::Matrixd viewMatrix = *cv->getModelViewMatrix();
 
-        GeoPoint eyeGeo;
-        eyeGeo.fromWorld( _mapNode->getMapSRS(), vp );
-        _lon = eyeGeo.x();
-        _lat = eyeGeo.y();
+        // Only update if the view matrix has changed.
+        if (viewMatrix != _viewMatrix)
+        {            
+            GeoPoint eyeGeo;
+            eyeGeo.fromWorld( _mapNode->getMapSRS(), vp );
+            _lon = eyeGeo.x();
+            _lat = eyeGeo.y();            
 
-        osg::Viewport* viewport = cv->getViewport();
+            osg::Viewport* viewport = cv->getViewport();
 
-        float centerX = viewport->x() + viewport->width() / 2.0;
-        float centerY = viewport->y() + viewport->height() / 2.0;
+            float centerX = viewport->x() + viewport->width() / 2.0;
+            float centerY = viewport->y() + viewport->height() / 2.0;
 
-        float offsetCenterX = centerX;
-        float offsetCenterY = centerY;
+            float offsetCenterX = centerX;
+            float offsetCenterY = centerY;
 
-        bool hitValid = false;
+            bool hitValid = false;
 
-        // Try the center of the screen.
-        if(_mapNode->getTerrain()->getWorldCoordsUnderMouse(cv->getCurrentCamera()->getView(), centerX, centerY, _focalPoint))
-        {
-            hitValid = true;
-        }
-
-        if (hitValid)
-        {
-            GeoPoint focalGeo;
-            focalGeo.fromWorld( _mapNode->getMapSRS(), _focalPoint );
-            _lon = focalGeo.x();
-            _lat = focalGeo.y();
-        }
-       
-    
-        double targetResolution = (_viewExtent.height() / 180.0) / _options.gridLines().get();
-
-        double resolution = _resolutions[0];
-        for (unsigned int i = 0; i < _resolutions.size(); i++)
-        {
-            resolution = _resolutions[i];
-            if (resolution <= targetResolution)
+            // Try the center of the screen.
+            if(_mapNode->getTerrain()->getWorldCoordsUnderMouse(cv->getCurrentCamera()->getView(), centerX, centerY, _focalPoint))
             {
-                break;
+                hitValid = true;
             }
-        }
 
-        // Trippy
-        //resolution = targetResolution;
+            if (hitValid)
+            {
+                GeoPoint focalGeo;
+                focalGeo.fromWorld( _mapNode->getMapSRS(), _focalPoint );
+                _lon = focalGeo.x();
+                _lat = focalGeo.y();
+                // We only store the previous view matrix if we actually got a hit.  Otherwise we still need to update.
+                _viewMatrix = viewMatrix;
+            }
 
-        _viewExtent = getViewExtent( cv );
 
-        // Try to compute an approximate meters to pixel value at this view.
-        double fovy, aspectRatio, zNear, zFar;
-        cv->getProjectionMatrix()->getPerspective(fovy, aspectRatio, zNear, zFar);
-        double dist = osg::clampAbove(eyeGeo.z(), 1.0);
-        double halfWidth = osg::absolute( tan(osg::DegreesToRadians(fovy/2.0)) * dist );
-        _metersPerPixel = (2.0 * halfWidth) / (double)viewport->height();
+            double targetResolution = (_viewExtent.height() / 180.0) / _options.gridLines().get();
 
-        if (_resolution != resolution)
-        {
-            setResolution(resolution);
+            double resolution = _resolutions[0];
+            for (unsigned int i = 0; i < _resolutions.size(); i++)
+            {
+                resolution = _resolutions[i];
+                if (resolution <= targetResolution)
+                {
+                    break;
+                }
+            }
+
+            // Trippy
+            //resolution = targetResolution;
+
+            _viewExtent = getViewExtent( cv );
+
+            // Try to compute an approximate meters to pixel value at this view.
+            double fovy, aspectRatio, zNear, zFar;
+            cv->getProjectionMatrix()->getPerspective(fovy, aspectRatio, zNear, zFar);
+            double dist = osg::clampAbove(eyeGeo.z(), 1.0);
+            double halfWidth = osg::absolute( tan(osg::DegreesToRadians(fovy/2.0)) * dist );
+            _metersPerPixel = (2.0 * halfWidth) / (double)viewport->height();
+
+            if (_resolution != resolution)
+            {
+                setResolution(resolution);
+            }
         }
     }
     osg::Group::traverse(nv);

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -196,7 +196,8 @@ static osgEarthRegisterRenderBinProxy<ClampingRenderBin> s_regbin(OSGEARTH_CLAMP
 //---------------------------------------------------------------------------
 
 ClampingTechnique::ClampingTechnique() :
-_textureSize( 1024 )
+_textureSize( 1024 ),
+_engine(0L)
 {
     // disable if GLSL is not supported
     _supported = Registry::capabilities().supportsGLSL();
@@ -358,6 +359,9 @@ ClampingTechnique::setUpCamera(OverlayDecorator::TechRTTParams& params)
     // they are available (default is false).
     vp->addBindAttribLocation( Clamping::AnchorAttrName, Clamping::AnchorAttrLocation );
     local->_groupStateSet->addUniform( new osg::Uniform(Clamping::HasAttrsUniformName, false) );
+
+    // Bind clamping heights location.
+    vp->addBindAttribLocation( Clamping::HeightsAttrName, Clamping::HeightsAttrLocation );
 
     osgEarth::Shaders pkg;
     pkg.load(vp, pkg.GPUClampingVertex);

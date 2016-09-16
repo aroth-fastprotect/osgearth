@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -190,12 +190,9 @@ HeightFieldUtils::getHeightAtPixel(const osg::HeightField* hf, double c, double 
             {
                 //OE_NOTICE << "Bilinear" << std::endl;
                 //Bilinear interpolate
-                float r1 = ((double)colMax - c) * llHeight + (c - (double)colMin) * lrHeight;
-                float r2 = ((double)colMax - c) * ulHeight + (c - (double)colMin) * urHeight;
-
-                //OE_INFO << "r1, r2 = " << r1 << " , " << r2 << std::endl;
-
-                result = ((double)rowMax - r) * r1 + (r - (double)rowMin) * r2;
+                double r1 = ((double)colMax - c) * (double)llHeight + (c - (double)colMin) * (double)lrHeight;
+                double r2 = ((double)colMax - c) * (double)ulHeight + (c - (double)colMin) * (double)urHeight;
+                result = ((double)rowMax - r) * (double)r1 + (r - (double)rowMin) * (double)r2;
             }
         }
         else if (interpolation == INTERP_AVERAGE)
@@ -325,10 +322,9 @@ HeightFieldUtils::scaleHeightFieldToDegrees( osg::HeightField* hf )
         //TODO: adjust this calculation based on the actual EllipsoidModel.
         float scale = 1.0f/111319.0f;
 
-        for (unsigned int i = 0; i < hf->getHeightList().size(); ++i)
-        {
-            hf->getHeightList()[i] *= scale;
-        }
+        osg::HeightField::HeightList& heights = hf->getHeightList();
+        for(unsigned i=0; i<heights.size(); ++i)
+            heights[i] *= scale;
     }
     else
     {
@@ -461,10 +457,7 @@ HeightFieldUtils::createReferenceHeightField(const GeoExtent& ex,
     }
     else
     {
-        for(unsigned int i=0; i<hf->getHeightList().size(); i++ )
-        {
-            hf->getHeightList()[i] = 0.0;
-        }
+        hf->getFloatArray()->assign(numCols*numRows, 0.0f);
     }
 
     hf->setBorderWidth( 0 );
@@ -503,18 +496,17 @@ HeightFieldUtils::resolveInvalidHeights(osg::HeightField* grid,
     }
     else
     {
-        for(unsigned int i=0; i<grid->getHeightList().size(); i++ )
+        osg::HeightField::HeightList& heights = grid->getHeightList();
+        for(unsigned i=0; i<heights.size(); ++i)
         {
-            if ( grid->getHeightList()[i] == invalidValue )
-            {
-                grid->getHeightList()[i] = 0.0;
-            }
+            if ( heights[i] == invalidValue )
+                heights[i] = 0.0f;
         }
     }
 }
 
 osg::NodeCallback*
-HeightFieldUtils::createClusterCullingCallback(osg::HeightField*          grid, 
+HeightFieldUtils::createClusterCullingCallback(const osg::HeightField*    grid, 
                                                const osg::EllipsoidModel* et, 
                                                float                      verticalScale )
 {
@@ -607,6 +599,8 @@ HeightFieldUtils::convertToNormalMap(const HeightFieldNeighborhood& hood,
                                      const SpatialReference*        hoodSRS)
 {
     const osg::HeightField* hf = hood._center.get();
+    if ( !hf )
+        return 0L;
     
     osg::Image* image = new osg::Image();
     image->allocateImage(hf->getNumColumns(), hf->getNumRows(), 1, GL_RGBA, GL_UNSIGNED_BYTE);

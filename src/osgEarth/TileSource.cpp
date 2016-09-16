@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -40,7 +40,8 @@ using namespace osgEarth;
 
 //------------------------------------------------------------------------
 
-TileBlacklist::TileBlacklist()
+TileBlacklist::TileBlacklist() :
+_tiles(true, 1024)
 {
     //NOP
 }
@@ -48,15 +49,13 @@ TileBlacklist::TileBlacklist()
 void
 TileBlacklist::add(const TileKey& key)
 {
-    Threading::ScopedWriteLock lock(_mutex);
-    _tiles.insert(key);
+    _tiles.insert(key, true);
     OE_DEBUG << "Added " << key.str() << " to blacklist" << std::endl;
 }
 
 void
 TileBlacklist::remove(const TileKey& key)
 {
-    Threading::ScopedWriteLock lock(_mutex);
     _tiles.erase(key);
     OE_DEBUG << "Removed " << key.str() << " from blacklist" << std::endl;
 }
@@ -64,7 +63,6 @@ TileBlacklist::remove(const TileKey& key)
 void
 TileBlacklist::clear()
 {
-    Threading::ScopedWriteLock lock(_mutex);
     _tiles.clear();
     OE_DEBUG << "Cleared blacklist" << std::endl;
 }
@@ -72,15 +70,7 @@ TileBlacklist::clear()
 bool
 TileBlacklist::contains(const TileKey& key) const
 {
-    Threading::ScopedReadLock lock(_mutex);
-    return _tiles.find(key) != _tiles.end();
-}
-
-unsigned int
-TileBlacklist::size() const
-{
-    Threading::ScopedReadLock lock(_mutex);
-    return _tiles.size();
+    return _tiles.has(key);
 }
 
 TileBlacklist*
@@ -130,14 +120,21 @@ TileBlacklist::write(const std::string &filename) const
     write(out);
 }
 
+namespace {
+    struct WriteFunctor : public LRUCache<TileKey,bool>::Functor {
+        std::ostream& _out;
+        WriteFunctor(std::ostream& out) : _out(out) { }
+        void operator()(const TileKey& key, const bool& value) {
+            _out << key.getLOD() << ' ' << key.getTileX() << ' ' << key.getTileY() << std::endl;
+        }
+    };
+}
+
 void
 TileBlacklist::write(std::ostream &output) const
 {
-    Threading::ScopedReadLock lock(const_cast<TileBlacklist*>(this)->_mutex);
-    for (BlacklistedTiles::const_iterator itr = _tiles.begin(); itr != _tiles.end(); ++itr)
-    {
-        output << itr->getLOD() << " " << itr->getTileX() << " " << itr->getTileY() << std::endl;
-    }
+    WriteFunctor writer(output);
+    _tiles.iterate(writer);
 }
 
 
@@ -171,6 +168,7 @@ TileSourceOptions::getConfig() const
     conf.updateIfSet( "bilinear_reprojection", _bilinearReprojection );
     conf.updateIfSet( "max_data_level", _maxDataLevel );
     conf.updateIfSet( "coverage", _coverage );
+    conf.updateIfSet( "osg_option_string", _osgOptionString );
     conf.updateObjIfSet( "profile", _profileOptions );
     return conf;
 }
@@ -198,6 +196,7 @@ TileSourceOptions::fromConfig( const Config& conf )
     conf.getIfSet( "bilinear_reprojection", _bilinearReprojection );
     conf.getIfSet( "max_data_level", _maxDataLevel );
     conf.getIfSet( "coverage", _coverage );
+    conf.getIfSet( "osg_option_string", _osgOptionString );
     conf.getObjIfSet( "profile", _profileOptions );
 }
 
@@ -205,7 +204,6 @@ TileSourceOptions::fromConfig( const Config& conf )
 //------------------------------------------------------------------------
 
 // statics
-TileSource::Status TileSource::STATUS_OK = TileSource::Status();
 
 const char* TileSource::INTERFACE_NAME = "osgEarth::TileSource";
 
@@ -218,11 +216,9 @@ TileSource::TileSource(const TileSourceOptions& options) :
 _options( options ),
 _status ( Status::Error("Not initialized") ),
 _mode   ( 0 ),
-_frame  ( 0L )
+_openCalled( false )
 {
     this->setThreadSafeRefUnref( true );
-
-    _frame = new MapFrame();
 
     // Initialize the l2 cache size to the options.
     int l2CacheSize = *options.L2CacheSize();
@@ -232,6 +228,13 @@ _frame  ( 0L )
     if ( l2env )
     {
         l2CacheSize = as<int>( std::string(l2env), 0 );
+    }
+
+    // Env cache-only mode also disables the L2 cache.
+    char const* noCacheEnv = ::getenv( "OSGEARTH_MEMORY_PROFILE" );
+    if ( noCacheEnv )
+    {
+        l2CacheSize = 0;
     }
 
     // Initialize the l2 cache if it's size is > 0
@@ -268,56 +271,38 @@ TileSource::~TileSource()
     {
         _blacklist->write(_blacklistFilename);
     }
-
-    if ( _frame )
-    {
-        delete _frame;
-    }
 }
 
-void
-TileSource::setStatus( TileSource::Status status )
-{
-    _status = status;
-}
-
-TileSource::Status
-TileSource::initialize(const osgDB::Options* options)
-{
-    // default implementation. Subclasses should override this.
-    return STATUS_OK;
-}
-
-const TileSource::Status&
+const Status&
 TileSource::open(const Mode&           openMode,
                  const osgDB::Options* options)
 {
-    _mode = openMode;
-
-    // Initialize the underlying data store
-    Status status = initialize(options);
-
-    // Check the return status. The TileSource MUST have a valid
-    // Profile after initialization.
-    if ( status == STATUS_OK )
+    if (!_openCalled)
     {
-        if ( getProfile() != 0L )
+        _mode = openMode;
+
+        // Initialize the underlying data store
+        Status status = initialize(options);
+
+        // Check the return status. The TileSource MUST have a valid
+        // Profile after initialization.
+        if ( status == STATUS_OK )
+        {
+            if ( getProfile() != 0L )
+            {
+                _status = status;
+            }
+            else 
+            {
+                _status = Status::Error("No profile available");
+            }
+        }
+        else
         {
             _status = status;
         }
-        else 
-        {
-            _status = Status::Error("No profile available");
-        }
-    }
-    else
-    {
-        _status = status;
-    }
 
-    if ( _status.isError() )
-    {
-        OE_WARN << LC << "Open failed: " << _status.message() << std::endl;
+        _openCalled = true;
     }
 
     return _status;
@@ -339,8 +324,7 @@ const GeoExtent& TileSource::getDataExtentsUnion() const
 {
     if (_dataExtentsUnion.isInvalid() && _dataExtents.size() > 0)
     {
-        static Threading::Mutex s_mutex;
-        Threading::ScopedMutexLock lock(s_mutex);
+        Threading::ScopedMutexLock lock(_mutex);
         {
             if (_dataExtentsUnion.isInvalid() && _dataExtents.size() > 0) // double-check
             {
@@ -356,30 +340,18 @@ const GeoExtent& TileSource::getDataExtentsUnion() const
     return _dataExtentsUnion;
 }
 
-void
-TileSource::setMap(const Map* map)
-{
-    _frame->setMap( map );
-}
-
-MapFrame&
-TileSource::getMapFrame() const
-{
-    return *_frame;
-}
-
 osg::Image*
 TileSource::createImage(const TileKey&        key,
                         ImageOperation*       prepOp, 
                         ProgressCallback*     progress )
 {
-    if ( _status != STATUS_OK )
+    if (getStatus().isError())
         return 0L;
 
     // Try to get it from the memcache fist
     if (_memCache.valid())
     {
-        ReadResult r = _memCache->getOrCreateDefaultBin()->readImage( key.str() );
+        ReadResult r = _memCache->getOrCreateDefaultBin()->readImage(key.str(), 0L);
         if ( r.succeeded() )
             return r.releaseImage();
     }
@@ -392,7 +364,7 @@ TileSource::createImage(const TileKey&        key,
     if ( newImage.valid() && _memCache.valid() )
     {
         // cache it to the memory cache.
-        _memCache->getOrCreateDefaultBin()->write( key.str(), newImage.get() );
+        _memCache->getOrCreateDefaultBin()->write(key.str(), newImage.get(), 0L);
     }
 
     return newImage.release();
@@ -403,13 +375,13 @@ TileSource::createHeightField(const TileKey&        key,
                               HeightFieldOperation* prepOp, 
                               ProgressCallback*     progress )
 {
-    if ( _status != STATUS_OK )
+    if (getStatus().isError())
         return 0L;
 
     // Try to get it from the memcache first:
     if (_memCache.valid())
     {
-        ReadResult r = _memCache->getOrCreateDefaultBin()->readObject( key.str() );
+        ReadResult r = _memCache->getOrCreateDefaultBin()->readObject(key.str(), 0L);
         if ( r.succeeded() )
             return r.release<osg::HeightField>();
     }
@@ -421,7 +393,7 @@ TileSource::createHeightField(const TileKey&        key,
 
     if ( newHF.valid() && _memCache.valid() )
     {
-        _memCache->getOrCreateDefaultBin()->write( key.str(), newHF.get() );
+        _memCache->getOrCreateDefaultBin()->write(key.str(), newHF.get(), 0L);
     }
 
     //TODO: why not just newHF.release()? -gw
@@ -439,7 +411,7 @@ osg::HeightField*
 TileSource::createHeightField(const TileKey&        key,
                               ProgressCallback*     progress)
 {
-    if ( _status != STATUS_OK )
+    if (getStatus().isError())
         return 0L;
 
     osg::ref_ptr<osg::Image> image = createImage(key, progress);
@@ -457,7 +429,7 @@ TileSource::storeHeightField(const TileKey&     key,
                              osg::HeightField*  hf,
                               ProgressCallback* progress)
 {
-    if ( _status != STATUS_OK || hf == 0L )
+    if (getStatus().isError() || hf == 0L )
         return 0L;
 
     ImageToHeightFieldConverter conv;
@@ -472,7 +444,7 @@ TileSource::storeHeightField(const TileKey&     key,
 bool
 TileSource::isOK() const 
 {
-    return _status == STATUS_OK;
+    return _status.isOK();
 }
 
 void
@@ -570,6 +542,9 @@ TileSource::hasData(const osgEarth::TileKey& key) const
 {
     //sematics: "might have data"
 
+    if ( !key.valid() )
+        return false;
+
     // If no data extents are provided, and there's no data level override,
     // return true because there might be data but there's no way to tell.
     if (_dataExtents.size() == 0 && !_options.maxDataLevel().isSet())
@@ -618,6 +593,10 @@ bool
 TileSource::getBestAvailableTileKey(const osgEarth::TileKey& key,
                                     osgEarth::TileKey&       output) const
 {
+    // trivial reject
+    if ( !key.valid() )
+        return false;
+
     // trivial accept: no data extents = not enough info.
     if (_dataExtents.size() == 0)
     {
@@ -643,7 +622,7 @@ TileSource::getBestAvailableTileKey(const osgEarth::TileKey& key,
         if (key.getExtent().intersects( *itr ))
         {
             // check that the extent isn't higher-resolution than our key:
-            if ( !itr->minLevel().isSet() || layerLOD >= itr->minLevel().get() )
+            if ( !itr->minLevel().isSet() || layerLOD >= (int)itr->minLevel().get() )
             {
                 // Got an intersetion; now test the LODs:
                 intersects = true;
@@ -658,7 +637,7 @@ TileSource::getBestAvailableTileKey(const osgEarth::TileKey& key,
 
                 // Is our key at a lower or equal LOD than the max key in this extent?
                 // If so, our key is good.
-                else if ( layerLOD <= itr->maxLevel().get() )
+                else if ( layerLOD <= (int)itr->maxLevel().get() )
                 {
                     output = key;
                     return true;
@@ -689,6 +668,9 @@ bool
 TileSource::hasDataForFallback(const osgEarth::TileKey& key) const
 {
     //sematics: might have data.
+
+    if ( !key.valid() )
+        return false;
 
     //If no data extents are provided, just return true
     if (_dataExtents.size() == 0) 
@@ -749,68 +731,36 @@ TileSourceFactory::create(const TileSourceOptions& options)
     result = dynamic_cast<TileSource*>( osgDB::readObjectFile( driverExt, dbopt.get() ) );
     if ( !result )
     {
-        OE_WARN << LC << "Failed to load TileSource driver \"" << driver << "\"" << std::endl;
+        OE_INFO << LC << "Failed to load TileSource driver \"" << driver << "\"" << std::endl;
     }
 
-    OE_DEBUG << LC << "Tile source Profile = " << (result->getProfile() ? result->getProfile()->toString() : "NULL") << std::endl;
-
-    // apply an Override Profile if provided.
-    if ( result && options.profile().isSet() )
+    else
     {
-        const Profile* profile = Profile::create(*options.profile());
-        if ( profile )
+        OE_DEBUG << LC << "Tile source Profile = " << (result->getProfile() ? result->getProfile()->toString() : "NULL") << std::endl;
+
+        // apply an Override Profile if provided.
+        if ( options.profile().isSet() )
         {
-            result->setProfile( profile );
+            const Profile* profile = Profile::create(*options.profile());
+            if ( profile )
+            {
+                result->setProfile( profile );
+            }
         }
     }
 
     return result;
 }
 
-#if 0
-ReadWriteTileSource*
-TileSourceFactory::openReadWrite(const TileSourceOptions& options)
-{
-    ReadWriteTileSource* result = 0L;
-
-    std::string driver = options.getDriver();
-    if ( driver.empty() )
-    {
-        OE_WARN << LC << "ILLEGAL- no driver set for tile source" << std::endl;
-        return 0L;
-    }
-
-    osg::ref_ptr<osgDB::Options> dbopt = Registry::instance()->cloneOrCreateOptions();
-    dbopt->setPluginData      ( TILESOURCEOPTIONS_TAG,   (void*)&options );
-    dbopt->setPluginStringData( TILESOURCEINTERFACE_TAG, ReadWriteTileSource::INTERFACE_NAME );
-
-    std::string driverExt = std::string( ".osgearth_" ) + driver;
-    result = dynamic_cast<ReadWriteTileSource*>( osgDB::readObjectFile( driverExt, dbopt.get() ) );
-    if ( !result )
-    {
-        OE_WARN << LC << "Failed to load ReadWriteTileSource driver \"" << driver << "\"" << std::endl;
-    }
-
-    // apply an Override Profile if provided.
-    if ( result && options.profile().isSet() )
-    {
-        const Profile* profile = Profile::create(*options.profile());
-        if ( profile )
-        {
-            result->setProfile( profile );
-        }
-    }
-
-    return result;
-}
-#endif
 
 //------------------------------------------------------------------------
 
 const TileSourceOptions&
 TileSourceDriver::getTileSourceOptions(const osgDB::Options* dbopt ) const
 {
-    return *static_cast<const TileSourceOptions*>( dbopt->getPluginData( TILESOURCE_OPTIONS_TAG ) );
+    static TileSourceOptions s_default;
+    const void* data = dbopt->getPluginData(TILESOURCE_OPTIONS_TAG);
+    return data ? *static_cast<const TileSourceOptions*>(data) : s_default;
 }
 
 const std::string

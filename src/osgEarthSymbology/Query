@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -28,6 +28,8 @@
 
 namespace osgEarth { namespace Symbology
 {
+    using namespace osgEarth;
+
     /**
      * A query filter that you can use to limit a set of symbology to process.
      */
@@ -35,6 +37,8 @@ namespace osgEarth { namespace Symbology
     {
     public:
         Query( const Config& conf =Config() );
+
+        Query(const Query& rhs);
 
         virtual ~Query() { }
 

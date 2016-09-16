@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,8 @@
 #include <osgEarth/Common>
 #include <osgEarth/CachePolicy>
 #include <osgEarth/SharedSARepo>
+#include <osgEarth/Containers>
+#include <osgEarth/TraversalData>
 #include <osgEarth/ShaderGenerator>
 #include <OpenThreads/ReentrantMutex>
 #include <OpenThreads/ScopedLock>
@@ -79,21 +81,24 @@ namespace osgEarth
         /** Access to the application-wide GDAL serialization mutex. GDAL is not thread-safe. */
         OpenThreads::ReentrantMutex& getGDALMutex();
 
-        /** The system-wide default cache. */
-        Cache* getCache() const;
-        void setCache( Cache* cache );
+        /** Gets a default cache object - based on environment settings - unless setDefaultCache
+            was called to override it. */
+        Cache* getDefaultCache() const;
+
+        /** Sets a default cache that a Map will use if none other is specified. */
+        void setDefaultCache(Cache* cache);
 
         /** The default cache policy (used when no policy is set elsewhere) */
-        const optional<CachePolicy>& defaultCachePolicy() const { return _defaultCachePolicy; }
+        const optional<CachePolicy>& defaultCachePolicy() const;
         void setDefaultCachePolicy( const CachePolicy& policy );
 
         /** The override cache policy (overrides all others if set) */
-        const optional<CachePolicy>& overrideCachePolicy() const { return _overrideCachePolicy; }
+        const optional<CachePolicy>& overrideCachePolicy() const;
         void setOverrideCachePolicy( const CachePolicy& policy );
 
         /** The default cache driver. */
         void setDefaultCacheDriverName( const std::string& name );
-        const std::string& getDefaultCacheDriverName() const { return _cacheDriver; }
+        const std::string& getDefaultCacheDriverName() const;
 
         /**
          * Given a CachePolicy, composites in the default and override cache policies
@@ -132,6 +137,7 @@ namespace osgEarth
         /**
          * The graphics hardware capabilities for this platform.
          */
+        bool hasCapabilities() const;
         const Capabilities& getCapabilities() const;
         void setCapabilities( Capabilities* caps );
         static const Capabilities& capabilities() { return instance()->getCapabilities(); }
@@ -245,6 +251,16 @@ namespace osgEarth
         optional<bool>& unRefImageDataAfterApply() { return _unRefImageDataAfterApply; }
         const optional<bool>& unRefImageDataAfterApply() const { return _unRefImageDataAfterApply; }
 
+        /**
+         * Adds a texture image unit number that osgEarth should never use.
+         */
+        void setTextureImageUnitOffLimits(int unit);
+        const std::set<int> getOffLimitsTextureImageUnits() const;
+
+        /** General purpose transient data store to support VisitorData in pre-osg 3.4 */
+        TransientUserDataStore& dataStore() { return _dataStore; }
+        const TransientUserDataStore& dataStore() const { return _dataStore; }
+
     protected:
         virtual ~Registry();
         Registry();
@@ -259,12 +275,14 @@ namespace osgEarth
         osg::ref_ptr<const Profile> _spherical_mercator_profile;
         osg::ref_ptr<const Profile> _cube_profile;
 
-        Threading::ReadWriteMutex _regMutex;  
+        mutable Threading::Mutex _regMutex;  
         int _numGdalMutexGets;
 
-        osg::ref_ptr<Cache> _cache;
-        optional<CachePolicy> _defaultCachePolicy;
-        optional<CachePolicy> _overrideCachePolicy;
+        mutable osg::ref_ptr<Cache>   _defaultCache;
+        mutable optional<CachePolicy> _defaultCachePolicy;
+        mutable optional<CachePolicy> _overrideCachePolicy;
+
+        mutable bool _overrideCachePolicyInitialized;
 
         typedef std::set<std::string> StringSet;
         StringSet _blacklistedFilenames;
@@ -296,7 +314,8 @@ namespace osgEarth
         osg::ref_ptr<StateSetCache> _stateSetCache;
 
         std::string _terrainEngineDriver;
-        std::string _cacheDriver;
+
+        mutable optional<std::string> _cacheDriver;
 
         typedef std::pair<std::string,std::string> Activity;
         struct ActivityLess {
@@ -312,6 +331,10 @@ namespace osgEarth
         optional<bool> _unRefImageDataAfterApply;
 
         osg::ref_ptr<ObjectIndex> _objectIndex;
+
+        std::set<int> _offLimitsTextureImageUnits;
+
+        TransientUserDataStore _dataStore;
     };
 }
 

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ namespace
             //nop
         }
 
-        ReadResult readObject(const std::string& key )
+        ReadResult readObject(const std::string& key, const osgDB::Options*)
         {
             MemCacheLRU::Record rec;
             _lru.get(key, rec);
@@ -63,17 +63,17 @@ namespace
             }
         }
 
-        ReadResult readImage(const std::string& key)
+        ReadResult readImage(const std::string& key, const osgDB::Options* readOptions)
         {
-            return readObject( key );
+            return readObject(key, readOptions);
         }
 
-        ReadResult readString(const std::string& key)
+        ReadResult readString(const std::string& key, const osgDB::Options* readOptions)
         {
-            return readObject( key );
+            return readObject(key, readOptions);
         }
 
-        bool write( const std::string& key, const osg::Object* object, const Config& meta )
+        bool write( const std::string& key, const osg::Object* object, const Config& meta, const osgDB::Options* writeOptions)
         {
             if ( object ) 
             {
@@ -109,6 +109,11 @@ namespace
             return true;
         }
 
+        std::string getHashedKey(const std::string& key) const
+        {
+            return key;
+        }
+
         MemCacheLRU _lru;
     };
     
@@ -119,7 +124,10 @@ namespace
 //------------------------------------------------------------------------
 
 MemCache::MemCache( unsigned maxBinSize ) :
-_maxBinSize( std::max(maxBinSize, 1u) )
+_maxBinSize( std::max(maxBinSize, 1u) ),
+_reads(0),
+_writes(0),
+_hits(0)
 {
     //nop
 }

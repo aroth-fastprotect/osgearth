@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -38,87 +38,24 @@ using namespace osgEarth;
 
 #define LC "[SingleKeyNodeFactory] "
 
-namespace
-{
-    /**
-     * Culling callback for terrain tiles.
-     *
-     * It performs a horizon-visibility test against the highest four corners of
-     * the tile's bounding box.
-
-     * This is an alternative to the old cluster culling callback.
-     */
-    struct HorizonTileCuller : public osg::NodeCallback
-    {
-        Horizon    _horizonPrototype;
-        osg::Vec3d _points[4];
-
-        HorizonTileCuller(const SpatialReference* srs, const osg::BoundingBox& bbox, const osg::Matrix& m)
-        {
-            _horizonPrototype.setEllipsoid(*srs->getEllipsoid());
-
-            // Adjust the horizon ellipsoid based on the minimum Z value of the tile;
-            // necessary because a tile that's below the ellipsoid (ocean floor, e.g.)
-            // may be visible even if it doesn't pass the horizon-cone test. In such
-            // cases we need a more conservative ellipsoid.
-            double zMin = bbox.corner(0).z();
-            if ( zMin < 0.0 )
-            {
-                _horizonPrototype.setEllipsoid(osg::EllipsoidModel(
-                    srs->getEllipsoid()->getRadiusEquator() + zMin,
-                    srs->getEllipsoid()->getRadiusPolar()   + zMin));
-            }
-            
-
-            // consider the uppermost 4 points of the tile-aligned bounding box.
-            // (the last four corners of the bbox are the "zmax" corners.)
-            for(unsigned i=0; i<4; ++i)
-            {
-                _points[i] = bbox.corner(4+i) * m;
-            }
-        }
-
-        void operator()(osg::Node* node, osg::NodeVisitor* nv)
-        {
-            // Clone the horizon object to support multiple cull threads
-            // (since we call setEye with the current node visitor eye point)
-            Horizon horizon(_horizonPrototype);
-
-            // Since each terrain tile has an aboslute reference frame, 
-            // there is no need to transform the eyepoint:
-            horizon.setEye(nv->getViewPoint()); // * osg::computeLocalToWorld(nv->getNodePath()));
-            
-            for(unsigned i=0; i<4; ++i)
-            {                   
-                if ( !horizon.occludes(_points[i]) )
-                {
-                    traverse(node, nv);
-                    break;
-                }
-            }
-        }
-    };
-}
 
 
 SingleKeyNodeFactory::SingleKeyNodeFactory(const Map*                    map,
                                            TileModelFactory*             modelFactory,
                                            TileModelCompiler*            modelCompiler,
                                            TileNodeRegistry*             liveTiles,
-                                           TileNodeRegistry*             deadTiles,
+                                           ResourceReleaser*             releaser,
                                            const MPTerrainEngineOptions& options,
-                                           UID                           engineUID,
-                                           TerrainTileNodeBroker*        tileNodeBroker ) :
+                                           TerrainEngine*                engine ) :
 _frame           ( map ),
 _modelFactory    ( modelFactory ),
 _modelCompiler   ( modelCompiler ),
 _liveTiles       ( liveTiles ),
-_deadTiles       ( deadTiles ),
+_releaser        ( releaser ),
 _options         ( options ),
-_engineUID       ( engineUID ),
-_tileNodeBroker  ( tileNodeBroker )
+_engine          ( engine )
 {
-    _debug = _options.debug() == true;
+    //nop
 }
 
 unsigned
@@ -164,7 +101,6 @@ SingleKeyNodeFactory::createTile(TileModel*        model,
 #else
     // compile the model into a node:
     TileNode* tileNode = _modelCompiler->compile(model, _frame, progress);
-    tileNode->setEngineUID( _engineUID );
 #endif
 
     // see if this tile might have children.
@@ -177,11 +113,30 @@ SingleKeyNodeFactory::createTile(TileModel*        model,
     if ( prepareForChildren )
     {
         osg::BoundingSphere bs = tileNode->getBound();
-        TilePagedLOD* plod = new TilePagedLOD( _engineUID, _liveTiles, _deadTiles );
+        TilePagedLOD* plod = new TilePagedLOD( _engine->getUID(), _liveTiles.get(), _releaser.get() );
         plod->setCenter  ( bs.center() );
         plod->addChild   ( tileNode );
-        plod->setFileName( 1, Stringify() << tileNode->getKey().str() << "." << _engineUID << ".osgearth_engine_mp_tile" );
-        plod->setDebug   ( _debug );
+        plod->setFileName( 1, Stringify() << tileNode->getKey().str() << "." << _engine->getUID() << ".osgearth_engine_mp_tile" );
+        
+        double rangeFactor = _options.minTileRangeFactor().get();
+        if (_options.adaptivePolarRangeFactor() == true)
+        {
+            double lat = model->_tileKey.getExtent().yMin() < 0 ? -model->_tileKey.getExtent().yMax() : model->_tileKey.getExtent().yMin();
+            double latRad = osg::DegreesToRadians(lat);
+            rangeFactor -= (rangeFactor - 1.0)*sin(latRad)*sin(latRad);
+        }
+        plod->setRangeFactor(rangeFactor);
+
+        // Setup expiration.
+        if (_options.minExpiryFrames().isSet())
+        {
+            plod->setMinimumExpiryFrames(1, *_options.minExpiryFrames());
+        }
+        
+        if (_options.minExpiryTime().isSet())
+        {         
+            plod->setMinimumExpiryTime(1, *_options.minExpiryTime());
+        }      
 
         if ( _options.rangeMode().value() == osg::LOD::DISTANCE_FROM_EYE_POINT )
         {
@@ -213,7 +168,8 @@ SingleKeyNodeFactory::createTile(TileModel*        model,
                 radius = (ur - ll).length() / 2.0;
             }
           
-            float minRange = (float)(radius * _options.minTileRangeFactor().value());
+            //float minRange = (float)(radius * _options.minTileRangeFactor().value());
+            float minRange = radius;
 
             plod->setRange( 0, minRange, FLT_MAX );
             plod->setRange( 1, 0, minRange );
@@ -250,8 +206,6 @@ SingleKeyNodeFactory::createTile(TileModel*        model,
         // this one rejects back-facing tiles:
         if ( _frame.getMapInfo().isGeocentric() && _options.clusterCulling() == true )
         {
-
-#if 1
             osg::HeightField* hf =
                 model->_elevationData.getHeightField();
 
@@ -259,14 +213,6 @@ SingleKeyNodeFactory::createTile(TileModel*        model,
                 hf,
                 tileNode->getKey().getProfile()->getSRS()->getEllipsoid(),
                 *_options.verticalScale() ) );
-#else
-            // This works, but isn't quite as tight at the cluster culler.
-            // Re-evaluate down the road.
-            result->addCullCallback( new HorizonTileCuller(
-                _frame.getMapInfo().getSRS(),
-                tileNode->getTerrainBoundingBox(),
-                tileNode->getMatrix(), tileNode->getKey() ) );
-#endif
         }
     }
     else
@@ -352,7 +298,7 @@ SingleKeyNodeFactory::createNode(const TileKey&    key,
     {
         if ( _options.incrementalUpdate() == true )
         {
-            quad = new TileGroup(key, _engineUID, _liveTiles.get(), _deadTiles.get());
+            quad = new TileGroup(key, _engine->getUID(), _liveTiles.get(), _releaser.get());
         }
         else
         {
@@ -362,7 +308,7 @@ SingleKeyNodeFactory::createNode(const TileKey&    key,
         for( unsigned q=0; q<4; ++q )
         {
             osg::ref_ptr<osg::Node> tile = createTile(model[q].get(), setupChildren, progress);
-            _tileNodeBroker->notifyOfTerrainTileNodeCreation( model[q]->_tileKey, tile.get() );
+            _engine->notifyOfTerrainTileNodeCreation( model[q]->_tileKey, tile.get() );
             quad->addChild( tile.get() );
         }
     }

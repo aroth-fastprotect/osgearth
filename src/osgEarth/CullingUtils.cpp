@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -140,7 +140,9 @@ namespace
     {
         ComputeVisitor()
             : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN), 
-              _maxRadius2(0.0f) { }
+              _maxRadius2(0.0f),
+              _maxNormalLen(0.0f),
+              _pass(0u) { }
 
         void run( osg::Node* node, const osg::Vec3d& centerECEF )
         {
@@ -250,7 +252,8 @@ namespace
     {
         ComputeClusterCullingParams( const osg::Vec3d& ecefControlPoint )
             : osg::NodeVisitor(osg::NodeVisitor::TRAVERSE_ALL_CHILDREN),
-              _minDeviation( 1.0 )
+              _minDeviation( 1.0 ),
+              _maxOffset(0)
         {
             _ecefControl = ecefControlPoint;
             _ecefNormal = ecefControlPoint;
@@ -284,7 +287,7 @@ namespace
         }
         
         std::vector<osg::Matrixd> _matrixStack;
-        double _maxOffset, _maxRadius, _minDeviation;
+        double _maxOffset, _minDeviation;
         osg::Vec3d _ecefControl, _ecefNormal;
     };
 }
@@ -485,6 +488,57 @@ ClusterCullingFactory::create(const osg::Vec3& controlPoint,
     return ccc;
 }
 
+osg::NodeCallback*
+ClusterCullingFactory::create(const GeoExtent& extent)
+{
+    GeoPoint centerPoint;
+    extent.getCentroid( centerPoint );
+
+    // select the farthest corner:
+    GeoPoint edgePoint;
+    if ( centerPoint.y() >= 0.0 )
+        edgePoint = GeoPoint(extent.getSRS(), extent.xMin(), extent.yMin(), 0.0, ALTMODE_ABSOLUTE);
+    else
+        edgePoint = GeoPoint(extent.getSRS(), extent.xMin(), extent.yMax(), 0.0, ALTMODE_ABSOLUTE);
+
+    // convert both to ECEF and make unit vectors:
+    osg::Vec3d center, centerNormal, edge, edgeNormal;
+
+    centerPoint.toWorld( center );
+    edgePoint.toWorld( edge );
+
+    edgeNormal = edge;
+    edgeNormal.normalize();
+
+    centerNormal = center;
+    centerNormal.normalize();
+
+    // determine the height above the center point necessary to see the edge point:
+    double dp = centerNormal * edgeNormal;
+    double centerLen = center.length();
+    double height = (edge.length() / dp) - centerLen;
+
+    // set the control point at that height:
+    osg::Vec3d controlPoint = center + centerNormal*height;
+
+    // cluster culling only occurs beyond the maximum radius:
+    double maxRadius = (controlPoint-edge).length();
+
+    // determine the maximum visibility angle (i.e. minimum dot product
+    // of the center up vector and the vector from the control point to 
+    // the edge point)
+    osg::Vec3d cpToEdge = edge - controlPoint;
+    cpToEdge.normalize();                
+    double minDeviation = centerNormal * cpToEdge;
+    
+    // create and return the callback.
+    return create(
+        controlPoint,
+        centerNormal,
+        minDeviation,
+        maxRadius);
+}
+
 //------------------------------------------------------------------------
 
 CullNodeByNormal::CullNodeByNormal( const osg::Vec3d& normal )
@@ -528,10 +582,18 @@ DisableSubgraphCulling::operator()(osg::Node* n, osg::NodeVisitor* v)
 // The max frame time in ms
 double OcclusionCullingCallback::_maxFrameTime = 10.0;
 
-OcclusionCullingCallback::OcclusionCullingCallback(const osgEarth::SpatialReference *srs, const osg::Vec3d& world, osg::Node* node):
-_srs        ( srs ),
-_world      ( world ),
-_node       ( node ),
+//OcclusionCullingCallback::OcclusionCullingCallback(const osgEarth::SpatialReference *srs, const osg::Vec3d& world, osg::Node* node):
+//_srs        ( srs ),
+//_world      ( world ),
+//_node       ( node ),
+//_visible    ( true ),
+//_maxAltitude( 200000 )
+//{
+//    //nop
+//}
+//
+OcclusionCullingCallback::OcclusionCullingCallback(GeoTransform* xform) :
+_xform      ( xform ),
 _visible    ( true ),
 _maxAltitude( 200000 )
 {
@@ -546,16 +608,6 @@ double OcclusionCullingCallback::getMaxFrameTime()
 void OcclusionCullingCallback::setMaxFrameTime( double ms )
 {
     _maxFrameTime = ms;
-}
-
-const osg::Vec3d& OcclusionCullingCallback::getWorld() const
-{
-    return _world;
-}
-
-void OcclusionCullingCallback::setWorld( const osg::Vec3d& world)
-{
-    _world = world;
 }
 
 double OcclusionCullingCallback::getMaxAltitude() const
@@ -593,51 +645,59 @@ void OcclusionCullingCallback::operator()(osg::Node* node, osg::NodeVisitor* nv)
 
         osg::Vec3d eye = cv->getViewPoint();
 
-        if (_prevEye != eye || _prevWorld != _world)
+        if (_prevEye != eye)
         {
             if (remainingTime > 0.0)
             {
-                double alt = 0.0;
-
-                if ( _srs && !_srs->isProjected() )
+                osg::ref_ptr<GeoTransform> geo;
+                if ( _xform.lock(geo) )
                 {
-                    osgEarth::GeoPoint mapPoint;
-                    mapPoint.fromWorld( _srs.get(), eye );
-                    alt = mapPoint.z();
-                }
-                else
-                {
-                    alt = eye.z();
-                }
+                    double alt = 0.0;
 
+                    osg::ref_ptr<Terrain> terrain = geo->getTerrain();
+                    if ( terrain.valid() && !terrain->getSRS()->isProjected() )
+                    {
+                        osgEarth::GeoPoint mapPoint;
+                        mapPoint.fromWorld( terrain->getSRS(), eye );
+                        alt = mapPoint.z();
+                    }
+                    else
+                    {
+                        alt = eye.z();
+                    }
 
-                //Only do the intersection if we are close enough for it to matter
-                if (alt <= _maxAltitude && _node.valid())
-                {
-                    //Compute the intersection from the eye to the world point
-                    osg::Timer_t startTick = osg::Timer::instance()->tick();
-                    osg::Vec3d start = eye;
-                    osg::Vec3d end = _world;
-                    DPLineSegmentIntersector* i = new DPLineSegmentIntersector( start, end );
-                    i->setIntersectionLimit( osgUtil::Intersector::LIMIT_NEAREST );
-                    osgUtil::IntersectionVisitor iv;
-                    iv.setIntersector( i );
-                    _node->accept( iv );
-                    osgUtil::LineSegmentIntersector::Intersections& results = i->getIntersections();
-                    _visible = results.empty();
-                    osg::Timer_t endTick = osg::Timer::instance()->tick();
-                    double elapsed = osg::Timer::instance()->delta_m( startTick, endTick );
-                    remainingTime -= elapsed;
+                    //Only do the intersection if we are close enough for it to matter
+                    if (alt <= _maxAltitude && terrain.valid())
+                    {
+                        //Compute the intersection from the eye to the world point
+                        osg::Timer_t startTick = osg::Timer::instance()->tick();
+                        osg::Vec3d start = eye;
+                        osg::Vec3d end = osg::Vec3d(0,0,0) * geo->getMatrix();
+
+                        // shorten the intersector by 1m to prevent flickering.
+                        osg::Vec3d vec = end-start; vec.normalize();
+                        end -= vec*1.0;
+
+                        DPLineSegmentIntersector* i = new DPLineSegmentIntersector( start, end );
+                        i->setIntersectionLimit( osgUtil::Intersector::LIMIT_NEAREST );
+                        osgUtil::IntersectionVisitor iv;
+                        iv.setIntersector( i );
+                        terrain->accept( iv );
+                        osgUtil::LineSegmentIntersector::Intersections& results = i->getIntersections();
+                        _visible = results.empty();
+                        osg::Timer_t endTick = osg::Timer::instance()->tick();
+                        double elapsed = osg::Timer::instance()->delta_m( startTick, endTick );
+                        remainingTime -= elapsed;
+                    }
+                    else
+                    {
+                        _visible = true;
+                    }
+
+                    numCompleted++;
+
+                    _prevEye = eye;
                 }
-                else
-                {
-                    _visible = true;
-                }
-
-                numCompleted++;
-
-                _prevEye = eye;
-                _prevWorld = _world;
             }
             else
             {
@@ -1007,10 +1067,11 @@ LODScaleGroup::traverse(osg::NodeVisitor& nv)
 ClipToGeocentricHorizon::ClipToGeocentricHorizon(const osgEarth::SpatialReference* srs,
                                                  osg::ClipPlane*                   clipPlane)
 {
-    _radii.set(
-        srs->getEllipsoid()->getRadiusEquator(),
-        srs->getEllipsoid()->getRadiusEquator(),
-        srs->getEllipsoid()->getRadiusPolar() );
+    if ( srs )
+    {
+        _horizon = new Horizon();
+        _horizon->setEllipsoid( *srs->getEllipsoid() );
+    }
 
     _clipPlane = clipPlane;
 }
@@ -1021,26 +1082,79 @@ ClipToGeocentricHorizon::operator()(osg::Node* node, osg::NodeVisitor* nv)
     osg::ref_ptr<osg::ClipPlane> clipPlane;
     if ( _clipPlane.lock(clipPlane) )
     {
-        osg::Vec3d eye = nv->getEyePoint();
+        osg::ref_ptr<Horizon> horizon = Horizon::get(*nv);
+        if ( !horizon.valid() ) 
+        {
+            horizon = new Horizon(*_horizon.get());
+            horizon->setEye( nv->getViewPoint() );
+        }
 
-        // viewer in ellipsoidal unit space:
-        osg::Vec3d unitEye( eye.x()/_radii.x(), eye.y()/_radii.y(), eye.z()/_radii.z());
+        osg::Plane horizonPlane;
+        horizon->getPlane( horizonPlane );
 
-        // calculate scaled distance from center to viewer:
-        double unitEyeLen = unitEye.length();
-
-        // calculate scaled distance from center to horizon plane:
-        double unitHorizonPlaneLen = 1.0/unitEyeLen;
-
-        // convert back to real space:
-        double eyeLen = eye.length();
-        double horizonPlaneLen = eyeLen * unitHorizonPlaneLen/unitEyeLen;
-
-        // normalize the eye vector:
-        eye /= eyeLen;
-
-        // compute a new clip plane:
-        clipPlane->setClipPlane(osg::Plane(eye, eye*horizonPlaneLen));
+        _clipPlane->setClipPlane( horizonPlane );
     }
     traverse(node, nv);
+}
+
+//......................................................................
+
+namespace
+{
+    Config dumpStateGraph(osgUtil::StateGraph* sg)
+    {
+        Config conf("StateGraph");
+
+        Config leaves("Leaves");
+        for(osgUtil::StateGraph::LeafList::const_iterator i = sg->_leaves.begin(); i != sg->_leaves.end(); ++i)
+        {
+            Config leaf("Leaf");
+            leaf.add("Name", i->get()->getDrawable()->getName());
+            leaf.add("Depth", i->get()->_depth);
+            leaves.add( leaf );
+        }
+        if ( !leaves.empty() )
+            conf.add(leaves);
+
+        Config kids("Children");
+        for(osgUtil::StateGraph::ChildList::const_iterator i = sg->_children.begin(); i != sg->_children.end(); ++i)
+        {
+            kids.add( dumpStateGraph(i->second.get()) );
+        }
+        if ( !kids.children().empty() )
+            conf.add(kids);
+
+        return conf;
+    }
+}
+
+Config
+CullDebugger::dumpRenderBin(osgUtil::RenderBin* bin) const
+{
+    Config conf("RenderBin");
+    if ( !bin->getName().empty() )
+        conf.set("Name", bin->getName());
+    conf.set("BinNum", bin->getBinNum());
+    
+    Config sg("StateGraphList");
+    sg.add("NumChildren", bin->getStateGraphList().size());
+
+    for(osgUtil::RenderBin::StateGraphList::const_iterator i = bin->getStateGraphList().begin(); i != bin->getStateGraphList().end(); ++i)
+    {
+        sg.add( dumpStateGraph(*i) );
+    }
+
+    if ( !sg.children().empty() )
+        conf.add(sg);
+
+    Config rb("_children");
+    for(osgUtil::RenderBin::RenderBinList::const_iterator i = bin->getRenderBinList().begin(); i != bin->getRenderBinList().end(); ++i)
+    {
+        osgUtil::RenderBin* childBin = i->second.get();
+        rb.add( dumpRenderBin(childBin) );
+    }
+    if ( !rb.children().empty() )
+        conf.add(rb);
+
+    return conf;
 }

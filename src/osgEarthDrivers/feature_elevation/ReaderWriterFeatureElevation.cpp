@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -48,6 +48,8 @@ using namespace std;
 using namespace osgEarth;
 using namespace osgEarth::Drivers;
 
+#include <osgEarth/Profiler>
+
 
 class FeatureElevationTileSource : public TileSource
 {
@@ -55,99 +57,68 @@ public:
     FeatureElevationTileSource( const TileSourceOptions& options ) :
       TileSource( options ),
       _options(options),
-      _maxDataLevel(30)
+      _maxDataLevel(23),
+      _offset(-0.1)
     {
+        _offset = _options.offset().getOrUse(_offset);
     }
 
     virtual ~FeatureElevationTileSource() { }
 
 
-    Status initialize( const osgDB::Options* dbOptions )
+    Status initialize(const osgDB::Options* readOptions)
     {
         Cache* cache = 0;
 
-        _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );
-
-        if ( _dbOptions.valid() )
-        {
-            // Set up a Custom caching bin for this TileSource
-            cache = Cache::get( _dbOptions.get() );
-            if ( cache )
-            {
-                Config optionsConf = _options.getConfig();
-
-                std::string binId = Stringify() << std::hex << hashString(optionsConf.toJSON());
-                _cacheBin = cache->addBin( binId );
-
-                if ( _cacheBin.valid() )
-                {
-                    _cacheBin->apply( _dbOptions.get() );
-                }
-            }
-        }
-
-
         if ( !_options.featureOptions().isSet() )
         {
-            return Status::Error( Stringify() << LC << "Illegal: feature source is required" );
+            return Status::Error(Status::ConfigurationError, "Feature source is required" );
         }
     
+        // create the driver:
         _features = FeatureSourceFactory::create( _options.featureOptions().value() );
         if ( !_features.valid() )
         {
-            return Status::Error( Stringify() << "Illegal: no valid feature source provided");
+            return Status::Error(Status::ServiceUnavailable, "Cannot find feature driver \"" + _options.featureOptions()->getDriver() + "\"");
         }
 
-        //if ( _features->getGeometryType() != osgEarth::Symbology::Geometry::TYPE_POLYGON )
-        //{
-        //    Status::Error( Stringify() << "Illegal: only polygon features are currently supported");
-        //    return false;
-        //}
-
-        _features->initialize( _dbOptions );
-
-        // populate feature list
-        osg::ref_ptr<FeatureCursor> cursor = _features->createFeatureCursor();
-        while ( cursor.valid() && cursor->hasMore() )
+        // open the feature source:
+        const Status& fstatus = _features->open(readOptions);
+        if (fstatus.isError())
         {
-            Feature* f = cursor->nextFeature();
-            if ( f && f->getGeometry() )
-                _featureList.push_back(f);
+            return fstatus;
         }
 
         if (_features->getFeatureProfile())
         {
-            if (getProfile() && !getProfile()->getSRS()->isEquivalentTo(_features->getFeatureProfile()->getSRS()))
+			if (getProfile() && !getProfile()->getSRS()->isEquivalentTo(_features->getFeatureProfile()->getSRS()))
+            {
                 OE_WARN << LC << "Specified profile does not match feature profile, ignoring specified profile." << std::endl;
+            }
 
             _extents = _features->getFeatureProfile()->getExtent();
 
-            const Profile* profile = Profile::create(
-                _extents.getSRS(),
-                _extents.bounds().xMin(),
-                _extents.bounds().yMin(),
-                _extents.bounds().xMax(),
-                _extents.bounds().yMax());
+			// If you didn't specify a profile (hint, you should have), use the feature profile.
+			if ( !getProfile() )
+			{
+                OE_WARN << LC << "No profile specified; falling back on feature profile." << std::endl;
 
-            setProfile( profile );
-        }
-        else if (getProfile())
-        {
-            _extents = getProfile()->getExtent();
-        }
-        else
-        {
-            return Status::Error( Stringify() << "Failed to establish a profile for " <<  this->getName() );
-        }
+				const Profile* profile = Profile::create(
+					_extents.getSRS(),
+					_extents.bounds().xMin(),
+					_extents.bounds().yMin(),
+					_extents.bounds().xMax(),
+					_extents.bounds().yMax());
 
-        getDataExtents().push_back( DataExtent(_extents, 0, _maxDataLevel) );
+				setProfile( profile );
+			}
+        }
 
         return STATUS_OK;
     }
 
 
-    osg::Image* createImage( const TileKey&        key,
-                             ProgressCallback*     progress)
+    osg::Image* createImage(const TileKey& key, ProgressCallback* progress)
     {
         return 0L;
     }
@@ -162,60 +133,121 @@ public:
             return NULL;
         }
 
-        int tileSize = _options.tileSize().value();
+        int tileSize = _options.tileSize().value();        
 
-        //Allocate the heightfield
-        osg::ref_ptr<osg::HeightField> hf = new osg::HeightField;
-        hf->allocate(tileSize, tileSize);
-        for (unsigned int i = 0; i < hf->getHeightList().size(); ++i) hf->getHeightList()[i] = NO_DATA_VALUE;
-
-        if (intersects(key))
+	    if (intersects(key))
         {
             //Get the extents of the tile
             double xmin, ymin, xmax, ymax;
             key.getExtent().getBounds(xmin, ymin, xmax, ymax);
 
-            // Iterate over the output heightfield and sample the data that was read into it.
-            double dx = (xmax - xmin) / (tileSize-1);
-            double dy = (ymax - ymin) / (tileSize-1);
+            const SpatialReference* featureSRS = _features->getFeatureProfile()->getSRS();
+            GeoExtent extentInFeatureSRS = key.getExtent().transform( featureSRS );
 
-            for (int c = 0; c < tileSize; ++c)
+            const SpatialReference* keySRS = key.getProfile()->getSRS();
+            
+            // populate feature list
+            // assemble a spatial query. It helps if your features have a spatial index.
+            Query query;
+            query.bounds() = extentInFeatureSRS.bounds();
+
+		    FeatureList featureList;
+            osg::ref_ptr<FeatureCursor> cursor = _features->createFeatureCursor(query);
+            while ( cursor.valid() && cursor->hasMore() )
             {
-                double geoX = xmin + (dx * (double)c);
-                for (int r = 0; r < tileSize; ++r)
-                {
-                    double geoY = ymin + (dy * (double)r);
-
-                    float h = NO_DATA_VALUE;
-
-
-                    for (FeatureList::iterator f = _featureList.begin(); f != _featureList.end(); ++f)
-                    {
-                        osgEarth::Symbology::Polygon* p = dynamic_cast<osgEarth::Symbology::Polygon*>((*f)->getGeometry());
-
-                        if (!p)
-                        {
-                            OE_WARN << LC << "NOT A POLYGON" << std::endl;
-                        }
-                        else
-                        {
-                            GeoPoint geo(key.getProfile()->getSRS(), geoX, geoY);
-                            if (!key.getProfile()->getSRS()->isEquivalentTo(getProfile()->getSRS()))
-                                geo.transform(getProfile()->getSRS());
-                            
-                            if (p->contains2D(geo.x(), geo.y()))
-                            {
-                                h = (*f)->getDouble(_options.attr().value());
-                                break;
-                            }
-                        }
-                    }
-
-                    hf->setHeight(c, r, h);
-                }
+                Feature* f = cursor->nextFeature();
+                if ( f && f->getGeometry() )
+                    featureList.push_back(f);
             }
+
+            // We now have a feature list in feature SRS.
+
+            bool transformRequired = !keySRS->isHorizEquivalentTo(featureSRS);
+		    
+			if (!featureList.empty())
+			{
+                //Only allocate the heightfield if we actually intersect any features.
+                osg::ref_ptr<osg::HeightField> hf = new osg::HeightField;
+                hf->allocate(tileSize, tileSize);
+                for (unsigned int i = 0; i < hf->getHeightList().size(); ++i) hf->getHeightList()[i] = NO_DATA_VALUE;
+
+				// Iterate over the output heightfield and sample the data that was read into it.
+				double dx = (xmax - xmin) / (tileSize-1);
+				double dy = (ymax - ymin) / (tileSize-1);
+
+				for (int c = 0; c < tileSize; ++c)
+				{
+					double geoX = xmin + (dx * (double)c);
+					for (int r = 0; r < tileSize; ++r)
+					{
+						double geoY = ymin + (dy * (double)r);
+
+						float h = NO_DATA_VALUE;
+
+						for (FeatureList::iterator f = featureList.begin(); f != featureList.end(); ++f)
+						{
+							osgEarth::Symbology::Polygon* boundary = dynamic_cast<osgEarth::Symbology::Polygon*>((*f)->getGeometry());
+
+							if (!boundary)
+							{
+								OE_WARN << LC << "NOT A POLYGON" << std::endl;
+							}
+							else
+							{
+								GeoPoint geo(keySRS, geoX, geoY, 0.0, ALTMODE_ABSOLUTE);
+
+                                if ( transformRequired )
+                                    geo = geo.transform(featureSRS);
+
+								if ( boundary->contains2D(geo.x(), geo.y()) )
+								{
+                                    h = (*f)->getDouble(_options.attr().value());
+
+                                    if ( keySRS->isGeographic() )
+                                    {                              
+                                        // for a round earth, must adjust the final elevation accounting for the
+                                        // curvature of the earth; so we have to adjust it in the feature boundary's
+                                        // local tangent plane.
+                                        Bounds bounds = boundary->getBounds();
+                                        GeoPoint anchor( featureSRS, bounds.center().x(), bounds.center().y(), h, ALTMODE_ABSOLUTE );
+                                        if ( transformRequired )
+                                            anchor = anchor.transform(keySRS);
+
+                                        // For transforming between ECEF and local tangent plane:
+                                        osg::Matrix localToWorld, worldToLocal;
+                                        anchor.createLocalToWorld(localToWorld);
+                                        worldToLocal.invert( localToWorld );
+
+                                        // Get the ECEF location of the anchor point:
+                                        osg::Vec3d ecef;
+                                        geo.toWorld( ecef );
+
+                                        // Move it into Local Tangent Plane coordinates:
+                                        osg::Vec3d local = ecef * worldToLocal;
+
+                                        // Reset the Z to zero, since the LTP is centered on the "h" elevation:
+                                        local.z() = 0.0;
+
+                                        // Back into ECEF:
+                                        ecef = local * localToWorld;
+
+                                        // And back into lat/long/alt:
+                                        geo.fromWorld( geo.getSRS(), ecef);
+
+                                        h = geo.z();
+                                    }
+									break;
+								}
+							}
+						}
+
+						hf->setHeight(c, r, h + _offset);
+					}
+				}
+                return hf.release();
+			}	
         }
-        return hf.release();
+        return 0;        
     }
 
 
@@ -230,14 +262,11 @@ private:
     GeoExtent _extents;
 
     const FeatureElevationOptions _options;
-
     osg::ref_ptr<FeatureSource> _features;
-    FeatureList _featureList;
-
-    osg::ref_ptr< CacheBin > _cacheBin;
-    osg::ref_ptr< osgDB::Options > _dbOptions;
 
     unsigned int _maxDataLevel;
+
+    double _offset;
 };
 
 
@@ -246,7 +275,7 @@ class ReaderWriterFeatureElevationTile : public TileSourceDriver
 public:
     ReaderWriterFeatureElevationTile() {}
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "Feature Elevation Tile Reader";
     }

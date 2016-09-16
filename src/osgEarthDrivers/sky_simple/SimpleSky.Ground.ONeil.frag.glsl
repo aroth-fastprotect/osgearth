@@ -1,9 +1,9 @@
 #version $GLSL_VERSION_STR
 $GLSL_DEFAULT_PRECISION_FLOAT
 
-#pragma vp_entryPoint "atmos_fragment_main"
-#pragma vp_location   "fragment_lighting"
-#pragma vp_order      "0.8"
+#pragma vp_entryPoint atmos_fragment_main
+#pragma vp_location   fragment_lighting
+#pragma vp_order      0.8
 
 uniform bool oe_mode_GL_LIGHTING; 
 uniform float atmos_exposure;   // scene exposure (ground level)
@@ -14,7 +14,7 @@ varying vec3 atmos_up;          // earth up vector at fragment (in view coords)
 varying float atmos_space;      // camera altitude (0=ground, 1=atmos outer radius)
 varying vec3 atmos_vert; 
         
-vec3 oe_global_Normal;          // surface normal (from osgEarth)
+vec3 vp_Normal;          // surface normal (from osgEarth)
 
 void atmos_fragment_main(inout vec4 color) 
 { 
@@ -26,20 +26,20 @@ void atmos_fragment_main(inout vec4 color)
     vec3 ambient = gl_LightSource[0].ambient.rgb;
     float minAmbient = ambient.r;
 
-    vec3 N = normalize(oe_global_Normal); 
+    vec3 N = normalize(vp_Normal); 
     vec3 L = normalize(atmos_lightDir); //normalize(gl_LightSource[0].position.xyz); 
     vec3 U = normalize(atmos_up); 
 
     const float maxAmbient = 0.5;
     float daytime = max(0.0, dot(U,L));
-    float brightness = clamp(daytime, minAmbient, maxAmbient);
+    float ambientLightLevel = clamp(daytime, minAmbient, maxAmbient);
 
     float NdotL = max(dot(N,L), 0.0);
 
     const float lowAlt  = 1.0;
-    const float highAlt = 4.0;
+    const float highAlt = 14.0;
     float altitudeInfluence = 1.0 - clamp( (atmos_space-lowAlt)/(highAlt-lowAlt), 0.0, 1.0);
-    float useNormals = altitudeInfluence * (1.0-brightness);
+    float useNormals = altitudeInfluence * (1.0-ambientLightLevel);
 
     // try to brighten up surfaces the sun is shining on
     float overExposure = 1.0;
@@ -50,7 +50,7 @@ void atmos_fragment_main(inout vec4 color)
 
     if (NdotL > 0.0 ) { 
         vec3 V = normalize(atmos_vert); 
-        vec3 H = normalize(L-V); 
+        vec3 H = reflect(-L, N);
         float HdotN = max(dot(H,N), 0.0); 
         float shine = clamp(gl_FrontMaterial.shininess, 1.0, 128.0); 
         sceneColor += gl_FrontLightProduct[0].specular * pow(HdotN, shine); 

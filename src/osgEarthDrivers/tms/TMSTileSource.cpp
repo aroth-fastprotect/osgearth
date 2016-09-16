@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ _forceRGB (false)
 }
 
 
-TileSource::Status
+Status
 TMSTileSource::initialize(const osgDB::Options* dbOptions)
 {
     // local copy of options we can modify if necessary.
@@ -54,13 +54,13 @@ TMSTileSource::initialize(const osgDB::Options* dbOptions)
     URI tmsURI = _options.url().value();
     if ( tmsURI.empty() )
     {
-        return Status::Error( "Fail: TMS driver requires a valid \"url\" property" );
+        return Status::Error( Status::ConfigurationError, "Fail: TMS driver requires a valid \"url\" property" );
     }
 
     // A repo is writable only if it's local.
     if ( tmsURI.isRemote() )
     {
-        OE_INFO << LC << "Repo is remote; opening in read-only mode" << std::endl;
+        OE_DEBUG << LC << "Repo is remote; opening in read-only mode" << std::endl;
     }
 
     // Is this a new repo? (You can only create a new repo at a local non-archive URI.)
@@ -75,7 +75,7 @@ TMSTileSource::initialize(const osgDB::Options* dbOptions)
         // new repo REQUIRES a profile:
         if ( !profile )
         {
-            return Status::Error("Fail: profile required to create new TMS repo");
+            return Status::Error(Status::ConfigurationError, "Fail: profile required to create new TMS repo");
         }
     }
 
@@ -87,9 +87,12 @@ TMSTileSource::initialize(const osgDB::Options* dbOptions)
             << "\" for URI \"" << tmsURI.base() << "\"" 
             << std::endl;
 
+        DataExtentList extents;
+
         _tileMap = TMS::TileMap::create( 
             _options.url()->full(),
             profile,
+            extents,
             _options.format().value(),
             _options.tileSize().value(), 
             _options.tileSize().value() );
@@ -99,7 +102,7 @@ TMSTileSource::initialize(const osgDB::Options* dbOptions)
         {
             if ( !_options.format().isSet() )
             {
-                return Status::Error("Cannot create new repo with required [format] property");
+                return Status::Error(Status::ConfigurationError, "Cannot create new repo with required [format] property");
             }
 
             TMS::TileMapReaderWriter::write( _tileMap.get(), tmsURI.full() );
@@ -114,7 +117,7 @@ TMSTileSource::initialize(const osgDB::Options* dbOptions)
 
         if (!_tileMap.valid())
         {
-            return Status::Error( Stringify() << "Failed to read tilemap from " << tmsURI.full() );
+            return Status::Error( Status::ResourceUnavailable, Stringify() << "Failed to read tilemap from " << tmsURI.full() );
         }
 
         OE_INFO << LC
@@ -157,6 +160,7 @@ TMSTileSource::initialize(const osgDB::Options* dbOptions)
             this->getDataExtents().push_back(DataExtent(profile->getExtent(), 0, _tileMap->getMaxLevel()));
         }
     }
+ 
     return STATUS_OK;
 }
 
@@ -215,6 +219,13 @@ TMSTileSource::createImage(const TileKey&    key,
                 }
             }
         }
+        
+        if (image.valid() && _options.coverage() == true)
+        {
+            image->setInternalTextureFormat(GL_LUMINANCE32F_ARB);
+            ImageUtils::markAsUnNormalized(image, true);
+        }
+
         return image.release();
     }
     return 0;

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -25,9 +25,8 @@
 #include <osgEarth/ECEF>
 #include <osgEarth/VirtualProgram>
 #include <osgEarth/DrawInstanced>
-#include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
-#include <osgEarth/Decluttering>
+#include <osgEarth/ScreenSpaceLayout>
 #include <osgEarth/CullingUtils>
 
 #include <osg/AutoTransform>
@@ -38,18 +37,6 @@
 #include <osg/ShapeDrawable>
 #include <osg/AlphaFunc>
 #include <osg/Billboard>
-
-#include <osgSim/LightPointNode>
-
-#include <osgDB/FileNameUtils>
-#include <osgDB/Registry>
-#include <osgDB/WriteFile>
-
-#include <osgUtil/Optimizer>
-#include <osgUtil/MeshOptimizers>
-
-#include <list>
-#include <deque>
 
 #define LC "[SubstituteModelFilter] "
 
@@ -149,15 +136,24 @@ SubstituteModelFilter::process(const FeatureList&           features,
     // keep track of failed URIs so we don't waste time or warning messages on them
     std::set< URI > missing;
 
-    StringExpression  uriEx   = *symbol->url();
-    NumericExpression scaleEx = *symbol->scale();
+    StringExpression  uriEx    = *symbol->url();
+    NumericExpression scaleEx  = *symbol->scale();
 
     const ModelSymbol* modelSymbol = dynamic_cast<const ModelSymbol*>(symbol);
     const IconSymbol*  iconSymbol  = dynamic_cast<const IconSymbol*> (symbol);
 
-    NumericExpression headingEx;
+    NumericExpression headingEx;    
+    NumericExpression scaleXEx;
+    NumericExpression scaleYEx;
+    NumericExpression scaleZEx;
+
     if ( modelSymbol )
+    {
         headingEx = *modelSymbol->heading();
+        scaleXEx  = *modelSymbol->scaleX();
+        scaleYEx  = *modelSymbol->scaleY();
+        scaleZEx  = *modelSymbol->scaleZ();
+    }
 
     for( FeatureList::const_iterator f = features.begin(); f != features.end(); ++f )
     {
@@ -185,16 +181,34 @@ SubstituteModelFilter::process(const FeatureList&           features,
 
         // evalute the scale expression (if there is one)
         float scale = 1.0f;
+        osg::Vec3d scaleVec(1.0, 1.0, 1.0);
         osg::Matrixd scaleMatrix;
         if ( symbol->scale().isSet() )
         {
             scale = input->eval( scaleEx, &context );
-            if ( scale == 0.0 )
-                scale = 1.0;
-            if ( scale != 1.0 )
-                _normalScalingRequired = true;
-            scaleMatrix = osg::Matrix::scale( scale, scale, scale );
+            scaleVec.set(scale, scale, scale);
         }
+        if ( modelSymbol )
+        {
+            if ( modelSymbol->scaleX().isSet() )
+            {
+                scaleVec.x() *= input->eval( scaleXEx, &context );
+            }
+            if ( modelSymbol->scaleY().isSet() )
+            {
+                scaleVec.y() *= input->eval( scaleYEx, &context );
+            }
+            if ( modelSymbol->scaleZ().isSet() )
+            {
+                scaleVec.z() *= input->eval( scaleZEx, &context );
+            }
+        }
+
+        if ( scaleVec.x() == 0.0 ) scaleVec.x() = 1.0;
+        if ( scaleVec.y() == 0.0 ) scaleVec.y() = 1.0;
+        if ( scaleVec.z() == 0.0 ) scaleVec.z() = 1.0;
+
+        scaleMatrix = osg::Matrix::scale( scaleVec );
         
         osg::Matrixd rotationMatrix;
         if ( modelSymbol && modelSymbol->heading().isSet() )
@@ -204,7 +218,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
         }
 
 		// how that we have a marker source, create a node for it
-		std::pair<URI,float> key( instanceURI, iconSymbol? scale : 1.0f );//use 1.0 for models, since we don't want unique models based on scaling
+		std::pair<URI,float> key( instanceURI, iconSymbol? scale : 1.0f ); //use 1.0 for models, since we don't want unique models based on scaling
 
         // cache nodes per instance.
         osg::ref_ptr<osg::Node>& model = uniqueModels[key];
@@ -212,14 +226,14 @@ SubstituteModelFilter::process(const FeatureList&           features,
         {
             // Always clone the cached instance so we're not processing data that's
             // already in the scene graph. -gw
-            context.resourceCache()->cloneOrCreateInstanceNode(instance.get(), model);
+            context.resourceCache()->cloneOrCreateInstanceNode(instance.get(), model, context.getDBOptions());
 
             // if icon decluttering is off, install an AutoTransform.
             if ( iconSymbol )
             {
                 if ( iconSymbol->declutter() == true )
                 {
-                    Decluttering::setEnabled( model->getOrCreateStateSet(), true );
+                    ScreenSpaceLayout::activate(model->getOrCreateStateSet());
                 }
                 else if ( dynamic_cast<osg::AutoTransform*>(model.get()) == 0L )
                 {
@@ -250,15 +264,35 @@ SubstituteModelFilter::process(const FeatureList&           features,
                     osg::Matrixd mat;
 
                     // need to recalcluate expression-based data per-point, not just per-feature!
+                    float scale = 1.0f;
+                    osg::Vec3d scaleVec(1.0, 1.0, 1.0);
+                    osg::Matrixd scaleMatrix;
                     if ( symbol->scale().isSet() )
                     {
-                        scale = input->eval(scaleEx, &context);
-                        if ( scale == 0.0 )
-                            scale = 1.0;
-                        if ( scale != 1.0 )
-                            _normalScalingRequired = true;
-                        scaleMatrix = osg::Matrix::scale( scale, scale, scale );
+                        scale = input->eval( scaleEx, &context );
+                        scaleVec.set(scale, scale, scale);
                     }
+                    if ( modelSymbol )
+                    {
+                        if ( modelSymbol->scaleX().isSet() )
+                        {
+                            scaleVec.x() *= input->eval( scaleXEx, &context );
+                        }
+                        if ( modelSymbol->scaleY().isSet() )
+                        {
+                            scaleVec.y() *= input->eval( scaleYEx, &context );
+                        }
+                        if ( modelSymbol->scaleZ().isSet() )
+                        {
+                            scaleVec.z() *= input->eval( scaleZEx, &context );
+                        }
+                    }
+
+                    if ( scaleVec.x() == 0.0 ) scaleVec.x() = 1.0;
+                    if ( scaleVec.y() == 0.0 ) scaleVec.y() = 1.0;
+                    if ( scaleVec.z() == 0.0 ) scaleVec.z() = 1.0;
+
+                    scaleMatrix = osg::Matrix::scale( scaleVec );
 
                     if ( modelSymbol->heading().isSet() )
                     {
@@ -274,7 +308,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
                         // but if the tile is big enough the up vectors won't be quite right.
                         osg::Matrixd rotation;
                         ECEF::transformAndGetRotationMatrix( point, context.profile()->getSRS(), point, targetSRS, rotation );
-                        mat = rotationMatrix * rotation * scaleMatrix * osg::Matrixd::translate( point ) * _world2local;
+                        mat = rotationMatrix * scaleMatrix * rotation * osg::Matrixd::translate( point ) * _world2local;
                     }
                     else
                     {
@@ -310,7 +344,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
         // activate decluttering for icons if requested
         if ( iconSymbol->declutter() == true )
         {
-            Decluttering::setEnabled( attachPoint->getOrCreateStateSet(), true );
+            ScreenSpaceLayout::activate(attachPoint->getOrCreateStateSet());
         }
 
         // activate horizon culling if we are in geocentric space
@@ -322,7 +356,7 @@ SubstituteModelFilter::process(const FeatureList&           features,
     }
 
     // active DrawInstanced if required:
-    if ( _useDrawInstanced && Registry::capabilities().supportsDrawInstanced() )
+    if ( _useDrawInstanced )
     {
         DrawInstanced::convertGraphToUseDrawInstanced( attachPoint );
 
@@ -417,7 +451,7 @@ SubstituteModelFilter::push(FeatureList& features, FilterContext& context)
 
     const StyleSheet* sheet = context.getSession() ? context.getSession()->styles() : 0L;
 
-    if ( symbol->library().isSet() )
+    if ( sheet && symbol->library().isSet() )
     {
         _resourceLib = sheet->getResourceLibrary( symbol->library()->expr() );
 

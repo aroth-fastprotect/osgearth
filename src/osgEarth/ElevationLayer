@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -145,8 +145,6 @@ namespace osgEarth
             const TileKey&     key,
             ProgressCallback*  progress );
         
-        virtual std::string suggestCacheFormat() const;
-
     private:
         ElevationLayerOptions _runtimeOptions;
 
@@ -186,16 +184,6 @@ namespace osgEarth
 
         /** Copy ctor */
         ElevationLayerVector(const ElevationLayerVector& rhs);
-
-        /**
-         * Sets a tile size that createHeightField will always return.
-         * By default, it will return a heightfield whose tile size matches
-         * that of the largest tile size found in the source data layers.
-         */
-        void setExpressTileSize( unsigned tileSize );
-
-    private:
-        optional<unsigned> _expressTileSize;        
     };
 
 } // namespace osgEarth

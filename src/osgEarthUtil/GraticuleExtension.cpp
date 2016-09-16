@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -21,12 +21,15 @@
 #include "GraticuleNode"
 
 #include <osgEarth/MapNode>
+#include <osgEarth/TerrainEngineNode>
 #include <osgDB/FileNameUtils>
 
 using namespace osgEarth;
 using namespace osgEarth::Util;
 
 #define LC "[GraticuleExtension] "
+
+REGISTER_OSGEARTH_EXTENSION( osgearth_graticule, GraticuleExtension );
 
 
 GraticuleExtension::GraticuleExtension()
@@ -35,7 +38,7 @@ GraticuleExtension::GraticuleExtension()
 }
 
 GraticuleExtension::GraticuleExtension(const GraticuleOptions& options) :
-_options( options )
+GraticuleOptions( options )
 {
     //nop
 }
@@ -60,7 +63,7 @@ GraticuleExtension::connect(MapNode* mapNode)
         return false;
     }
 
-   _node = new GraticuleNode(mapNode, _options);
+   _node = new GraticuleNode(mapNode, *this);
     mapNode->addChild(_node.get());
     
     OE_INFO << LC << "Installed!\n";
@@ -78,32 +81,3 @@ GraticuleExtension::disconnect(MapNode* mapNode)
     _node = 0L;
     return true;
 }
-
-
-
-// Register the GraticuleExtension as a plugin
-class GraticulePlugin : public osgDB::ReaderWriter
-{
-public: // Plugin stuff
-
-    GraticulePlugin() {
-        supportsExtension( "osgearth_graticule", "osgEarth Graticule Extension" );
-    }
-
-    const char* className() {
-        return "osgEarth Graticule Extension";
-    }
-
-    virtual ~GraticulePlugin() { }
-
-    ReadResult readObject(const std::string& filename, const osgDB::Options* dbOptions) const
-    {
-        if ( !acceptsExtension(osgDB::getLowerCaseFileExtension(filename)) )
-            return ReadResult::FILE_NOT_HANDLED;
-
-        return ReadResult( new GraticuleExtension(Extension::getConfigOptions(dbOptions)) );
-    }
-};
-
-REGISTER_OSGPLUGIN(osgearth_graticule, GraticulePlugin)
-

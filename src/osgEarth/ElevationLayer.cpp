@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -157,13 +157,7 @@ _runtimeOptions( options )
 void
 ElevationLayer::init()
 {
-    //nop
-}
-
-std::string
-ElevationLayer::suggestCacheFormat() const
-{
-    return "tif";
+    TerrainLayer::init();
 }
 
 void
@@ -376,8 +370,10 @@ GeoHeightField
 ElevationLayer::createHeightField(const TileKey&    key,
                                   ProgressCallback* progress )
 {
-    GeoHeightField result;
-    osg::ref_ptr<osg::HeightField> hf;
+    if (getStatus().isError())
+    {
+        return GeoHeightField::INVALID;
+    }
 
     // If the layer is disabled, bail out.
     if ( getEnabled() == false )
@@ -385,12 +381,20 @@ ElevationLayer::createHeightField(const TileKey&    key,
         return GeoHeightField::INVALID;
     }
 
+    GeoHeightField result;
+    osg::ref_ptr<osg::HeightField> hf;
+
     // Check the memory cache first
     bool fromMemCache = false;
+
+    // cache key combines the key with the full signature (incl vdatum)
+    std::string cacheKey = Stringify() << key.str() << "_" << key.getProfile()->getFullSignature();
+    const CachePolicy& policy = getCacheSettings()->cachePolicy().get();
+
     if ( _memCache.valid() )
     {
-        CacheBin* bin = _memCache->getOrCreateBin( key.getProfile()->getFullSignature() );        
-        ReadResult cacheResult = bin->readObject(key.str() );
+        CacheBin* bin = _memCache->getOrCreateDefaultBin();
+        ReadResult cacheResult = bin->readObject(cacheKey, 0L);
         if ( cacheResult.succeeded() )
         {
             result = GeoHeightField(
@@ -399,7 +403,6 @@ ElevationLayer::createHeightField(const TileKey&    key,
 
             fromMemCache = true;
         }
-        //_memCache->dumpStats(key.getProfile()->getFullSignature());
     }
 
     if ( !result.valid() )
@@ -408,18 +411,16 @@ ElevationLayer::createHeightField(const TileKey&    key,
         CacheBin* cacheBin = getCacheBin( key.getProfile() );
 
         // validate that we have either a valid tile source, or we're cache-only.
-        if ( ! (getTileSource() || (isCacheOnly() && cacheBin) ) )
+        if ( ! (getTileSource() || (policy.isCacheOnly() && cacheBin) ) )
         {
-            OE_WARN << LC << "Error: layer does not have a valid TileSource, cannot create heightfield" << std::endl;
-            _runtimeOptions.enabled() = false;
+            disable("Error: layer does not have a valid TileSource, cannot create heightfield");
             return GeoHeightField::INVALID;
         }
 
         // validate the existance of a valid layer profile.
-        if ( !isCacheOnly() && !getProfile() )
+        if ( !policy.isCacheOnly() && !getProfile() )
         {
-            OE_WARN << LC << "Could not establish a valid profile" << std::endl;
-            _runtimeOptions.enabled() = false;
+            disable("Could not establish a valid profile");
             return GeoHeightField::INVALID;
         }
 
@@ -429,12 +430,12 @@ ElevationLayer::createHeightField(const TileKey&    key,
 
         osg::ref_ptr< osg::HeightField > cachedHF;
 
-        if ( cacheBin && getCachePolicy().isCacheReadable() )
+        if ( cacheBin && policy.isCacheReadable() )
         {
-            ReadResult r = cacheBin->readObject( key.str() );
+            ReadResult r = cacheBin->readObject(cacheKey, 0L);
             if ( r.succeeded() )
             {            
-                bool expired = getCachePolicy().isExpired(r.lastModifiedTime());
+                bool expired = policy.isExpired(r.lastModifiedTime());
                 cachedHF = r.get<osg::HeightField>();
                 if ( cachedHF && validateHeightField(cachedHF) )
                 {
@@ -448,7 +449,7 @@ ElevationLayer::createHeightField(const TileKey&    key,
         }
 
         // if we're cache-only, but didn't get data from the cache, fail silently.
-        if ( !hf.valid() && isCacheOnly() )
+        if ( !hf.valid() && policy.isCacheOnly() )
         {
             return GeoHeightField::INVALID;
         }
@@ -476,9 +477,9 @@ ElevationLayer::createHeightField(const TileKey&    key,
             if ( hf            && 
                  cacheBin      && 
                  !fromCache    &&
-                 getCachePolicy().isCacheWriteable() )
+                 policy.isCacheWriteable() )
             {
-                cacheBin->write( key.str(), hf );
+                cacheBin->write(cacheKey, hf, 0L);
             }
 
             // We have an expired heightfield from the cache and no new data from the TileSource.  So just return the cached data.
@@ -513,8 +514,8 @@ ElevationLayer::createHeightField(const TileKey&    key,
     // write to mem cache if needed:
     if ( result.valid() && !fromMemCache && _memCache.valid() )
     {
-        CacheBin* bin = _memCache->getOrCreateBin( key.getProfile()->getFullSignature() ); 
-        bin->write(key.str(), result.getHeightField());
+        CacheBin* bin = _memCache->getOrCreateDefaultBin();
+        bin->write(cacheKey, result.getHeightField(), 0L);
     }
 
     // post-processing:
@@ -560,18 +561,12 @@ ElevationLayerVector::ElevationLayerVector()
 
 
 ElevationLayerVector::ElevationLayerVector(const ElevationLayerVector& rhs) :
-osg::MixinVector< osg::ref_ptr<ElevationLayer> >( rhs ),
-_expressTileSize( rhs._expressTileSize )
+osg::MixinVector< osg::ref_ptr<ElevationLayer> >( rhs )
 {
     //nop
 }
 
 
-void
-ElevationLayerVector::setExpressTileSize(unsigned tileSize)
-{
-    _expressTileSize = tileSize;
-}
 
 namespace
 {

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -70,7 +70,7 @@ ImageLayerOptions::setDefaults()
     _magFilter.init( osg::Texture::LINEAR );
     _texcomp.init( osg::Texture::USE_IMAGE_DATA_FORMAT ); // none
     _shared.init( false );
-    _coverage.init( false );
+    _coverage.init( false );    
 }
 
 void
@@ -300,6 +300,8 @@ _runtimeOptions( options )
 void
 ImageLayer::init()
 {
+    TerrainLayer::init();
+
     // Set the tile size to 256 if it's not explicitly set.
     if (!_runtimeOptions.driver()->tileSize().isSet())
     {
@@ -307,13 +309,16 @@ ImageLayer::init()
     }
 
     _emptyImage = ImageUtils::createEmptyImage();
-    //*((unsigned*)_emptyImage->data()) = 0x7F0000FF;
 
     if ( _runtimeOptions.shareTexUniformName().isSet() )
         _shareTexUniformName = _runtimeOptions.shareTexUniformName().get();
+    else
+        _shareTexUniformName.init( Stringify() << "layer_" << getUID() << "_tex" );
 
     if ( _runtimeOptions.shareTexMatUniformName().isSet() )
         _shareTexMatUniformName = _runtimeOptions.shareTexMatUniformName().get();
+    else
+        _shareTexMatUniformName.init( Stringify()  << "layer_" << getUID() << "_texMatrix" );
 }
 
 void
@@ -419,7 +424,7 @@ ImageLayer::getOrCreatePreCacheOp()
                 _targetProfileHint->isEquivalentTo( getProfile() );
 
             ImageLayerPreCacheOperation* op = new ImageLayerPreCacheOperation();
-            op->_processor.init( _runtimeOptions, _dbOptions.get(), layerInTargetProfile );
+            op->_processor.init( _runtimeOptions, _readOptions.get(), layerInTargetProfile );
 
             _preCacheOp = op;
         }
@@ -428,20 +433,25 @@ ImageLayer::getOrCreatePreCacheOp()
 }
 
 
-CacheBin*
-ImageLayer::getCacheBin( const Profile* profile)
-{
-    // specialize ImageLayer to only consider the horizontal signature (ignore vertical
-    // datum component for images)
-    std::string binId = *_runtimeOptions.cacheId() + "_" + profile->getHorizSignature();
-    return TerrainLayer::getCacheBin( profile, binId );
-}
+//CacheBin*
+//ImageLayer::getCacheBin( const Profile* profile)
+//{
+//    // specialize ImageLayer to only consider the horizontal signature (ignore vertical
+//    // datum component for images)
+//    std::string binId = *_runtimeOptions.cacheId() + "_" + profile->getHorizSignature();
+//    return TerrainLayer::getCacheBin( profile, binId );
+//}
 
 
 GeoImage
 ImageLayer::createImage(const TileKey&    key,
                         ProgressCallback* progress)
 {
+    if (getStatus().isError())
+    {
+        return GeoImage::INVALID;
+    }
+
     return createImageInKeyProfile( key, progress );
 }
 
@@ -450,7 +460,10 @@ GeoImage
 ImageLayer::createImageInNativeProfile(const TileKey&    key,
                                        ProgressCallback* progress)
 {
-    GeoImage result;
+    if (getStatus().isError())
+    {
+        return GeoImage::INVALID;
+    }
 
     const Profile* nativeProfile = getProfile();
     if ( !nativeProfile )
@@ -458,6 +471,9 @@ ImageLayer::createImageInNativeProfile(const TileKey&    key,
         OE_WARN << LC << "Could not establish the profile" << std::endl;
         return GeoImage::INVALID;
     }
+    
+
+    GeoImage result;
 
     if ( key.getProfile()->isHorizEquivalentTo(nativeProfile) )
     {
@@ -513,7 +529,10 @@ GeoImage
 ImageLayer::createImageInKeyProfile(const TileKey&    key, 
                                     ProgressCallback* progress)
 {
-    GeoImage result;
+    if (getStatus().isError())
+    {
+        return GeoImage::INVALID;
+    }
 
     // If the layer is disabled, bail out.
     if ( !getEnabled() )
@@ -527,51 +546,59 @@ ImageLayer::createImageInKeyProfile(const TileKey&    key,
         return GeoImage::INVALID;
     }
 
+
+    GeoImage result;
+
     OE_DEBUG << LC << "create image for \"" << key.str() << "\", ext= "
         << key.getExtent().toString() << std::endl;
+
+    // the cache key combines the Key and the horizontal profile.
+    std::string cacheKey = Stringify() << key.str() << "_" << key.getProfile()->getHorizSignature();
+    const CachePolicy& policy = getCacheSettings()->cachePolicy().get();
     
     // Check the layer L2 cache first
     if ( _memCache.valid() )
     {
-        CacheBin* bin = _memCache->getOrCreateBin( key.getProfile()->getFullSignature() );        
-        ReadResult result = bin->readObject(key.str() );
+        CacheBin* bin = _memCache->getOrCreateDefaultBin();
+        ReadResult result = bin->readObject(cacheKey, 0L);
         if ( result.succeeded() )
             return GeoImage(static_cast<osg::Image*>(result.releaseObject()), key.getExtent());
-        //_memCache->dumpStats(key.getProfile()->getFullSignature());
     }
 
     // locate the cache bin for the target profile for this layer:
     CacheBin* cacheBin = getCacheBin( key.getProfile() );
 
     // validate that we have either a valid tile source, or we're cache-only.
-    if ( ! (getTileSource() || (isCacheOnly() && cacheBin) ) )
+    if (getTileSource() || (cacheBin && policy.isCacheOnly()))
     {
-        OE_WARN << LC << "Error: layer does not have a valid TileSource, cannot create image " << std::endl;
-        _runtimeOptions.enabled() = false;
+        //nop = OK.
+    }
+    else
+    {
+        disable("Error: layer does not have a valid TileSource, cannot create image");
         return GeoImage::INVALID;
     }
 
     // validate the existance of a valid layer profile (unless we're in cache-only mode, in which
     // case there is no layer profile)
-    if ( !isCacheOnly() && !getProfile() )
+    if ( !policy.isCacheOnly() && !getProfile() )
     {
-        OE_WARN << LC << "Could not establish a valid profile" << std::endl;
-        _runtimeOptions.enabled() = false;
+        disable("Could not establish a valid profile");
         return GeoImage::INVALID;
     }
 
-    osg::ref_ptr< osg::Image > cachedImage;        
+    osg::ref_ptr< osg::Image > cachedImage;
 
     // First, attempt to read from the cache. Since the cached data is stored in the
     // map profile, we can try this first.
-    if ( cacheBin && getCachePolicy().isCacheReadable() )
+    if ( cacheBin && policy.isCacheReadable() )
     {
-        ReadResult r = cacheBin->readImage( key.str() );
+        ReadResult r = cacheBin->readImage(cacheKey, 0L);
         if ( r.succeeded() )
         {
             cachedImage = r.releaseImage();
             ImageUtils::fixInternalFormat( cachedImage.get() );            
-            bool expired = getCachePolicy().isExpired(r.lastModifiedTime());
+            bool expired = policy.isExpired(r.lastModifiedTime());
             if (!expired)
             {
                 OE_DEBUG << "Got cached image for " << key.str() << std::endl;                
@@ -585,7 +612,7 @@ ImageLayer::createImageInKeyProfile(const TileKey&    key,
     }
     
     // The data was not in the cache. If we are cache-only, fail sliently
-    if ( isCacheOnly() )
+    if ( policy.isCacheOnly() )
     {
         // If it's cache only and we have an expired but cached image, just return it.
         if (cachedImage.valid())
@@ -610,22 +637,22 @@ ImageLayer::createImageInKeyProfile(const TileKey&    key,
     // memory cache first:
     if ( result.valid() && _memCache.valid() )
     {
-        CacheBin* bin = _memCache->getOrCreateBin( key.getProfile()->getFullSignature() ); 
-        bin->write(key.str(), result.getImage());
+        CacheBin* bin = _memCache->getOrCreateDefaultBin();
+        bin->write(cacheKey, result.getImage(), 0L);
     }
 
     // If we got a result, the cache is valid and we are caching in the map profile,
     // write to the map cache.
     if (result.valid()  &&
         cacheBin        && 
-        getCachePolicy().isCacheWriteable() )
+        policy.isCacheWriteable())
     {
         if ( key.getExtent() != result.getExtent() )
         {
             OE_INFO << LC << "WARNING! mismatched extents." << std::endl;
         }
 
-        cacheBin->write( key.str(), result.getImage() );
+        cacheBin->write(cacheKey, result.getImage(), 0L);
     }
 
     if ( result.valid() )
@@ -832,7 +859,7 @@ ImageLayer::assembleImageFromTileSource(const TileKey&    key,
             {
                 // a tile completely failed, even with fallback. Eject.
                 OE_DEBUG << LC << "Couldn't fallback on tiles for ImageMosaic" << std::endl;
-                return GeoImage::INVALID;
+                // let it go. The empty areas will be filled with alpha by ImageMosaic.
             }
         }
 

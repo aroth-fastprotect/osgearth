@@ -68,7 +68,7 @@ _forceRGB ( false )
     //nop
 }
 
-TileSource::Status
+Status
 MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
 {    
     _dbOptions = Registry::instance()->cloneOrCreateOptions( dbOptions );    
@@ -82,7 +82,7 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
     {
         // For a NEW database, the profile MUST be set prior to initialization.
         if ( getProfile() == 0L )
-            return Status::Error("Cannot create database; required Profile is missing");
+            return Status::Error(Status::ConfigurationError, "Cannot create database; required Profile is missing");
 
         // For a NEW database the format is required.
         if ( _options.format().isSet() )
@@ -90,11 +90,11 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
             _tileFormat = _options.format().value();
             _rw = getReaderWriter( _tileFormat );
             if ( !_rw.valid() )
-                return Status::Error("No plugin to load format \"" + _tileFormat + "\"");
+                return Status::Error(Status::ServiceUnavailable, "No plugin to load format \"" + _tileFormat + "\"");
         }
         else
         {
-            return Status::Error("Cannot create database; required format is missing");
+            return Status::Error(Status::ConfigurationError, "Cannot create database; required format is missing");
         }
 
         OE_INFO << LC << "Database does not exist; attempting to create it." << std::endl;
@@ -109,7 +109,7 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
     int rc = sqlite3_open_v2( fullFilename.c_str(), &_database, flags, 0L );
     if ( rc != 0 )
     {                        
-        return Status::Error( Stringify()
+        return Status::Error( Status::ResourceUnavailable, Stringify()
             << "Database \"" << fullFilename << "\": " << sqlite3_errmsg(_database) );
     }
     
@@ -136,11 +136,33 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
                 OE_INFO << LC << "Data will be compressed (zlib)" << std::endl;
             }
         }
+
+        // If we have some data extents at this point, write the bounds to the metadata.
+        if (getDataExtents().size() > 0)
+        {
+            // Get the union of all the extents
+            GeoExtent e(getDataExtents()[0]);
+            for (unsigned int i = 1; i < getDataExtents().size(); i++)
+            {
+                e.expandToInclude(getDataExtents()[i]);
+            }
+
+            // Convert the bounds to wgs84
+            GeoExtent bounds = e.transform(osgEarth::SpatialReference::get("wgs84"));
+            std::stringstream boundsStr;
+            boundsStr << bounds.xMin() << "," << bounds.yMin() << "," << bounds.xMax() << "," << bounds.yMax();
+            putMetaData("bounds", boundsStr.str());
+        }
     }
 
     // If the database pre-existed, read in the information from the metadata.
     else // !isNewDatabase
     {
+        if ( _options.computeLevels() == true )
+        {
+            computeLevels();
+        }
+
         std::string profileStr;
         getMetaData( "profile", profileStr );
 
@@ -162,11 +184,11 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
 
         // By this point, we require a valid tile format.
         if ( _tileFormat.empty() )
-            return Status::Error("Required format not in metadata, nor specified in the options.");
+            return Status::Error(Status::ConfigurationError, "Required format not in metadata, nor specified in the options.");
 
         _rw = getReaderWriter( _tileFormat );
         if ( !_rw.valid() )
-            return Status::Error("No plugin to load format \"" + _tileFormat + "\"");
+            return Status::Error(Status::ServiceUnavailable, "No plugin to load format \"" + _tileFormat + "\"");
 
         // check for compression.
         std::string compression;
@@ -175,32 +197,10 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
         {
             _compressor = osgDB::Registry::instance()->getObjectWrapperManager()->findCompressor(compression);
             if ( !_compressor.valid() )
-                return Status::Error("Cannot find compressor \"" + compression + "\"");
+                return Status::Error(Status::ServiceUnavailable, "Cannot find compressor \"" + compression + "\"");
             else
                 OE_INFO << LC << "Data is compressed (" << compression << ")" << std::endl;
-        }
-
-        // Check for bounds and populate DataExtents.
-        std::string boundsStr;
-        if ( getMetaData("bounds", boundsStr) )
-        {
-            std::vector<std::string> tokens;
-            StringTokenizer(",").tokenize(boundsStr, tokens);
-            if (tokens.size() == 4)
-            {
-                GeoExtent extent(
-                    osgEarth::SpatialReference::get("wgs84"),
-                    osgEarth::as<double>(tokens[0], 0.0),
-                    osgEarth::as<double>(tokens[3], 0.0), // south
-                    osgEarth::as<double>(tokens[2], 0.0), // east
-                    osgEarth::as<double>(tokens[1], 0.0)  // north
-                    );
-
-                this->getDataExtents().push_back(DataExtent(extent));
-
-                OE_INFO << LC << "Bounds = " << extent.toString() << std::endl;
-            }
-        }
+        }        
 
         // Set the profile
         const Profile* profile = getProfile();
@@ -224,7 +224,8 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
                     return Status::Error( Stringify() << "Profile not recognized: " << profileStr );
                 }
             }
-            else
+            
+            if (!profile)
             {
                 // Spherical mercator is the MBTiles default.
                 profile = osgEarth::Registry::instance()->getSphericalMercatorProfile();
@@ -234,10 +235,32 @@ MBTilesTileSource::initialize(const osgDB::Options* dbOptions)
             OE_INFO << LC << "Profile = " << profileStr << std::endl;
         }
 
-        if ( _options.computeLevels() == true )
+        // Check for bounds and populate DataExtents.
+        std::string boundsStr;
+        if ( getMetaData("bounds", boundsStr) )
         {
-            computeLevels();
+            std::vector<std::string> tokens;
+            StringTokenizer(",").tokenize(boundsStr, tokens);
+            if (tokens.size() == 4)
+            {
+                GeoExtent extent(
+                    osgEarth::SpatialReference::get("wgs84"),
+                    osgEarth::as<double>(tokens[0], 0.0),
+                    osgEarth::as<double>(tokens[1], 0.0), // south
+                    osgEarth::as<double>(tokens[2], 0.0), // east
+                    osgEarth::as<double>(tokens[3], 0.0)  // north
+                    );
+
+                this->getDataExtents().push_back(DataExtent(extent, _minLevel, _maxLevel));
+
+                OE_INFO << LC << "Bounds = " << extent.toString() << std::endl;
+            }
         }
+        else
+        {
+            this->getDataExtents().push_back(DataExtent(getProfile()->getExtent(), _minLevel, _maxLevel));
+        }
+
     }
 
     // do we require RGB? for jpeg?
@@ -337,7 +360,7 @@ MBTilesTileSource::createImage(const TileKey&    key,
         if ( valid )
         {
             std::istringstream inputStream(dataBuffer);
-            osgDB::ReaderWriter::ReadResult rr = _rw->readImage( inputStream );
+            osgDB::ReaderWriter::ReadResult rr = _rw->readImage( inputStream, _dbOptions.get() );
             if (rr.validImage())
             {
                 result = rr.takeImage();                
@@ -370,11 +393,11 @@ MBTilesTileSource::storeImage(const TileKey&    key,
     if ( _forceRGB && ImageUtils::hasAlphaChannel(image) )
     {
         osg::ref_ptr<osg::Image> rgb = ImageUtils::convertToRGB8(image);
-        wr = _rw->writeImage(*(rgb.get()), buf);
+        wr = _rw->writeImage(*(rgb.get()), buf, _dbOptions.get());
     }
     else
     {
-        wr = _rw->writeImage(*image, buf);
+        wr = _rw->writeImage(*image, buf, _dbOptions.get());
     }
 
     if ( wr.error() )
@@ -413,7 +436,7 @@ MBTilesTileSource::storeImage(const TileKey&    key,
     if ( rc != SQLITE_OK )
     {
         OE_WARN << LC << "Failed to prepare SQL: " << query << "; " << sqlite3_errmsg(_database) << std::endl;
-        return NULL;
+        return false;
     }
 
     // bind parameters:

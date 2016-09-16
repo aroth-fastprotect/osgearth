@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -44,6 +44,8 @@ int usage(char** argv)
         << "\n    --profile [profile def]             : set an output profile (optional; default = same as input)"
         << "\n    --min-level [int]                   : minimum level of detail"
         << "\n    --max-level [int]                   : maximum level of detail"
+        << "\n    --osg-options [OSG options string]  : options to pass to OSG readers/writers"
+        << "\n    --extents [minLat] [minLong] [maxLat] [maxLong] : Lat/Long extends to copy"
         << std::endl;
         
     return 0;
@@ -103,8 +105,9 @@ struct ImageLayerToTileSource : public TileHandler
     {
         bool ok = false;
         GeoImage image = _source->createImage(key);
-        if ( image.valid() )
-            ok = _dest->storeImage(key, image.getImage(), 0L);
+        if (image.valid())
+            ok = _dest->storeImage(key, image.getImage(), 0L);        
+
         return ok;
     }
     
@@ -192,6 +195,7 @@ struct ProgressReporter : public osgEarth::ProgressCallback
  *      --in driver gdal
  *      --in url world.tif
  *      --out driver mbtiles
+ *      --out format image/png
  *      --out filename world.db
  *
  * The "in" properties come from the GDALOptions getConfig method. The
@@ -206,6 +210,10 @@ struct ProgressReporter : public osgEarth::ProgressCallback
  *      --threads [n]         : threads to use (may crash. Careful.)
  *
  *      --extents [minLat] [minLong] [maxLat] [maxLong] : Lat/Long extends to copy (*)
+ *
+ * OSG arguments:
+ *
+ *      -O <string>           : OSG Options string (plugin options)
  *
  * Of course, the output driver must support writing (by implementing
  * the ReadWriteTileSource interface).
@@ -226,6 +234,15 @@ main(int argc, char** argv)
     while( args.read("--in", key, value) )
         inConf.set(key, value);
 
+    osg::ref_ptr<osgDB::Options> dbo = new osgDB::Options();
+    
+    // plugin options, if the user passed them in:
+    std::string str;
+    while(args.read("--osg-options", str) || args.read("-O", str))
+    {
+        dbo->setOptionString( str );
+    }
+
     TileSourceOptions inOptions(inConf);
     osg::ref_ptr<TileSource> input = TileSourceFactory::create(inOptions);
     if ( !input.valid() )
@@ -234,7 +251,7 @@ main(int argc, char** argv)
         return -1;
     }
 
-    TileSource::Status inputStatus = input->open();
+    Status inputStatus = input->open( input->MODE_READ, dbo.get() );
     if ( inputStatus.isError() )
     {
         OE_WARN << LC << "Error initializing input" << std::endl;
@@ -282,7 +299,10 @@ main(int argc, char** argv)
         return -1;
     }
 
-    TileSource::Status outputStatus = output->open(TileSource::MODE_WRITE | TileSource::MODE_CREATE);
+    Status outputStatus = output->open(
+        TileSource::MODE_WRITE | TileSource::MODE_CREATE,
+        dbo.get() );
+
     if ( outputStatus.isError() )
     {
         OE_WARN << LC << "Error initializing output" << std::endl;
@@ -326,6 +346,12 @@ main(int argc, char** argv)
         if (heightFields)
         {
             ElevationLayer* layer = new ElevationLayer(ElevationLayerOptions(), input.get());
+            Status layerStatus = layer->open();
+            if (layerStatus.isError())
+            {
+                OE_WARN << "Failed to create input ElevationLayer " << layerStatus.message() << std::endl;
+                return -1;
+            }
             if ( !layer->getProfile() || !layer->getProfile()->isOK() )
             {
                 OE_WARN << LC << "Input profile is not valid" << std::endl;
@@ -336,6 +362,12 @@ main(int argc, char** argv)
         else
         {
             ImageLayer* layer = new ImageLayer(ImageLayerOptions(), input.get());
+            Status layerStatus = layer->open();
+            if (layerStatus.isError())
+            {
+                OE_WARN << "Failed to create input ImageLayer " << layerStatus.message() << std::endl;
+                return -1;
+            }
             if ( !layer->getProfile() || !layer->getProfile()->isOK() )
             {
                 OE_WARN << LC << "Input profile is not valid" << std::endl;

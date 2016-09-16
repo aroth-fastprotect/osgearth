@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -27,6 +27,8 @@
 
 namespace osgEarth
 {
+    class Profile;
+
     /**
      * A "snapshot in time" of a Map model revision. Use this class to get a safe "copy" of
      * the map model lists that you can use without worrying about the model changing underneath
@@ -49,21 +51,6 @@ namespace osgEarth
         MapFrame(const Map* map, Map::ModelParts parts);
 
         bool isValid() const;
-
-        /**
-         * Constructs a new map frame and connects it to a map.
-         */
-        //MapFrame(
-        //    const Map*         map, 
-        //    Map::ModelParts    parts =Map::TERRAIN_LAYERS,
-        //    const std::string& name  ="" );
-
-        /**
-         * A copy constructor with a new name (no sync happens)
-         */
-       // MapFrame(
-        //    const MapFrame& frame, 
-        //    const std::string& name ="" );
 
         /** dtor */
         virtual ~MapFrame() { }

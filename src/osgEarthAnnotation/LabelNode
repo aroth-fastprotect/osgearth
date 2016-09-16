@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -23,9 +23,10 @@
 #ifndef OSGEARTH_ANNOTATION_LABEL_NODE_H
 #define OSGEARTH_ANNOTATION_LABEL_NODE_H 1
 
-#include <osgEarthAnnotation/OrthoNode>
+#include <osgEarthAnnotation/GeoPositionNode>
 #include <osgEarthSymbology/Style>
 #include <osgEarth/MapNode>
+#include <osgEarth/ScreenSpaceLayout>
 #include <osg/Geode>
 
 namespace osgEarth { namespace Annotation
@@ -36,7 +37,7 @@ namespace osgEarth { namespace Annotation
     /**
      * Text labeling node.
      */
-    class OSGEARTHANNO_EXPORT LabelNode : public OrthoNode
+    class OSGEARTHANNO_EXPORT LabelNode : public GeoPositionNode
     {
     public:
         META_AnnotationNode( osgEarthAnnotation, LabelNode );
@@ -92,6 +93,9 @@ namespace osgEarth { namespace Annotation
             const Config&         conf,
             const osgDB::Options* dbOptions );
 
+        /**
+         * Destructor
+         */
         virtual ~LabelNode() { }
 
         /**
@@ -111,13 +115,15 @@ namespace osgEarth { namespace Annotation
          */
         void setStyle( const Style& style );
 
-    public: // OrthoNode override
+    public: // GeoPositionNode override
 
-        virtual void setAnnotationData( AnnotationData* data );
+        virtual void setPriority(float value);
 
         virtual void setDynamic( bool value );
 
         virtual Config getConfig() const;
+
+        virtual void dirty();
 
     protected:
         void init(const Style& style);
@@ -125,9 +131,18 @@ namespace osgEarth { namespace Annotation
         std::string              _text;
         Style                    _style;
         osg::ref_ptr<osg::Geode> _geode;
+        osg::ref_ptr<ScreenSpaceLayoutData> _dataLayout;
+
+        /** rotation of the label **/
+        float                    _labelRotationRad;
+        bool                     _followFixedCourse;
+        GeoPoint                 _geoPointLoc;
+        GeoPoint                 _geoPointProj;
 
         /** Copy constructor */
-        LabelNode( const LabelNode& rhs, const osg::CopyOp& op =osg::CopyOp::DEEP_COPY_ALL ) : OrthoNode(rhs, op) { }
+        LabelNode(const LabelNode& rhs, const osg::CopyOp& op = osg::CopyOp::DEEP_COPY_ALL);
+
+        void updateLayoutData();
     };
 
 } } // namespace osgEarth::Annotation

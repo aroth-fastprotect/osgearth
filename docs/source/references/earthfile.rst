@@ -44,7 +44,6 @@ the entire map.
     <map>
         <options lighting                 = "true"
                  elevation_interpolation  = "bilinear"
-                 elevation_tile_size      = "17"
                  overlay_texture_size     = "4096"
                  overlay_blending         = "true"
                  overlay_resolution_ratio = "3.0" >
@@ -103,7 +102,8 @@ These options control the rendering of the terrain surface.
                      color                 = "#ffffffff"
                      tile_size             = "17"
                      normalize_edges       = "false"
-                     elevation_smoothing   = "false">
+                     elevation_smoothing   = "false"
+                     normal_maps           = "false">
 
 +-----------------------+--------------------------------------------------------------------+
 | Property              | Description                                                        |
@@ -117,7 +117,7 @@ These options control the rendering of the terrain surface.
 +-----------------------+--------------------------------------------------------------------+
 | min_tile_range_factor | Determines how close you need to be to a terrain tile for it to    |
 |                       | display. The value is the ratio of a tile's extent to its          |
-|                       | For example, if a tile is 10km is radius, and the MTRF=6, then the |
+|                       | For example, if a tile has a 10km radius, and the MTRF=6, then the |
 |                       | tile will become visible at a range of about 60km.                 |
 +-----------------------+--------------------------------------------------------------------+
 | min_lod               | The lowest level of detail that the terrain is guaranteed to       |
@@ -153,7 +153,17 @@ These options control the rendering of the terrain surface.
 |                       | Doing so will give a smoother appearance to disparate height field |
 |                       | data, but elevations will not be as accurate. Default = false      |
 +-----------------------+--------------------------------------------------------------------+
-
+| normal_maps           | Whether to generate and use normal maps in place of geometry       |
+|                       | normals. Normal maps are used with lighting to create the          |
+|                       | appearance of higher-resolution terrain than can be represented    |
+|                       | with triangles alone. Default is engine-dependent.                 |
++-----------------------+--------------------------------------------------------------------+
+| min_expiry_frames     | The number of frames that a terrain tile hasn't been seen before   |
+|                       | it can be considered for expiration. Default = 0                   |
++-----------------------+--------------------------------------------------------------------+
+| min_expiry_time       | The number of seconds that a terrain tile hasn't been culled before|
+|                       | it can be considered for expiration. Default = 0                   |
++-----------------------+--------------------------------------------------------------------+
 
 
 .. _ImageLayer:
@@ -175,6 +185,7 @@ An *image layer* is a raster image overlaid on the map's geometry.
                max_level      = "23"
                min_resolution = "100.0"
                max_resolution = "0.0"
+               max_data_level = "23"
                enabled        = "true"
                visible        = "true"
                shared         = "false"
@@ -341,8 +352,8 @@ A *Model Layer* renders non-terrain data, like vector features or external 3D mo
     <map>
         <model name    = "my model layer"
                driver  = "feature_geom"
-               enabled = true
-               visible = true >
+               enabled = "true"
+               visible = "true" >
 
 
 +-----------------------+--------------------------------------------------------------------+
@@ -413,7 +424,7 @@ tiling scheme that it should use to render map tiles.
 | Property              | Description                                                        |
 +=======================+====================================================================+
 | srs                   | Spatial reference system of the map. This can be a WKT string, an  |
-|                       | ESPG code, a PROJ4 initialization string, or a stock profile name. |
+|                       | EPSG code, a PROJ4 initialization string, or a stock profile name. |
 |                       | Please refer to :doc:`/user/spatialreference` for details.         |
 +-----------------------+--------------------------------------------------------------------+
 | vdatum                | Vertical datum of the profile, which describes how to treat        |

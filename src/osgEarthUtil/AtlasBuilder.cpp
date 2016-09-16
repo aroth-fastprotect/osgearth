@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -132,8 +132,8 @@ AtlasBuilder::build(const ResourceLibrary* inputLib,
     {
         SkinResource* skin = i->get();
 
-        // skip tiled skins for now.
-        if ( skin->isTiled() == true )
+        // skip skins that say "no atlas please"
+        if ( skin->atlasHint() == false )
         {
             continue;
         }
@@ -256,6 +256,10 @@ AtlasBuilder::build(const ResourceLibrary* inputLib,
             maxT = t;
     }
 
+    // protecte against a div0
+    maxS = std::max(maxS, 1u);
+    maxT = std::max(maxT, 1u);
+
     OE_INFO << LC <<
         "Final atlas size will be (" << maxS << ", " << maxT << ")" << std::endl;
 
@@ -303,6 +307,9 @@ AtlasBuilder::build(const ResourceLibrary* inputLib,
     
     // for each source in this atlas layer, apply its texture matrix info
     // to the new catalog.
+    maxS = std::max(maxS, 1u);
+    maxT = std::max(maxT, 1u);
+
     for(int r=0; r<(int)mainAtlasList.size(); ++r)
     {
         for(int k=0; k<mainAtlasList[r]->_sourceList.size(); ++k)

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -42,6 +42,7 @@ using namespace osgEarth::Symbology;
 using namespace geos;
 using namespace geos::operation;
 
+#define LC "[GEOS] "
 
 namespace
 {
@@ -138,15 +139,18 @@ namespace
                     {
                         const Symbology::Polygon* poly = static_cast<const Symbology::Polygon*>(input);
                         std::vector<geom::Geometry*>* holes = poly->getHoles().size() > 0 ? new std::vector<geom::Geometry*>() : 0L;
-                        for( Symbology::RingCollection::const_iterator r = poly->getHoles().begin(); r != poly->getHoles().end(); ++r )
+                        if (holes)
                         {
-                            geom::Geometry* hole = import( r->get(), f );
-                            if ( hole ) holes->push_back( hole );
-                        }
-                        if ( holes && holes->size() == 0 )
-                        {
-                            delete holes;
-                            holes = 0L;
+                            for( Symbology::RingCollection::const_iterator r = poly->getHoles().begin(); r != poly->getHoles().end(); ++r )
+                            {
+                                geom::Geometry* hole = import( r->get(), f );
+                                if ( hole ) holes->push_back( hole );
+                            }
+                            if (holes->size() == 0)
+                            {
+                                delete holes;
+                                holes = 0L;
+                            }
                         }
                         output = f->createPolygon( shell, holes );
                     }
@@ -160,7 +164,7 @@ namespace
                 //if ( seq )
                 //    delete seq;
 
-                OE_NOTICE << "GEOS::import: Removed degenerate geometry" << std::endl;
+                OE_DEBUG << "GEOS::import: Removed degenerate geometry" << std::endl;
             }
         }
 
@@ -248,7 +252,7 @@ GEOSContext::exportGeometry(const geom::Geometry* input)
 
     if ( dynamic_cast<const geom::Point*>( input ) )
     {
-        OE_NOTICE << "GEOS 'Point' NYI" << std::endl;        
+        OE_NOTICE << LC << "GEOS 'Point' NYI" << std::endl;        
     }
     else if ( dynamic_cast<const geom::MultiPoint*>( input ) )
     {

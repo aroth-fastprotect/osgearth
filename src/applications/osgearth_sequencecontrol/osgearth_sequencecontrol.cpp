@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -51,7 +51,7 @@ struct UpdateLabel : public osg::Operation
     {
         osgViewer::View* view = dynamic_cast<osgViewer::View*>(obj);
         unsigned index = _sc->getCurrentSequenceFrameIndex(view->getFrameStamp());
-        if ( index >= 0 && index != _prevIndex )
+        if ( index != _prevIndex )
         {
             const std::vector<osgEarth::SequenceFrameInfo>& frames = _sc->getSequenceFrameInfo();
             _label->setText( frames[index].timeIdentifier );

@@ -8,12 +8,15 @@ IF (GEOS_FOUND)
     ADD_DEFINITIONS(-DOSGEARTH_HAVE_GEOS)
 ENDIF(GEOS_FOUND)
 
-SET(TARGET_PUBLIC_H
-	AltitudeFilter
+SET(LIB_NAME osgEarthFeatures)
+
+
+SET(HEADER_PATH ${OSGEARTH_SOURCE_DIR}/include/${LIB_NAME})
+SET(LIB_PUBLIC_HEADERS
+    AltitudeFilter
     BufferFilter
     BuildGeometryFilter  
     BuildTextFilter
-    BuildTextOperator
     CentroidFilter
     Common
     ConvertTypeFilter
@@ -35,7 +38,7 @@ SET(TARGET_PUBLIC_H
     GeometryCompiler
     GeometryUtils
     LabelSource
-    MeshClamper
+    MVT
     OgrUtils
     OptimizerHints
     PolygonizeLines
@@ -45,6 +48,7 @@ SET(TARGET_PUBLIC_H
     ScatterFilter
     Script
     ScriptEngine
+    ScriptFilter
     SubstituteModelFilter
     TessellateOperator
     TextSymbolizer
@@ -57,7 +61,6 @@ SET(TARGET_SRC
     BufferFilter.cpp
     BuildGeometryFilter.cpp 
     BuildTextFilter.cpp
-    BuildTextOperator.cpp
     CentroidFilter.cpp
     ConvertTypeFilter.cpp
     CropFilter.cpp
@@ -66,7 +69,7 @@ SET(TARGET_SRC
     FeatureCursor.cpp
     FeatureDisplayLayout.cpp
     FeatureDrawSet.cpp
-	FeatureListSource.cpp
+    FeatureListSource.cpp
     FeatureModelGraph.cpp
     FeatureModelSource.cpp
     FeatureSource.cpp
@@ -75,9 +78,9 @@ SET(TARGET_SRC
     Filter.cpp
     FilterContext.cpp
     GeometryCompiler.cpp
-	GeometryUtils.cpp
+    GeometryUtils.cpp
     LabelSource.cpp
-    MeshClamper.cpp
+    MVT.cpp
     OgrUtils.cpp
     OptimizerHints.cpp
     PolygonizeLines.cpp
@@ -86,35 +89,61 @@ SET(TARGET_SRC
     Session.cpp
     ScatterFilter.cpp
     ScriptEngine.cpp
+    ScriptFilter.cpp
     SubstituteModelFilter.cpp
     TessellateOperator.cpp
     TextSymbolizer.cpp
     TransformFilter.cpp
-    VirtualFeatureSource.cpp
+    VirtualFeatureSource.cpp    
 )
 
-IF(GEOS_FOUND)
-  INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR} ${GEOS_INCLUDE_DIR})
-ELSE(GEOS_FOUND)
-  INCLUDE_DIRECTORIES(${OSG_INCLUDE_DIR} ${OSGEARTH_SOURCE_DIR})
-ENDIF(GEOS_FOUND)
+IF(PROTOBUF_FOUND AND PROTOBUF_PROTOC_EXECUTABLE)
 
-LIST(APPEND TARGET_ADDED_LIBRARIES
-	osgEarth
-	osgEarthSymbology
-    osg
-    osgUtil
-    osgSim
-    osgTerrain
-    osgDB
-    osgFX
-    osgViewer
-	osgText
-	osgGA
-    OpenThreads
-    )
-IF(GEOS_FOUND)
-	LIST(APPEND TARGET_LIBRARIES_VARS GEOS_LIBRARY)
-ENDIF(GEOS_FOUND)
-LIST(APPEND TARGET_LIBRARIES_VARS GDAL_LIBRARY)
-SETUP_OSG_LIB(osgEarthFeatures)
+  INCLUDE_DIRECTORIES(${PROTOBUF_INCLUDE_DIR} ${CMAKE_CURRENT_BINARY_DIR})
+  PROTOBUF_GENERATE_CPP(PROTO_VECTOR_TILE_CPP PROTO_VECTOR_TILE_H vector_tile.proto)
+
+  SET(LIB_PUBLIC_HEADERS
+    ${LIB_PUBLIC_HEADERS}
+    ${PROTO_VECTOR_TILE_H}
+  )
+
+  SET(TARGET_SRC
+    ${TARGET_SRC}
+    ${PROTO_VECTOR_TILE_CPP}
+  )
+
+  ADD_DEFINITIONS(-DOSGEARTH_HAVE_MVT)
+
+ENDIF()
+
+ADD_LIBRARY(${LIB_NAME} ${OSGEARTH_USER_DEFINED_DYNAMIC_OR_STATIC}
+    ${LIB_PUBLIC_HEADERS}
+    ${TARGET_SRC}
+)
+
+INCLUDE_DIRECTORIES(${GDAL_INCLUDE_DIR})
+
+
+IF (WIN32)
+  LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
+ELSE(WIN32)
+  LINK_EXTERNAL(${LIB_NAME} ${TARGET_EXTERNAL_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
+ENDIF(WIN32)
+
+LINK_INTERNAL(${LIB_NAME}
+    osgEarth
+    osgEarthSymbology
+)
+
+SET(LINK_VARS OSG_LIBRARY OSGUTIL_LIBRARY OSGSIM_LIBRARY OSGTERRAIN_LIBRARY OSGDB_LIBRARY OSGFX_LIBRARY OSGVIEWER_LIBRARY OSGTEXT_LIBRARY OSGGA_LIBRARY OPENTHREADS_LIBRARY)
+IF(PROTOBUF_FOUND AND PROTOBUF_PROTOC_EXECUTABLE)
+  SET(LINK_VARS ${LINK_VARS} PROTOBUF_LIBRARY)
+ENDIF()
+
+
+
+LINK_WITH_VARIABLES(${LIB_NAME} ${LINK_VARS})
+
+LINK_CORELIB_DEFAULT(${LIB_NAME} ${CMAKE_THREAD_LIBS_INIT} ${MATH_LIBRARY})
+
+INCLUDE(ModuleInstall OPTIONAL)

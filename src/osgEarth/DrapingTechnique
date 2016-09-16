@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -24,8 +24,10 @@
 
 #include <osgEarth/Common>
 #include <osgEarth/OverlayDecorator>
+#include <osgEarth/DrapeableNode>
 #include <osg/TexGenNode>
 #include <osg/Uniform>
+#include <vector>
 
 namespace osgEarth
 {
@@ -80,7 +82,7 @@ namespace osgEarth
         bool getOverlayBlending() const { return _rttBlending; }
 
         /**
-         * Whether to attach the RTT to camera to the stencil buffer.  Default = true.
+         * Whether to attach the RTT to camera to the stencil buffer.  Default = false.
          * Some older cards don't have very good support 
          */
         void setAttachStencil( bool value );
@@ -98,9 +100,6 @@ namespace osgEarth
         virtual bool hasData(
             OverlayDecorator::TechRTTParams& params) const;
 
-        void reestablish(
-            TerrainEngineNode* engine );
-
         void preCullTerrain(
             OverlayDecorator::TechRTTParams& params,
             osgUtil::CullVisitor*            cv );
@@ -112,7 +111,9 @@ namespace osgEarth
         void onInstall( TerrainEngineNode* engine );
 
         void onUninstall( TerrainEngineNode* engine );
-
+        
+        const osg::BoundingSphere& getBound(
+            OverlayDecorator::TechRTTParams& params) const;
 
     protected:
         virtual ~DrapingTechnique() { }

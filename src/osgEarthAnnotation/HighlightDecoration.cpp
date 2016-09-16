@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -20,6 +20,7 @@
 * along with this program.  If not, see <http://www.gnu.org/licenses/>
 */
 
+#if 0
 #include <osgEarthAnnotation/HighlightDecoration>
 #include <osgEarthAnnotation/AnnotationNode>
 #include <osgEarthAnnotation/AnnotationUtils>
@@ -76,7 +77,7 @@ HighlightDecoration::apply(AnnotationNode& node, bool enable)
         if ( enable )
         {
             VirtualProgram* vp = VirtualProgram::getOrCreate( ss );
-            if ( vp->getShader(FRAG_FUNCTION) == 0L )
+            if ( vp->getPolyShader(FRAG_FUNCTION) == 0L )
             {
                 vp->setFunction(FRAG_FUNCTION, fragSource, ShaderComp::LOCATION_FRAGMENT_COLORING, 0.6f);
                 ss->addUniform( _colorUniform.get() );
@@ -91,3 +92,4 @@ HighlightDecoration::apply(AnnotationNode& node, bool enable)
     }
     return _supported;
 }
+#endif

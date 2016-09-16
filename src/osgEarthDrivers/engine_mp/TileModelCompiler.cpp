@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -141,6 +141,14 @@ namespace
             ownsTileCoords   = false;
             stitchTileCoords = 0L;
             installParentData = false;
+            usePatches       = false;
+            numVerticesInSkirt = 0;
+            numVerticesInSurface = 0;
+            numRows = 0;
+            numCols = 0;
+            originalNumRows = 0;
+            originalNumCols = 0;
+            useUInt = false;
         }
 
         osg::Matrixd local2world, world2local;
@@ -167,12 +175,12 @@ namespace
         osg::ref_ptr<osg::Vec2Array> stitchTileCoords;
 
         // surface data:
-        osg::Geode*                   surfaceGeode;
-        MPGeometry*                   surface;
-        osg::Vec3Array*               surfaceVerts;
-        osg::Vec3Array*               normals;
-        osg::Vec4Array*               surfaceAttribs;
-        osg::Vec4Array*               surfaceAttribs2;
+        osg::ref_ptr<osg::Geode>      surfaceGeode;
+        osg::ref_ptr<MPGeometry>      surface;
+        osg::ref_ptr<osg::Vec3Array>  surfaceVerts;
+        osg::ref_ptr<osg::Vec3Array>  normals;
+        osg::ref_ptr<osg::Vec4Array>  surfaceAttribs;
+        osg::ref_ptr<osg::Vec4Array>  surfaceAttribs2;
         unsigned                      numVerticesInSurface;
         osg::ref_ptr<osg::FloatArray> elevations;
         Indices                       indices;
@@ -195,6 +203,8 @@ namespace
         // for masking/stitching:
         MaskRecordVector         maskRecords;
         //MPGeometry*              stitchGeom;
+
+        bool                     usePatches;
 
         bool useUInt;
         osg::DrawElements* newDrawElements(GLenum mode) {
@@ -248,7 +258,7 @@ namespace
 
             if (x_match && y_match)
             {
-                MPGeometry* stitchGeom = new MPGeometry( d.model->_tileKey, d.frame, d.textureImageUnit );
+                osg::ref_ptr<MPGeometry> stitchGeom = new MPGeometry( d.model->_tileKey, d.frame, d.textureImageUnit );
                 stitchGeom->setName("stitchGeom");
                 d.maskRecords.push_back( MaskRecord(boundary, min_ndc, max_ndc, stitchGeom) );
             }
@@ -870,8 +880,8 @@ namespace
                 // Add mask bounds as a triangulation constraint
 
                 osg::ref_ptr<osgUtil::DelaunayConstraint> newdc=new osgUtil::DelaunayConstraint;
-                osg::Vec3Array* maskConstraint = new osg::Vec3Array();
-                newdc->setVertexArray(maskConstraint);
+                osg::ref_ptr<osg::Vec3Array> maskConstraint = new osg::Vec3Array();
+                newdc->setVertexArray(maskConstraint.get());
 
                 //Crop the mask to the stitching poly (for case where mask crosses tile edge)
                 osg::ref_ptr<Geometry> maskCrop;
@@ -886,7 +896,7 @@ namespace
 
                     if (part->getType() == Geometry::TYPE_POLYGON)
                     {
-                        osg::Vec3Array* partVerts = part->toVec3Array();
+                        osg::ref_ptr<osg::Vec3Array> partVerts = part->createVec3Array();
                         maskConstraint->insert(maskConstraint->end(), partVerts->begin(), partVerts->end());
                         newdc->addPrimitiveSet(new osg::DrawArrays(osg::PrimitiveSet::LINE_LOOP, maskConstraint->size() - partVerts->size(), partVerts->size()));
                     }
@@ -1026,8 +1036,8 @@ namespace
             }
 
             // Create array to hold vertex normals
-            osg::Vec3Array *norms=new osg::Vec3Array;
-            trig->setOutputNormalArray(norms);
+            osg::ref_ptr<osg::Vec3Array> norms = new osg::Vec3Array;
+            trig->setOutputNormalArray(norms.get());
 
 
             // Triangulate vertices and remove triangles that lie within the contraint loop
@@ -1041,13 +1051,31 @@ namespace
 
             MaskRecordVector::iterator mr = d.maskRecords.begin();
             // Set up new arrays to hold final vertices and normals
-            osg::Geometry* stitch_geom = (*mr)._geom;
-            osg::Vec3Array* stitch_verts = new osg::Vec3Array();
+            osg::ref_ptr<osg::Geometry> stitch_geom = (*mr)._geom;
+
+            osg::ref_ptr<osg::Vec3Array> stitch_verts = new osg::Vec3Array();
             stitch_verts->reserve(trig->getInputPointArray()->size());
             stitch_geom->setVertexArray(stitch_verts);
-            osg::Vec3Array* stitch_norms = new osg::Vec3Array(trig->getInputPointArray()->size());
+
+            osg::ref_ptr<osg::Vec3Array> stitch_norms = new osg::Vec3Array(trig->getInputPointArray()->size());
             stitch_geom->setNormalArray( stitch_norms );
             stitch_geom->setNormalBinding( osg::Geometry::BIND_PER_VERTEX );
+
+
+            // vertex attribution
+            // for each vertex, a vec4 containing a unit extrusion vector in [0..2] and the raw elevation in [3]
+            osg::ref_ptr<osg::Vec4Array> surfaceAttribs = new osg::Vec4Array();
+            surfaceAttribs->reserve( trig->getInputPointArray()->size() );
+            stitch_geom->setVertexAttribArray( osg::Drawable::ATTRIBUTE_6, surfaceAttribs );
+            stitch_geom->setVertexAttribBinding( osg::Drawable::ATTRIBUTE_6, osg::Geometry::BIND_PER_VERTEX );
+            stitch_geom->setVertexAttribNormalize( osg::Drawable::ATTRIBUTE_6, false );
+
+            // for each vertex, index 0 holds the interpolated elevation from the lower lod (for morphing)
+            osg::ref_ptr<osg::Vec4Array> surfaceAttribs2 = new osg::Vec4Array();
+            surfaceAttribs2->reserve( trig->getInputPointArray()->size() );
+            stitch_geom->setVertexAttribArray( osg::Drawable::ATTRIBUTE_7, surfaceAttribs2 );
+            stitch_geom->setVertexAttribBinding( osg::Drawable::ATTRIBUTE_7, osg::Geometry::BIND_PER_VERTEX );
+            stitch_geom->setVertexAttribNormalize( osg::Drawable::ATTRIBUTE_7, false );
 
 
             //Initialize tex coords
@@ -1072,6 +1100,7 @@ namespace
                 stitch_verts->push_back(model);
 
                 // calc normals
+                osg::Vec3d local_zero(*it);
                 osg::Vec3d local_one(*it);
                 local_one.z() += 1.0;
                 osg::Vec3d model_one;
@@ -1079,6 +1108,49 @@ namespace
                 model_one = (model_one*d.world2local) - model;
                 model_one.normalize();
                 (*stitch_norms)[++norm_i] = model_one;
+
+
+                // calculate and set vertext attributes for newly created mask geometry
+                osg::Vec3d model_up;
+                d.model->_tileLocator->unitToModel(local_one, model_up);
+                model_up = (model_up*d.world2local) - local_zero;
+                model_up.normalize();
+                (*d.normals).push_back(model_up);
+
+                // Calculate and store the "old height", i.e the height value from
+                // the parent LOD.
+                float heightValue = 0.0;
+                d.model->_elevationData.getHeight( local_zero, d.model->_tileLocator, heightValue, INTERP_TRIANGULATE );
+
+                float     oldHeightValue = heightValue;
+                osg::Vec3 oldNormal;
+
+                // This only works if the tile size is an odd number in both directions.
+                if (d.model->_tileKey.getLOD() > 0 && (d.numCols&1) && (d.numRows&1) && d.parentModel.valid())
+                {
+                    d.parentModel->_elevationData.getHeight( local_zero, d.model->_tileLocator.get(), oldHeightValue, INTERP_TRIANGULATE );
+                    d.parentModel->_elevationData.getNormal( local_zero, d.model->_tileLocator.get(), oldNormal, INTERP_TRIANGULATE );
+                }
+                else
+                {
+                    d.model->_elevationData.getNormal(local_zero, d.model->_tileLocator.get(), oldNormal, INTERP_TRIANGULATE );
+                }
+
+                // first attribute set has the unit extrusion vector and the
+                // raw height value.
+                (*surfaceAttribs).push_back( osg::Vec4f(
+                    model_up.x(),
+                    model_up.y(),
+                    model_up.z(),
+                    heightValue) );
+
+                // second attribute set has the old height value in "w"
+                (*surfaceAttribs2).push_back( osg::Vec4f(
+                    oldNormal.x(),
+                    oldNormal.y(),
+                    oldNormal.z(),
+                    oldHeightValue ) );
+
 
                 // set up text coords
                 if (d.renderLayers.size() > 0)
@@ -1102,7 +1174,7 @@ namespace
 
 
             // Get triangles from triangulator and add as primative set to the geometry
-            osg::DrawElementsUInt* tris = trig->getTriangles();
+            osg::ref_ptr<osg::DrawElementsUInt> tris = trig->getTriangles();
             if ( tris && tris->getNumIndices() >= 3 )
             {
                 stitch_geom->addPrimitiveSet(tris);
@@ -1141,7 +1213,11 @@ namespace
         }
 
         // Use the existing DrawElements on the surface so we merge the skirts and the surface together.
-        osg::ref_ptr<osg::DrawElements> elements = dynamic_cast< osg::DrawElements* >(d.surface->getPrimitiveSet(0));
+        osg::ref_ptr<osg::DrawElements> elements;
+        if ( d.surface->getNumPrimitiveSets() > 0 )
+        {
+            elements = dynamic_cast< osg::DrawElements* >(d.surface->getPrimitiveSet(0));
+        }
         if (!elements)
         {
             OE_WARN << LC << "Couldn't find existing DrawElements" << std::endl;
@@ -1388,7 +1464,8 @@ namespace
 
         unsigned numSurfaceNormals = d.numRows * d.numCols;
 
-        osg::DrawElements* elements = d.newDrawElements(GL_TRIANGLES);
+        GLenum mode = d.usePatches ? GL_PATCHES : GL_TRIANGLES;
+        osg::ref_ptr<osg::DrawElements> elements = d.newDrawElements(mode);
         elements->reserveElements((d.numRows-1) * (d.numCols-1) * 6);
 
         if ( recalcNormals )
@@ -2099,6 +2176,7 @@ TileModelCompiler::compile(TileModel*        model,
     d.parentModel = model->getParentTileModel();
     d.heightScale = *_options.verticalScale();
     d.heightOffset = *_options.verticalOffset();
+    d.usePatches = *_options.gpuTessellation();
 
     // A Geode/Geometry for the surface:
     d.surface = new MPGeometry( d.model->_tileKey, d.frame, _textureImageUnit );

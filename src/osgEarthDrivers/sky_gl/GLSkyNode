@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -29,7 +29,7 @@ namespace osg {
     class LightSource;
 }
 
-namespace osgEarth { namespace Drivers { namespace GLSky
+namespace osgEarth { namespace GLSky
 {
     using namespace osgEarth;
     using namespace osgEarth::Util;
@@ -70,4 +70,4 @@ namespace osgEarth { namespace Drivers { namespace GLSky
         GLSkyOptions                      _options;
     };
 
-} } } // namespace osgEarth::Drivers::GLSky
+} } // namespace osgEarth::Drivers::GLSky

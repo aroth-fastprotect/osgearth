@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -27,6 +27,7 @@
 #include <osgEarth/DateTime>
 #include <osgEarth/GeoData>
 #include <osgEarth/Config>
+#include <osgEarth/Profile>
 #include <osg/Group>
 #include <osg/Uniform>
 #include <osg/View>
@@ -167,6 +168,10 @@ namespace osgEarth { namespace Util
         void setStarsVisible(bool value);
         bool getStarsVisible() const { return _starsVisible; }
 
+        /** Whether the atmosphere is visible */
+        void setAtmosphereVisible(bool value);
+        bool getAtmosphereVisible() const { return _atmosphereVisible; }
+
         /** Access the osg::Light representing the sun */
         virtual osg::Light* getSunLight() = 0;
 
@@ -193,6 +198,7 @@ namespace osgEarth { namespace Util
         virtual void onSetMoonVisible() { }
         virtual void onSetStarsVisible() { }
         virtual void onSetSunVisible() { }
+        virtual void onSetAtmosphereVisible() { }
         virtual void onSetMinimumAmbient() { }
 
     private:
@@ -202,6 +208,7 @@ namespace osgEarth { namespace Util
         bool                    _sunVisible;
         bool                    _moonVisible;
         bool                    _starsVisible;
+        bool                    _atmosphereVisible;
         osg::Vec4f              _minimumAmbient;
         optional<GeoPoint>      _refpoint;
 
@@ -222,6 +229,18 @@ namespace osgEarth { namespace Util
     protected:
         MapNode* getMapNode(const osgDB::Options* opt) const;
         const SkyOptions& getSkyOptions(const osgDB::Options* opt) const;
+    };
+
+    /**
+     * Factory interface that sky extensions need to implement. Someday we will
+     * convert the sky extensions into proper NodeKits, at which point this method
+     * will probably be no longer necessary since you can just link with the library
+     * and create the SkyNode normally.
+     */
+    class /*header-only*/ SkyNodeFactory
+    {
+    public:
+        virtual SkyNode* createSkyNode(const Profile* profile) =0;
     };
 
 } } // namespace osgEarth::Util

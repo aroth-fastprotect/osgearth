@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -103,7 +103,7 @@ namespace
 
 //------------------------------------------------------------------------
 
-GeoObject::GeoObject()
+GeoObject::GeoObject() : _priority(0.0f)
 {
     //NOP
 }
@@ -168,15 +168,16 @@ GeoGraph::insertObject( GeoObject* object )
 GeoCell::GeoCell(const GeoExtent& extent, float maxRange, unsigned maxObjects,
                  unsigned splitDim, float splitRangeFactor, unsigned depth ) :
 _extent( extent ),
-_splitDim( splitDim ),
-_maxObjects( maxObjects ),
-_minObjects( (maxObjects/10)*8 ), // 80%
 _maxRange( maxRange ),
+_maxObjects( maxObjects ),
+_splitDim( splitDim ),
 _splitRangeFactor( splitRangeFactor ),
-_count( 0 ),
 _depth( depth ),
+_minObjects( (maxObjects/10)*8 ), // 80%
+_count( 0 ),
+_boundaryPoints( 10 ),
 _frameStamp( 0 ),
-_boundaryPoints( 10 )
+_boundaryColor(0L)
 {
     generateBoundaries();
     //generateBoundaryGeometry();
@@ -319,13 +320,16 @@ GeoCell::traverse( osg::NodeVisitor& nv )
             // custom BSP culling function. this checks that the set of boundary points
             // for this cell intersects the viewing frustum.
             osgUtil::CullVisitor* cv = Culling::asCullVisitor(nv);
-            if ( cv && !intersects( cv->getCurrentCullingSet().getFrustum() ) )
+            if ( cv )
             {
-                return;
-            }
+                if (!intersects( cv->getCurrentCullingSet().getFrustum() ) )
+                {
+                    return;
+                }
 
-            // passed cull, so record the framestamp.
-            _frameStamp = cv->getFrameStamp()->getFrameNumber();
+                // passed cull, so record the framestamp.
+                _frameStamp = cv->getFrameStamp()->getFrameNumber();
+            }
         }
 
         if ( _objects.size() > 0 )

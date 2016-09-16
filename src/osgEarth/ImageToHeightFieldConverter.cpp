@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -27,12 +27,6 @@
 #include <string.h>
 
 using namespace osgEarth;
-
-static bool
-isNoData( short s )
-{
-  return s == SHRT_MAX || s == -SHRT_MAX;
-}
 
 static bool
 isNoData( float f )

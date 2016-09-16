@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -89,7 +89,7 @@ int
         << "        [--index shapefile]             ; Use the feature extents in a shapefile to set the bounding boxes for seeding" << std::endl
         << "        [--mp]                          ; Use multiprocessing to process the tiles.  Useful for GDAL sources as this avoids the global GDAL lock" << std::endl
         << "        [--mt]                          ; Use multithreading to process the tiles." << std::endl
-        << "        [--concurrency]                 ; The number of threads or proceses to use if --mp or --mt are provided." << std::endl
+        << "        [--concurrency]                 ; The number of threads or processes to use if --mp or --mt are provided." << std::endl
         << "        [--verbose]                     ; Displays progress of the seed operation" << std::endl
         << std::endl
         << "    --purge file.earth                  ; Purges a layer cache in a .earth file (interactive)" << std::endl
@@ -173,17 +173,23 @@ int
         featureOpt.url() = index;        
 
         osg::ref_ptr< FeatureSource > features = FeatureSourceFactory::create( featureOpt );
-        features->initialize();
-        features->getFeatureProfile();
+        Status status = features->open();
 
-        osg::ref_ptr< FeatureCursor > cursor = features->createFeatureCursor();
-        while (cursor.valid() && cursor->hasMore())
+        if (status.isOK())
         {
-            osg::ref_ptr< Feature > feature = cursor->nextFeature();
-            osgEarth::Bounds featureBounds = feature->getGeometry()->getBounds();
-            GeoExtent ext( feature->getSRS(), featureBounds );
-            ext = ext.transform( mapNode->getMapSRS() );
-            bounds.push_back( ext.bounds() );            
+            osg::ref_ptr< FeatureCursor > cursor = features->createFeatureCursor();
+            while (cursor.valid() && cursor->hasMore())
+            {
+                osg::ref_ptr< Feature > feature = cursor->nextFeature();
+                osgEarth::Bounds featureBounds = feature->getGeometry()->getBounds();
+                GeoExtent ext( feature->getSRS(), featureBounds );
+                ext = ext.transform( mapNode->getMapSRS() );
+                bounds.push_back( ext.bounds() );            
+            }
+        }
+        else
+        {
+            OE_WARN << status.message() << "\n";
         }
     }
 
@@ -383,8 +389,7 @@ int
     return 0;
 }
 
-int
-    list( osg::ArgumentParser& args )
+int list( osg::ArgumentParser& args )
 {
     osg::ref_ptr<osg::Node> node = osgDB::readNodeFiles( args );
     if ( !node.valid() )
@@ -413,7 +418,6 @@ int
     for( TerrainLayerVector::iterator i =layers.begin(); i != layers.end(); ++i )
     {
         TerrainLayer* layer = i->get();
-        TerrainLayer::CacheBinMetadata meta;
 
         bool useMFP =
             layer->getProfile() &&
@@ -422,9 +426,10 @@ int
 
         const Profile* cacheProfile = useMFP ? layer->getProfile() : map->getProfile();
 
-        if ( layer->getCacheBinMetadata( cacheProfile, meta ) )
+        TerrainLayer::CacheBinMetadata* meta = layer->getCacheBinMetadata(cacheProfile);
+        if (meta)
         {
-            Config conf = meta.getConfig();
+            Config conf = meta->getConfig();
             std::cout << "Layer \"" << layer->getName() << "\", cache metadata =" << std::endl
                 << conf.toJSON(true) << std::endl;
         }
@@ -447,10 +452,8 @@ struct Entry
 
 
 int
-    purge( osg::ArgumentParser& args )
+purge( osg::ArgumentParser& args )
 {
-    //return usage( "Sorry, but purge is not yet implemented." );
-
     osg::ref_ptr<osg::Node> node = osgDB::readNodeFiles( args );
     if ( !node.valid() )
         return usage( "Failed to read .earth file." );
@@ -480,13 +483,17 @@ int
 
         const Profile* cacheProfile = useMFP ? layer->getProfile() : map->getProfile();
 
-        CacheBin* bin = layer->getCacheBin( cacheProfile );
-        if ( bin )
+        CacheSettings* cacheSettings = layer->getCacheSettings();
+        if (cacheSettings)
         {
-            entries.push_back(Entry());
-            entries.back()._isImage = true;
-            entries.back()._name = i->get()->getName();
-            entries.back()._bin = bin;
+            CacheBin* bin = cacheSettings->getCacheBin();
+            if ( bin )
+            {
+                entries.push_back(Entry());
+                entries.back()._isImage = true;
+                entries.back()._name = i->get()->getName();
+                entries.back()._bin = bin;
+            }
         }
     }
 
@@ -502,14 +509,18 @@ int
             mapNode->getMapNodeOptions().getTerrainOptions().enableMercatorFastPath() == true;
 
         const Profile* cacheProfile = useMFP ? layer->getProfile() : map->getProfile();
-
-        CacheBin* bin = i->get()->getCacheBin( cacheProfile );
-        if ( bin )
+        
+        CacheSettings* cacheSettings = layer->getCacheSettings();
+        if (cacheSettings)
         {
-            entries.push_back(Entry());
-            entries.back()._isImage = false;
-            entries.back()._name = i->get()->getName();
-            entries.back()._bin = bin;
+            CacheBin* bin = cacheSettings->getCacheBin();
+            if (bin)
+            {
+                entries.push_back(Entry());
+                entries.back()._isImage = false;
+                entries.back()._name = i->get()->getName();
+                entries.back()._bin = bin;
+            }
         }
     }
 

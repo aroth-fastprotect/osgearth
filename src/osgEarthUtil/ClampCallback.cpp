@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -42,6 +42,22 @@ ClampCallback::ClampCallback(osg::Node* terrainNode)
     setTerrainNode( terrainNode );
     _intersectionMask = 0xffffffff;
 }
+
+
+unsigned int
+ClampCallback::getIntersectionMask() const
+{
+    return _intersectionMask;
+}
+
+void
+ClampCallback::setIntersectionMask(unsigned int intersectionMask)
+{
+    _intersectionMask = intersectionMask;
+}
+
+
+
 
 bool ClampCallback::clamp(const osg::Vec3d& pos, osg::Vec3d& out) const
 {

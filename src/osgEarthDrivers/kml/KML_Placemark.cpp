@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -24,8 +24,8 @@
 #include <osgEarthAnnotation/PlaceNode>
 #include <osgEarthAnnotation/LabelNode>
 #include <osgEarthAnnotation/ModelNode>
-#include <osgEarthAnnotation/LocalGeometryNode>
-#include <osgEarth/Decluttering>
+#include <osgEarth/ObjectIndex>
+#include <osgEarth/Registry>
 
 #include <osg/Depth>
 #include <osgDB/WriteFile>
@@ -87,13 +87,27 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
 
                 GeoPoint position(cx._srs.get(), geom->getBounds().center(), altMode);
 
-                bool isPoly = geom->getComponentType() == Geometry::TYPE_POLYGON;
-                //bool isPoint = geom->getComponentType() == Geometry::TYPE_POINTSET;
-
                 // check for symbols.
-                ModelSymbol*    model = style.get<ModelSymbol>();
-                IconSymbol*     icon  = style.get<IconSymbol>();
-                TextSymbol*     text  = style.get<TextSymbol>();
+                ModelSymbol* model = style.get<ModelSymbol>();
+                IconSymbol*  icon  = style.get<IconSymbol>();
+                TextSymbol*  text  = style.get<TextSymbol>();
+
+                // for a single point placemark, apply the default icon and text symbols
+                // if none are specified in the KML.
+                if (geom->getTotalPointCount() == 1)
+                {
+                    if (!model && !icon && cx._options->defaultIconSymbol().valid())
+                    {
+                        icon = cx._options->defaultIconSymbol().get();
+                        style.add(icon);
+                    }
+
+                    if (!text && cx._options->defaultTextSymbol().valid())
+                    {
+                        text = cx._options->defaultTextSymbol().get();
+                        style.add(text);
+                    }
+                }
 
                 // the annotation name:
                 std::string name = getValue(node, "name");
@@ -105,14 +119,6 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
                 // one coordinate? It's a place marker or a label.
                 if ( (model || icon || text) && geom->getTotalPointCount() == 1 )
                 {
-                    // load up the default icon if there we don't have one.
-                    if ( !model && !icon )
-                    {
-                        icon = cx._options->defaultIconSymbol().get();
-                        if ( icon )
-                            style.add( icon );
-                    }
-
                     // if there's a model, render that - models do NOT get labels.
                     if ( model )
                     {
@@ -123,13 +129,13 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
                         if ( cx._options->modelScale() != 1.0f )
                         {
                             float s = *cx._options->modelScale();
-                            node->setScale( osg::Vec3f(s,s,s) );
+                            node->getPositionAttitudeTransform()->setScale(osg::Vec3d(s,s,s));
                         }
 
                         // model local tangent plane rotation:
                         if ( !cx._options->modelRotation()->zeroRotation() )
                         {
-                            node->setLocalRotation( *cx._options->modelRotation() );
+                            node->getPositionAttitudeTransform()->setAttitude( *cx._options->modelRotation() );
                         }
 
                         modelNode = node;
@@ -138,13 +144,7 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
                     // is there a label?
                     else if ( !name.empty() )
                     {
-                        if ( !text && cx._options->defaultTextSymbol().valid() )
-                        {
-                            text = cx._options->defaultTextSymbol().get();
-                            style.addSymbol( text );
-
-                        }
-                        else
+                        if ( !text )
                         {
                             text = style.getOrCreate<TextSymbol>();
                             text->encoding() = TextSymbol::ENCODING_UTF8;
@@ -168,8 +168,6 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
                 // multiple coords? feature:
                 if ( geom->getTotalPointCount() > 1 )
                 {
-                    ExtrusionSymbol* extruded = style.get<ExtrusionSymbol>();
-
                     // Remove symbols that we have already processed so the geometry
                     // compiler doesn't get confused.
                     if ( model )
@@ -181,6 +179,21 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
 
                     Feature* feature = new Feature(geom, cx._srs.get(), style);
                     featureNode = new FeatureNode( cx._mapNode, feature );
+                }
+
+                if ( iconNode )
+                {
+                    Registry::objectIndex()->tagNode( iconNode, iconNode );
+                }
+
+                if ( modelNode )
+                {
+                    Registry::objectIndex()->tagNode( modelNode, modelNode );
+                }
+
+                if ( featureNode )
+                {
+                    Registry::objectIndex()->tagNode( featureNode, featureNode );
                 }
 
 
@@ -195,11 +208,6 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
                         group->addChild( modelNode );
 
                     cx._groupStack.top()->addChild( group );
-
-                    if ( iconNode && cx._options->declutter() == true )
-                    {
-                        Decluttering::setEnabled( iconNode->getOrCreateStateSet(), true );
-                    }
 
                     if ( iconNode )
                         KML_Feature::build( node, cx, iconNode );
@@ -220,10 +228,6 @@ KML_Placemark::build( xml_node<>* node, KMLContext& cx )
                         else
                         {
                             cx._groupStack.top()->addChild( iconNode );
-                            if ( cx._options->declutter() == true )
-                            {
-                                Decluttering::setEnabled( iconNode->getOrCreateStateSet(), true );
-                            }
                         }
                         KML_Feature::build( node, cx, iconNode );
                     }

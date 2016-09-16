@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -110,6 +110,9 @@ VirtualFeatureSource::add( FeatureSource* source, FeaturePredicate* predicate )
 {
     _sources.push_back( FeatureSourceMapping(source, predicate) );
     dirty();
+
+    if (_sources.size() == 1)
+        setFeatureProfile(createFeatureProfile());
 }
 
 FeatureCursor* 
@@ -118,13 +121,20 @@ VirtualFeatureSource::createFeatureCursor( const Query& query )
     return new VirtualFeatureCursor( _sources, query );
 }
 
-void 
-VirtualFeatureSource::initialize( const osgDB::Options* dbOptions )
+Status 
+VirtualFeatureSource::initialize( const osgDB::Options* readOptions )
 {
+    //FeatureSource::initialize( dbOptions );
+
     for( FeatureSourceMappingVector::iterator i = _sources.begin(); i != _sources.end(); ++i )
     {
-        i->_source->initialize( dbOptions );
+        const Status& sourceStatus = i->_source->open(readOptions);
+        if (sourceStatus.isError())
+            return sourceStatus;
+        //i->_source->initialize( dbOptions );
     }
+
+    return Status::OK();
 }
 
 const FeatureProfile* 

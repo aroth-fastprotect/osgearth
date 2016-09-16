@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -86,12 +86,16 @@ public: // TileSource interface
         if ( _options.featureSourceOptions().isSet() )
         {
             _featureSource = FeatureSourceFactory::create( _options.featureSourceOptions().get() );
-            _featureSource->initialize( _dbOptions.get() );
+            _featureSource->open( _dbOptions.get() );
         }
 
-        // set up the IO options so that we do not cache input data:
-        CachePolicy::NO_CACHE.apply( _dbOptions.get() );
-        return STATUS_OK;
+        return Status::OK();
+    }
+
+    // Tells the layer not to cache data from this tile source.
+    CachePolicy getCachePolicyHint(const Profile* profile) const 
+    {
+        return CachePolicy::NO_CACHE;
     }
 
     // override
@@ -137,7 +141,7 @@ class TemplateMatClassDriver : public TileSourceDriver
     public:
         TemplateMatClassDriver() {}
 
-        virtual const char* className()
+        virtual const char* className() const
         {
             return "Template mat class driver";
         }

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -44,13 +44,13 @@ namespace
         "uniform bool oe_mode_GL_LIGHTING; \n"
         "varying vec4 oe_lighting_adjustment; \n"
         "varying vec4 oe_lighting_zero_vec; \n"
-        "varying vec3 oe_Normal; \n"
+        "varying vec3 vp_Normal; \n"
 
         "void oe_phong_vertex(inout vec4 VertexVIEW) \n"
         "{ \n"
         "    if ( oe_mode_GL_LIGHTING == false ) return; \n"
         "    oe_lighting_adjustment = vec4(1.0); \n"
-        "    vec3 N = oe_Normal; \n"
+        "    vec3 N = vp_Normal; \n"
         "    float NdotL = dot( N, normalize(gl_LightSource[0].position.xyz) ); \n"
         "    NdotL = max( 0.0, NdotL ); \n"
 
@@ -94,7 +94,8 @@ namespace
         GLSL_DEFAULT_PRECISION_FLOAT "\n"
         
         "uniform bool oe_mode_GL_LIGHTING; \n"
-        "varying vec3 oe_phong_vertexView3; \n"
+
+        "out vec3 oe_phong_vertexView3; \n"
 
         "void oe_phong_vertex(inout vec4 VertexVIEW) \n"
         "{ \n"
@@ -107,16 +108,16 @@ namespace
         GLSL_DEFAULT_PRECISION_FLOAT "\n"
 
         "uniform bool oe_mode_GL_LIGHTING; \n"
-        "varying vec3 oe_phong_vertexView3; \n"
 
-        "vec3 oe_global_Normal; \n"
+        "in vec3 oe_phong_vertexView3; \n"
+        "in vec3 vp_Normal; \n"
 
         "void oe_phong_fragment(inout vec4 color) \n"
         "{ \n"        
         "    if ( oe_mode_GL_LIGHTING == false ) return; \n"
 
         "    vec3 L = normalize(gl_LightSource[0].position.xyz); \n"
-        "    vec3 N = normalize(oe_global_Normal); \n"
+        "    vec3 N = vp_Normal; \n"//normalize(vp_Normal); \n"
         
         "    vec4 ambient = gl_FrontLightProduct[0].ambient; \n"
 
@@ -128,7 +129,7 @@ namespace
         "    if (NdotL > 0.0) \n"
         "    { \n"
         "        vec3 V = normalize(oe_phong_vertexView3); \n"
-        "        vec3 H = normalize(L-V); \n"
+        "        vec3 H = reflect(-L,N); \n"
         "        float HdotN = max(dot(H,N), 0.0); \n"
         "        float shine = clamp(gl_FrontMaterial.shininess, 1.0, 128.0); \n"
         "        specular = gl_FrontLightProduct[0].specular * pow(HdotN, shine); \n"

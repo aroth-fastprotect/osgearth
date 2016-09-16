@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,6 +23,7 @@
 #include <osgEarthSymbology/Common>
 #include <osgEarthSymbology/Tags>
 #include <osgEarth/Config>
+#include <vector>
 
 namespace osgEarth { namespace Symbology
 {
@@ -60,6 +61,8 @@ namespace osgEarth { namespace Symbology
     private:
         std::string _name;
     };
+
+    typedef std::vector< osg::ref_ptr<Resource> > ResourceVector;
 
 } } // namespace osgEarth::Symbology
 

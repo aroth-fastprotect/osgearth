@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -25,6 +25,16 @@ Query::Query( const Config& conf ):
 _map(0)
 {
     mergeConfig( conf );
+}
+
+Query::Query(const Query& rhs) :
+_bounds(rhs._bounds),
+_expression(rhs._expression),
+_orderby(rhs._orderby),
+_tileKey(rhs._tileKey),
+_map(rhs._map)
+{
+    //nop
 }
 
 void

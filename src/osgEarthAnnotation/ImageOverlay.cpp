@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -23,7 +23,7 @@
 #include <osgEarthAnnotation/AnnotationRegistry>
 #include <osgEarthSymbology/MeshSubdivider>
 #include <osgEarthFeatures/GeometryUtils>
-#include <osgEarthFeatures/MeshClamper>
+#include <osgEarth/GeometryClamper>
 #include <osgEarthFeatures/Feature>
 #include <osgEarth/MapNode>
 #include <osgEarth/NodeUtils>
@@ -55,6 +55,8 @@ namespace
     {
         l.y() = osg::clampBetween( l.y(), -90.0, 90.0);
     }
+
+    static Distance default_geometryResolution(5.0, Units::DEGREES);
 }
 
 //---------------------------------------------------------------------------
@@ -62,7 +64,7 @@ namespace
 OSGEARTH_REGISTER_ANNOTATION( imageoverlay, osgEarth::Annotation::ImageOverlay );
 
 ImageOverlay::ImageOverlay(MapNode* mapNode, const Config& conf, const osgDB::Options* dbOptions) :
-AnnotationNode(mapNode, conf),
+AnnotationNode(conf),
 _lowerLeft    (10, 10),
 _lowerRight   (20, 10),
 _upperRight   (20, 20),
@@ -71,7 +73,8 @@ _dirty        (false),
 _alpha        (1.0f),
 _minFilter    (osg::Texture::LINEAR_MIPMAP_LINEAR),
 _magFilter    (osg::Texture::LINEAR),
-_texture      (0)
+_texture      (0),
+_geometryResolution(default_geometryResolution)
 {
     conf.getIfSet( "url",   _imageURI );
     if ( _imageURI.isSet() )
@@ -115,7 +118,15 @@ _texture      (0)
     conf.getIfSet("min_filter","NEAREST_MIPMAP_LINEAR", _minFilter,osg::Texture::NEAREST_MIPMAP_LINEAR);
     conf.getIfSet("min_filter","NEAREST_MIPMAP_NEAREST",_minFilter,osg::Texture::NEAREST_MIPMAP_NEAREST);
 
+    if (conf.hasValue("geometry_resolution"))
+    {
+        float value; Units units;
+        if (Units::parse(conf.value("geometry_resolution"), value, units, Units::DEGREES))
+            _geometryResolution.set(value, units);
+    }
+
     postCTOR();
+    ImageOverlay::setMapNode( mapNode );
 }
 
 Config
@@ -161,6 +172,11 @@ ImageOverlay::getConfig() const
     conf.updateIfSet("min_filter","NEAREST_MIPMAP_LINEAR", _minFilter,osg::Texture::NEAREST_MIPMAP_LINEAR);
     conf.updateIfSet("min_filter","NEAREST_MIPMAP_NEAREST",_minFilter,osg::Texture::NEAREST_MIPMAP_NEAREST);
 
+    if (_geometryResolution != default_geometryResolution)
+    {
+        conf.update("geometry_resolution", _geometryResolution.asParseableString());
+    }
+
     return conf;
 }
 
@@ -168,7 +184,7 @@ ImageOverlay::getConfig() const
 
 
 ImageOverlay::ImageOverlay(MapNode* mapNode, osg::Image* image) :
-AnnotationNode(mapNode),
+AnnotationNode(),
 _lowerLeft    (10, 10),
 _lowerRight   (20, 10),
 _upperRight   (20, 20),
@@ -178,9 +194,11 @@ _dirty        (false),
 _alpha        (1.0f),
 _minFilter    (osg::Texture::LINEAR_MIPMAP_LINEAR),
 _magFilter    (osg::Texture::LINEAR),
-_texture      (0)
+_texture      (0),
+_geometryResolution(default_geometryResolution)
 {        
     postCTOR();
+    ImageOverlay::setMapNode(mapNode);
 }
 
 void
@@ -192,7 +210,7 @@ ImageOverlay::postCTOR()
     _transform->addChild( _geode );
 
     // place the geometry under a drapeable node so it will project onto the terrain    
-    DrapeableNode* d = new DrapeableNode( getMapNode() );
+    DrapeableNode* d = new DrapeableNode(); // getMapNode() );
     addChild( d );
 
     d->addChild( _transform );
@@ -209,13 +227,15 @@ ImageOverlay::init()
 
     _geode->removeDrawables(0, _geode->getNumDrawables() );
 
+    if ( !_clampCallback.valid() )
+    {
+        _clampCallback = new TerrainCallbackAdapter<ImageOverlay>(this);
+    }
+
     if ( getMapNode() )
     {
-        double height = 0;
         osg::Geometry* geometry = new osg::Geometry();
         geometry->setUseVertexBufferObjects(true);
-
-        const osg::EllipsoidModel* ellipsoid = getMapNode()->getMapSRS()->getEllipsoid();
 
         const SpatialReference* mapSRS = getMapNode()->getMapSRS();
 
@@ -226,7 +246,7 @@ ImageOverlay::init()
         g->push_back( osg::Vec3d(_lowerRight.x(), _lowerRight.y(), 0) );
         g->push_back( osg::Vec3d(_upperRight.x(), _upperRight.y(), 0) );
         g->push_back( osg::Vec3d(_upperLeft.x(),  _upperLeft.y(),  0) );
-        //_boundingPolytope = f->getWorldBoundingPolytope();
+        
         f->getWorldBoundingPolytope( getMapNode()->getMapSRS(), _boundingPolytope );
 
         // next, convert to world coords and create the geometry:
@@ -289,7 +309,7 @@ ImageOverlay::init()
         if (getMapNode()->getMap()->isGeocentric())
         {
             MeshSubdivider ms(osg::Matrixd::inverse(_transform->getMatrix()), _transform->getMatrix());
-            ms.run(*geometry, osg::DegreesToRadians(5.0), GEOINTERP_RHUMB_LINE);
+            ms.run(*geometry, _geometryResolution.as(Units::RADIANS), GEOINTERP_RHUMB_LINE);
         }
 
         _geode->addDrawable( geometry );
@@ -305,13 +325,16 @@ ImageOverlay::init()
         style.getOrCreate<AltitudeSymbol>()->clamping() = AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN;
         applyStyle( style );
         setLightingIfNotSet( false );
-        clampMesh( getMapNode()->getTerrain()->getGraph() );
+        //clampMesh( getMapNode()->getTerrain()->getGraph() );
 
         if ( Registry::capabilities().supportsGLSL() )
         {
             //OE_WARN << LC << "ShaderGen RUNNING" << std::endl;
             Registry::shaderGenerator().run( _geode, "osgEarth.ImageOverlay" );
         }
+
+        getMapNode()->getTerrain()->addTerrainCallback( _clampCallback.get() );
+        clamp( getMapNode()->getTerrain(), getMapNode()->getTerrain()->getGraph() );
     }
 }
 
@@ -328,13 +351,13 @@ ImageOverlay::setMapNode( MapNode* mapNode )
 bool
 ImageOverlay::getDraped() const
 {
-    return static_cast< const DrapeableNode *>( getChild(0))->getDraped();
+    return static_cast< const DrapeableNode *>( getChild(0))->getDrapingEnabled();
 }
 
 void
 ImageOverlay::setDraped( bool draped )
 {
-    static_cast< DrapeableNode *>( getChild(0))->setDraped( draped );
+    static_cast< DrapeableNode *>( getChild(0))->setDrapingEnabled( draped );
 }
 
 osg::Image*
@@ -717,37 +740,27 @@ ImageOverlay::removeCallback( ImageOverlayCallback* cb )
     }    
 }
 
-
 void
-ImageOverlay::reclamp( const TileKey& key, osg::Node* tile, const Terrain* )
+ImageOverlay::clamp(const Terrain* terrain, osg::Node* patch)
 {
-    if ( _boundingPolytope.contains( tile->getBound() ) ) // intersects, actually
+    if ( terrain && patch )
     {
-        clampMesh( tile );
-        OE_DEBUG << LC << "Clamped overlay mesh, tile radius = " << tile->getBound().radius() << std::endl;
+        GeometryClamper clamper;
+        clamper.setTerrainPatch( patch );
+        clamper.setTerrainSRS( terrain->getSRS() );
+
+        this->accept( clamper );
+        this->dirtyBound();
     }
 }
 
 void
-ImageOverlay::clampMesh( osg::Node* terrainModel )
+ImageOverlay::onTileAdded(const TileKey&          key, 
+                          osg::Node*              tile, 
+                          TerrainCallbackContext& context)
 {
-    double scale  = 1.0;
-    double offset = 0.0;
-    bool   relative = false;
-
-    if (_altitude.valid())
+    if ( tile == 0L || _boundingPolytope.contains(tile->getBound()) )
     {
-        if ( _altitude->verticalScale().isSet() )
-            scale = _altitude->verticalScale()->eval();
-
-        if ( _altitude->verticalOffset().isSet() )
-            offset = _altitude->verticalOffset()->eval();
-
-        relative = _altitude->clamping() == AltitudeSymbol::CLAMP_RELATIVE_TO_TERRAIN;
+        clamp( context.getTerrain(), tile );
     }
-
-    MeshClamper clamper( terrainModel, getMapNode()->getMapSRS(), getMapNode()->isGeocentric(), relative, scale, offset );
-    this->accept( clamper );
-
-    this->dirtyBound();
 }

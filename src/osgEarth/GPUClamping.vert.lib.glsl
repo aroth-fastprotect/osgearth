@@ -12,9 +12,7 @@ uniform mat4 oe_clamp_depthClip2cameraView;
 // Given a vertex in view space, clamp it to the "ground" as represented
 // by an orthographic depth texture. Return the clamped vertex in view space,
 // along with the associated depth value.
-void oe_getClampedViewVertex(in  vec4  vertView,
-                             out vec4  out_clampedVertView,
-                             out float out_depth)
+void oe_getClampedViewVertex(in vec4 vertView, out vec4 out_clampedVertView, out float out_depth)
 {
     // transform the vertex into the depth texture's clip coordinates.
     vec4 vertDepthClip = oe_clamp_cameraView2depthClip * vertView;
@@ -29,7 +27,7 @@ void oe_getClampedViewVertex(in  vec4  vertView,
     out_clampedVertView = oe_clamp_depthClip2cameraView * clampedVertDepthClip;
 }
 
-// Returns a vector indiciating the "down" direction.
+// Returns a vector indicating the "down" direction.
 void oe_getClampingUpVector(out vec3 up)
 {
     up = normalize(mat3(oe_clamp_depthClip2cameraView) * vec3(0,0,-1));

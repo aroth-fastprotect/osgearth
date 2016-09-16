@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -506,7 +506,7 @@ BoundaryUtil::findMeshBoundary( osg::Node* node, bool geocentric )
     node->accept( buildTopoVisitor );
 
     OE_DEBUG << "Found " << topology._verts.size() << " unique verts" << std::endl;
-    dumpPointCloud(topology);
+    //dumpPointCloud(topology);
 
     // starting with the minimum-Y vertex (which is guaranteed to be in the boundary)
     // traverse the outside of the point set. Do this by sorting all the edges by

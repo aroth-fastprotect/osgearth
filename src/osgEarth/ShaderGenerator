@@ -26,6 +26,7 @@
 #include <osg/NodeVisitor>
 #include <osg/State>
 #include <osg/Version>
+#include <osg/Drawable>
 #include <sstream>
 #include <set>
 
@@ -166,6 +167,10 @@ namespace osgEarth
         virtual void apply( osg::ProxyNode& );
         virtual void apply( osg::ClipNode& );
 
+#if OSG_VERSION_GREATER_OR_EQUAL(3,3,3)
+        virtual void apply( osg::Drawable& );
+#endif
+
     public: // types not in osg::NodeVisitor
 
         virtual void applyNonCoreNodeIfNecessary( osg::Node& );
@@ -239,6 +244,8 @@ namespace osgEarth
 
         typedef std::vector<osg::ref_ptr<AcceptCallback> > AcceptCallbackVector;
         AcceptCallbackVector _acceptCallbacks;
+
+        std::set<osg::Drawable*> _drawablesVisited;
 
         bool accept(const osg::StateAttribute* sa) const;
     };

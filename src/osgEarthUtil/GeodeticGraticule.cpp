@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -23,7 +23,6 @@
 #include <osgEarthSymbology/Geometry>
 #include <osgEarthAnnotation/LabelNode>
 
-#include <osgEarth/Decluttering>
 #include <osgEarth/Registry>
 #include <osgEarth/NodeUtils>
 #include <osgEarth/Utils>
@@ -204,7 +203,9 @@ GeodeticGraticule::rebuild()
         }
     }
 
-    _root = new DrapeableNode( _mapNode.get(), false );
+    DrapeableNode* drapeable = new DrapeableNode();
+    drapeable->setDrapingEnabled( false );
+    _root = drapeable;
     this->addChild( _root );
 
     // need at least one level
@@ -268,8 +269,6 @@ GeodeticGraticule::buildTile( const TileKey& key, Map* map ) const
     if ( hasText )
     {
         labels = new osg::Group();
-        //TODO:  This is a bug, if you don't turn on decluttering the text labels are giant.  Need to determine what is wrong with LabelNodes without decluttering.
-        Decluttering::setEnabled( labels->getOrCreateStateSet(), true );
     }
 
     // spatial ref for features:
@@ -439,18 +438,24 @@ namespace osgEarth { namespace Util
     class GeodeticGraticuleFactory : public osgDB::ReaderWriter
     {
     public:
-        virtual const char* className()
+        GeodeticGraticuleFactory()
         {
             supportsExtension( GRATICULE_EXTENSION, "osgEarth graticule" );
+        }
+
+    public: // osgDB::ReaderWriter
+
+        const char* className() const
+        {
             return "osgEarth graticule LOD loader";
         }
 
-        virtual bool acceptsExtension(const std::string& extension) const
+        bool acceptsExtension(const std::string& extension) const
         {
             return osgDB::equalCaseInsensitive(extension, GRATICULE_EXTENSION);
         }
 
-        virtual ReadResult readNode(const std::string& uri, const Options* options) const
+        ReadResult readNode(const std::string& uri, const Options* options) const
         {        
             std::string ext = osgDB::getFileExtension( uri );
             if ( !acceptsExtension( ext ) )
@@ -474,7 +479,10 @@ namespace osgEarth { namespace Util
                     graticule = i->second.get();
             }
 
-            osg::Node* result = graticule->buildChildren( levelNum, x, y );
+            osg::Node* result = 0L;
+            if (graticule)
+                result = graticule->buildChildren( levelNum, x, y );
+
             return result ? ReadResult(result) : ReadResult::ERROR_IN_READING_FILE;
         }
     };

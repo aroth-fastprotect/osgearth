@@ -1,9 +1,9 @@
 #version $GLSL_VERSION_STR
 $GLSL_DEFAULT_PRECISION_FLOAT
 
-#pragma vp_entryPoint "atmos_vertex_main"
-#pragma vp_location   "vertex_view"
-#pragma vp_order      "0.5"
+#pragma vp_entryPoint atmos_vertex_main
+#pragma vp_location   vertex_view
+#pragma vp_order      0.5
 
 uniform bool oe_mode_GL_LIGHTING; 
 
@@ -36,7 +36,7 @@ varying vec3 atmos_up;             // earth up vector at vertex location (not th
 varying float atmos_space;         // [0..1]: camera: 0=inner radius (ground); 1.0=outer radius
 varying vec3 atmos_vert; 
 
-vec3 oe_global_Normal;             // surface normal (from osgEarth)
+vec3 vp_Normal;             // surface normal (from osgEarth)
 
 float atmos_scale(float fCos) 	
 { 
@@ -68,7 +68,7 @@ void atmos_GroundFromSpace(in vec4 vertexVIEW)
     vec3 v3Start = v3Ray * fNear; 			
     fFar -= fNear; 
     float fDepth = exp((atmos_fInnerRadius - atmos_fOuterRadius) / atmos_fScaleDepth);
-    float fCameraAngle = dot(-v3Ray, normal); 
+    float fCameraAngle = dot(-v3Ray, normal);  // try max(0, ...) to get rid of yellowing building tops
     float fLightAngle = dot(atmos_lightDir, normal); 
     float fCameraScale = atmos_scale(fCameraAngle); 
     float fLightScale = atmos_scale(fLightAngle); 

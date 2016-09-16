@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -84,6 +84,7 @@ SimplexNoise::Grad::Grad(double x, double y, double z)
     this->x = x;
     this->y = y;
     this->z = z;
+    this->w = 1.0;
 }
 
 SimplexNoise::Grad::Grad(double x, double y, double z, double w)
@@ -149,6 +150,9 @@ double SimplexNoise::getTiledValue(double x, double y) const
     double amp = 1.0;
     double maxamp = 0.0;
     double n = 0.0;
+
+    // trick to create tiled noise (2 ortho circles)
+    // http://www.gamedev.net/blog/33/entry-2138456-seamless-noise/
     
     double nx = cos(x*TwoPI)/TwoPI;
     double ny = cos(y*TwoPI)/TwoPI;
@@ -179,7 +183,10 @@ double SimplexNoise::getTiledValueWithTurbulence(double x, double y, double F) c
     double amp = 1.0;
     double maxamp = 0.0;
     double n = 0.0;
-    
+
+    // trick to create tiled noise (2 ortho circles)
+    // http://www.gamedev.net/blog/33/entry-2138456-seamless-noise/
+
     double nx = cos(x*TwoPI)/TwoPI;
     double ny = cos(y*TwoPI)/TwoPI;
     double nz = sin(x*TwoPI)/TwoPI;

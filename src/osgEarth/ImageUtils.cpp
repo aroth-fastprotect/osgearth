@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -22,6 +22,7 @@
 #include <osgEarth/Registry>
 #include <osgEarth/Capabilities>
 #include <osgEarth/Random>
+#include <osgEarth/GeoCommon>
 #include <osg/Notify>
 #include <osg/Texture>
 #include <osg/ImageSequence>
@@ -906,6 +907,49 @@ ImageUtils::computeTextureCompressionMode(const osg::Image*                 imag
     return false;
 }
 
+bool 
+ImageUtils::replaceNoDataValues(osg::Image*       target,
+                                const Bounds&     targetBounds,
+                                const osg::Image* reference,
+                                const Bounds&     referenceBounds)
+{
+    if (target == 0L ||
+        reference == 0L ||
+        !targetBounds.intersects(referenceBounds) )
+    {
+        return false;
+    }
+
+    float
+        xscale = targetBounds.width()/referenceBounds.width(),
+        yscale = targetBounds.height()/referenceBounds.height();
+
+    float
+        xbias = targetBounds.xMin() - referenceBounds.xMin(),
+        ybias = targetBounds.yMin() - referenceBounds.yMin();
+
+    PixelReader readTarget(target);
+    PixelWriter writeTarget(target);
+    PixelReader readReference(reference);
+
+    for(int s=0; s<target->s(); ++s)
+    {
+        for(int t=0; t<target->t(); ++t)
+        {
+            osg::Vec4f pixel = readTarget(s, t);
+            if ( pixel.r() == NO_DATA_VALUE )
+            {
+                float nx = (float)s / (float)(target->s()-1);
+                float ny = (float)t / (float)(target->t()-1);
+                osg::Vec4f refValue = readReference( xscale*nx+xbias, yscale*ny+ybias );
+                writeTarget(refValue, s, t);
+            }
+        }
+    }
+
+    return true;
+}
+
 bool
 ImageUtils::canConvert( const osg::Image* image, GLenum pixelFormat, GLenum dataType )
 {
@@ -1649,7 +1693,8 @@ namespace
 }
     
 ImageUtils::PixelReader::PixelReader(const osg::Image* image) :
-_image     (image)
+_image     (image),
+_bilinear  (false)
 {
     _normalized = ImageUtils::isNormalized(image);
     _colMult = _image->getPixelSizeInBits() / 8;
@@ -1662,6 +1707,45 @@ _image     (image)
         OE_WARN << "[PixelReader] No reader found for pixel format " << std::hex << _image->getPixelFormat() << std::endl; 
         _reader = &ColorReader<0,GLbyte>::read;
     }
+}
+
+osg::Vec4
+ImageUtils::PixelReader::operator()(float u, float v, int r, int m) const
+ {
+     if ( _bilinear )
+     {
+         float sizeS = (float)(_image->s()-1);
+         float sizeT = (float)(_image->t()-1);
+
+         // u, v => [0..1]
+         float s = u * sizeS;
+         float t = v * sizeT;
+
+         float s0 = std::max(floorf(s), 0.0f);
+         float s1 = std::min(s0+1.0f, sizeS);
+         float smix = s0 < s1 ? (s-s0)/(s1-s0) : 0.0f;
+
+         float t0 = std::max(floorf(t), 0.0f);
+         float t1 = std::min(t0+1.0f, sizeT);
+         float tmix = t0 < t1 ? (t-t0)/(t1-t0) : 0.0f;
+
+         osg::Vec4 UL = (*_reader)(this, (int)s0, (int)t0, r, m); // upper left
+         osg::Vec4 UR = (*_reader)(this, (int)s1, (int)t0, r, m); // upper right
+         osg::Vec4 LL = (*_reader)(this, (int)s0, (int)t1, r, m); // lower left
+         osg::Vec4 LR = (*_reader)(this, (int)s1, (int)t1, r, m); // lower right
+
+         osg::Vec4 TOP = UL*(1.0f-smix) + UR*smix;
+         osg::Vec4 BOT = LL*(1.0f-smix) + LR*smix;
+
+         return TOP*(1.0f-tmix) + BOT*tmix;
+     }
+     else
+     {
+         return (*_reader)(this,
+             (int)(u * (float)(_image->s()-1)),
+             (int)(v * (float)(_image->t()-1)),
+             r, m);
+     }
 }
 
 bool
@@ -1757,4 +1841,79 @@ bool
 ImageUtils::PixelWriter::supports( GLenum pixelFormat, GLenum dataType )
 {
     return getWriter(pixelFormat, dataType) != 0L;
+}
+
+TextureAndImageVisitor::TextureAndImageVisitor() :
+osg::NodeVisitor()
+{
+    setNodeMaskOverride( ~0L );
+    setTraversalMode(TRAVERSE_ALL_CHILDREN);
+}
+
+void
+TextureAndImageVisitor::apply(osg::Texture& texture)
+{
+    for (unsigned k = 0; k < texture.getNumImages(); ++k)
+    {
+        osg::Image* image = texture.getImage(k);
+        if (image)
+        {
+            apply(*image);
+        }
+    }
+}
+
+void
+TextureAndImageVisitor::apply(osg::Node& node)
+{
+    if (node.getStateSet())
+        apply(*node.getStateSet());
+
+    traverse(node);
+}
+
+void
+TextureAndImageVisitor::apply(osg::Geode& geode)
+{
+    if (geode.getStateSet())
+        apply(*geode.getStateSet());
+
+    for (unsigned i = 0; i < geode.getNumDrawables(); ++i) {
+        apply(*geode.getDrawable(i));
+        //if (geode.getDrawable(i) && geode.getDrawable(i)->getStateSet())
+        //    apply(*geode.getDrawable(i)->getStateSet());
+    }
+
+    //traverse(geode);
+}
+
+void
+TextureAndImageVisitor::apply(osg::Drawable& drawable)
+{
+    if (drawable.getStateSet())
+        apply(*drawable.getStateSet());
+
+    //traverse(drawable);
+}
+
+void
+TextureAndImageVisitor::apply(osg::StateSet& stateSet)
+{
+    osg::StateSet::TextureAttributeList& a = stateSet.getTextureAttributeList();
+    for (osg::StateSet::TextureAttributeList::iterator i = a.begin(); i != a.end(); ++i)
+    {
+        osg::StateSet::AttributeList& b = *i;
+        for (osg::StateSet::AttributeList::iterator j = b.begin(); j != b.end(); ++j)
+        {
+            osg::StateAttribute* sa = j->second.first.get();
+            if (sa)
+            {
+                osg::Texture* tex = dynamic_cast<osg::Texture*>(sa);
+                if (tex)
+                {
+                    apply(*tex);
+                }
+            }
+        }
+    }
 }

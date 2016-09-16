@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -295,7 +295,6 @@ _maxTextureBufferSize   ( 0 )
             osg::isGLExtensionSupported( id, "GL_ARB_texture_non_power_of_two" );
         OE_INFO << LC << "  NPOT textures = " << SAYBOOL(_supportsNonPowerOfTwoTextures) << std::endl;
 
-#if OSG_VERSION_GREATER_OR_EQUAL(3, 1, 7)
         _supportsTextureBuffer = 
             osg::isGLExtensionOrVersionSupported( id, "GL_ARB_texture_buffer_object", 3.0 ) ||
             osg::isGLExtensionOrVersionSupported( id, "GL_EXT_texture_buffer_object", 3.0 );
@@ -304,13 +303,16 @@ _maxTextureBufferSize   ( 0 )
         {
             glGetIntegerv( GL_MAX_TEXTURE_BUFFER_SIZE, &_maxTextureBufferSize );
         }
-#endif
 
         OE_INFO << LC << "  Texture buffers = " << SAYBOOL(_supportsTextureBuffer) << std::endl;
         if ( _supportsTextureBuffer )
         {
             OE_INFO << LC << "  Texture buffer max size = " << _maxTextureBufferSize << std::endl;
-        }            
+        }       
+
+        bool supportsTransformFeedback =
+            osg::isGLExtensionSupported( id, "GL_ARB_transform_feedback2" );
+        OE_INFO << LC << "  Transform feedback = " << SAYBOOL(supportsTransformFeedback) << "\n";
 
 
         // Writing to gl_FragDepth is not supported under GLES:

@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -24,6 +24,7 @@
 
 #include <osgEarthAnnotation/AnnotationNode>
 #include <osgEarth/MapNode>
+#include <osgEarth/GeometryClamper>
 #include <osgEarthSymbology/Style>
 #include <osgEarthFeatures/Feature>
 #include <osgEarthFeatures/GeometryCompiler>
@@ -52,7 +53,8 @@ namespace osgEarth { namespace Annotation
             MapNode* mapNode, 
             Feature* feature,
             const Style& style = Style(),
-            const GeometryCompilerOptions& options = GeometryCompilerOptions() );
+            const GeometryCompilerOptions& options = GeometryCompilerOptions(),
+            StyleSheet* styleSheet = 0);
 
         /**
          * Constructs a new FeatureNode from a FeatureList
@@ -61,14 +63,15 @@ namespace osgEarth { namespace Annotation
             MapNode* mapNode, 
             FeatureList& features,
             const Style& style = Style(),
-            const GeometryCompilerOptions& options = GeometryCompilerOptions() );
+            const GeometryCompilerOptions& options = GeometryCompilerOptions(), 
+            StyleSheet* styleSheet = 0);
 
         virtual ~FeatureNode() { }
 
          /**
          * Gets the list of features
          */
-        FeatureList& getFeatures() { return _features; };
+        FeatureList& getFeatures() { return _features; }
 
         /**
          * Utility that lets you work on this FeatureNode as a single Feature instead of a list
@@ -81,14 +84,14 @@ namespace osgEarth { namespace Annotation
         void setFeature(Feature* feature);
 
         /**
-         * Get whether cluster culling is enabled on this FeatureNode
+         * Gets the StyleSheet for the session.
          */
-        bool getClusterCulling() const;
+        StyleSheet* getStyleSheet() const;
 
-        /*
-         * Sets whether cluster culling is enabled on this FeatureNode.
+        /**
+         * Sets the StyleSheet for the session.
          */
-        void setClusterCulling( bool clusterCulling );
+        void setStyleSheet(StyleSheet* styleSheet);
 
 
         /**
@@ -99,8 +102,6 @@ namespace osgEarth { namespace Annotation
         void dirty() { init(); }
 
     public: // AnnotationNode
-
-        virtual osg::Group* getAttachPoint();
 
         /**
          * Gets the Style for this FeatureNode.
@@ -130,24 +131,28 @@ namespace osgEarth { namespace Annotation
         osg::Polytope                _featurePolytope;
         Style                        _style;
         bool                         _needsRebuild;
-        bool                         _clusterCulling;
         GeoExtent                    _extent;
-        osg::NodeCallback*           _clusterCullingCallback;
+
+        typedef TerrainCallbackAdapter<FeatureNode> ClampCallback;
+        osg::ref_ptr<ClampCallback> _clampCallback;
 
         osg::ref_ptr< osg::Node >    _compiled;
+
+        osg::ref_ptr< StyleSheet >   _styleSheet;
 
         FeatureNode() { }
         FeatureNode(const FeatureNode& rhs, const osg::CopyOp& op) { }
         
-        virtual void reclamp( const TileKey& key, osg::Node* tile, const Terrain* );
+        void clamp(const Terrain* terrain, osg::Node* patch);
 
         void build();
 
-        void updateClusterCulling();
+    public:
 
-        
-    private:
-        void clampMesh( osg::Node* terrainModel );
+        void onTileAdded(
+            const TileKey&          key, 
+            osg::Node*              tile, 
+            TerrainCallbackContext& context);
     };
 
 } } // namespace osgEarth::Annotation

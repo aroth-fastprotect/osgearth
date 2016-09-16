@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -34,6 +34,58 @@
 
 namespace osgEarth
 {
+    template<typename DATA>
+    struct fast_set
+    {
+        typedef DATA                 entry_t;
+        typedef std::vector<entry_t> container_t;
+
+        container_t _data;
+
+        typedef typename container_t::iterator       iterator;
+        typedef typename container_t::const_iterator const_iterator;
+
+        iterator find(const DATA& value) {
+            for( iterator i = _data.begin(); i != _data.end(); ++i ) {
+                if ( (*i) == value ) {
+                    return i;
+                }
+            }
+            return _data.end();
+        }
+
+        const_iterator find(const DATA& value) const {
+            for( const_iterator i = _data.begin(); i != _data.end(); ++i ) {
+                if ( (*i) == value ) {
+                    return i;
+                }
+            }
+            return _data.end();
+        }
+
+        std::pair<iterator,bool> insert(const DATA& value) {
+            for( iterator i = _data.begin(); i != _data.end(); ++i ) {
+                if ( (*i) == value ) {
+                    *i = value;
+                    return std::make_pair(i, false);
+                }
+            }
+            _data.push_back(value);
+            iterator n = _data.end(); --n;
+            return std::make_pair(n, true);
+        }
+
+        const_iterator begin() const { return _data.begin(); }
+        const_iterator end() const { return _data.end(); }
+        iterator begin() { return _data.begin(); }
+        iterator end() { return _data.end(); }
+        bool empty() const { return _data.empty(); }
+        void clear() { _data.clear(); }        
+        void erase(iterator i) { _data.erase(i); }
+        void erase(const DATA& data) { iterator i = find(data); if (i != _data.end()) _data.erase(i); }
+        int size() const { return _data.size(); }
+    };
+
     /**
      * A std::map-like map that uses a vector and a getUID method for keying.
      * DATA must have a getUID() method.
@@ -45,7 +97,7 @@ namespace osgEarth
             inline const KEY&  key()  const { return _key; }
             inline const DATA& data() const { return _data; }
             inline DATA&       data()       { return _data; }
-            KEY   _key;
+            KEY  _key;
             DATA _data;
         };
         typedef std::vector<ENTRY> container_t;
@@ -65,7 +117,6 @@ namespace osgEarth
                 }
             }
             _container.resize(_container.size()+1);
-            //_container.push_back(ENTRY());
             _container.back()._key = key;
             return _container.back()._data;
         }
@@ -96,13 +147,6 @@ namespace osgEarth
         inline bool empty() const { return _container.empty(); }
 
         inline void clear() { _container.clear(); }
-        
-        //iterator erase(iterator& i) {
-        //    iterator j = i; ++j;
-        //    *i = _data.at(_data.size()-1);
-        //    _data.resize(_data.size()-1);
-        //    return j;
-        //}
 
         inline void erase(const KEY& key) {
             for(unsigned i=0; i<_container.size(); ++i) {
@@ -131,27 +175,19 @@ namespace osgEarth
     template<typename KEY, typename DATA>
     struct fast_map
     {
-        typedef std::pair<KEY,DATA> entry_t;
-        typedef std::list<entry_t>  list_t;
+        typedef std::pair<KEY,DATA>  entry_t;
+        typedef std::vector<entry_t> container_t;
 
-        typedef typename list_t::iterator       iterator;
-        typedef typename list_t::const_iterator const_iterator;
+        typedef typename container_t::iterator       iterator;
+        typedef typename container_t::const_iterator const_iterator;
 
-        list_t _data;
-        KEY    _lastKey;
+        container_t _data;
+        KEY         _lastKey;
 
         DATA& operator[] (const KEY& key) {
             for( iterator i = _data.begin(); i != _data.end(); ++i ) {
                 if ( i->first == key ) {
-                    if ( _lastKey == key && i != _data.begin() ) {
-                        _data.insert(begin(), *i);
-                        _data.erase(i);
-                        return _data.front().second;
-                    }
-                    else {
-                        _lastKey = key;
-                        return i->second;
-                    }
+                    return i->second;
                 }
             }
             _data.push_back(entry_t(key,DATA()));
@@ -183,9 +219,17 @@ namespace osgEarth
 
         bool empty() const { return _data.empty(); }
 
-        void clear() { _data.clear(); }
+        void clear() {
+            _data.clear();
+        }
         
-        iterator erase(iterator& i) { return _data.erase( i ); }
+        iterator erase(iterator i) {
+            return _data.erase( i );
+        }
+
+        iterator erase(iterator i0, iterator i1) {
+            return _data.erase(i0, i1);
+        }
 
         void erase(const KEY& key) {
             iterator i = find(key);
@@ -247,12 +291,17 @@ namespace osgEarth
             friend class LRUCache;
         };
 
+        struct Functor {
+            virtual void operator()(const K& key, const T& value) =0;
+        };
+
     protected:
         typedef typename std::list<K>::iterator      lru_iter;
         typedef typename std::list<K>                lru_type;
         typedef typename std::pair<T, lru_iter>      map_value_type;
         typedef typename std::map<K, map_value_type> map_type;
         typedef typename map_type::iterator          map_iter;
+        typedef typename map_type::const_iterator    map_const_iter;
 
         map_type _map;
         lru_type _lru;
@@ -345,7 +394,17 @@ namespace osgEarth
 
         CacheStats getStats() const {
             return CacheStats(
-                _lru.size(), _max, _queries, _queries > 0 ? (float)_hits/(float)_queries : 0.0f );
+                _map.size(), _max, _queries, _queries > 0 ? (float)_hits/(float)_queries : 0.0f );
+        }
+
+        void iterate(Functor& functor) const {
+            if (_threadsafe) {
+                Threading::ScopedMutexLock lock(_mutex);
+                iterate_impl(functor);
+            }
+            else {
+                iterate_impl(functor);
+            }
         }
 
     private:
@@ -365,7 +424,7 @@ namespace osgEarth
                 _map[key] = std::make_pair(value, last);
             }
 
-            if ( _lru.size() > _max ) {
+            if ( _map.size() > _max ) {
                 for( unsigned i=0; i < _buf; ++i ) {
                     const K& key = _lru.front();
                     _map.erase( key );
@@ -385,11 +444,7 @@ namespace osgEarth
                 _hits++;
                 result._value = mi->second.first;
                 result._valid = true;
-                //return Record( &(mi->second.first) );
             }
-            //else {
-            //    return Record( 0L );
-            //}
         }
 
         bool has_impl( const K& key ) {
@@ -414,13 +469,18 @@ namespace osgEarth
         void setMaxSize_impl( unsigned max ) {
             _max = max;
             _buf = max/10;
-            while( _lru.size() > _max ) {
+            while( _map.size() > _max ) {
                 const K& key = _lru.front();
                 _map.erase( key );
                 _lru.pop_front();
             }
         }
 
+        void iterate_impl(Functor& f) const {
+            for (map_const_iter i = _map.begin(); i != _map.end(); ++i) {
+                f(i->first, i->second.first);
+            }
+        }
     };
 
     //--------------------------------------------------------------------

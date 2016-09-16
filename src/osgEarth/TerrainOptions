@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -53,15 +53,6 @@ namespace osgEarth
          */
         optional<float>& verticalOffset() { return _verticalOffset; }
         const optional<float>& verticalOffset() const { return _verticalOffset; }
-
-        /**
-         * @deprecated - Use MapOptions::elevationTileSize instead
-         * The sample ratio for height fields. I.e., the terrain engine
-         * will sample heightfield grids at this ratio
-         * Default = 1.0
-         */
-        optional<float>& heightFieldSampleRatio() { return _heightFieldSampleRatio; }
-        const optional<float>& heightFieldSampleRatio() const { return _heightFieldSampleRatio; }
 
         /**
          * Size of each dimension of each terrain tile, in verts. Ideally this 
@@ -176,10 +167,28 @@ namespace osgEarth
         const optional<unsigned>& minNormalMapLOD() const { return _minNormalMapLOD; }
 
         /**
+         * Whether the terrain engine will be using GPU tessellation shaders.
+         */
+        optional<bool>& gpuTessellation() { return _gpuTessellation; }
+        const optional<bool>& gpuTessellation() const { return _gpuTessellation; }
+
+        /**
          * debugging mode
          */
         optional<bool>& debug() { return _debug; }
         const optional<bool>& debug() const { return _debug; }
+
+        optional<int>& binNumber() { return _binNumber; }
+        const optional<int>& binNumber() const { return _binNumber; }
+
+        /**
+         * Terrain tile expiration
+         */
+        optional<int>& minExpiryFrames() { return _minExpiryFrames; }
+        const optional<int>& minExpiryFrames() const { return _minExpiryFrames; }
+
+        optional<double>& minExpiryTime() { return _minExpiryTime; }
+        const optional<double>& minExpiryTime() const { return _minExpiryTime; }
    
     public:
         virtual Config getConfig() const;
@@ -195,7 +204,6 @@ namespace osgEarth
                     
         optional<float> _verticalScale;
         optional<float> _verticalOffset;
-        optional<float> _heightFieldSampleRatio;
         optional<int>   _tileSize;
         optional<float> _minTileRangeFactor;        
         optional<bool> _combineLayers;
@@ -215,7 +223,11 @@ namespace osgEarth
         optional<unsigned> _primaryTraversalMask;
         optional<unsigned> _secondaryTraversalMask;
         optional<unsigned> _minNormalMapLOD;
+        optional<bool> _gpuTessellation;
         optional<bool> _debug;
+        optional<int> _binNumber;
+        optional<int> _minExpiryFrames;
+        optional<double> _minExpiryTime;
     };
 }
 

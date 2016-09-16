@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -80,7 +80,8 @@ _numTilesHigh(-1),
 _numTilesWide(-1),
 _timestamp(0),
 _version("1.0"),
-_tileMapService("http://tms.osgeo.org/1.0.0")
+_tileMapService("http://tms.osgeo.org/1.0.0"),
+_profile_type(Profile::TYPE_MERCATOR)
 {   
 }
 
@@ -393,6 +394,7 @@ std::string getHorizSRSString(const osgEarth::SpatialReference* srs)
 TileMap*
 TileMap::create(const std::string& url,
                 const Profile*     profile,
+                const DataExtentList& dataExtents,
                 const std::string& format,
                 int                tile_width,
                 int                tile_height)
@@ -423,40 +425,29 @@ TileMap::create(const std::string& url,
         tileMap->_format.setExtension( Registry::instance()->getExtensionForMimeType(format) );
     }
 
+    //Add the data extents
+    tileMap->getDataExtents().insert(tileMap->getDataExtents().end(), dataExtents.begin(), dataExtents.end());
+
+    // If we have some data extents specified then make a nicer bounds than the 
+    if (!tileMap->getDataExtents().empty())
+    {
+        // Get the union of all the extents
+        GeoExtent e(tileMap->getDataExtents()[0]);
+        for (unsigned int i = 1; i < tileMap->getDataExtents().size(); i++)
+        {
+            e.expandToInclude(tileMap->getDataExtents()[i]);
+        }
+
+        // Convert the bounds to the output profile
+        GeoExtent bounds = e.transform(profile->getSRS());
+        tileMap->setExtents(bounds.xMin(), bounds.yMin(), bounds.xMax(), bounds.yMax());
+    }
+
     tileMap->generateTileSets();
     tileMap->computeMinMaxLevel();
 
     return tileMap;
 }
-
-TileMap* TileMap::create(const TileSource* tileSource, const Profile* profile)
-{
-    TileMap* tileMap = new TileMap();
-
-    tileMap->setTitle( tileSource->getName() );
-    tileMap->setProfileType( profile->getProfileType() );
-
-    const GeoExtent& ex = profile->getExtent();
-    
-    tileMap->_srs = getHorizSRSString(profile->getSRS()); //srs();
-    tileMap->_vsrs = profile->getSRS()->getVertInitString(); //profile->getVerticalSRS() ? profile->getVerticalSRS()->getInitString() : 0L;
-    tileMap->_originX = ex.xMin();
-    tileMap->_originY = ex.yMin();
-    tileMap->_minX = ex.xMin();
-    tileMap->_minY = ex.yMin();
-    tileMap->_maxX = ex.xMax();
-    tileMap->_maxY = ex.yMax();
-    profile->getNumTiles( 0, tileMap->_numTilesWide, tileMap->_numTilesHigh );
-
-    tileMap->_format.setWidth( tileSource->getPixelsPerTile() );
-    tileMap->_format.setHeight( tileSource->getPixelsPerTile() );
-    tileMap->_format.setExtension( tileSource->getExtension() );
-
-    tileMap->generateTileSets();
-
-    return tileMap;
-}
-
 
 
 //----------------------------------------------------------------------------
@@ -470,7 +461,7 @@ TileMapReaderWriter::read( const std::string& location, const osgDB::ReaderWrite
     ReadResult r = URI(location).readString();
     if ( r.failed() )
     {
-        OE_WARN << LC << "Failed to read TMS tile map file from " << location << std::endl;
+        OE_DEBUG << LC << "Failed to read TMS tile map file from " << location << std::endl;
         return 0L;
     }
     

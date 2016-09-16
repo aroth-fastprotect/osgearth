@@ -24,17 +24,26 @@ How do I place a 3D model on the map?
         ...
         xform->setTerrain( mapNode->getTerrain() );
         ...
-        GeoPoint point(srs, -121.0, 34.0, 1000.0, ALTMODE_ABSOLUTE);
+        GeoPoint point(srs, -121.0, 34.0);
         xform->setPosition(point);
 
-    A lower-level approach is to make a ``osg::Matrix`` so you can position
-    a model using your own ``osg::MatrixTransform``::
-    
-        GeoPoint point(latLong, -121.0, 34.0, 1000.0, ALTMODE_ABSOLUTE);
-        osg::Matrix matrix;
-        point.createLocalToWorld( matrix );
-        myMatrixTransform->setMatrix( matrix );
-    
+
+I added a node, but it has no texture/lighting/etc. in osgEarth. Why?
+.....................................................................
+
+    Everything under an osgEarth scene graph is rendered with shaders.
+    So, when using your own models (or creating geometry by hand) you 
+    need to create shader components in order for them to render properly.
+
+    osgEarth has a built-in shader generator for this purpose. Run the
+    shader generator on your node like so:
+
+        osgEarth::Registry::shaderGenerator().run( myNode );
+
+    After that, your node will contain shader snippets that allows osgEarth
+    to render it properly and for it to work with other osgEarth features
+    like sky lighting.
+
 
 How do make the terrain transparent?
 ....................................
@@ -60,30 +69,16 @@ How do I set the resolution of terrain tiles?
 .............................................
 
     Each tile is a grid of vertices. The number of vertices can vary depending on source data
-    and settings. By default (when you have no elevation data) it is an 15x15 grid, tessellated
+    and settings. By default (when you have no elevation data) it is an 17x17 grid, tessellated
     into triangles.
     
-    If you do have elevation data, osgEarth will use the tile size of the first elevation layer 
-    to decide on the overall tile size for the terrain.
-
-    You can control this in a couple ways. If you have elevation data, you can set the
-    ``tile_size`` property on the elevation layer. For example::
-    
-        <elevation name="srtm" driver="gdal">
-            <url>...</url>
-            <tile_size>31</tile_size>
-        </elevation>
-        
-    That will read data as a grid of 31x31 vertices. If this is your first elevation layer,
-    osgEarth will render tiles at a resolution of 31x31.
-
-    Or, you can expressly set the terrain's tile size overall by using the Map options.
+    You can expressly set the terrain's tile size by using the Map options.
     osgEarth will then resample all elevation data to the size you specify::
 
         <map>
             <options>
                 <terrain>
-                    <tile_size>32</tile_size> 
+                    <tile_size>65</tile_size> 
                     ...
 
 
@@ -111,7 +106,8 @@ Does osgEarth work with VirtualPlanetBuilder?
 	  plug-in framework.
 
 	osgEarth has a *VPB driver* for "scraping" elevation and imagery tiles from a VPB model.
-	See the ``vpb_earth_bayarea.earth`` example in the repo for usage.
+    Confiugration of this driver is quite tricky and requires you to understand the details
+    of how VPB models are organized. You're on your own.
 	
 	**Please Note** that this driver only exists as a **last resort** for people that have a VPB
 	model but no longer have access to the source data from which it was built. If at all
@@ -137,8 +133,8 @@ Can osgEarth load TerraPage or MetaFlight?
 Community and Support
 ---------------------
 
-What is the "best practice" for using GitHub?
-.............................................
+What is the best practice for using GitHub?
+...........................................
 
 	The best way to work with the osgEarth repository is to make your own clone on GitHub
 	and to work from that clone. Why not work directly against the main repository? You

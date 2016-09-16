@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -214,7 +214,8 @@ TileModelFactory::TileModelFactory(TileNodeRegistry*             liveTiles,
                                    TerrainEngineRequirements*    terrainReqs) :
 _liveTiles     ( liveTiles ),
 _terrainOptions( terrainOptions ),
-_terrainReqs   ( terrainReqs )
+_terrainReqs   ( terrainReqs ),
+_normalMapUnit ( 0 )
 {
     _meshHFCache = new HeightFieldCache( terrainOptions );
 
@@ -394,6 +395,8 @@ TileModelFactory::buildNormalMap(const TileKey&    key,
                     hf,
                     GeoLocator::createForKey( key, mapInfo ),
                     isFallback );
+
+                model->_normalData._unit = _normalMapUnit;
             }
         }
     }
@@ -408,6 +411,8 @@ TileModelFactory::buildNormalMap(const TileKey&    key,
             hf,
             GeoLocator::createForKey( key, mapInfo ),
             false );
+
+        model->_normalData._unit = _normalMapUnit;
     }
 
     if ( isFallback && parentModel.valid() )

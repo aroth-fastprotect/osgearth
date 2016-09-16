@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -61,6 +61,7 @@ main(int argc, char** argv)
 
 
     osgViewer::Viewer viewer(arguments);
+    viewer.setThreadingModel( viewer.SingleThreaded );
     viewer.setRunFrameScheme( viewer.ON_DEMAND );
     viewer.setCameraManipulator( new EarthManipulator() );
 

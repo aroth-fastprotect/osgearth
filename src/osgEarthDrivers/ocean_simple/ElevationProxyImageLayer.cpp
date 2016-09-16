@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -18,8 +18,10 @@
  */
 #include "ElevationProxyImageLayer"
 
+#include <osgEarth/HeightFieldUtils>
+
 using namespace osgEarth;
-using namespace osgEarth::Drivers::SimpleOcean;
+using namespace osgEarth::SimpleOcean;
 
 #define LC "[ElevationProxyImageLayer] "
 
@@ -62,7 +64,7 @@ ElevationProxyImageLayer::createImage(const TileKey& key, ProgressCallback* prog
         }
     }
 
-    osg::ref_ptr<osg::HeightField> hf;
+    osg::ref_ptr<osg::HeightField> hf = HeightFieldUtils::createReferenceHeightField(key.getExtent(), 257,257, true );
 
     if ( _mapf.populateHeightField(hf, key, true, 0L) )
     {

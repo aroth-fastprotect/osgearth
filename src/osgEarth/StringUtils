@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -55,6 +55,11 @@ namespace osgEarth
      * Trims whitespace from the ends of a string.
      */
     extern OSGEARTH_EXPORT std::string trim( const std::string& in );
+
+    /**
+     * Trims whitespace from the ends of a string; in-place modification on the string to reduce string copies.
+     */
+    extern OSGEARTH_EXPORT void trim2( std::string& str );
 
     /**
      * True is "ref" starts with "pattern"
@@ -118,6 +123,9 @@ namespace osgEarth
 
     /** Generates a hashed integer for a string (poor man's MD5) */
     extern OSGEARTH_EXPORT unsigned hashString( const std::string& input );
+
+    /** Same as hashString but returns a string value. */
+    extern OSGEARTH_EXPORT std::string hashToString(const std::string& input);
 
     /**
     * Gets the total number of seconds formatted as H:M:S

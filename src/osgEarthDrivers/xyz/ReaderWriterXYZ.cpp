@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -50,7 +50,7 @@ class XYZSource : public TileSource
 {
 public:
     XYZSource(const TileSourceOptions& options) : 
-      TileSource(options), _options(options), _rotate_iter(0u)
+        TileSource(options), _options(options), _rotate_iter(0u), _rotateStart(0), _rotateEnd(0)
     {
         //nop
     }
@@ -63,13 +63,13 @@ public:
         URI xyzURI = _options.url().value();
         if ( xyzURI.empty() )
         {
-            return Status::Error( "Fail: driver requires a valid \"url\" property" );
+            return Status::Error( Status::ConfigurationError, "Fail: driver requires a valid \"url\" property" );
         }
 
         // driver requires a profile.
         if ( !getProfile() )
         {
-            return Status::Error( "An explicit profile definition is required by the XYZ driver." );
+            return Status::Error( Status::ConfigurationError, "An explicit profile definition is required by the XYZ driver." );
         }
 
         _template = xyzURI.full();
@@ -162,7 +162,7 @@ public:
         supportsExtension( "osgearth_xyz", "XYZ Driver" );
     }
 
-    virtual const char* className()
+    virtual const char* className() const
     {
         return "XYZ Driver";
     }

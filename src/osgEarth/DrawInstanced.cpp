@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
- * Copyright 2015 Pelican Mapping
+ * Copyright 2016 Pelican Mapping
  * http://osgearth.org
  *
  * osgEarth is free software; you can redistribute it and/or modify
@@ -232,12 +232,14 @@ ConvertToDrawInstanced::apply(osg::LOD& lod)
 }
 
 
-void
+bool
 DrawInstanced::install(osg::StateSet* stateset)
 {
     if ( !stateset )
-        return;
-
+        return false;
+    
+    if ( !Registry::capabilities().supportsDrawInstanced() )
+        return false;
 
     VirtualProgram* vp = VirtualProgram::getOrCreate(stateset);
     
@@ -245,6 +247,8 @@ DrawInstanced::install(osg::StateSet* stateset)
     pkg.load( vp, pkg.InstancingVertex );
 
     stateset->getOrCreateUniform("oe_di_postex_TBO", osg::Uniform::SAMPLER_BUFFER)->set(POSTEX_TBO_UNIT);
+
+    return true;
 }
 
 
@@ -262,13 +266,15 @@ DrawInstanced::remove(osg::StateSet* stateset)
     pkg.unload( vp, pkg.InstancingVertex );
 
     stateset->removeUniform("oe_di_postex_TBO");
-    stateset->removeUniform("oe_di_postex_TBO_size");
 }
 
 
-void
+bool
 DrawInstanced::convertGraphToUseDrawInstanced( osg::Group* parent )
 {
+    if ( !Registry::capabilities().supportsDrawInstanced() )
+        return false;
+
     // place a static bounding sphere on the graph since we intend to alter
     // the structure of the subgraph.
     const osg::BoundingSphere& bs = parent->getBound();
@@ -411,18 +417,24 @@ DrawInstanced::convertGraphToUseDrawInstanced( osg::Group* parent )
         posTBO->setInternalFormat( GL_RGBA32F_ARB );
         posTBO->setUnRefImageDataAfterApply( true );
 
+        // so the TBO will serialize properly.
+        image->setWriteHint(osg::Image::STORE_INLINE);
+
         // Tell the SG to skip the positioning texture.
         ShaderGenerator::setIgnoreHint(posTBO, true);
 
         osg::StateSet* stateset = instanceGroup->getOrCreateStateSet();
         stateset->setTextureAttribute(POSTEX_TBO_UNIT, posTBO);
-        stateset->getOrCreateUniform("oe_di_postex_TBO_size", osg::Uniform::INT)->set((int)tboSize);
 
 		// add the node as a child:
         instanceGroup->addChild( node );
 
         parent->addChild( instanceGroup );
+
+        //OE_INFO << LC << "ConvertToDI: instances=" << numInstancesToStore << "\n";
     }
+
+    return true;
 }
 
 

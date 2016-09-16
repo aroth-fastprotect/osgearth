@@ -1,6 +1,6 @@
 /* -*-c++-*- */
 /* osgEarth - Dynamic map generation toolkit for OpenSceneGraph
-* Copyright 2015 Pelican Mapping
+* Copyright 2016 Pelican Mapping
 * http://osgearth.org
 *
 * osgEarth is free software; you can redistribute it and/or modify
@@ -40,17 +40,17 @@ using namespace osgEarth;
 namespace
 {
     const char* indexVertexInit =
-        "#version 330\n"
+        "#version " GLSL_VERSION_STR "\n"
 
-        "#pragma vp_entryPoint \"oe_index_setObjectID\" \n"
-        "#pragma vp_location   \"vertex_model\" \n"
-        "#pragma vp_order      \"first\" \n"
+        "#pragma vp_entryPoint oe_index_readObjectID \n"
+        "#pragma vp_location   vertex_model \n"
+        "#pragma vp_order      first \n"
 
         "uniform uint oe_index_objectid_uniform; \n"   // override objectid if > 0
         "in uint      oe_index_objectid_attr; \n"      // Vertex attribute containing the object ID.
         "uint         oe_index_objectid; \n"           // Stage global containing the Object ID.
 
-        "void oe_index_setObjectID(inout vec4 vertex) \n"
+        "void oe_index_readObjectID(inout vec4 vertex) \n"
         "{ \n"
         "    if ( oe_index_objectid_uniform > 0u ) \n"
         "        oe_index_objectid = oe_index_objectid_uniform; \n"
@@ -231,4 +231,102 @@ ObjectIndex::tagNode(osg::Node* node, ObjectID id) const
         osg::StateSet* stateSet = node->getOrCreateStateSet();
         stateSet->addUniform( new osg::Uniform(_oidUniformName.c_str(), id) );
     }
+}
+
+bool
+ObjectIndex::getObjectIDs(const osg::Drawable* drawable, std::set<ObjectID>& output) const
+{
+    if (!drawable) return false;
+    
+    const osg::Geometry* geometry = drawable->asGeometry();
+    if (!geometry) return false;
+
+    const ObjectIDArray* oids = dynamic_cast<const ObjectIDArray*>(geometry->getVertexAttribArray(_attribLocation));
+    if ( !oids ) return false;
+    if (oids->empty()) return false;
+
+    for (ObjectIDArray::const_iterator i = oids->begin(); i != oids->end(); ++i)
+        output.insert( *i );
+
+    return true;
+}
+
+bool
+ObjectIndex::getObjectID(osg::Node* node, ObjectID& output) const
+{
+    if (!node) return false;
+
+    osg::StateSet* stateSet = node->getStateSet();
+    if (!stateSet) return false;
+
+    osg::Uniform* uniform = stateSet->getUniform(_oidUniformName.c_str());
+    if ( !uniform ) return false;
+
+    uniform->get(output);
+    return true;
+}
+
+bool
+ObjectIndex::updateObjectIDs(osg::Drawable* drawable,
+                             std::map<ObjectID, ObjectID>& oldNewMap,
+                             osg::Referenced* object)
+{
+    // in a drawable, replaces each OIDs in map.first with the corresponding OID in map.second
+    if (!drawable) return false;
+
+    osg::Geometry* geometry = drawable->asGeometry();
+    if (!geometry) return false;
+
+    ObjectIDArray* oids = dynamic_cast<ObjectIDArray*>(geometry->getVertexAttribArray(_attribLocation));
+    if ( !oids ) return false;
+    if (oids->empty()) return false;
+    
+    for (ObjectIDArray::iterator i = oids->begin(); i != oids->end(); ++i)
+    {
+        ObjectID newoid;
+        std::map<ObjectID, ObjectID>::iterator k = oldNewMap.find(*i);
+        if (k != oldNewMap.end()) {
+            newoid = k->second;
+        }
+        else {
+            newoid = insert(object);
+            oldNewMap[*i] = newoid;
+        }
+        *i = newoid;
+    }
+
+    oids->dirty();
+
+    return true;
+}
+
+bool
+ObjectIndex::updateObjectID(osg::Node* node,
+                            std::map<ObjectID, ObjectID>& oldNewMap,
+                            osg::Referenced* object)
+{
+    if (!node) return false;
+
+    osg::StateSet* stateSet = node->getStateSet();
+    if (!stateSet) return false;
+
+    osg::Uniform* uniform = stateSet->getUniform(_oidUniformName.c_str());
+    if ( !uniform ) return false;
+
+    ObjectID oldoid;
+    uniform->get(oldoid);
+
+    ObjectID newoid;
+    std::map<ObjectID, ObjectID>::iterator k = oldNewMap.find(oldoid);
+    if (k != oldNewMap.end()) {
+        newoid = k->second;
+    }
+    else {
+        newoid = insert(object);
+        oldNewMap[oldoid] = newoid;
+    }
+
+    uniform->set(newoid);
+
+    return true;
 }

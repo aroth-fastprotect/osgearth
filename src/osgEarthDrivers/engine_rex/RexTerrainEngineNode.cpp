@@ -109,7 +109,7 @@ namespace
             TileRenderModel& model = tileNode.renderModel();
             for (int p = 0; p < model._passes.size(); ++p)
             {
-                RenderingPass& pass = model._passes[p];
+                RenderingPass& pass = *model._passes[p];
 
                 // if the map doesn't contain a layer with a matching UID,
                 // or if the layer is now disabled, remove it from the render model.

@@ -178,11 +178,11 @@ TileNode::create(const TileKey& key, TileNode* parent, EngineContext* context)
 
         for (unsigned p = 0; p < parent->_renderModel._passes.size(); ++p)
         {
-            const RenderingPass& parentPass = parent->_renderModel._passes[p];
+            const RenderingPass& parentPass = *parent->_renderModel._passes[p];
 
             // Copy the parent pass:
-            _renderModel._passes.push_back(parentPass);
-            RenderingPass& myPass = _renderModel._passes.back();
+            _renderModel._passes.push_back(new RenderingPass(parentPass));
+            RenderingPass& myPass = *_renderModel._passes.back();
 
             // Scale/bias each matrix for this key quadrant.
             Samplers& samplers = myPass.samplers();
@@ -564,7 +564,7 @@ TileNode::traverse(osg::NodeVisitor& nv)
 
             for (unsigned p = 0; p < _renderModel._passes.size(); ++p)
             {
-                RenderingPass& pass = _renderModel._passes[p];
+                RenderingPass& pass = *_renderModel._passes[p];
                 Samplers& samplers = pass.samplers();
                 for (unsigned s = 0; s < samplers.size(); ++s)
                 {
@@ -854,7 +854,7 @@ TileNode::refreshInheritedData(TileNode* parent, const RenderBindings& bindings)
 
     for (unsigned p = 0; p<parentPasses.size(); ++p)
     {
-        const RenderingPass& parentPass = parentPasses[p];
+        const RenderingPass& parentPass = *parentPasses[p];
 
         RenderingPass* myPass = _renderModel.getPass(parentPass.sourceUID());
 

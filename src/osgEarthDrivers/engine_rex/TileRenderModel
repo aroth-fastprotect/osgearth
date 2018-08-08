@@ -102,7 +102,7 @@ namespace osgEarth { namespace Drivers { namespace RexTerrainEngine
     /**
      * Unordered collection of rendering passes.
      */
-    typedef std::vector<RenderingPass> RenderingPasses;
+    typedef std::vector<RenderingPass*> RenderingPasses;
 
     /**
      * Everything necessary to render a single terrain tile.
@@ -116,19 +116,28 @@ namespace osgEarth { namespace Drivers { namespace RexTerrainEngine
         /** Samplers bound for each visible layer (color) */
         RenderingPasses _passes;
 
+        ~TileRenderModel()
+        {
+            for (unsigned i = 0; i < _passes.size(); ++i) {
+                delete _passes[i];
+            }
+        }
+
         /** Add a new rendering pass to the end of the list. */
         RenderingPass& addPass()
         {
             _passes.resize(_passes.size()+1);
-            return _passes.back();
+            RenderingPass * p = new RenderingPass;
+            _passes.back() = p;
+            return *p;
         }
 
         /** Look up a rendering pass by the corresponding layer ID */
         const RenderingPass* getPass(UID uid) const
         {
             for (unsigned i = 0; i < _passes.size(); ++i) {
-                if (_passes[i].sourceUID() == uid)
-                    return &_passes[i];
+                if (_passes[i]->sourceUID() == uid)
+                    return _passes[i];
             }
             return 0L;
         }
@@ -137,8 +146,8 @@ namespace osgEarth { namespace Drivers { namespace RexTerrainEngine
         RenderingPass* getPass(UID uid)
         {
             for (unsigned i = 0; i < _passes.size(); ++i) {
-                if (_passes[i].sourceUID() == uid)
-                    return &_passes[i];
+                if (_passes[i]->sourceUID() == uid)
+                    return _passes[i];
             }
             return 0L;
         }
@@ -151,7 +160,7 @@ namespace osgEarth { namespace Drivers { namespace RexTerrainEngine
                     _sharedSamplers[s]._texture->releaseGLObjects(state);
 
             for (unsigned p = 0; p<_passes.size(); ++p)
-                _passes[p].releaseGLObjects(state);
+                _passes[p]->releaseGLObjects(state);
         }
 
         /** Resize GL buffers associated with this model */
@@ -162,7 +171,7 @@ namespace osgEarth { namespace Drivers { namespace RexTerrainEngine
                     _sharedSamplers[s]._texture->resizeGLObjectBuffers(size);
 
             for (unsigned p = 0; p<_passes.size(); ++p)
-                _passes[p].resizeGLObjectBuffers(size);
+                _passes[p]->resizeGLObjectBuffers(size);
         }
     };
 

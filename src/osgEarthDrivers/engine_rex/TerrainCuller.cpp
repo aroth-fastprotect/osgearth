@@ -228,7 +228,7 @@ TerrainCuller::apply(osg::Node& node)
             // and add a DrawCommand for each.
             for (unsigned p = 0; p < renderModel._passes.size(); ++p)
             {
-                const RenderingPass& pass = renderModel._passes[p];
+                const RenderingPass& pass = *renderModel._passes[p];
                 DrawTileCommand* cmd = addDrawCommand(pass.sourceUID(), &renderModel, &pass, _currentTileNode);
                 if (cmd)
                 {

@@ -266,6 +266,86 @@ struct TogglePicker : public ui::ControlEventHandler
     }
 };
 
+struct ToggleNamedImageLayer : public ui::ControlEventHandler
+{
+    App& _app;
+    osg::ref_ptr<osgEarth::Layer> _saved_layer;
+    std::string _layer_name;
+    ToggleNamedImageLayer(App& app, const std::string & layer_name) : _app(app), _layer_name(layer_name) { }
+    void onClick(Control* button_)
+    {
+        ButtonControl * button = static_cast<ButtonControl*>(button_);
+        osgEarth::Map * map = _app.mapNode->getMap();
+        osg::ref_ptr<osgEarth::Layer> layer = map->getLayerByName(_layer_name);
+        if (layer.valid())
+        {
+            _saved_layer = layer;
+            map->removeLayer(layer.get());
+            button->setText("Add layer");
+        }
+        else if(_saved_layer.valid())
+        {
+            map->addLayer(_saved_layer.get());
+            _saved_layer = NULL;
+            button->setText("Remove layer");
+        }
+    }
+};
+
+class SwapLayers : public osg::Callback
+{
+    osgEarth::LayerVector & _vector;
+    osgEarth::Map * _map;
+    enum { VECTOR_TO_MAP, MAP_TO_VECTOR } _direction;
+public:
+    SwapLayers(osgEarth::LayerVector & src, osgEarth::Map * dst)
+        : _vector(src), _map(dst), _direction(VECTOR_TO_MAP) {}
+    SwapLayers(osgEarth::Map * src, osgEarth::LayerVector & dst)
+        : _vector(dst), _map(src), _direction(MAP_TO_VECTOR) {}
+
+    virtual bool run(osg::Object* object, osg::Object* data)
+    {
+        if (_direction == VECTOR_TO_MAP)
+        {
+            for (osgEarth::LayerVector::const_iterator it = _vector.begin(); it != _vector.end(); ++it)
+                _map->addLayer((*it).get());
+            _vector.clear();
+        }
+        else
+        {
+            _map->getLayers(_vector);
+            for (osgEarth::LayerVector::const_iterator it = _vector.begin(); it != _vector.end(); ++it)
+                _map->removeLayer((*it).get());
+        }
+        static_cast<osgEarth::MapNode*>(object)->removeUpdateCallback(this);
+        return false;
+    }
+};
+
+struct ToggleAllLayers : public ui::ControlEventHandler
+{
+    App& _app;
+    osgEarth::LayerVector _saved_layers;
+    std::string _layer_name;
+    ToggleAllLayers(App& app) : _app(app) {}
+    void onClick(Control* button_)
+    {
+        ButtonControl * button = static_cast<ButtonControl*>(button_);
+        osgEarth::Map * map = _app.mapNode->getMap();
+        osgEarth::LayerVector layers;
+        map->getLayers(layers);
+        if (layers.empty())
+        {
+            button->setText("Remove all layers");
+            _app.mapNode->addUpdateCallback(new SwapLayers(_saved_layers, map));
+        }
+        else
+        {
+            button->setText("Restore all layers");
+            _app.mapNode->addUpdateCallback(new SwapLayers(map, _saved_layers));
+        }
+    }
+};
 //-----------------------------------------------------------------------
 
 int
@@ -303,6 +383,8 @@ main(int argc, char** argv)
 
     uiContainer->addControl( new ui::LabelControl("RTT Picker Test", osg::Vec4(1,1,0,1)) );
     uiContainer->addControl( new ui::ButtonControl("Toggle picker", new TogglePicker(app)) );
+    //uiContainer->addControl(new ui::ButtonControl("Toggle layer", new ToggleNamedImageLayer(app, "second")));
+    uiContainer->addControl(new ui::ButtonControl("Remove all layers", new ToggleAllLayers(app)));
     app.fidLabel = new ui::LabelControl("---");
     uiContainer->addControl( app.fidLabel );
     app.nameLabel = uiContainer->addControl( new ui::LabelControl( "---" ) );

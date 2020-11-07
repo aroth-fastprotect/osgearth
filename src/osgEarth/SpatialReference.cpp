@@ -313,7 +313,21 @@ SpatialReference::getLocal() const
 
             if (_setup.type == INIT_PROJ)
             {
+#if GDAL_VERSION_MAJOR>=3
+                // With Proj6 the string "+proj=longlat +ellps=wgs84 +datum=wgs84 +no_defs" fails with an error
+                // Error -9 (unknown elliptical parameter name). This can be avoiding to uppercase these reference
+                // to wgs84. This is not ideal, since there are surely many more of these "problematic" strings.
+                std::string s = _setup.horiz;
+                std::string::size_type i = s.find("=wgs84");
+                while(i != std::string::npos)
+                {
+                    s.replace(i, 6, "=WGS84");
+                    i = s.find("=wgs84", i + 6);
+                }
+                error = OSRImportFromProj4(local._handle, s.c_str());
+#else
                 error = OSRImportFromProj4(local._handle, _setup.horiz.c_str());
+#endif
             }
             else if (_setup.type == INIT_WKT)
             {
@@ -347,7 +361,7 @@ SpatialReference::getLocal() const
             }
             else
             {
-                OE_WARN << LC << "Failed to create SRS from \"" << _setup.horiz << "\", error " << error << std::endl;
+                OE_WARN << LC << "Failed to create SRS from " << _setup.type << " \"" << _setup.horiz << "\", error " << error << std::endl;
                 OSRDestroySpatialReference(local._handle);
                 local._handle = nullptr;
                 _valid = false;
